@@ -526,11 +526,16 @@ const redactedDataFromMetadata = (metadata: ProviderMetadata | undefined, key: s
   return typeof provider.redactedData === "string" ? provider.redactedData : undefined
 }
 
-const lowerTool = (breakpoints: Cache.Breakpoints, tool: ToolDefinition, inputSchema: JsonSchema): AnthropicTool => ({
+const lowerTool = (
+  breakpoints: Cache.Breakpoints,
+  tool: ToolDefinition,
+  inputSchema: JsonSchema,
+  supportsCacheControl: boolean,
+): AnthropicTool => ({
   name: tool.name,
   description: tool.description,
   input_schema: inputSchema,
-  cache_control: cacheControl(breakpoints, tool.cache),
+  cache_control: supportsCacheControl ? cacheControl(breakpoints, tool.cache) : undefined,
 })
 
 const lowerToolChoice = (toolChoice: NonNullable<LLMRequest["toolChoice"]>) =>
@@ -1128,6 +1133,7 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
   const updates = resolveEffortUpdates(request, options.effort)
   const generation = request.generation
   const toolSchemaCompatibility = request.model.compatibility?.toolSchema
+  const supportsToolCacheControl = request.model.compatibility?.supportsToolCacheControl !== false
   // Allocate the 4-breakpoint budget in invalidation order: tools → system →
   // messages. Tools live highest in the cache hierarchy, so when callers
   // over-mark we keep their tool hints and shed the message-tail ones first.
@@ -1141,6 +1147,7 @@ const fromRequest = Effect.fn("AnthropicMessages.fromRequest")(function* (reques
             breakpoints,
             tool,
             ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility),
+            supportsToolCacheControl,
           ),
         )
   // Anthropic rejects tool_choice when tools are absent; "none" is only meaningful with tools present.

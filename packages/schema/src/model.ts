@@ -64,6 +64,8 @@ export const Compatibility = Schema.Struct({
   maxTokensField: MaxTokensField.pipe(optional),
   requireFinishReason: Schema.Boolean.pipe(optional),
   requireAssistantAfterTool: Schema.Boolean.pipe(optional),
+  /** Supports cache_control on Anthropic tool definitions. Defaults to true. */
+  supportsToolCacheControl: Schema.Boolean.pipe(optional),
 }).annotate({ identifier: "Model.Compatibility" })
 
 export interface Capabilities extends Schema.Schema.Type<typeof Capabilities> {}

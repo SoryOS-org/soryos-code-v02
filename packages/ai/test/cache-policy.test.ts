@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { CacheHint, LLM, Message } from "../src/index.js"
+import { CacheHint, LanguageModel, LLM, Message } from "../src/index.js"
 import { Auth } from "../src/route.js"
 import { compileRequest } from "../src/route/client.js"
 import { AmazonBedrock, GoogleVertexMessages } from "../src/providers.js"
@@ -212,6 +212,52 @@ describe("applyCachePolicy", () => {
         tools: [{ name: "t1", cache_control: { type: "ephemeral" } }],
         system: [{ type: "text", text: "Sys", cache_control: undefined }],
       })
+    }),
+  )
+
+  it.effect("tool cache compatibility preserves system and message markers", () =>
+    Effect.gen(function* () {
+      const model = LanguageModel.update(anthropicModel, {
+        compatibility: { supportsToolCacheControl: false },
+      })
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          system: "Sys",
+          tools: [{ name: "t1", description: "t1", inputSchema: { type: "object", properties: {} } }],
+          prompt: "hi",
+          cache: "auto",
+        }),
+      )
+
+      expect(prepared.body).toMatchObject({
+        tools: [{ name: "t1", cache_control: undefined }],
+        system: [{ type: "text", text: "Sys", cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: [{ type: "text", text: "hi", cache_control: { type: "ephemeral" } }] }],
+      })
+    }),
+  )
+
+  it.effect("tool cache compatibility suppresses manual tool hints", () =>
+    Effect.gen(function* () {
+      const model = LanguageModel.update(anthropicModel, {
+        compatibility: { supportsToolCacheControl: false },
+      })
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          tools: [
+            {
+              name: "t1",
+              description: "t1",
+              inputSchema: { type: "object", properties: {} },
+              cache: new CacheHint({ type: "ephemeral" }),
+            },
+          ],
+        }),
+      )
+
+      expect(prepared.body).toMatchObject({ tools: [{ name: "t1", cache_control: undefined }] })
     }),
   )
 
