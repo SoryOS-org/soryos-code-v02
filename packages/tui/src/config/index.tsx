@@ -253,10 +253,19 @@ export const Info = Schema.Struct({
   }),
   mouse: Schema.optional(Schema.Boolean).annotate({ description: "Enable terminal mouse capture" }),
   cursor: Schema.optional(Cursor),
+  linux_clipboard_selection: Schema.optional(
+    Schema.Literals(["clipboard", "primary", "both"]),
+  ).annotate({
+    description:
+      "Clipboard buffers updated by Linux copies (default: 'both'); 'primary' targets the middle-click selection, 'both' targets standard and primary. Ignored on other platforms",
+  }),
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
-export type Resolved = Omit<Info, "attention" | "cursor" | "keybinds" | "leader" | "mouse" | "session" | "tabs"> & {
+export type Resolved = Omit<
+  Info,
+  "attention" | "cursor" | "keybinds" | "leader" | "linux_clipboard_selection" | "mouse" | "session" | "tabs"
+> & {
   attention: {
     notifications: boolean
     sound: boolean
@@ -266,6 +275,7 @@ export type Resolved = Omit<Info, "attention" | "cursor" | "keybinds" | "leader"
   }
   keybinds: TuiKeybind.BindingLookupView
   leader: { timeout: number }
+  linux_clipboard_selection: "clipboard" | "primary" | "both"
   mouse: boolean
   cursor?: {
     style: "block" | "underline" | "line" | "default"
@@ -314,6 +324,7 @@ export function resolve(
       bindingDefaults: TuiKeybind.bindingDefaults(),
     }),
     leader: { timeout: input.leader?.timeout ?? 2000 },
+    linux_clipboard_selection: input.linux_clipboard_selection ?? "both",
     mouse: input.mouse ?? true,
     cursor: input.cursor
       ? {
