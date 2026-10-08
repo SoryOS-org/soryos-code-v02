@@ -7,7 +7,7 @@ import { Service, type Endpoint } from "@opencode/client/effect/service"
 import { OpenCode, type SessionInfo } from "@opencode/client"
 import { Global } from "@opencode/util/global"
 import { noTimeoutFetch } from "@opencode/util/no-timeout-fetch"
-import { ClipboardProvider, useClipboard, type ClipboardService } from "./context/clipboard"
+import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { LogProvider, type LogSink } from "./context/log"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -32,7 +32,6 @@ import {
   onCleanup,
   batch,
   Show,
-  type JSX,
 } from "solid-js"
 import {
   TuiLifecycleProvider,
@@ -110,7 +109,7 @@ import { StorageProvider, useStorage } from "./context/storage"
 import { SessionTerminalsProvider } from "./context/session-terminals"
 import { PanelProvider, usePanel } from "./context/panel"
 import { SessionFrame } from "./component/session-frame"
-import { createTuiClipboard, type OwnedClipboardService } from "./clipboard"
+import { createTuiClipboard } from "./clipboard"
 
 const appGlobalBindingCommands = ["session.list", "session.new", "open.menu"] as const
 
@@ -369,13 +368,13 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                   skipInitialLoading: Boolean(process.env.OPENCODE_FAST_BOOT),
                                 }}
                               >
-                                <ArgsProvider {...input.args}>
-                                  <ConfigProvider
-                                    config={config}
-                                    service={input.config}
-                                    options={{ terminalSuspend: process.platform !== "win32" }}
-                                  >
-                                    <ConfigClipboardProvider clipboard={clipboard}>
+                                <ClipboardProvider value={clipboard}>
+                                  <ArgsProvider {...input.args}>
+                                    <ConfigProvider
+                                      config={config}
+                                      service={input.config}
+                                      options={{ terminalSuspend: process.platform !== "win32" }}
+                                    >
                                       <Keymap.Provider>
                                         <ToastProvider>
                                           <RouteProvider
@@ -437,9 +436,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                           </RouteProvider>
                                         </ToastProvider>
                                       </Keymap.Provider>
-                                    </ConfigClipboardProvider>
-                                  </ConfigProvider>
-                                </ArgsProvider>
+                                    </ConfigProvider>
+                                  </ArgsProvider>
+                                </ClipboardProvider>
                               </TuiStartupProvider>
                             </TuiTerminalEnvironmentProvider>
                           </TuiLifecycleProvider>
@@ -467,15 +466,6 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
     if (result.epilogue) process.stdout.write(result.epilogue + "\n")
   })
 })
-
-function ConfigClipboardProvider(props: { clipboard: OwnedClipboardService; children: JSX.Element }) {
-  const config = useConfig()
-  const clipboard: ClipboardService = {
-    read: () => props.clipboard.read(),
-    write: (text) => props.clipboard.write(text, { primary: config.data.terminal?.primary_selection === true }),
-  }
-  return <ClipboardProvider value={clipboard}>{props.children}</ClipboardProvider>
-}
 
 function App() {
   const app = useTuiApp()
@@ -570,8 +560,7 @@ function App() {
     }
   })
 
-  const copyOnSelectEnabled = () =>
-    (config.data.terminal?.copy ?? (process.platform === "win32" ? "manual" : "select")) === "select"
+  const copyOnSelectEnabled = () => ["select", "both"].includes(Config.copyMode(config.data))
 
   // Selection copy/dismiss must precede both app bindings and the terminal pane's raw key forwarding.
   const offSelectionKeys = keymap.intercept(
@@ -1396,7 +1385,7 @@ function App() {
       onMouseUp={(event) => {
         const url = clickedLink(renderer, event)
         if (url) return void openUrl(url).catch(toast.error)
-        if (copyOnSelectEnabled()) Selection.copyOnSelectRelease(event, renderer, toast, clipboard)
+        Selection.copyOnSelectRelease(event, renderer, toast, clipboard, Config.copyMode(config.data))
       }}
     >
       <box

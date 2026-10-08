@@ -1,5 +1,5 @@
 import { createMemo, createSignal } from "solid-js"
-import { useConfig, useNewDesigns } from "../config"
+import { copyMode, useConfig, useNewDesigns } from "../config"
 import { useThemes } from "../context/theme"
 import { useDialog, type DialogContext } from "../ui/dialog"
 import { DialogSelect, DialogSelectChoice } from "../ui/dialog-select"
@@ -355,18 +355,9 @@ export const settings: Setting[] = [
     category: "Terminal",
     path: ["terminal", "copy"],
     description: "Whether selecting text copies it",
-    default: process.platform === "win32" ? "manual" : "select",
-    values: ["manual", "select"],
-    keywords: ["selection", "clipboard"],
-  },
-  {
-    title: "Primary selection",
-    category: "Terminal",
-    path: ["terminal", "primary_selection"],
-    default: false,
-    values: [false, true],
-    labels: ["off", "on"],
-    keywords: ["clipboard", "middle click", "linux", "x11", "wayland"],
+    default: copyMode({}),
+    values: ["manual", "select", "primary", "both"],
+    keywords: ["selection", "clipboard", "primary selection", "middle click"],
   },
   {
     title: "Developer tools",

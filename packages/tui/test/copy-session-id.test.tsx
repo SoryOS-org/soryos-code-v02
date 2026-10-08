@@ -6,13 +6,13 @@ import { Global } from "@opencode/util/global"
 import { createEventStream, createFetch, directory, json } from "./fixture/tui-client"
 import { tmpdir } from "./fixture/fixture"
 
-test.each(["success", "failure", "home", "primary"])("Copy session ID from Ctrl+P (%s)", async (mode) => {
+test.each(["success", "failure", "home"])("Copy session ID from Ctrl+P (%s)", async (mode) => {
   await using state = await tmpdir()
   const setup = await createTestRenderer({ width: 100, height: 30, kittyKeyboard: true })
   await setup.renderer.setupTerminal()
   setup.renderer.start()
   Object.defineProperty(setup.renderer, "capabilities", { get: () => null })
-  const copy = spyOn(setup.renderer, "copyToClipboardOSC52").mockReturnValue(mode !== "failure")
+  const copy = spyOn(setup.renderer, "copyToClipboardOSC52").mockReturnValue(mode === "success")
   const sessionID = "ses_copy_id"
   const events = createEventStream()
   const calls = createFetch((url) => {
@@ -40,7 +40,7 @@ test.each(["success", "failure", "home", "primary"])("Copy session ID from Ctrl+
       app: { name: "test", version: "test", channel: "test" },
       server: { endpoint: { url: server.url.toString() } },
       config: {
-        get: async () => ({ animations: false, terminal: { primary_selection: mode === "primary" } }),
+        get: async () => ({ animations: false, terminal: { copy: "both" as const } }),
         update: async () => ({}),
       },
       packages: { prepare: async () => ({ directory: "" }) },
@@ -63,16 +63,9 @@ test.each(["success", "failure", "home", "primary"])("Copy session ID from Ctrl+
     await setup.waitForFrame((frame) => /Copy session ID\s+Session/.test(frame))
     setup.mockInput.pressEnter()
     const frame = await setup.waitForFrame((frame) =>
-      frame.includes(mode === "failure" ? "Failed to copy session ID" : "Session ID copied to clipboard!"),
+      frame.includes(mode === "success" ? "Session ID copied to clipboard!" : "Failed to copy session ID"),
     )
-    expect(copy.mock.calls).toEqual(
-      mode === "primary"
-        ? [
-            [sessionID, ClipboardTarget.Clipboard],
-            [sessionID, ClipboardTarget.Primary],
-          ]
-        : [[sessionID, ClipboardTarget.Clipboard]],
-    )
+    expect(copy.mock.calls).toEqual([[sessionID, ClipboardTarget.Clipboard]])
     expect(frame).not.toContain("Copy session ID")
     await setup.waitFor(
       () =>
