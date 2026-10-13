@@ -32,6 +32,23 @@ const it = testEffect(
   ),
 )
 
+it.live("reports a configured GUI entrypoint as a plugin feature", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    yield* Effect.promise(() =>
+      writeFiles(directory.path, {
+        "index.ts": 'export default { id: "gui-fixture", async setup() {} }',
+        "gui.tsx": "export default undefined",
+      }),
+    )
+
+    const modules = yield* PluginModule.make()
+    const plugin = yield* modules.load({ type: "add", target: directory.path, options: {} })
+
+    expect(plugin).toMatchObject({ id: "gui-fixture", features: { gui: true } })
+  }),
+)
+
 it.live("watches creation of an external helper with missing parent directories", () =>
   Effect.gen(function* () {
     const directory = yield* tmpdirScoped()

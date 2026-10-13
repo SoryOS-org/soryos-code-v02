@@ -11,6 +11,7 @@ export interface Target {
 export interface Entrypoints {
   readonly server?: string
   readonly tui?: string
+  readonly gui?: string
   readonly rpc?: string
 }
 
@@ -40,7 +41,7 @@ export function resolve(target: Target): Entrypoints {
     }
     return undefined
   }
-  return { server: entry(["server", ""]), tui: entry(["tui"]), rpc: entry(["rpc"]) }
+  return { server: entry(["server", ""]), tui: entry(["tui"]), gui: entry(["gui"]), rpc: entry(["rpc"]) }
 }
 
 export function load(entrypoint: string): Promise<unknown> {

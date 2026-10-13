@@ -136,6 +136,7 @@ const load = Effect.fn("PluginModule.load")(function* (
     id: plugin.id,
     features: {
       ...(entrypoints.tui ? { tui: true as const } : {}),
+      ...(entrypoints.gui ? { gui: true as const } : {}),
       ...(entrypoints.rpc ? { rpc: true as const } : {}),
     },
     revision: JSON.stringify([operation, loaded.version]),
