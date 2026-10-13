@@ -28,10 +28,11 @@ async function fixture(files: Record<string, string>, installed = false) {
 
 describe("Host.resolve", () => {
   it("resolves conventional entrypoints without package.json", async () => {
-    await using plugin = await fixture({ "index.ts": source, "tui.tsx": source, "rpc.ts": source })
+    await using plugin = await fixture({ "index.ts": source, "tui.tsx": source, "gui.tsx": source, "rpc.ts": source })
     assert.deepEqual(Host.resolve(plugin.target), {
       server: plugin.url("index.ts"),
       tui: plugin.url("tui.tsx"),
+      gui: plugin.url("gui.tsx"),
       rpc: plugin.url("rpc.ts"),
     })
   })
@@ -41,6 +42,24 @@ describe("Host.resolve", () => {
     assert.deepEqual(Host.resolve(plugin.target), {
       server: undefined,
       tui: plugin.url("tui.tsx"),
+      gui: undefined,
+      rpc: undefined,
+    })
+  })
+
+  it("resolves an explicitly exported GUI-only entrypoint", async () => {
+    await using plugin = await fixture(
+      {
+        "package.json": JSON.stringify({ name, exports: { "./gui": "./dist/desktop.js" } }),
+        "dist/desktop.js": source,
+        "index.js": source,
+      },
+      true,
+    )
+    assert.deepEqual(Host.resolve(plugin.target), {
+      server: undefined,
+      tui: undefined,
+      gui: plugin.url("dist/desktop.js"),
       rpc: undefined,
     })
   })
@@ -52,6 +71,7 @@ describe("Host.resolve", () => {
           "package.json": JSON.stringify({ name, main }),
           [main ?? "index.js"]: source,
           "tui.js": source,
+          "gui.js": source,
           "rpc.js": source,
         },
         true,
@@ -59,6 +79,7 @@ describe("Host.resolve", () => {
       assert.deepEqual(Host.resolve(plugin.target), {
         server: plugin.url(main ?? "index.js"),
         tui: plugin.url("tui.js"),
+        gui: plugin.url("gui.js"),
         rpc: plugin.url("rpc.js"),
       })
     })
@@ -69,11 +90,13 @@ describe("Host.resolve", () => {
       "package.json": JSON.stringify({ name, type: "module" }),
       "index.js": source,
       "tui.js": source,
+      "gui.js": source,
       "rpc.js": source,
     })
     assert.deepEqual(Host.resolve(plugin.target), {
       server: plugin.url("index.js"),
       tui: plugin.url("tui.js"),
+      gui: plugin.url("gui.js"),
       rpc: plugin.url("rpc.js"),
     })
   })
@@ -87,12 +110,14 @@ describe("Host.resolve", () => {
             ".": "./dist/root.js",
             "./server": "./dist/backend.js",
             "./tui": "./dist/terminal.js",
+            "./gui": "./dist/desktop.js",
             "./rpc": "./dist/contract.js",
           },
         }),
         "dist/root.js": source,
         "dist/backend.js": source,
         "dist/terminal.js": source,
+        "dist/desktop.js": source,
         "dist/contract.js": source,
       },
       true,
@@ -100,6 +125,7 @@ describe("Host.resolve", () => {
     assert.deepEqual(Host.resolve(plugin.target), {
       server: plugin.url("dist/backend.js"),
       tui: plugin.url("dist/terminal.js"),
+      gui: plugin.url("dist/desktop.js"),
       rpc: plugin.url("dist/contract.js"),
     })
   })
@@ -112,18 +138,22 @@ describe("Host.resolve", () => {
           exports: {
             ".": { import: "./dist/server.mjs", require: "./dist/server.cjs" },
             "./tui": { import: "./dist/tui.mjs", require: "./dist/tui.cjs" },
+            "./gui": { import: "./dist/gui.mjs", require: "./dist/gui.cjs" },
           },
         }),
         "dist/server.mjs": source,
         "dist/server.cjs": source,
         "dist/tui.mjs": source,
         "dist/tui.cjs": source,
+        "dist/gui.mjs": source,
+        "dist/gui.cjs": source,
       },
       true,
     )
     assert.deepEqual(Host.resolve(plugin.target), {
       server: plugin.url("dist/server.mjs"),
       tui: plugin.url("dist/tui.mjs"),
+      gui: plugin.url("dist/gui.mjs"),
       rpc: undefined,
     })
   })
@@ -142,6 +172,7 @@ describe("Host.resolve", () => {
     assert.deepEqual(Host.resolve(plugin.target), {
       server: undefined,
       tui: plugin.url("dist/terminal.js"),
+      gui: undefined,
       rpc: undefined,
     })
   })
@@ -151,6 +182,6 @@ describe("Host.resolve", () => {
       { "package.json": JSON.stringify({ name, exports: { "./tui": "./missing.js" } }) },
       true,
     )
-    assert.deepEqual(Host.resolve(plugin.target), { server: undefined, tui: undefined, rpc: undefined })
+    assert.deepEqual(Host.resolve(plugin.target), { server: undefined, tui: undefined, gui: undefined, rpc: undefined })
   })
 })
