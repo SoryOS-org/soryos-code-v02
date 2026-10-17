@@ -1043,6 +1043,7 @@ export function make(options: ClientOptions) {
                 action: input["action"],
                 objective: input["objective"],
                 expectedRevision: input["expectedRevision"],
+                expectedGoalID: input["expectedGoalID"],
               },
               successStatus: 200,
               declaredStatuses: [400, 401, 404, 409],
@@ -1057,7 +1058,11 @@ export function make(options: ClientOptions) {
             {
               method: "PUT",
               path: `/api/session/${encodeURIComponent(input.sessionID)}/todo`,
-              body: { todos: input["todos"] },
+              body: {
+                todos: input["todos"],
+                expectedRevision: input["expectedRevision"],
+                expectedGoalID: input["expectedGoalID"],
+              },
               successStatus: 204,
               declaredStatuses: [400, 401, 404, 409],
               empty: true,
