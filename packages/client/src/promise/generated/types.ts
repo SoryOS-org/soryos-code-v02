@@ -2319,6 +2319,7 @@ export type ConfigEntry =
                   settings?: ConfigModelSettings
                   headers?: { [x: string]: string }
                   body?: { [x: string]: JsonValue }
+                  disabled?: boolean
                 }>
                 cost?:
                   | {
