@@ -12,7 +12,7 @@ import {
   session,
   sessionHref,
 } from "../utils/app"
-import { openFileLauncher } from "../utils/side-panel"
+import { openFileLauncher, reviewTabs } from "../utils/side-panel"
 import { mockServers } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { fileNode, mockWorkspace, openSession } from "../utils/workspace"
@@ -912,7 +912,10 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
     sessions: [alpha, beta],
     fileList: (path) => (path ? [] : ["README.md"].map((file) => fileNode(directory, file))),
     fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
-    seed: { panes: { [alpha.id]: { review: true }, [beta.id]: { review: true } } },
+    seed: {
+      panes: { [alpha.id]: { review: true }, [beta.id]: { review: true } },
+      storage: reviewTabs(directory, alpha.id),
+    },
   })
 
   const panel = page.locator("#review-panel")

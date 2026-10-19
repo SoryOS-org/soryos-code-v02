@@ -142,7 +142,7 @@ test("opens terminals as side panel tabs from the + menu", async ({ page }) => {
     await editor.click()
     await expect(editor).toBeFocused()
     await panel.getByRole("button", { name: "Add tab", exact: true }).click()
-    await page.getByRole("menuitem", { name: /^Terminal/ }).click()
+    await panel.getByRole("button", { name: /^Terminal/ }).click()
   }
 
   for (const number of [2, 3]) {

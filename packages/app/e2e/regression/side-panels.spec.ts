@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { tabKey } from "../utils/app"
 import { fileDiff, openSession } from "../utils/workspace"
+import { openReviewLauncher } from "../utils/side-panel"
 import { expectSessionTitle } from "../utils/waits"
 
 test("review and terminal tabs follow the session tab and the terminal stays mounted", async ({ page }) => {
@@ -30,6 +31,7 @@ test("review and terminal tabs follow the session tab and the terminal stays mou
   }
 
   await page.getByRole("button", { name: "Toggle review" }).click()
+  await openReviewLauncher(page.locator("#review-panel"))
   await expect(review).toBeVisible()
   await expect(chat).toHaveCSS("width", "580px")
   await expect(reviewTab).toHaveText("Files Changed 2740")
@@ -46,6 +48,7 @@ test("review and terminal tabs follow the session tab and the terminal stays mou
   await expect(terminal).toBeHidden()
   await expectMarked(terminal)
   await page.getByRole("button", { name: "Toggle review" }).click()
+  await openReviewLauncher(page.locator("#review-panel"))
   await expect(review).toBeVisible()
   await expect(chat).toHaveCSS("width", "520px")
   // The workspace's terminal reopens in this session's strip instead of starting another shell.
@@ -110,7 +113,7 @@ test("review content stays aligned with the side region in both directions", asy
   await openSession(page, { name: "SideStack", vcsDiff: diffs })
   const toggle = page.getByRole("button", { name: "Toggle review" })
   await toggle.click()
-  await expect(page.locator("#review-panel")).toBeVisible()
+  await openReviewLauncher(page.locator("#review-panel"))
   await expectTreeSentinel(page)
 
   for (const direction of ["ltr", "rtl"] as const) {
