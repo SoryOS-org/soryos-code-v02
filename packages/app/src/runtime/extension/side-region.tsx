@@ -494,7 +494,7 @@ function LauncherRow(props: { item: SessionPanelMenuItem }): JSX.Element {
   return (
     <button
       type="button"
-      class="flex h-[41px] w-full items-center justify-between gap-4 rounded-[8px] border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base px-3.5 text-start hover:bg-v2-overlay-simple-overlay-hover"
+      class="flex h-[41px] w-full items-center justify-between gap-4 rounded-[8px] border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-01 px-3.5 text-start hover:bg-v2-background-bg-layer-02"
       // The new tab view stays until the tab the item opens selects itself, so nothing shows in between.
       onClick={() => props.item.run()}
     >
