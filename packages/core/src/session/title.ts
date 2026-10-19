@@ -90,8 +90,11 @@ export const layer = Layer.effect(
       )
       yield* recordUsage
       if (failed) return
+      // Some OpenAI-compatible gateways stream the title model's reasoning inline rather than as a
+      // separate part, and its first line would otherwise become the title.
       return chunks
         .join("")
+        .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
         .split("\n")
         .map((line) => line.trim())
         .find((line) => line.length > 0)

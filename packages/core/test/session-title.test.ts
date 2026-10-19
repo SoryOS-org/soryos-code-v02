@@ -230,6 +230,52 @@ it.effect("generates a title from the sole user message and renames the session"
   }),
 )
 
+it.effect("drops inline reasoning blocks from the generated title", () =>
+  Effect.gen(function* () {
+    yield* enableTitleAgent
+    const sessionID = Session.ID.make("ses_title_inline_reasoning")
+    yield* insertSession(sessionID)
+    yield* prompt(sessionID, "list my mcp servers")
+    // Some OpenAI-compatible gateways stream the title model's reasoning inline instead of a separate part.
+    titleStream = () =>
+      Stream.make(
+        LLMEvent.textDelta({
+          id: "title",
+          text: '<think>The user message is "/mcps". Need a brief title.</think>\nMCP servers list',
+        }),
+        LLMEvent.finish({ reason: { normalized: "stop" } }),
+      )
+
+    const title = yield* SessionTitle.Service
+    yield* title.generate(sessionID)
+
+    const store = yield* SessionStore.Service
+    expect((yield* store.get(sessionID))?.title).toBe("MCP servers list")
+  }),
+)
+
+it.effect("drops inline reasoning blocks split across stream deltas", () =>
+  Effect.gen(function* () {
+    yield* enableTitleAgent
+    const sessionID = Session.ID.make("ses_title_split_reasoning")
+    yield* insertSession(sessionID)
+    yield* prompt(sessionID, "list my mcp servers")
+    // The block is stripped after the deltas join, so a tag split across them still matches.
+    titleStream = () =>
+      Stream.make(
+        LLMEvent.textDelta({ id: "title", text: "<think>Need a brief " }),
+        LLMEvent.textDelta({ id: "title", text: "title.</think>\nMCP servers list" }),
+        LLMEvent.finish({ reason: { normalized: "stop" } }),
+      )
+
+    const title = yield* SessionTitle.Service
+    yield* title.generate(sessionID)
+
+    const store = yield* SessionStore.Service
+    expect((yield* store.get(sessionID))?.title).toBe("MCP servers list")
+  }),
+)
+
 it.effect("runs title hooks instead of context hooks", () =>
   Effect.gen(function* () {
     yield* enableTitleAgent
