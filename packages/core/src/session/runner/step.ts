@@ -103,6 +103,8 @@ export const make = Effect.gen(function* () {
     // Provider and tool fibers retain per-source order without a shared writer queue.
     // A local execution starts only after its Tool.Called publication completes.
     let overflowFailure: ProviderErrorEvent | undefined
+    // time.streamed must mark the first provider event (TTFB), not the stream end.
+    let streamedPublished = false
     // Read to the end, not just the finish event, so the next request can reuse this response.
     const providerStream = llm.stream(input.prepared.request, input.prepared.options).pipe(
       Stream.runForEach((event) =>
@@ -119,6 +121,10 @@ export const make = Effect.gen(function* () {
             return
           }
           yield* publisher.publish(event)
+          if (!streamedPublished) {
+            streamedPublished = true
+            yield* publisher.streamed()
+          }
           if (event.type !== "tool-call" || event.providerExecuted) return
           toolRuns.push({
             call: event,
@@ -146,7 +152,7 @@ export const make = Effect.gen(function* () {
         // Cancelled before the start snapshot existed: record nothing, as when the capture preceded the request.
         if (streamInterrupted && !publisher.hasStarted() && !pendingStartSnapshot.pollUnsafe())
           return yield* Effect.failCause(stream.cause)
-        if (!overflowFailure && publisher.hasStarted()) yield* publisher.streamed()
+        if (!streamedPublished && !overflowFailure && publisher.hasStarted()) yield* publisher.streamed()
         if (streamInterrupted) yield* interruptTools
         const joined = yield* restore(Fiber.awaitAll(toolRuns.map((run) => run.fiber))).pipe(Effect.exit)
         if (Exit.isFailure(joined)) yield* interruptTools
