@@ -5,15 +5,6 @@ export const ENTERPRISE_SPAM_MODEL = "jev-1.13"
 export const ENTERPRISE_SPAM_THRESHOLD = 0.9
 const TIMEOUT_MS = 2000
 
-export interface EnterpriseSpamInput {
-  name: string
-  role: string
-  company?: string
-  email: string
-  phone?: string
-  message: string
-}
-
 const question = {
   type: "noul",
   instructions:
@@ -25,21 +16,22 @@ const question = {
   },
 } as const
 
-export interface EnterpriseSpamOptions {
-  fetch?: (request: Request) => Promise<Response>
-  inferenceUrl?: string
-  apiKey?: string
-  timeoutMs?: number
-}
-
 // Scores a submission with Jev through the OpenCode System One gateway.
 // Returns undefined when scoring is unavailable so the caller can fail open.
 export async function enterpriseSpamProbability(
-  input: EnterpriseSpamInput,
-  options: EnterpriseSpamOptions = {},
+  input: { name: string; role: string; company?: string; email: string; message: string },
+  options: {
+    fetch?: (request: Request) => Promise<Response>
+    inferenceUrl?: string
+    apiKey?: string
+    timeoutMs?: number
+  } = {},
 ): Promise<number | undefined> {
   try {
-    const url = new URL(options.inferenceUrl ?? Resource.ConsoleMigration.inferenceUrl)
+    // Preview stages have no inference URL; skip scoring quietly instead of logging every submission.
+    const inferenceUrl = options.inferenceUrl ?? Resource.ConsoleMigration.inferenceUrl
+    if (!inferenceUrl) return undefined
+    const url = new URL(inferenceUrl)
     url.pathname = `${url.pathname.replace(/\/$/, "")}/systemone/v1/systemone`
     const send = options.fetch ?? ((request: Request) => (Resource.INFERENCE as { fetch: typeof fetch }).fetch(request))
     const response = await send(
@@ -57,7 +49,6 @@ export async function enterpriseSpamProbability(
               role: input.role,
               company: input.company ?? "",
               email: input.email,
-              phone: input.phone ?? "",
               message: input.message,
             },
           },

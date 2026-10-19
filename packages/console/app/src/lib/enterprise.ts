@@ -5,7 +5,7 @@ import { localeFromRequest } from "~/lib/language"
 import { createLead } from "~/lib/salesforce"
 import { inferenceSpendOptions } from "~/lib/inference-spend"
 import { lookupConsoleAccount, type ConsoleAccount } from "~/lib/console-account"
-import { ENTERPRISE_SPAM_THRESHOLD, enterpriseSpamProbability, type EnterpriseSpamInput } from "~/lib/enterprise-spam"
+import { ENTERPRISE_SPAM_THRESHOLD, enterpriseSpamProbability } from "~/lib/enterprise-spam"
 
 interface EnterpriseFormData {
   name: string
@@ -41,14 +41,23 @@ function escapeHtml(value: unknown) {
 
 export function enterpriseEmailContent(body: EnterpriseFormData, inferenceSpend?: string) {
   const field = (value?: unknown) => (value ? `${escapeHtml(value)}<br>` : "")
-  return `
+  return {
+    html: `
 ${escapeHtml(body.message)}<br><br>
 ${inferenceSpend ? `Current monthly inference spend: ${escapeHtml(inferenceSpend)}<br><br>` : ""}
 --<br>
 ${field(body.name)}
 ${field(body.role)}
 ${field(body.company)}${field(body.email)}
-${field(body.phone)}`.trim()
+${field(body.phone)}`.trim(),
+    text: [
+      body.message,
+      "",
+      ...(inferenceSpend ? [`Current monthly inference spend: ${inferenceSpend}`, ""] : []),
+      "--",
+      ...[body.name, body.role, body.company, body.email, body.phone].filter(Boolean),
+    ].join("\n"),
+  }
 }
 
 function subscribe(email: string, fullName: string) {
@@ -88,7 +97,7 @@ export async function handleEnterpriseRequest(
     salesforceSubmit?: (payload: Record<string, unknown>) => Promise<boolean>
     notifications?: boolean
     accountLookup?: (email: string) => Promise<ConsoleAccount | null>
-    spamProbability?: (input: EnterpriseSpamInput) => Promise<number | undefined>
+    spam?: Parameters<typeof enterpriseSpamProbability>[1]
   } = {},
 ) {
   const dict = i18n(localeFromRequest(request))
@@ -116,9 +125,10 @@ export async function handleEnterpriseRequest(
 
     // Fail open: a missing score never blocks a lead. Confident spam gets the same
     // response as the honeypot and never reaches Salesforce, email, or EmailOctopus.
-    const spam = await (options.spamProbability ?? enterpriseSpamProbability)(body).catch(() => undefined)
+    const spam = await enterpriseSpamProbability(body, options.spam)
     if (spam !== undefined) console.info("Enterprise inquiry spam score", { probability: spam })
     if (spam !== undefined && spam >= ENTERPRISE_SPAM_THRESHOLD) {
+      console.warn("Enterprise inquiry dropped as spam", { email: body.email, probability: spam })
       return Response.json({ success: true, message: dict["enterprise.form.success.submitted"] }, { status: 200 })
     }
 
@@ -151,7 +161,8 @@ export async function handleEnterpriseRequest(
         : sendEmail({
             to: Resource.ENTERPRISE_SALES_INBOX_EMAIL.value,
             subject: `Enterprise Inquiry from ${body.name}`,
-            body: emailContent,
+            body: emailContent.html,
+            text: emailContent.text,
             replyTo: body.email,
           }).then(
             () => true,

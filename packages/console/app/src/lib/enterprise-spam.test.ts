@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { afterEach, expect, mock, spyOn, test } from "bun:test"
 import { enterpriseSpamProbability, ENTERPRISE_SPAM_MODEL } from "./enterprise-spam"
 import { enterpriseEmailContent, handleEnterpriseRequest } from "./enterprise"
 
@@ -10,12 +10,16 @@ const submission = {
   message: "We need SSO for 200 developers.",
 }
 
+afterEach(() => mock.restore())
+
 const score = (probability: unknown) =>
   Response.json({ model: ENTERPRISE_SPAM_MODEL, answers: { spam: { type: "noul", noul: probability } } })
 
 test("scores a submission through the System One gateway", async () => {
   const requests: Request[] = []
-  const probability = await enterpriseSpamProbability(submission, {
+  // The form handler passes the whole submission, phone included; the classifier must not receive it.
+  const withPhone = { ...submission, phone: "+1 555 0100" }
+  const probability = await enterpriseSpamProbability(withPhone, {
     inferenceUrl: "https://opencode.test/inference",
     apiKey: "test-key",
     fetch: async (request) => {
@@ -31,6 +35,7 @@ test("scores a submission through the System One gateway", async () => {
   const body = await requests[0].json()
   expect(body.model).toBe(ENTERPRISE_SPAM_MODEL)
   expect(body.state.submission).toMatchObject({ email: submission.email, message: submission.message })
+  expect(body.state.submission).not.toHaveProperty("phone")
   expect(body.questions.spam.type).toBe("noul")
 })
 
@@ -54,11 +59,13 @@ test("returns no score when the gateway fails, times out, or answers without a p
   }
 })
 
-test("returns no score when the gateway is not configured", async () => {
+test("returns no score without logging an error when the gateway is not configured", async () => {
+  const error = spyOn(console, "error").mockImplementation(() => {})
   expect(await enterpriseSpamProbability(submission, { inferenceUrl: "", apiKey: "test-key" })).toBeUndefined()
+  expect(error).not.toHaveBeenCalled()
 })
 
-const submit = async (spamProbability: () => Promise<number | undefined>) => {
+const submit = async (fetch: (request: Request) => Promise<Response>) => {
   const leads: Record<string, unknown>[] = []
   const response = await handleEnterpriseRequest(
     new Request("http://localhost/api/enterprise", {
@@ -67,7 +74,7 @@ const submit = async (spamProbability: () => Promise<number | undefined>) => {
       body: JSON.stringify({ ...submission, alias: "" }),
     }),
     {
-      spamProbability,
+      spam: { inferenceUrl: "https://opencode.test/inference", apiKey: "test-key", fetch },
       salesforceSubmit: async (payload) => {
         leads.push(payload)
         return true
@@ -79,22 +86,28 @@ const submit = async (spamProbability: () => Promise<number | undefined>) => {
   return { status: response.status, body: await response.json(), leads }
 }
 
-test("confident spam gets the normal success response and never reaches Salesforce", async () => {
-  const result = await submit(async () => 0.95)
+test("confident spam gets the normal success response, never reaches Salesforce, and is logged", async () => {
+  const warn = spyOn(console, "warn").mockImplementation(() => {})
+  const result = await submit(async () => score(0.95))
   expect(result.status).toBe(200)
   expect(result.body).toMatchObject({ success: true })
   expect(result.leads).toHaveLength(0)
+  expect(warn).toHaveBeenCalledWith("Enterprise inquiry dropped as spam", {
+    email: submission.email,
+    probability: 0.95,
+  })
 })
 
 test("uncertain, missing, or failed scores still create the lead", async () => {
-  for (const spamProbability of [
-    async () => 0.6,
-    async () => undefined,
+  spyOn(console, "error").mockImplementation(() => {})
+  for (const fetch of [
+    async () => score(0.6),
+    async () => Response.json({ answers: {} }),
     async () => {
       throw new Error("classifier down")
     },
   ]) {
-    const result = await submit(spamProbability)
+    const result = await submit(fetch)
     expect(result.status).toBe(200)
     expect(result.leads).toHaveLength(1)
   }
@@ -108,11 +121,35 @@ test("the sales inbox email escapes submitted HTML", () => {
     message: `<script>alert("x")</script> & <img src=x onerror=alert(1)>`,
     alias: "",
   })
-  expect(content).not.toContain("<script>")
-  expect(content).not.toContain("<img")
-  expect(content).not.toContain("<b>")
-  expect(content).toContain(
+  expect(content.html).not.toContain("<script>")
+  expect(content.html).not.toContain("<img")
+  expect(content.html).not.toContain("<b>")
+  expect(content.html).toContain(
     "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;img src=x onerror=alert(1)&gt;",
   )
-  expect(content).toContain("&lt;b&gt;Name&lt;/b&gt;<br>")
+  expect(content.html).toContain("&lt;b&gt;Name&lt;/b&gt;<br>")
+})
+
+test("the sales inbox plain-text email is not HTML-escaped", () => {
+  const content = enterpriseEmailContent(
+    { ...submission, name: "Ada <CTO>", message: "Pricing & SSO?", phone: "+1 555 0100", alias: "" },
+    "$10k+",
+  )
+  expect(content.text).not.toContain("<br>")
+  expect(content.text).not.toContain("&lt;")
+  expect(content.text).not.toContain("&amp;")
+  expect(content.text).toBe(
+    [
+      "Pricing & SSO?",
+      "",
+      "Current monthly inference spend: $10k+",
+      "",
+      "--",
+      "Ada <CTO>",
+      submission.role,
+      submission.company,
+      submission.email,
+      "+1 555 0100",
+    ].join("\n"),
+  )
 })
