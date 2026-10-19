@@ -30,10 +30,6 @@ const engines = [
   { family: "gpt-realtime", id: "openai-realtime", provider: "openai" },
   { family: "grok-voice", id: "xai-realtime", provider: "xai" },
   { family: "gemini-3.8-live", id: "gemini-live", provider: "google" },
-  { family: "gemini-3.5-live", id: "gemini-live", provider: "google" },
-  { family: "gemini-3.5-transcribe-live", id: "gemini-live", provider: "google" },
-  { family: "gemini-3.1-flash-live", id: "gemini-live", provider: "google" },
-  { family: "gemini-2.5-flash-native-audio", id: "gemini-live", provider: "google" },
 ] as const
 
 // Matches the bare family name (`gpt-realtime`) and its versions (`gpt-realtime-2.1`, `gpt-realtime-mini`).

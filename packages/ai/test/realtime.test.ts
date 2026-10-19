@@ -146,26 +146,11 @@ describe("experimental Realtime", () => {
         "grok-voice-latest",
         "gemini-3.8-live",
         "gemini-3.8-live-extended-thinking",
-        "gemini-3.5-live-translate-preview",
-        "gemini-3.5-transcribe-live",
-        "gemini-3.1-flash-live-preview",
-        "gemini-2.5-flash-native-audio-preview-12-2025",
       ].map((model) => Realtime.engine(model)?.id),
-    ).toEqual([
-      "openai-realtime",
-      "openai-realtime",
-      "openai-live",
-      "xai-realtime",
-      "gemini-live",
-      "gemini-live",
-      "gemini-live",
-      "gemini-live",
-      "gemini-live",
-      "gemini-live",
-    ])
+    ).toEqual(["openai-realtime", "openai-realtime", "openai-live", "xai-realtime", "gemini-live", "gemini-live"])
     expect(Realtime.engine("gpt-realtimex")).toBeUndefined()
     expect(Realtime.engine("gemini-3.8-flash")).toBeUndefined()
-    expect(Realtime.engine("gemini-3.5-transcribe")).toBeUndefined()
+    expect(Realtime.engine("gemini-3.5-live")).toBeUndefined()
   })
 
   it.effect("rejects unsupported transports before network I/O", () =>
