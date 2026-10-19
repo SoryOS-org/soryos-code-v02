@@ -489,7 +489,7 @@ export const OpencodePlugin = define<HttpClient.HttpClient | Bus.Service | Manag
     // periodically and only rebuild the catalog and search providers when the snapshot differs.
     // Only while connected: a signed-out location runs no timer and no credential lookups.
     const polling = yield* FiberHandle.make<void, never>()
-    const poll = Effect.fn("OpencodePlugin.poll")(function* () {
+    const poll = Effect.fnUntraced(function* () {
       if (!snapshot.connection) return yield* FiberHandle.clear(polling)
       yield* FiberHandle.run(polling, Effect.sleep(Duration.minutes(1)).pipe(Effect.andThen(check()), Effect.forever), {
         onlyIfMissing: true,
