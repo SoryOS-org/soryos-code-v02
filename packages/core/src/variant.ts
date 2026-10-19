@@ -1,6 +1,7 @@
 export * as Variant from "./variant.js"
 
 import { ConfigProvider } from "@opencode/schema/config/provider"
+import { AISDKNative } from "./aisdk-native.js"
 import { Model } from "./model.js"
 import { Provider } from "./provider.js"
 
@@ -27,7 +28,18 @@ type Overlay = Omit<Variants[number], "id">
 type Protocol = (model: Model.Info, support: Support) => Variants
 
 export function resolve(model: Model.Info, supports: readonly Support[] = [{ type: "effort" }]): Variants {
-  const protocol = model.package === undefined ? undefined : PROTOCOLS[model.package]
+  // Config plugins resolve variants before AISDKNative.rewrite maps an aisdk:
+  // package to its native spelling, so normalize the same way rewrite will.
+  const pkg =
+    model.package === undefined || PROTOCOLS[model.package] !== undefined
+      ? model.package
+      : AISDKNative.packageFor(model.package, {
+          providerID: model.providerID,
+          canonical: model.canonical,
+          modelID: model.modelID ?? model.id,
+          settings: model.settings,
+        })
+  const protocol = pkg === undefined ? undefined : PROTOCOLS[pkg]
   if (!protocol) return []
   const toggle = supports.some((support) => support.type === "toggle") ? protocol(model, { type: "toggle" }) : []
   const effort = supports.find((support) => support.type === "effort")
