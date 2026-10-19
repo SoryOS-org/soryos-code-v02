@@ -335,6 +335,7 @@ export const dict = {
   "mcp.status.disabled": "disabled",
   "mcp.auth.interactiveForm": "MCP server {{name}} requires an interactive authentication form",
 
+  "dialog.fork.fullSession": "Full session",
   "dialog.fork.empty": "No messages to fork from",
 
   "dialog.directory.action.selectFile": "Select file",
