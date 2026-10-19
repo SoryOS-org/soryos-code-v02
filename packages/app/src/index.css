@@ -60,7 +60,8 @@
     );
   }
 
-  #review-panel {
+  #review-panel,
+  #bottom-panel {
     container-type: inline-size;
   }
 
