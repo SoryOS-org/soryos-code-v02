@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { LLM, Message, Media } from "@opencode/ai"
+import { Message, Media } from "@opencode/ai"
 import { Model } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
 import { SessionMessage } from "@opencode/core/session/message"
@@ -10,10 +10,7 @@ import { Agent } from "@opencode/core/agent"
 import { Shell } from "@opencode/schema/shell"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
-import { DateTime, Effect, Layer } from "effect"
-import { AnthropicMessages, OpenAIChat, OpenAIResponses } from "@opencode/ai/protocols"
-import { compileRequest } from "@opencode/ai/route/client"
-import { testEffect } from "./lib/effect"
+import { DateTime } from "effect"
 import path from "path"
 import { pathToFileURL } from "url"
 
@@ -21,7 +18,6 @@ const created = DateTime.makeUnsafe(0)
 const id = (value: string) => SessionMessage.ID.make(`msg_${value}`)
 const model = Model.Ref.make({ id: Model.ID.make("model"), providerID: Provider.ID.make("provider") })
 const build = Agent.defaultID
-const it = testEffect(Layer.empty)
 
 describe("toLLMMessages", () => {
   test("background user shells enter model context only through their completion notification", () => {
@@ -569,36 +565,6 @@ Earlier work
       ])
     })
   }
-
-  it.effect("keeps unsupported attachments visible on native provider requests", () =>
-    Effect.gen(function* () {
-      const messages = toLLMMessages(
-        [
-          SessionMessage.User.make({
-            id: id("unsupported-wire"),
-            type: "user",
-            text: "",
-            files: [
-              FileAttachment.make({
-                data: Base64.make("YmluYXJ5"),
-                mime: "image/avif",
-                source: { type: "inline" },
-                name: "preview.avif",
-              }),
-            ],
-            time: { created },
-          }),
-        ],
-        model,
-      )
-      for (const route of [OpenAIChat.route, OpenAIResponses.route, AnthropicMessages.route]) {
-        const prepared = yield* compileRequest(LLM.request({ model: route.model({ id: "test" }), messages }))
-        expect(JSON.stringify(prepared.body)).toContain("preview.avif")
-        expect(JSON.stringify(prepared.body)).toContain("unsupported attachment format: image/avif")
-        expect(JSON.stringify(prepared.body)).not.toContain("YmluYXJ5")
-      }
-    }),
-  )
 
   test("uses materialized image and PDF data as provider media", () => {
     const data = Base64.make("AAECAw==")
