@@ -276,6 +276,48 @@ it.effect("drops inline reasoning blocks split across stream deltas", () =>
   }),
 )
 
+it.effect("drops an unclosed or uppercase reasoning block", () =>
+  Effect.gen(function* () {
+    yield* enableTitleAgent
+    const sessionID = Session.ID.make("ses_title_partial_reasoning")
+    yield* insertSession(sessionID)
+    yield* prompt(sessionID, "list my mcp servers")
+    // A truncated stream stops mid-reasoning, and some models tag it in uppercase.
+    titleStream = () =>
+      Stream.make(
+        LLMEvent.textDelta({ id: "title", text: "<THINK>Need a brief title." }),
+        LLMEvent.finish({ reason: { normalized: "stop" } }),
+      )
+
+    const title = yield* SessionTitle.Service
+    yield* title.generate(sessionID)
+
+    const store = yield* SessionStore.Service
+    // Reasoning alone leaves no title, so the fallback stays instead of a tag being stored.
+    expect((yield* store.get(sessionID))?.title).toBeUndefined()
+  }),
+)
+
+it.effect("strips a stray closing tag that has no opening block", () =>
+  Effect.gen(function* () {
+    yield* enableTitleAgent
+    const sessionID = Session.ID.make("ses_title_stray_tag")
+    yield* insertSession(sessionID)
+    yield* prompt(sessionID, "list my mcp servers")
+    titleStream = () =>
+      Stream.make(
+        LLMEvent.textDelta({ id: "title", text: "</think>MCP servers list" }),
+        LLMEvent.finish({ reason: { normalized: "stop" } }),
+      )
+
+    const title = yield* SessionTitle.Service
+    yield* title.generate(sessionID)
+
+    const store = yield* SessionStore.Service
+    expect((yield* store.get(sessionID))?.title).toBe("MCP servers list")
+  }),
+)
+
 it.effect("runs title hooks instead of context hooks", () =>
   Effect.gen(function* () {
     yield* enableTitleAgent
