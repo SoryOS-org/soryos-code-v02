@@ -533,16 +533,33 @@ function CurrentHighlightedText(props: {
     ].sort((a, b) => a.start - b.start)
 
     const result: HighlightSegment[] = []
+    // Plain text between references may contain URLs, which become links.
+    const pushText = (text: string) => {
+      let last = 0
+
+      for (const match of text.matchAll(urlPattern)) {
+        const href = match[0].replace(/[),.;:!?\]]+$/, "")
+
+        if (!URL.canParse(href)) continue
+
+        if (match.index > last) result.push({ text: text.slice(last, match.index) })
+        result.push({ text: href, type: "link" })
+        last = match.index + href.length
+      }
+
+      if (last < text.length) result.push({ text: text.slice(last) })
+    }
+
     let last = 0
     references.forEach((reference) => {
       if (reference.start < last) return
 
-      if (reference.start > last) result.push({ text: props.text.slice(last, reference.start) })
+      if (reference.start > last) pushText(props.text.slice(last, reference.start))
       result.push({ text: props.text.slice(reference.start, reference.end), type: reference.type })
       last = reference.end
     })
 
-    if (last < props.text.length) result.push({ text: props.text.slice(last) })
+    if (last < props.text.length) pushText(props.text.slice(last))
 
     return result
   })
@@ -550,18 +567,29 @@ function CurrentHighlightedText(props: {
   return (
     <For each={segments()}>
       {(segment) => (
-        <span data-highlight={segment.type}>
-          <Show when={segment.type && segment.text.startsWith("@")} fallback={segment.text}>
-            <span data-slot="user-message-mention-prefix">@</span>
-            {segment.text.slice(1)}
-          </Show>
-        </span>
+        <Show
+          when={segment.type === "link"}
+          fallback={
+            <span data-highlight={segment.type}>
+              <Show when={segment.type && segment.text.startsWith("@")} fallback={segment.text}>
+                <span data-slot="user-message-mention-prefix">@</span>
+                {segment.text.slice(1)}
+              </Show>
+            </span>
+          }
+        >
+          <a data-slot="user-message-link" href={segment.text} target="_blank" rel="noopener noreferrer">
+            {segment.text}
+          </a>
+        </Show>
       )}
     </For>
   )
 }
 
-type HighlightSegment = { text: string; type?: "file" | "agent" }
+const urlPattern = /https?:\/\/[^\s<>"'`]+/g
+
+type HighlightSegment = { text: string; type?: "file" | "agent" | "link" }
 
 /** A compaction the server admitted but has not started, drawn as the divider a started one opens with. */
 export function SessionCompactionQueued() {

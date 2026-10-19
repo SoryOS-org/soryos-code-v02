@@ -195,6 +195,17 @@
       color: var(--v2-blue-500);
     }
 
+    [data-slot="user-message-link"] {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
+      text-underline-offset: 2px;
+
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
+
     max-width: 100%;
   }
 
