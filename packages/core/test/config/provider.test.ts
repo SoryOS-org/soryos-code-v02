@@ -804,6 +804,38 @@ describe("ConfigProviderPlugin.Plugin", () => {
     }),
   )
 
+  // A model-level `aisdk:` package is rewritten to a native one after this update runs, so resolving
+  // variants against the spec it was configured with produced none (#57076).
+  it.effect("builds the same variants for an aisdk model package and its native spelling", () =>
+    Effect.gen(function* () {
+      const models = yield* Model.Service
+      const providerID = Provider.ID.make("custom")
+      const reasoning = { supported: true, effort: ["default", "low", "high"] }
+      yield* addPlugin([
+        new Document({
+          type: "document",
+          info: decode({
+            providers: {
+              custom: {
+                package: "aisdk:@ai-sdk/openai-compatible",
+                models: {
+                  spelled: { package: "aisdk:@ai-sdk/openai", capabilities: { reasoning } },
+                  native: { package: "@opencode/ai/providers/openai", capabilities: { reasoning } },
+                },
+              },
+            },
+          }),
+        }),
+      ])
+
+      const spelled = required(yield* models.get(providerID, Model.ID.make("spelled")))
+      const native = required(yield* models.get(providerID, Model.ID.make("native")))
+      expect(spelled.package).toBe(native.package)
+      expect(spelled.variants.length).toBeGreaterThan(0)
+      expect(spelled.variants).toEqual(native.variants)
+    }),
+  )
+
   it.effect("applies configured release date, temperature support, and reasoning field", () =>
     Effect.gen(function* () {
       const models = yield* Model.Service

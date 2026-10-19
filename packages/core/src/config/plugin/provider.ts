@@ -6,6 +6,7 @@ import { ConfigProvider } from "@opencode/schema/config/provider"
 import { Money } from "@opencode/schema/money"
 import { Effect } from "effect"
 import { Config } from "../../config.js"
+import { AISDKNative } from "../../aisdk-native.js"
 import { Model } from "../../model.js"
 import { Provider } from "../../provider.js"
 import { Variant } from "../../variant.js"
@@ -132,13 +133,21 @@ export const Plugin = define({
               model.capabilities = Model.mergeCapabilities(config.capabilities, model.capabilities)
             if (config.limit !== undefined) model.limit = { ...model.limit, ...config.limit }
             // Configured reasoning replaces the base variants; configured variants still overlay them below.
-            if (config.capabilities?.reasoning !== undefined)
-              model.variants = [
-                ...Variant.resolve(
-                  { ...model, package: model.package ?? models.provider.get(providerID)?.provider.package },
-                  Variant.supports(config.capabilities.reasoning),
-                ),
-              ]
+            if (config.capabilities?.reasoning !== undefined) {
+              // The provider rewrite that maps `aisdk:` specs to native packages runs after this callback,
+              // so resolve against the package it will leave: protocols are keyed by native specifier, and
+              // an `aisdk:` one yields no variants at all (#57076).
+              const provider = models.provider.get(providerID)?.provider
+              const packageSource = model.package ?? provider?.package
+              const resolved = { ...model, package: packageSource }
+              AISDKNative.rewrite(resolved, {
+                specifier: packageSource,
+                providerID,
+                canonical: model.canonical ?? provider?.canonical,
+                modelID: model.modelID ?? id,
+              })
+              model.variants = [...Variant.resolve(resolved, Variant.supports(config.capabilities.reasoning))]
+            }
             if (config.variants !== undefined) {
               model.variants ??= []
               for (const variant of config.variants) {
