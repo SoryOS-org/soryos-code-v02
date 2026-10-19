@@ -281,6 +281,14 @@ export function createData(config: CreateDataInput) {
   )
   const messageIndex = new Map<string, Map<string, number>>()
   const sync = createSync()
+  // Coalesce placement events only for active reads, including unloaded family members.
+  // Overlay them at publication rather than restarting pagination on unrelated movement.
+  const sessionReads = new Set<{
+    sessionID: string
+    children: boolean
+    revision: number
+    moves: Map<string, Pick<SessionInfo, "location" | "subpath"> & Partial<Pick<SessionInfo, "projectID">>>
+  }>()
   let activeUpdates: Map<string, DataSessionStatus | undefined> | undefined
   const pendingUpdates = new Map<string, Map<string, SessionInboxInfo | SessionInbox.Delivery | undefined>>()
 
@@ -753,6 +761,16 @@ export function createData(config: CreateDataInput) {
           setStore("session", "info", event.data.sessionID, "time", "archived", undefined)
         return
       case "session.moved": {
+        for (const read of sessionReads) {
+          if (read.sessionID !== event.data.sessionID && !read.children) continue
+          read.revision++
+          read.moves.set(event.data.sessionID, {
+            ...read.moves.get(event.data.sessionID),
+            location: event.data.location,
+            ...(event.data.projectID ? { projectID: event.data.projectID } : {}),
+            subpath: event.data.subpath,
+          })
+        }
         const current = store.session.info[event.data.sessionID]
         if (current) {
           const previous = {
@@ -760,7 +778,7 @@ export function createData(config: CreateDataInput) {
             projectID: current.projectID,
             subpath: current.subpath,
           }
-          setStore("session", "info", event.data.sessionID, "location", event.data.location)
+          setStore("session", "info", event.data.sessionID, "location", reconcile(event.data.location))
           if (event.data.projectID) setStore("session", "info", event.data.sessionID, "projectID", event.data.projectID)
           setStore("session", "info", event.data.sessionID, "subpath", event.data.subpath)
           message.insert(event.data.sessionID, {
@@ -1663,24 +1681,46 @@ export function createData(config: CreateDataInput) {
       },
       sync(sessionID: string, options?: { children?: boolean }) {
         return sync.run(options?.children ? `session.family:${sessionID}` : `session:${sessionID}`, async () => {
-          const [info, children] = await Promise.all([
-            api().session.get({ sessionID }),
-            options?.children ? listChildren({ parentID: sessionID, order: "desc", limit: CHILD_PAGE }) : [],
-          ])
-          const sessions = [info, ...children]
-          batch(() => {
-            setStore(
-              "session",
-              "info",
-              produce((draft) => {
-                for (const session of sessions) draft[session.id] = session
-              }),
-            )
-            for (const session of sessions) {
-              sync.complete(`session:${session.id}`)
-              registerSession(session.id)
-            }
-          })
+          const read = {
+            sessionID,
+            children: options?.children === true,
+            revision: 0,
+            moves: new Map<
+              string,
+              Pick<SessionInfo, "location" | "subpath"> & Partial<Pick<SessionInfo, "projectID">>
+            >(),
+          }
+          sessionReads.add(read)
+          try {
+            const load = () =>
+              Promise.all([
+                api().session.get({ sessionID }),
+                read.children ? listChildren({ parentID: sessionID, order: "desc", limit: CHILD_PAGE }) : [],
+              ]).then(([info, children]) => [info, ...children])
+            const revision = read.revision
+            const sessions = await load().catch((error) => {
+              // Retry a superseded failure once; continuous movement cannot create a retry loop.
+              if (read.revision !== revision) return load()
+              throw error
+            })
+            batch(() => {
+              setStore(
+                "session",
+                "info",
+                produce((draft) => {
+                  for (const session of sessions) {
+                    draft[session.id] = { ...session, ...read.moves.get(session.id) }
+                  }
+                }),
+              )
+              for (const session of sessions) {
+                sync.complete(`session:${session.id}`)
+                registerSession(session.id)
+              }
+            })
+          } finally {
+            sessionReads.delete(read)
+          }
         })
       },
       invalidate(sessionID: string) {
