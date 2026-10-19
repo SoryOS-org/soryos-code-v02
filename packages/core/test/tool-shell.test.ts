@@ -300,7 +300,11 @@ describe("ShellTool scanner permissions", () => {
         Effect.gen(function* () {
           const saved = yield* PermissionSaved.Service
           const location = yield* Location.Service
-          yield* saved.add({ projectID: location.project.id, action: "shell", resources: ["printf *"] })
+          yield* saved.add({
+            projectID: location.project.id,
+            action: "shell",
+            resources: ["printf *"].map((resource) => `cwd-v1:${JSON.stringify(fixture.active)}:${resource}`),
+          })
           const marker = path.join(fixture.active, "marker")
           const approved = yield* runPermissionCommand(
             registry,
@@ -314,7 +318,9 @@ describe("ShellTool scanner permissions", () => {
             value: { status: "completed", metadata: { exit: 0 } },
           })
           expect(yield* Effect.promise(() => Bun.file(marker).text())).toBe("hello")
-          expect((yield* saved.list()).map((item) => item.resource)).toEqual(["printf *"])
+          expect((yield* saved.list()).map((item) => item.resource)).toEqual([
+            `cwd-v1:${JSON.stringify(fixture.active)}:printf *`,
+          ])
 
           yield* Effect.forEach(yield* saved.list(), (item) => saved.remove(item.id))
           const command = 'export SCAN_TEST=$(printf hello); printf %s "$SCAN_TEST" > marker'
@@ -349,7 +355,9 @@ describe("ShellTool scanner permissions", () => {
               save: ["printf *", "printf *"],
             })
           }
-          expect((yield* saved.list()).map((item) => item.resource)).toEqual(["printf *"])
+          expect((yield* saved.list()).map((item) => item.resource)).toEqual([
+            `cwd-v1:${JSON.stringify(fixture.active)}:printf *`,
+          ])
 
           const agents = yield* Agent.Service
           yield* agents.transform((editor) =>
@@ -372,7 +380,13 @@ describe("ShellTool scanner permissions", () => {
         Effect.gen(function* () {
           const saved = yield* PermissionSaved.Service
           const location = yield* Location.Service
-          yield* saved.add({ projectID: location.project.id, action: "shell", resources: ["printf hello", "cat"] })
+          yield* saved.add({
+            projectID: location.project.id,
+            action: "shell",
+            resources: ["printf hello", "cat"].map(
+              (resource) => `cwd-v1:${JSON.stringify(fixture.active)}:${resource}`,
+            ),
+          })
           const marker = path.join(fixture.active, "marker")
           const command = "printf hello | cat > marker"
           const exact = yield* runPermissionCommand(registry, command, marker, [])
@@ -380,7 +394,11 @@ describe("ShellTool scanner permissions", () => {
           expect(exact.exit).toMatchObject({ _tag: "Success", value: { status: "completed", metadata: { exit: 0 } } })
           expect(yield* Effect.promise(() => Bun.file(marker).text())).toBe("hello")
 
-          yield* saved.add({ projectID: location.project.id, action: "shell", resources: ["printf *", "cat *"] })
+          yield* saved.add({
+            projectID: location.project.id,
+            action: "shell",
+            resources: ["printf *", "cat *"].map((resource) => `cwd-v1:${JSON.stringify(fixture.active)}:${resource}`),
+          })
           yield* Effect.promise(() => fs.rm(marker))
           const broad = yield* runPermissionCommand(registry, command, marker, [])
           expect(broad.requests).toEqual([])
@@ -568,7 +586,11 @@ describe("ShellTool conditional process substitution", () => {
             Effect.gen(function* () {
               const saved = yield* PermissionSaved.Service
               const location = yield* Location.Service
-              yield* saved.add({ projectID: location.project.id, action: "shell", resources: ["wait *"] })
+              yield* saved.add({
+                projectID: location.project.id,
+                action: "shell",
+                resources: ["wait *"].map((resource) => `cwd-v1:${JSON.stringify(directory.active)}:${resource}`),
+              })
               const marker = path.join(directory.active, "marker")
               const command = '[[ -n <(printf reached > marker) ]]; wait "$!"'
               const result = yield* runPermissionCommand(registry, command, marker, [reply])
@@ -648,7 +670,11 @@ describe("ShellTool compound syntax approval compatibility", () => {
             Effect.gen(function* () {
               const saved = yield* PermissionSaved.Service
               const location = yield* Location.Service
-              yield* saved.add({ projectID: location.project.id, action: "shell", resources: fixture.saved })
+              yield* saved.add({
+                projectID: location.project.id,
+                action: "shell",
+                resources: fixture.saved.map((resource) => `cwd-v1:${JSON.stringify(directory.active)}:${resource}`),
+              })
               const result = yield* runPermissionCommand(
                 registry,
                 portable ? fixture.command : fixture.equivalent,
@@ -716,7 +742,11 @@ describe("ShellTool ordinary shell syntax", () => {
               Effect.gen(function* () {
                 const saved = yield* PermissionSaved.Service
                 const location = yield* Location.Service
-                yield* saved.add({ projectID: location.project.id, action: "shell", resources: fixture.saved })
+                yield* saved.add({
+                  projectID: location.project.id,
+                  action: "shell",
+                  resources: fixture.saved.map((resource) => `cwd-v1:${JSON.stringify(directory.active)}:${resource}`),
+                })
                 const result = yield* runPermissionCommand(
                   registry,
                   fixture.command,
@@ -792,7 +822,9 @@ describe("ShellTool ordinary shell syntax", () => {
               yield* saved.add({
                 projectID: location.project.id,
                 action: "shell",
-                resources: ["Write-Output *", "Show-Value *"],
+                resources: ["Write-Output *", "Show-Value *"].map(
+                  (resource) => `cwd-v1:${JSON.stringify(directory.active)}:${resource}`,
+                ),
               })
               const result = yield* runPermissionCommand(registry, command, path.join(directory.active, "marker"), [])
               expect(result.requests).toEqual([])
@@ -1415,7 +1447,12 @@ describe("ShellTool", () => {
               (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]().then(() => undefined)),
             ),
           )
-          expect(results[1]).toEqual(results[0])
+          const normalize = (items: Permission.AssertInput[]) =>
+            items.map((item) => ({
+              ...item,
+              metadata: item.metadata?.shellCwd ? { ...item.metadata, shellCwd: "<test-workdir>" } : item.metadata,
+            }))
+          expect(normalize(results[1])).toEqual(normalize(results[0]))
         }),
       { timeout: 15_000 },
     )

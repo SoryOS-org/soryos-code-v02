@@ -145,14 +145,21 @@ const layer = Layer.effect(
     }).pipe(Effect.uninterruptible)
     yield* Effect.addFinalizer(() => close)
 
-    const savedRules = Effect.fnUntraced(function* () {
-      return (yield* saved.list({ projectID: location.project.id })).map(
-        (item): Permission.Rule => ({
-          action: item.action,
-          resource: item.resource,
-          effect: "allow",
-        }),
-      )
+    // Shell approvals are persistently bound to the resolved working directory.
+    // An unscoped historic bash approval cannot silently authorize a new cwd.
+    const cwdPrefix = "cwd-v1:"
+    const savedRules = Effect.fnUntraced(function* (input: AssertInput) {
+      const shellAction = input.action === "shell" || input.action === "bash"
+      const cwd = shellAction && typeof input.metadata?.shellCwd === "string" ? input.metadata.shellCwd : undefined
+      return (yield* saved.list({ projectID: location.project.id })).flatMap((item): Permission.Ruleset => {
+        if (item.action !== "shell" && item.action !== "bash")
+          return [{ action: item.action, resource: item.resource, effect: "allow" }]
+        // Preserve direct permission-service callers; the live shell tool always supplies shellCwd.
+        if (cwd === undefined) return [{ action: item.action, resource: item.resource, effect: "allow" }]
+        const prefix = `${cwdPrefix}${JSON.stringify(cwd)}:`
+        if (!item.resource.startsWith(prefix)) return []
+        return [{ action: item.action, resource: item.resource.slice(prefix.length), effect: "allow" }]
+      })
     })
 
     const configured = Effect.fnUntraced(function* (sessionID: SessionSchema.ID, agentID?: Agent.ID) {
@@ -173,7 +180,7 @@ const layer = Layer.effect(
     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
       const rules = yield* configured(input.sessionID, input.agent)
       if (denied(input, rules)) return { effect: "deny" as const, rules }
-      const all = [...rules, ...(yield* savedRules())]
+      const all = [...rules, ...(yield* savedRules(input))]
       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
       const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
       const event = yield* hooks.trigger("permission", "evaluate", {
@@ -300,7 +307,13 @@ const layer = Layer.effect(
             yield* saved.add({
               projectID: location.project.id,
               action: existing.request.action,
-              resources: existing.request.save,
+              resources:
+                (existing.request.action === "shell" || existing.request.action === "bash") &&
+                typeof existing.request.metadata?.shellCwd === "string"
+                  ? existing.request.save.map(
+                      (resource) => `${cwdPrefix}${JSON.stringify(existing.request.metadata!.shellCwd)}:${resource}`,
+                    )
+                  : existing.request.save,
             })
           }
           yield* Deferred.succeed(existing.deferred, undefined)

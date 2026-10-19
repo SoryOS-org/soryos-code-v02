@@ -260,6 +260,101 @@ describe("Permission", () => {
     }),
   )
 
+  it.effect("does not reuse saved bash approval across working directories", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const saved = yield* PermissionSaved.Service
+      const service = yield* Permission.Service
+      const a = yield* ShellParse.scanPortable("npm test", "bash", "/project/a")
+      const b = yield* ShellParse.scanPortable("npm test", "bash", "/project/b")
+      yield* saved.add({
+        projectID: Project.ID.global,
+        action: "bash",
+        resources: a.commands.map((cmd) => `cwd-v1:${JSON.stringify("/project/a")}:${cmd.save}`),
+      })
+      const fromA = yield* service.ask(
+        assertion({
+          action: "bash",
+          resources: a.commands.map((cmd) => cmd.resource),
+          metadata: { shellCwd: "/project/a" },
+        }),
+      )
+      const fromB = yield* service.ask(
+        assertion({
+          action: "bash",
+          resources: b.commands.map((cmd) => cmd.resource),
+          metadata: { shellCwd: "/project/b" },
+        }),
+      )
+      expect(fromA.effect).toBe("allow")
+      expect(fromB.effect).toBe("ask")
+    }),
+  )
+
+  it.effect("scopes the live shell action to cwd and rejects legacy unscoped approvals", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const saved = yield* PermissionSaved.Service
+      const service = yield* Permission.Service
+      yield* saved.add({ projectID: Project.ID.global, action: "shell", resources: ["npm test *"] })
+      const first = assertion({ action: "shell", resources: ["npm test"], metadata: { shellCwd: "/project/a" } })
+      expect((yield* service.ask(first)).effect).toBe("ask")
+      yield* saved.add({
+        projectID: Project.ID.global,
+        action: "shell",
+        resources: [`cwd-v1:${JSON.stringify("/project/a")}:npm test *`],
+      })
+      expect((yield* service.ask(first)).effect).toBe("allow")
+      expect(
+        (yield* service.ask({
+          ...first,
+          id: Permission.ID.create("per_other_cwd"),
+          metadata: { shellCwd: "/project/b" },
+        })).effect,
+      ).toBe("ask")
+      yield* setRules([{ action: "shell", resource: "*", effect: "deny" }])
+      expect((yield* service.ask(first)).effect).toBe("deny")
+    }),
+  )
+
+  it.effect("persists Always for the same shell cwd but not another cwd", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const { service, fiber, request } = yield* waitForRequest({
+        action: "shell",
+        resources: ["npm test"],
+        save: ["npm test *"],
+        metadata: { shellCwd: "/project/a" },
+      })
+      yield* service.reply({ requestID: request.id, reply: "always" })
+      yield* Fiber.join(fiber)
+      expect(
+        (yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_same_cwd"),
+            action: "shell",
+            resources: ["npm test"],
+            metadata: { shellCwd: "/project/a" },
+          }),
+        )).effect,
+      ).toBe("allow")
+      expect(
+        (yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_other_cwd"),
+            action: "shell",
+            resources: ["npm test"],
+            metadata: { shellCwd: "/project/b" },
+          }),
+        )).effect,
+      ).toBe("ask")
+      const saved = yield* PermissionSaved.Service
+      expect((yield* saved.list()).map((item) => item.resource)).toEqual([
+        `cwd-v1:${JSON.stringify("/project/a")}:npm test *`,
+      ])
+    }),
+  )
+
   it.effect("uses saved bash approvals while preserving configured deny precedence", () =>
     Effect.gen(function* () {
       yield* setup()

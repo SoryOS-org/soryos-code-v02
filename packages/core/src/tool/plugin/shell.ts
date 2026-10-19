@@ -141,6 +141,7 @@ export const Plugin = {
           save: parsed.commands.map((command) => command.save),
           sessionID: context.sessionID,
           agent: context.agent,
+          metadata: { shellCwd: target.absolute },
           source,
         })
       // Approval can outlive the directory, so validate immediately before spawning.
