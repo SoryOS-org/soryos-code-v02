@@ -10,6 +10,7 @@ import { useData } from "../context/data"
 import { modelPreferenceKey } from "../model-preference"
 import { useLocation } from "../context/location"
 import { useNewDesigns } from "../config"
+import { Harness, harnessOptions } from "../ecode-router"
 
 export function DialogModel(props: { providerID?: string }) {
   const local = useLocal()
@@ -33,6 +34,21 @@ export function DialogModel(props: { providerID?: string }) {
     const showSections = showExtra() && needle.length === 0
     const favorites = connected() ? local.model.favorite() : []
     const recents = local.model.recent()
+    const harnesses = props.providerID
+      ? []
+      : harnessOptions.map((harness) => ({
+          value: { providerID: "ecode", modelID: harness.id },
+          providerID: "ecode",
+          providerName: "ecode",
+          title: harness.title,
+          releaseDate: Number.MAX_SAFE_INTEGER,
+          description: harness.description,
+          category: "Coding harnesses",
+          onSelect() {
+            local.harness.set(harness.id)
+            dialog.clear()
+          },
+        }))
 
     function toOptions(items: typeof favorites, category: string) {
       if (!showSections) return []
@@ -46,7 +62,7 @@ export function DialogModel(props: { providerID?: string }) {
             value: { providerID: model.providerID, modelID: model.id },
             title: model.name,
             releaseDate: model.time.released,
-            description: provider?.name ?? model.providerID,
+            description: providerLabel(model.providerID, provider?.name),
             category,
             footer: free(model) ? "Free" : undefined,
             onSelect: () => {
@@ -76,11 +92,11 @@ export function DialogModel(props: { providerID?: string }) {
           return {
             value: { providerID: model.providerID, modelID: model.id },
             providerID: model.providerID,
-            providerName: provider?.name ?? model.providerID,
+            providerName: providerLabel(model.providerID, provider?.name),
             title: model.name,
             releaseDate: model.time.released,
             description: favorite ? "(Favorite)" : undefined,
-            category: connected() ? (provider?.name ?? model.providerID) : undefined,
+            category: connected() ? providerLabel(model.providerID, provider?.name) : undefined,
             footer: free(model) ? "Free" : undefined,
             onSelect() {
               onSelect(model.providerID, model.id)
@@ -107,14 +123,16 @@ export function DialogModel(props: { providerID?: string }) {
     if (needle) {
       return prioritizeFavorites(
         sortModelOptions(
-          fuzzysort.go(needle, modelOptions, { keys: ["title", "category"] }).map((item) => item.obj),
+          fuzzysort
+            .go(needle, [...harnesses, ...modelOptions], { keys: ["title", "category"] })
+            .map((item) => item.obj),
           false,
         ),
         favoritePriority,
       )
     }
 
-    return [...favoriteOptions, ...recentOptions, ...modelOptions]
+    return [...harnesses, ...favoriteOptions, ...recentOptions, ...modelOptions]
   })
 
   const provider = createMemo(() => (props.providerID ? providers().get(props.providerID) : undefined))
@@ -122,10 +140,11 @@ export function DialogModel(props: { providerID?: string }) {
   const title = createMemo(() => {
     const value = provider()
     if (!value) return "Select model"
-    return value.name
+    return providerLabel(value.id, value.name)
   })
 
   function onSelect(providerID: string, modelID: string) {
+    local.harness.set(Harness.Ecode)
     local.model.set({ providerID, modelID }, { recent: true })
     const list = local.model.variant.list()
     const cur = local.model.variant.current()
@@ -177,7 +196,11 @@ export function DialogModel(props: { providerID?: string }) {
       flat={true}
       skipFilter={true}
       title={title()}
-      current={local.model.current()}
+      current={
+        local.harness.current() === Harness.Ecode
+          ? local.model.current()
+          : { providerID: "ecode", modelID: local.harness.current() }
+      }
       focusCurrent={false}
     />
   )
@@ -223,4 +246,9 @@ export function sortModelOptions<
 
 function free(model: { cost: Array<{ input: number }> }) {
   return model.cost.length > 0 && model.cost.every((cost) => cost.input === 0)
+}
+
+function providerLabel(providerID: string, name: string | undefined) {
+  if (providerID === "opencode" || providerID === "opencode-go") return "ecode"
+  return name ?? providerID
 }

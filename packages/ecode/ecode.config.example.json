@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "defaultExecutor": "opencode",
+  "executors": {
+    "opencode": {
+      "kind": "opencode",
+      "enabled": true,
+      "command": "opencode",
+      "args": [],
+      "capabilities": ["files", "shell", "network", "mcp"],
+      "models": {
+        "fast": "anthropic/claude-haiku-4-20250514",
+        "balanced": "anthropic/claude-sonnet-4-20250514",
+        "deep": "openai/gpt-5.3-codex"
+      }
+    },
+    "codex": {
+      "kind": "codex-cli",
+      "enabled": false,
+      "command": "codex",
+      "args": [],
+      "approval": "on-request",
+      "capabilities": ["files", "shell", "network", "mcp"],
+      "models": {
+        "balanced": "gpt-5.6-sol",
+        "deep": "gpt-6-astra"
+      }
+    },
+    "claude-code": {
+      "kind": "claude-code-cli",
+      "enabled": false,
+      "command": "claude",
+      "args": [],
+      "permissionMode": {
+        "read": "plan",
+        "write": "acceptEdits"
+      },
+      "capabilities": ["files", "shell", "network", "browser", "mcp"],
+      "models": {
+        "fast": "haiku",
+        "balanced": "sonnet",
+        "deep": "opus"
+      }
+    }
+  }
+}

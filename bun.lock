@@ -369,6 +369,21 @@
         "@lydell/node-pty-win32-x64": "1.2.0-beta.12",
       },
     },
+    "packages/ecode": {
+      "name": "@opencode/ecode",
+      "version": "2.0.32",
+      "bin": {
+        "ecode": "./src/cli.ts",
+      },
+      "dependencies": {
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "@tsconfig/bun": "catalog:",
+        "@types/bun": "catalog:",
+        "@typescript/native": "catalog:",
+      },
+    },
     "packages/function": {
       "name": "@opencode/function",
       "version": "2.0.32",
@@ -2016,6 +2031,8 @@
     "@opencode/core": ["@opencode/core@workspace:packages/core"],
 
     "@opencode/desktop": ["@opencode/desktop@workspace:packages/desktop"],
+
+    "@opencode/ecode": ["@opencode/ecode@workspace:packages/ecode"],
 
     "@opencode/files": ["@opencode/files@workspace:services/files"],
 

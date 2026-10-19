@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode/ecode",
+  "version": "2.0.32",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "ecode": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "ecode": "bun src/cli.ts",
+    "build": "bun build src/cli.ts --compile --outfile dist/ecode",
+    "test": "bun test --only-failures",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "@typescript/native": "catalog:"
+  }
+}

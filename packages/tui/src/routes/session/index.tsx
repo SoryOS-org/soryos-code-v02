@@ -1141,7 +1141,9 @@ export function Session(props: {
       },
       run: () => {
         const lastAssistantMessage = messagesBeforeRevert().findLast(
-          (msg) => msg.type === "assistant" || (msg.type === "compaction" && msg.status === "completed" && msg.summary.trim() !== ""),
+          (msg) =>
+            msg.type === "assistant" ||
+            (msg.type === "compaction" && msg.status === "completed" && msg.summary.trim() !== ""),
         )
         if (!lastAssistantMessage) {
           toast.show({ message: "No assistant messages found", variant: "error" })
@@ -1451,9 +1453,7 @@ export function Session(props: {
                   onMouseOut={() => setLatestHovered(false)}
                   onMouseUp={toBottom}
                 >
-                  <text
-                    fg={latestHovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}
-                  >
+                  <text fg={latestHovered() ? theme.text.action.secondary.hovered : theme.text.action.secondary.base}>
                     Jump to latest ↓
                   </text>
                 </box>
@@ -1499,12 +1499,7 @@ export function Session(props: {
                     }}
                   </Show>
                 </Match>
-                <Match
-                  when={
-                    session() &&
-                    currentLocation.error?.location.directory === session()!.location.directory
-                  }
-                >
+                <Match when={session() && currentLocation.error?.location.directory === session()!.location.directory}>
                   <SessionLocationMissing
                     directory={session()!.location.directory}
                     projectID={session()!.projectID}
@@ -1964,11 +1959,15 @@ function SessionSwitchMessageV2(props: { message: SessionMessageInfo }) {
 function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   const ctx = use()
   const theme = useTheme()
+  const { currentSyntax: syntax } = useThemes()
+  const plugins = usePlugin()
   const renderer = useRenderer()
   const { navigate } = useRoute()
   const [hover, setHover] = createSignal(false)
   const metadata = () => (props.message.type === "synthetic" ? props.message.metadata : undefined)
   const source = () => stringValue(metadata()?.source)
+  const harness = () => stringValue(metadata()?.harness)
+  const model = () => stringValue(metadata()?.model)
   const completion = () => source() === "subagent" || source() === "shell"
   const childID = () => (source() === "subagent" ? stringValue(metadata()?.childID) : undefined)
   const state = () => stringValue(metadata()?.state)
@@ -1994,28 +1993,67 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   }
   return (
     <Show
-      when={completion()}
+      when={source() === "harness" || source() === "harness-user"}
       fallback={
-        <InlineToolRow icon="◈" color={theme.text.muted} pending="Notice" complete={true}>
-          {text()}
-        </InlineToolRow>
+        <Show
+          when={completion()}
+          fallback={
+            <InlineToolRow icon="◈" color={theme.text.muted} pending="Notice" complete={true}>
+              {text()}
+            </InlineToolRow>
+          }
+        >
+          <box
+            marginLeft={3}
+            onMouseOver={() => childID() && setHover(true)}
+            onMouseOut={() => setHover(false)}
+            onMouseUp={() => {
+              if (renderer.getSelection()?.getSelectedText()) return
+              const id = childID()
+              if (id) navigate({ type: "session", sessionID: id })
+            }}
+          >
+            <text wrapMode="none">
+              <span style={{ fg: color() }}>{heading()}</span>
+              <span style={{ fg: theme.text.muted }}>{suffix()}</span>
+            </text>
+          </box>
+        </Show>
       }
     >
-      <box
-        marginLeft={3}
-        onMouseOver={() => childID() && setHover(true)}
-        onMouseOut={() => setHover(false)}
-        onMouseUp={() => {
-          if (renderer.getSelection()?.getSelectedText()) return
-          const id = childID()
-          if (id) navigate({ type: "session", sessionID: id })
-        }}
+      <Show
+        when={source() === "harness-user"}
+        fallback={
+          <box paddingTop={1} paddingLeft={3} flexDirection="column">
+            <text fg={state() === "error" ? theme.text.feedback.error.base : theme.text.muted}>
+              {harness() === "claude-code" ? "Claude Code" : harness() === "opencode" ? "OpenCode CLI" : "Codex CLI"}
+              {model() ? ` · ${model()}` : ""}
+            </text>
+            <markdown
+              syntaxStyle={syntax()}
+              renderNode={plugins.markdown()}
+              streaming={false}
+              internalBlockMode="top-level"
+              content={stripAnsi(text())}
+              tableOptions={{ style: "grid", cellPaddingX: 1 }}
+              conceal={ctx.markdownMode() === "rendered"}
+              fg={state() === "error" ? theme.text.feedback.error.base : theme.markdown.text}
+              bg={theme.background.base}
+            />
+          </box>
+        }
       >
-        <text wrapMode="none">
-          <span style={{ fg: color() }}>{heading()}</span>
-          <span style={{ fg: theme.text.muted }}>{suffix()}</span>
-        </text>
-      </box>
+        <box
+          border={["left"]}
+          borderColor={theme.hue.accent[400]}
+          customBorderChars={SplitBorder.customBorderChars}
+          backgroundColor={theme.background.raised.base}
+        >
+          <box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor={theme.background.raised.base}>
+            <text fg={theme.text.base}>{text()}</text>
+          </box>
+        </box>
+      </Show>
     </Show>
   )
 }
@@ -2762,9 +2800,7 @@ function BlockTool(props: BlockToolProps) {
               <Show
                 when={props.spinner}
                 fallback={
-                  <text
-                    fg={permission() ? theme.text.feedback.warning.base : (props.headerColor ?? theme.text.muted)}
-                  >
+                  <text fg={permission() ? theme.text.feedback.warning.base : (props.headerColor ?? theme.text.muted)}>
                     {title()}
                   </text>
                 }
@@ -2952,11 +2988,7 @@ function ShellDisplay(props: {
           <Show
             when={isRunning()}
             fallback={
-              <text
-                fg={theme.text.base}
-                wrapMode={expanded() ? "word" : "char"}
-                maxHeight={expanded() ? undefined : 2}
-              >
+              <text fg={theme.text.base} wrapMode={expanded() ? "word" : "char"} maxHeight={expanded() ? undefined : 2}>
                 {limitedInput()}
               </text>
             }
@@ -3057,7 +3089,9 @@ function Read(props: ToolProps) {
         Read {pathFormatter.format(stringValue(props.input.path))}
         <Show when={props.input.offset !== undefined || props.input.limit !== undefined}>
           :{finiteNumber(props.input.offset) || 1}-
-          {props.input.limit ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1 : ""}
+          {props.input.limit
+            ? (finiteNumber(props.input.offset) || 1) + (finiteNumber(props.input.limit) || 0) - 1
+            : ""}
         </Show>
       </InlineTool>
       <For each={loaded()}>

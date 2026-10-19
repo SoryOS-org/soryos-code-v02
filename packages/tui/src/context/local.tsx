@@ -1,7 +1,7 @@
 import { createStore } from "solid-js/store"
 import { dedupeWith } from "effect/Array"
 import { createSimpleContext } from "./helper"
-import { batch, createMemo, onCleanup } from "solid-js"
+import { batch, createMemo, createSignal, onCleanup } from "solid-js"
 import { useEvent } from "./event"
 import path from "path"
 import { useTuiPaths } from "./runtime"
@@ -26,6 +26,7 @@ import { useData } from "./data"
 import { usePermission } from "./permission"
 import { useLocation } from "./location"
 import { parse } from "../util/model"
+import { Harness, type Harness as HarnessSelection } from "../ecode-router"
 
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
@@ -40,6 +41,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const event = useEvent()
     const permission = usePermission()
     const location = useLocation()
+    const [selectedHarness, setSelectedHarness] = createSignal<HarnessSelection>(Harness.Router)
 
     const models = () => data.location.model.list(location.ref)
     const providers = () => data.location.provider.list(location.ref)
@@ -407,7 +409,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const provider = providers()?.find((item) => item.id === value.providerID)
           const info = models()?.find((item) => item.providerID === value.providerID && item.id === value.modelID)
           return {
-            provider: provider?.name ?? value.providerID,
+            provider:
+              value.providerID === "opencode" || value.providerID === "opencode-go"
+                ? "ecode"
+                : (provider?.name ?? value.providerID),
             model: info?.name ?? `${value.modelID} (unavailable)`,
             reasoning: (info?.variants?.length ?? 0) !== 0,
           }
@@ -609,6 +614,10 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       agent,
       session,
       permission,
+      harness: {
+        current: selectedHarness,
+        set: setSelectedHarness,
+      },
     }
     return result
   },
