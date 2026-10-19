@@ -4,9 +4,9 @@ import { motionPresets, motionTuning, type MotionKnob } from "./motion-tuning"
 const global = "Global"
 
 /**
- * Mounts the Motion workspace into `container`: a tab per surface, Global on every tab, an action row per replay
- * button, a "Jump to" palette over sections, actions and presets, the Snappy, Smooth and Calm presets for every spring
- * at once, and copy as code. knobs loads on first
+ * Mounts the Motion workspace into `container`: a tab per surface under the Snappy, Smooth and Calm presets for every
+ * spring at once. Each tab shows one Global card (speed, slow motion and other settings every surface reads), then one
+ * card for its surface: its springs and knobs, with its replay buttons under a Replay sub-heading. knobs loads on first
  * mount, so importing this module costs nothing until then. Works anywhere a surface registered its knobs, including
  * Storybook stories. Returns its removal.
  */
@@ -23,10 +23,7 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
   }
 
   async function start() {
-    const [{ action, defineControls, knob, spring, toggle }, { commandPalette, commandsFrom }] = await Promise.all([
-      import("knobs"),
-      import("knobs/ui"),
-    ])
+    const { action, defineControls, knob, spring, toggle } = await import("knobs")
 
     const field = (item: MotionKnob) => {
       const meta = { label: item.label, group: item.group, tab: item.group === global ? undefined : item.group }
@@ -65,37 +62,21 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
       const springs = list.flatMap((item) => (item.kind === "spring" ? [item] : []))
       const sections = [...new Set([...list, ...actions].map((item) => item.group))].filter((group) => group !== global)
 
-      const palette = commandPalette({
-        hotkey: false,
-        recents: false,
-        placeholder: "Jump to a section, action or preset",
-        commands: () => [
-          ...sections.map((id) => ({
-            id: `section.${id}`,
-            label: id,
-            section: "Sections",
-            run: () => {
-              section = id
-              mount()
-            },
-          })),
-          ...commandsFrom(controls, { fields: false }).filter((command) => command.label !== "Jump to…"),
-        ],
-      })
-
       const controls = defineControls(
         "opencode-motion",
         {
           // Global first, then each section's knobs and its replay buttons together, so each shows as one card.
           ...Object.fromEntries(list.filter((item) => item.group === global).map((item) => [item.id, field(item)])),
-          ...Object.fromEntries([["jump", action("Jump to…", { group: global, run: () => palette.open() })]]),
           ...Object.fromEntries(
             [...list, ...actions]
               .filter((item) => item.group !== global)
               .toSorted((a, b) => sections.indexOf(a.group) - sections.indexOf(b.group))
               .map((item) =>
                 "run" in item
-                  ? [`action.${item.id}`, action(item.label, { group: item.group, tab: item.group, run: item.run })]
+                  ? [
+                      `action.${item.id}`,
+                      action(item.label, { group: item.group, tab: item.group, subsection: "Replay", run: item.run }),
+                    ]
                   : [item.id, field(item)],
               ),
           ),
@@ -142,7 +123,6 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
       unmount = () => {
         stopWatch()
         stopPanel()
-        palette.dispose()
       }
     }
 

@@ -17,7 +17,7 @@ export const panelSpring = motionTuning.spring("panels", {
 
 const keyboardInstant = motionTuning.toggle("keyboardInstant", {
   label: "Keyboard toggles are instant",
-  group,
+  group: "Global",
   value: true,
 })
 

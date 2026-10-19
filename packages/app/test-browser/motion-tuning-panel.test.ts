@@ -9,7 +9,7 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-it("offers Snappy, Smooth and Calm for every spring, with one card per section", async () => {
+it("offers Snappy, Smooth and Calm for every spring, with one Global card and one card per section", async () => {
   const panels = motionTuning.spring("test.panels", {
     label: "Spring",
     group: "Panels",
@@ -46,12 +46,15 @@ it("offers Snappy, Smooth and Calm for every spring, with one card per section",
   expect(labels).toContain("Calm")
   expect(labels).not.toContain("default")
 
-  // Global once, then the section's knobs and its replay button in one card.
-  const cards = [...container.querySelectorAll(".knobs-group-label")].filter(
-    (label) => label.closest("[hidden]") === null,
-  )
+  // Global once, then the section's spring with its replay buttons under a sub-heading in the same card.
+  const shown = (selector: string) =>
+    [...container.querySelectorAll(selector)].flatMap((element) =>
+      element.closest("[hidden]") === null ? [element.textContent?.trim()] : [],
+    )
 
-  expect(cards.map((label) => label.textContent)).toEqual(["Global", "Panels"])
+  expect(shown(".knobs-group-label")).toEqual(["Global", "Panels"])
+  expect(shown(".knobs-subhead-label")).toEqual(["Replay"])
+  expect(labels).not.toContain("Jump to…")
   expect(panels()).toEqual({ duration: 0.15, bounce: 0 })
 
   chip.click()
