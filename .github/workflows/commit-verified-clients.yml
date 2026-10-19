@@ -1,0 +1,66 @@
+name: Commit verified generated clients (fork only)
+
+on:
+  push:
+    branches: [custom-provider-save]
+    paths: [.github/workflows/commit-verified-clients.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: github.repository == 'WhoCares1337/opencode'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Generate clients
+        working-directory: packages/client
+        run: bun run generate
+      - name: Verify exact approved file contents
+        run: |
+          sha256sum --check <<'CHECKSUMS'
+          aa7a3fb612bfeac605d0dbe5adc9d4f6a4bb0ca07ad72fdaaf1b5902790be3af  packages/client/src/effect/api/api.ts
+          97431f38fffc2b3ba53ccb84c2b7a4e54fe15501ef0b86ad47c4ea5f4acad28a  packages/client/src/effect/generated/client.ts
+          647211b898c9a44733ac432ece4e93e309b1a9a8e5d57774ae7259f438260d1b  packages/client/src/promise/generated/client.ts
+          d4499d434f7e1906b8b8aee87234da6fde279f4f0c322b7ddad4493d294488c0  packages/client/src/promise/generated/types.ts
+          CHECKSUMS
+          git diff --name-only | sort > /tmp/generated-actual.txt
+          printf '%s\n' \
+            packages/client/src/effect/api/api.ts \
+            packages/client/src/effect/generated/client.ts \
+            packages/client/src/promise/generated/client.ts \
+            packages/client/src/promise/generated/types.ts | sort > /tmp/generated-expected.txt
+          if [ -s /tmp/generated-actual.txt ]; then
+            diff -u /tmp/generated-expected.txt /tmp/generated-actual.txt
+          fi
+      - name: Commit only verified generated clients
+        run: |
+          git add -- \
+            packages/client/src/effect/api/api.ts \
+            packages/client/src/effect/generated/client.ts \
+            packages/client/src/promise/generated/client.ts \
+            packages/client/src/promise/generated/types.ts
+          if git diff --cached --quiet; then
+            echo 'Verified generated clients are already committed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "chore(client): regenerate provider patch API"
+          git push origin HEAD:refs/heads/custom-provider-save
+          git rev-parse HEAD >> "$GITHUB_STEP_SUMMARY"
