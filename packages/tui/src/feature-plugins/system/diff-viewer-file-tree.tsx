@@ -141,7 +141,6 @@ export function DiffViewerFileTree(props: DiffViewerFileTreeProps) {
                     const background = () => {
                       // Elevated context maps this to a quiet neutral surface step, not the loud accent.
                       if (hovered()) return theme.background.raised.high
-                      if (selected()) return theme.background.action.primary.selected
                       return theme.background.raised.base
                     }
                     const marker = () => {
