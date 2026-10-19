@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { seed, sessionHref, type SeedInput } from "../utils/app"
-import { openFileLauncher } from "../utils/side-panel"
+import { browseFiles, openFileLauncher } from "../utils/side-panel"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { fileNode } from "../utils/workspace"
 
@@ -268,7 +268,7 @@ test("the summary's changes row switches the view and keeps the side tabs", asyn
 
   // After a reload forgets the preview, a stored Open file tab is still the slot a narrow-screen file open replaces.
   const launcher = panel.getByRole("tab", { name: "Open file", exact: true })
-  await openFileLauncher(panel)
+  await browseFiles(page)
   await expect(launcher).toHaveAttribute("aria-selected", "true")
   await expect(readme).toHaveCount(0)
   await page.reload()
