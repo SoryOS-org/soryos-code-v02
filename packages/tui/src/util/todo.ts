@@ -29,26 +29,15 @@ export function todoMarker(status: TodoStatus, ascii = false) {
   return "[ ]"
 }
 
-/**
- * The current list is the latest completed `todowrite` input or post-compaction todo reminder,
- * after the latest completed compaction and before the revert boundary. An empty list means none.
- */
+/** The current list is the input of the latest completed `todowrite` call before the revert boundary. */
 export function sessionTodos(messages: ReadonlyArray<SessionMessageInfo>, boundary?: string): Todo[] {
   const boundaryIndex = boundary ? messages.findIndex((message) => message.id === boundary) : -1
-  const visible = messages.slice(0, boundaryIndex === -1 ? messages.length : boundaryIndex)
-  const compaction = visible.findLastIndex((message) => message.type === "compaction" && message.status === "completed")
-  const source = visible
-    .slice(compaction + 1)
-    .flatMap((message) => {
-      if (message.type === "synthetic" && message.metadata?.kind === "todo.reminder") return [message.metadata.todos]
-      if (message.type !== "assistant") return []
-      return message.content
-        .filter(
-          (item): item is SessionMessageAssistantTool & { state: SessionMessageToolStateCompleted } =>
-            item.type === "tool" && item.name === "todowrite" && item.state.status === "completed",
-        )
-        .map((item) => item.state.input.todos)
-    })
-    .at(-1)
-  return parseTodos(source)
+  const tool = messages
+    .slice(0, boundaryIndex === -1 ? messages.length : boundaryIndex)
+    .flatMap((message) => (message.type === "assistant" ? message.content : []))
+    .findLast(
+      (item): item is SessionMessageAssistantTool & { state: SessionMessageToolStateCompleted } =>
+        item.type === "tool" && item.name === "todowrite" && item.state.status === "completed",
+    )
+  return parseTodos(tool?.state.input.todos)
 }
