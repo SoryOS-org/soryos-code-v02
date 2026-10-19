@@ -11,7 +11,8 @@ import tabStyles from "./tabs.css?inline"
 const setup: Setup<typeof definition> = (ctx) => {
   const sessions = ctx.sessions
   const [model, setModel] = createSignal<Model>()
-  // Settings > Shortcuts lists the command on every platform; it stays disabled until the pane can open.
+  // Settings > Shortcuts lists the command on every platform; it stays disabled until the pane can open. Unbound by
+  // default: the sidebar owns mod+shift+b, and mod+t opens a tab from inside the pane.
   ctx.add(Command, (): Command | undefined => {
     const view = sessions.current()
 
@@ -22,7 +23,6 @@ const setup: Setup<typeof definition> = (ctx) => {
       id: "open",
       title: ctx.t("command.open"),
       group: ctx.t("command.category.view"),
-      bind: "mod+shift+b",
       enabled: !!value?.available(view),
       run: () => value?.open(view),
     }
@@ -107,6 +107,27 @@ const setup: Setup<typeof definition> = (ctx) => {
     }
   })
 
+  // As in a browser, mod+t opens a tab inside the pane; everywhere else it keeps the app's new session.
+  ctx.add(Command, (): Command | undefined => {
+    const view = sessions.current()
+    const value = model()
+    const pane = value?.pane()
+
+    if (!view || !value || !pane) return undefined
+
+    return {
+      id: "newTab",
+      title: ctx.t("command.newTab"),
+      group: ctx.t("command.category.view"),
+      bind: "mod+t",
+      scope: "#browser-panel",
+      hidden: true,
+      editable: true,
+      enabled: pane.visible() && value.available(view),
+      run: () => value.open(view),
+    }
+  })
+
   // Chromium's element picker chord. While the page has focus, the page claims it itself; here it covers focus elsewhere
   // in the pane. Ctrl+Shift+C copies in the terminal outside the pane.
   ctx.add(Command, (): Command | undefined => {
@@ -139,7 +160,8 @@ const setup: Setup<typeof definition> = (ctx) => {
       id: "open",
       title: ctx.t("tab.new"),
       icon: "globe",
-      keybind: "browser.open",
+      // mod+t opens a browser tab only inside the pane, so advertise it only while the pane is on screen.
+      keybind: value.pane()?.visible() ? "browser.newTab" : undefined,
       order: 40,
       primary: true,
       run: () => value.open(view),

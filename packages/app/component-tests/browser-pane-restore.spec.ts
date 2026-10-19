@@ -1,6 +1,6 @@
 import { expect, sourceURL, story } from "../../storybook/playwright/story"
-import type { ParentProps } from "solid-js"
-import type { Command } from "@opencode/gui-extensions/sdk"
+import type { Accessor, ParentProps } from "solid-js"
+import type { Command, MenuItem } from "@opencode/gui-extensions/sdk"
 import type { Item } from "../src/runtime/extension/host"
 
 const source = (path: string) => sourceURL(new URL(path, import.meta.url))
@@ -81,15 +81,32 @@ story.beforeEach(async ({ mount, page }) => {
             })
           },
         }),
-      Commands: (props: { close: () => void; review: () => void }) => {
+      Commands: (props: {
+        close: () => void
+        review: () => void
+        newSession: () => void
+        shortcut: (shortcut: Accessor<string>) => void
+      }) => {
         const command = commands.useCommand()
         const extensions = host.useExtensionHost()
+        // What the side strip's + shows beside the browser item, through the host's own formatter.
+        props.shortcut(() => {
+          const item = extensions.list(sdk.MenuItem).find((value: MenuItem) => value.menu === "session.panel")
+
+          return item?.menu === "session.panel" && item.keybind ? command.keybind(item.keybind) : ""
+        })
         command.register("fixture-session", () => [
           {
             id: "tab.close",
             title: "Close session tab",
             keybind: "mod+w",
             onSelect: props.close,
+          },
+          {
+            id: "tab.new",
+            title: "New session",
+            keybind: "mod+t,mod+n",
+            onSelect: props.newSession,
           },
           {
             id: "review.toggle",
@@ -218,6 +235,57 @@ story("keeps in-page shortcuts like ⌘K in the page while forwarding ⌘⇧R an
   await expect(editor).toHaveValue("handled:k")
   await expect(root.getByTestId("browser-closes")).toHaveText('["tab_33333333-3333-3333-3333-333333333333"]')
   await expect(root.getByTestId("session-state")).toHaveText("open")
+})
+
+story("opens a browser tab with ⌘T inside the pane and a session everywhere else", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
+  const mod = mac ? "Meta" : "Control"
+  const outside = root.getByRole("button", { name: "Beta", exact: true })
+  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
+  const editor = page.frameLocator('iframe[title="Browser page"]').getByRole("textbox", { name: "Editor page input" })
+  const opens = root.getByTestId("browser-opens")
+  const sessions = root.getByTestId("new-sessions")
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  // Alpha shows a file tab, so the + advertises no browser shortcut.
+  await expect(root.getByTestId("add-shortcut")).toHaveText("none")
+  await outside.click()
+  await expect(root.getByText("Registrations: 2", { exact: true })).toBeVisible()
+  await root.getByRole("button", { name: "First inventory", exact: true }).click()
+  await expect(root.getByRole("tab", { name: "Preview", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(root.getByTestId("add-shortcut")).toHaveText(mac ? "⌘T" : "Ctrl+T")
+
+  // Outside the pane the shell keeps ⌘T.
+  await outside.focus()
+  await outside.press(`${mod}+t`)
+  await expect(sessions).toHaveText("1")
+  await expect(opens).toHaveText("0")
+
+  // Inside the pane it opens a browser tab instead.
+  await address.focus()
+  await address.press(`${mod}+t`)
+  await expect(opens).toHaveText("1")
+
+  // Dvorak's T sits on the physical K key: the shortcut follows the character, not the key position.
+  await address.evaluate((element, meta) => {
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "t",
+        code: "KeyK",
+        metaKey: meta,
+        ctrlKey: !meta,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+  }, mac)
+  await expect(opens).toHaveText("2")
+
+  // A focused page hands the reserved chord to the pane before it sees it.
+  await editor.focus()
+  await editor.press(`${mod}+t`)
+  await expect(opens).toHaveText("3")
+  await expect(sessions).toHaveText("1")
 })
 
 story("keeps a restored browser tab selected and undrawn until the desktop's first inventory", async ({ page }) => {
