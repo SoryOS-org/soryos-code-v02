@@ -159,8 +159,10 @@
   }
 }
 
+/* The dialog stack's overlay rule is unlayered, so it outranks this layered one unless marked important; without it the
+   overlay's full dim appears in one frame under the preview's own scrim. */
 [data-component="dialog-overlay"]:has(+ [data-dialog-layer] > [data-component="image-preview"]) {
-  background-color: transparent;
+  background-color: transparent !important;
 }
 
 [data-image-preview-origin] {
