@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, spyOn } from "bun:test"
 import { createRoot, createSignal } from "solid-js"
+import { motionTuning } from "@opencode/ui/motion-tuning"
 import { createPanelMotion } from "../src/shell/panel-motion"
 
 let frames: Map<number, FrameRequestCallback>
@@ -142,7 +143,27 @@ it("repaints at rest when the open size changes, like a resize drag", () => {
   expect(frames.size).toBe(0)
 })
 
-it("applies keyboard toggles at once", () => {
+it("animates keyboard toggles by default", () => {
+  window.dispatchEvent(new Event("keydown"))
+  const panel = setup(true)
+
+  panel.setOpen(false)
+  expect(panel.present()).toBe(true)
+  frame()
+  expect(panel.painted.width).toBeGreaterThan(0)
+  expect(panel.painted.width).toBeLessThan(200)
+  settle()
+  expect(panel.painted.width).toBe(0)
+  expect(panel.closed).toHaveLength(1)
+})
+
+it("applies keyboard toggles at once when the setting is on", () => {
+  const setting = motionTuning.list().find((item) => item.id === "keyboardInstant")
+  expect(setting?.kind).toBe("toggle")
+
+  if (setting?.kind !== "toggle") return
+  motionTuning.set(setting, true)
+  cleanups.push(() => motionTuning.set(setting, false))
   window.dispatchEvent(new Event("keydown"))
   const panel = setup(true)
 

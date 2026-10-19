@@ -18,7 +18,7 @@ export const panelSpring = motionTuning.spring("panels", {
 const keyboardInstant = motionTuning.toggle("keyboardInstant", {
   label: "Keyboard toggles are instant",
   group: "Global",
-  value: true,
+  value: false,
 })
 
 /** Adds buttons that play a panel's toggle to the Panels section of the Motion workspace while the panel is mounted. */
