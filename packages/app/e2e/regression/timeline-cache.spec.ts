@@ -37,7 +37,11 @@ for (const width of [1440, 390]) {
               ? [row.dataset.timelineKey!]
               : [],
           ),
-          bottomError: (spacer?.getBoundingClientRect().bottom ?? Infinity) - root.getBoundingClientRect().bottom,
+          // The viewport runs on under the composer; its visible part ends at the composer region.
+          bottomError:
+            (spacer?.getBoundingClientRect().bottom ?? Infinity) -
+            root.getBoundingClientRect().bottom +
+            parseFloat(getComputedStyle(root).scrollPaddingBottom),
           tables: answer.querySelectorAll("table").length,
           codeBlocks: answer.querySelectorAll("pre").length,
         }
@@ -528,7 +532,9 @@ async function sampleTabPaint(page: Page, sessionID: string) {
         )
 
         if (root) {
-          const view = root.getBoundingClientRect()
+          // The part of the viewport above the composer region, which the timeline scrolls on under.
+          const box = root.getBoundingClientRect()
+          const view = { top: box.top, bottom: box.bottom - parseFloat(getComputedStyle(root).scrollPaddingBottom) }
 
           // A frame counts only when the row is painted: inside the viewport and not hidden by CSS.
           const inView = (element: Element) => {

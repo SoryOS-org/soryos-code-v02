@@ -69,13 +69,13 @@ export function SessionActivityChips(props: {
 
   return (
     <Show when={props.subagents.length > 0 || props.shells.length > 0}>
-      <div data-component="session-activity-chips" class="flex items-center pb-2">
+      <div data-component="session-activity-chips" class="pointer-events-none flex items-center pb-2">
         <Menu gutter={6} placement="top-start">
           <Menu.Trigger
             as="button"
             type="button"
             data-slot="session-activity-chip"
-            class="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-v2-border-border-base bg-v2-background-bg-base ps-2 pe-2.5 text-[13px] font-[530] leading-text-compact tracking-[-0.04px] whitespace-nowrap tabular-nums text-v2-text-text-base shadow-[var(--v2-elevation-raised)] outline-none duration-150 ease-out animate-in fade-in motion-reduce:animate-none hover:bg-v2-background-bg-layer-01 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v2-border-border-focus"
+            class="pointer-events-auto flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-v2-border-border-base bg-v2-background-bg-base ps-2 pe-2.5 text-[13px] font-[530] leading-text-compact tracking-[-0.04px] whitespace-nowrap tabular-nums text-v2-text-text-base shadow-[var(--v2-elevation-raised)] outline-none duration-150 ease-out animate-in fade-in motion-reduce:animate-none hover:bg-v2-background-bg-layer-01 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v2-border-border-focus"
           >
             <SessionProgressIndicatorV2 class="shrink-0" />
             <span class="truncate">{label()}</span>

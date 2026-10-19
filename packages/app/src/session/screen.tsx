@@ -242,6 +242,9 @@ function SessionScreenContent(props: {
           centered={screen.centered()}
           reserveReviewToggle={!sideVisible()}
           setContentRef={timeline.view.setContentRef}
+          bottomInset={timeline.inset()}
+          fadeInset={timeline.edge()}
+          setVisibleRef={timeline.view.setVisibleRef}
           anchor={timeline.view.anchor}
           setRevealMessage={timeline.view.setRevealMessage}
           setRevealPart={timeline.view.setRevealPart}
@@ -290,7 +293,7 @@ function SessionScreenContent(props: {
           throw error()
         }}
       </Show>
-      <div class="relative flex-1 min-h-0 overflow-hidden">
+      <div class="relative isolate flex-1 min-h-0 overflow-hidden">
         <Show when={!isDesktop() && session.identity.params.id}>
           <For each={cachedViews()}>
             {(entry) => (
@@ -336,16 +339,21 @@ function SessionScreenContent(props: {
         </Switch>
       </div>
 
-      <Show when={composer.active()} keyed>
-        {(model) => (
-          <ActiveSessionComposerRegion
-            session={session}
-            model={model}
-            suggestionBoundary={timeline.scroller}
-            onReveal={timeline.actions.revealPart}
-          />
-        )}
-      </Show>
+      {/* The composer region overflows this zero-height row upward, over a timeline that scrolls on underneath it. It
+          stays shallower than the timeline's observed elements, so their resizes from its inset arrive in the same
+          ResizeObserver pass. */}
+      <div class="relative z-[70] flex h-0 shrink-0 flex-col justify-end">
+        <Show when={composer.active()} keyed>
+          {(model) => (
+            <ActiveSessionComposerRegion
+              session={session}
+              model={model}
+              suggestionBoundary={timeline.visible}
+              onReveal={timeline.actions.revealPart}
+            />
+          )}
+        </Show>
+      </div>
       <Show when={!isDesktop() && !!session.identity.params.id && bottomMobileTabs()}>{mobileTabs()}</Show>
     </>
   )

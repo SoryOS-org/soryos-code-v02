@@ -39,9 +39,25 @@
 
 @layer components {
   [data-slot="session-chat-panel"][data-scrollbar-hidden="true"]
-    [data-slot="session-timeline-scroll"]
-    > .scroll-view__thumb {
+    [data-slot="session-timeline-visible"]
+    .scroll-view__thumb {
     visibility: hidden;
+  }
+
+  /* The timeline scrolls on under the composer region, passing behind its pill and docks, and fades out as it reaches
+     the composer card. A mask fades the content itself, so the edge works over any theme's background; smoothstep
+     stops avoid a visible horizon. */
+  [data-slot="session-timeline-scroll"] > .scroll-view__viewport {
+    --session-timeline-fade-start: var(--session-timeline-fade-edge, 0px);
+    scroll-padding-bottom: var(--session-timeline-inset, 0px);
+    mask-image: linear-gradient(
+      to top,
+      transparent var(--session-timeline-fade-start),
+      rgb(0 0 0 / 0.16) calc(var(--session-timeline-fade-start) + 5px),
+      rgb(0 0 0 / 0.5) calc(var(--session-timeline-fade-start) + 10px),
+      rgb(0 0 0 / 0.84) calc(var(--session-timeline-fade-start) + 15px),
+      #000 calc(var(--session-timeline-fade-start) + 20px)
+    );
   }
 
   #review-panel {

@@ -9,7 +9,7 @@ for (const reducedMotion of [false, true]) {
     const chat = page.locator('[data-slot="session-chat-panel"]')
     const scroll = page.locator('[data-slot="session-timeline-scroll"]')
     const viewport = scroll.locator(".scroll-view__viewport")
-    const thumb = scroll.locator('.scroll-view__thumb[data-orientation="vertical"]')
+    const thumb = page.locator('[data-slot="session-timeline-visible"] .scroll-view__thumb')
     const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
     await expect(thumb).toHaveCount(1)
     await scroll.hover()

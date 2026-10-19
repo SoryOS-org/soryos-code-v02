@@ -19,10 +19,15 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     pendingMessage: string | undefined
     scroll: { overflow: boolean; jump: boolean }
     follow: { sessionKey: string; pinned: boolean }
+    /** The composer region's height; the timeline scrolls on underneath it. */
+    inset: number
+    /** Distance from the composer region's bottom to the top of its opaque card, where the timeline fades out. */
+    edge: number
     refs: {
       scroller: HTMLDivElement | undefined
       content: HTMLDivElement | undefined
       dock: HTMLDivElement | undefined
+      visible: HTMLDivElement | undefined
     }
   }>({
     messageID: undefined,
@@ -35,10 +40,13 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       sessionKey: session.identity.sessionKey(),
       pinned: true,
     },
+    inset: 0,
+    edge: 0,
     refs: {
       scroller: undefined,
       content: undefined,
       dock: undefined,
+      visible: undefined,
     },
   })
 
@@ -53,7 +61,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   }
 
   let scroller: HTMLDivElement | undefined
-  let dockHeight = 0
   // The history entry whose tool call was already revealed.
   let revealed: string | undefined
 
@@ -354,17 +361,25 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   )
   createResizeObserver(
     () => state.refs.dock,
-    ({ height }) => {
-      const next = Math.ceil(height)
+    (_rect, element, entry) => {
+      const next = Math.ceil(entry.borderBoxSize[0]?.blockSize ?? 0)
+      // Only the activity pill floats with gaps beside it; the docks, queue and composer below it form one opaque
+      // card. The pill changes the region's height as it comes and goes, so this observer sees every move of the edge.
+      const region = element.getBoundingClientRect()
+      const pill = element.querySelector('[data-component="session-activity-chips"]')?.getBoundingClientRect()
+      const edge = pill && pill.top - region.top < 1 ? Math.round(region.bottom - pill.bottom) : next
 
-      if (next === dockHeight) return
-      const delta = next - dockHeight
+      if (edge !== state.edge) setState("edge", edge)
 
+      if (next === state.inset) return
+      const delta = next - state.inset
+
+      // Measured before the new inset applies: a shrinking region also keeps a reader whose end it uncovers.
       const stick = scroller
-        ? pinned() || scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 10 + Math.max(0, delta)
+        ? pinned() || scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 10 + Math.max(0, -delta)
         : false
 
-      dockHeight = next
+      setState("inset", next)
 
       if (stick) scrollToEnd()
 
@@ -388,11 +403,15 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       resume,
       setActiveMessage,
     },
+    inset: () => state.inset,
+    edge: () => state.edge,
     lastUserMessage: timeline.lastUserMessage,
     resource: timeline.resource,
     ready: timeline.ready,
     scroll: state.scroll,
     scroller: () => state.refs.scroller,
+    /** The part of the timeline not covered by the composer region. */
+    visible: () => state.refs.visible,
     view: {
       anchor,
       markUserScroll,
@@ -408,6 +427,9 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       },
       setDockRef: (element: HTMLDivElement | undefined) => {
         setState("refs", "dock", element)
+      },
+      setVisibleRef: (element: HTMLDivElement | undefined) => {
+        setState("refs", "visible", element)
       },
       setRevealMessage: (reveal: (id: string, partID?: string) => void) => {
         revealMessage = reveal

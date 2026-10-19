@@ -6,6 +6,7 @@ import {
   historyMessages,
   partUpdated,
   renderedPartID,
+  session,
   sessionID,
   setupTimeline,
   shell,
@@ -630,3 +631,81 @@ async function captureCardEdges(page: Page, card: Locator) {
     { source: `data:image/png;base64,${screenshot.toString("base64")}`, viewport, box },
   )
 }
+
+test("scrolls the timeline behind the composer region, fading at the card, and keeps its end above the region", async ({
+  page,
+}) => {
+  await setupTimeline(page, {
+    sessionMessages: [
+      ...validateTimelineMessages(historyMessages(18)),
+      { id: "msg_9000_user", type: "user", text: "Split the work.", time: { created: 1 } },
+      {
+        id: "msg_9001_assistant",
+        type: "assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+        content: [
+          {
+            type: "tool",
+            id: "call_running_subagent",
+            name: "subagent",
+            state: {
+              status: "running",
+              input: { description: "Trace frame budget", agent: "explore" },
+              metadata: { sessionID: "ses_running_subagent" },
+            },
+            time: { created: 2 },
+          },
+          { type: "text", id: "prt_timeline_end", text: "The last answer ends above the composer region." },
+        ],
+        time: { created: 2 },
+      },
+    ],
+    sessions: [
+      session(),
+      session({ id: "ses_running_subagent", parentID: sessionID, title: "Trace frame budget", agent: "explore" }),
+    ],
+    sessionStatus: { [sessionID]: { type: "busy" }, ses_running_subagent: { type: "busy" } },
+  })
+  const dock = page.locator('[data-component="session-composer-dock"]')
+  const editor = page.locator('[data-component="composer"]').getByRole("textbox")
+  await expect(page.getByRole("button", { name: "1 subagent", exact: true })).toBeVisible()
+  await expect(page.getByText("The last answer ends above the composer region.", { exact: true })).toBeVisible()
+
+  const geometry = () =>
+    page.evaluate(() => {
+      const edge = "--session-timeline-fade-edge"
+      const viewport = document.querySelector<HTMLElement>('[data-slot="session-timeline-scroll"] > *')!
+      const region = document.querySelector('[data-component="session-composer-dock"]')!
+      const dock = region.getBoundingClientRect()
+      const card = region.querySelector('[data-component="composer"]')!.getBoundingClientRect()
+      const parts = [...viewport.querySelectorAll("[data-timeline-part-id]")]
+      const last = parts.find((element) => element.textContent?.includes("The last answer ends"))!
+
+      return {
+        // The scroll area runs on behind the composer region to the panel's bottom edge.
+        behind: Math.round(viewport.getBoundingClientRect().bottom - dock.bottom),
+        inset: Math.round(viewport.querySelector<HTMLElement>("[data-timeline-inset]")!.offsetHeight - dock.height),
+        // Content stays visible behind the pill and fades out where the composer card starts.
+        fade: Math.round(dock.bottom - card.top - parseFloat(getComputedStyle(viewport).getPropertyValue(edge))),
+        behindPill: card.top - dock.top > 20,
+        atEnd: viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 1,
+        clear: last.getBoundingClientRect().bottom <= dock.top,
+      }
+    })
+
+  const expected = { behind: 0, inset: 0, fade: 0, behindPill: true, atEnd: true, clear: true }
+  await expect.poll(geometry).toEqual(expected)
+  const before = (await dock.boundingBox())!.height
+
+  await editor.click()
+  await page.keyboard.type("A draft")
+
+  for (const line of ["that grows", "the composer", "by several lines"]) {
+    await page.keyboard.press("Shift+Enter")
+    await page.keyboard.type(line)
+  }
+
+  await expect.poll(async () => (await dock.boundingBox())!.height).toBeGreaterThan(before + 40)
+  await expect.poll(geometry).toEqual(expected)
+})
