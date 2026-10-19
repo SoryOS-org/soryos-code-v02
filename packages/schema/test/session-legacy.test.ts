@@ -100,21 +100,6 @@ describe("SessionLegacy", () => {
     })
   })
 
-  test("stores the empty recent that versions before v2.1 require, and reads drop it", () => {
-    const stored = SessionLegacy.storedMessage("compaction", { status: "completed", summary: "s" })
-    expect(stored).toHaveProperty("recent", "")
-    expect(SessionLegacy.message("compaction", stored)).toEqual({ status: "completed", summary: "s" })
-    // Compactions imported with kept text (V1, old exports) keep it where older versions read it.
-    expect(
-      SessionLegacy.storedMessage("compaction", { status: "completed", metadata: { recent: "[User]: kept" } }),
-    ).toHaveProperty("recent", "[User]: kept")
-    const failed = { status: "failed" }
-    expect(SessionLegacy.storedMessage("compaction", failed)).toBe(failed)
-    expect(SessionLegacy.storedEvent("session.compaction.ended", { text: "s" })).toHaveProperty("recent", "")
-    const text = { text: "s" }
-    expect(SessionLegacy.storedEvent("session.text.ended", text)).toBe(text)
-  })
-
   test("upgrades exported messages before decoding", () => {
     const message = {
       id: "msg_legacy",

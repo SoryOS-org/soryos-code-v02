@@ -34,21 +34,6 @@ export function message(type: unknown, data: Record<string, unknown>) {
   return data
 }
 
-/**
- * Versions before v2.1 require `recent` on compaction messages and their started and ended events, so stored copies
- * keep one that lets a downgraded install still load the session: the kept text of compactions that carry it (V1
- * imports and old exports), otherwise empty. Reads move it back into metadata or drop it.
- */
-export function storedMessage<T extends object>(type: unknown, data: T): T {
-  if (type !== "compaction" || !("status" in data) || data.status === "failed") return data
-  const metadata = "metadata" in data && isRecord(data.metadata) ? data.metadata : {}
-  return { ...data, recent: typeof metadata.recent === "string" ? metadata.recent : "" }
-}
-
-export function storedEvent<T extends object>(type: string, data: T): T {
-  return type === "session.compaction.started" || type === "session.compaction.ended" ? { ...data, recent: "" } : data
-}
-
 /** Upgrades complete messages, such as those in an exported session, before decoding. */
 export function messages(values: ReadonlyArray<unknown>) {
   return values.map((value) => (isRecord(value) ? message(value.type, value) : value))

@@ -2,7 +2,6 @@ export * as SessionProjector from "./projector.js"
 
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm"
 import { DateTime, Effect, Layer, Schema, Stream } from "effect"
-import { SessionLegacy } from "@opencode/schema/session-legacy"
 import path from "path"
 import { Database } from "../database/database.js"
 import { Bus } from "../bus.js"
@@ -33,10 +32,7 @@ type MessageEvent = Exclude<
   typeof SessionEvent.Forked.Type | typeof SessionEvent.Deleted.Type
 >
 
-const encodeMessage = (message: SessionMessage.Info) => {
-  const encoded = Schema.encodeSync(SessionMessage.Info)(message)
-  return SessionLegacy.storedMessage(encoded.type, encoded)
-}
+const encodeMessage = Schema.encodeSync(SessionMessage.Info)
 
 export class SessionAlreadyProjected extends Error {}
 

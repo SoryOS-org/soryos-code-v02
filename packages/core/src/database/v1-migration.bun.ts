@@ -4,7 +4,6 @@ import { Cause, Effect, Layer, Option, Schema, Semaphore } from "effect"
 import { Database } from "./database.js"
 import { SessionMessageTable, SessionTable } from "../session/sql.js"
 import { SessionV1 } from "@opencode/schema/session-v1"
-import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { SessionMessage } from "../session/message.js"
 import { SessionSchema } from "../session/schema.js"
 import { KVTable } from "../kv/sql.js"
@@ -895,7 +894,7 @@ function row(
     seq: 0,
     time_created: source.time_created,
     time_updated: source.time_updated,
-    data: SessionLegacy.storedMessage(type, data),
+    data,
   }
 }
 

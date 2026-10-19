@@ -3113,7 +3113,7 @@ describe("SessionRunnerLLM", () => {
       summary: "## Objective\n- Preserve the task",
       metadata: { recent: `[User]: ${"Recent exact request ".repeat(180)}` },
     })
-    // Only a reference to the kept messages is stored, plus the empty `recent` older versions require.
+    // Only a reference to the kept messages is stored; history rebuilds their text.
     const db = (yield* Database.Service).db
     const stored = yield* db
       .select()
@@ -3128,7 +3128,8 @@ describe("SessionRunnerLLM", () => {
       .orderBy(desc(SessionMessageTable.seq))
       .get()
       .pipe(Effect.orDie)
-    expect(stored?.data).toMatchObject({ recent: "", metadata: { firstKeptMessageID: kept?.id } })
+    expect(stored?.data).toMatchObject({ metadata: { firstKeptMessageID: kept?.id } })
+    expect(stored?.data).not.toHaveProperty("recent")
 
     s.requests.length = 0
     s.executions.length = 0

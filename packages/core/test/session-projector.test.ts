@@ -406,8 +406,7 @@ describe("SessionProjector", () => {
           .where(eq(SessionMessageTable.type, "compaction"))
           .all()
           .pipe(Effect.orDie),
-        // Versions before v2.1 require `recent`, so stored compactions keep an empty one for downgrades.
-      ).toEqual([{ data: expect.objectContaining({ status: "running", summary: "", recent: "" }) }])
+      ).toEqual([{ data: expect.objectContaining({ status: "running", summary: "" }) }])
       yield* bus.publish(SessionEvent.Compaction.Ended, {
         sessionID,
         reason: "manual",
@@ -450,7 +449,7 @@ describe("SessionProjector", () => {
         time: { completed: DateTime.makeUnsafe(0) },
       })
       expect(messages.find((message) => message.type === "compaction")).toMatchObject({ summary: "summary" })
-      expect(rows.find((row) => row.type === "compaction")?.data).toMatchObject({ recent: "" })
+      expect(rows.find((row) => row.type === "compaction")?.data).not.toHaveProperty("recent")
       expect(
         yield* db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get().pipe(Effect.orDie),
       ).toMatchObject({

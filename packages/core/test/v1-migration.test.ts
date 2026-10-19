@@ -651,7 +651,7 @@ describe("V1Migration.transformSession", () => {
       id: compact.id,
       time_created: 3,
       time_updated: 6,
-      data: { status: "completed", reason: "manual", summary: "summary", recent: "" },
+      data: { status: "completed", reason: "manual", summary: "summary" },
     })
   })
 
@@ -678,9 +678,8 @@ describe("V1Migration.transformSession", () => {
       reason: "auto",
       summary: "summary",
       metadata: { recent: "[User]: question\n\n[Assistant]: answer" },
-      // Older versions read it from here after a downgrade.
-      recent: "[User]: question\n\n[Assistant]: answer",
     })
+    expect(result.messages[2].data).not.toHaveProperty("recent")
     expect(result.session.agent).toBe("existing")
     expect(result.session.model).toEqual(existing.model)
   })

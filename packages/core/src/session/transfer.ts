@@ -3,7 +3,6 @@ export * as SessionTransfer from "./transfer.js"
 import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { Tool } from "@opencode/schema/tool"
 import { Skill } from "@opencode/schema/skill"
-import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { eq } from "drizzle-orm"
 import { Clock, Context, DateTime, Effect, Layer, Schema } from "effect"
 import { map } from "effect/Array"
@@ -76,14 +75,15 @@ const layer = Layer.effect(
         yield* upsertProject(db, project).pipe(Effect.orDie)
         const importedAt = yield* Clock.currentTimeMillis
         const messages = input.data.messages.filter(isSettled).map((message, index) => {
-          const { id: _, type, ...data } = encodeMessage(message)
+          const encoded = encodeMessage(message)
+          const { id: _, type, ...data } = encoded
           return {
             id: message.id,
             session_id: sessionID,
             type,
             seq: index + 1,
             time_created: DateTime.toEpochMillis(message.time.created),
-            data: SessionLegacy.storedMessage(type, data),
+            data,
           }
         })
         yield* bus
