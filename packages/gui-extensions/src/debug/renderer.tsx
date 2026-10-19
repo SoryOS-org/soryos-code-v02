@@ -4,7 +4,10 @@ import type Debug from "./index"
 
 const setup: Setup<typeof Debug> = (ctx) => {
   const DebugBar = lazy(() => import("./bar"))
-  const Motion = lazy(() => import("./motion"))
+  // Motion tuning lives only in the debug bar, on the dev server and in Beta. Both are fixed at build time, so other
+  // builds, prod included, drop the import and never contain knobs.
+  const motionTools = import.meta.env.DEV || import.meta.env.VITE_OPENCODE_CHANNEL === "beta"
+  const Motion = motionTools ? lazy(() => import("./motion")) : undefined
   const channel = ctx.build.channel
   // Window-local; every window starts with the bar hidden.
   const [visible, setVisible] = createSignal(false)
@@ -19,29 +22,16 @@ const setup: Setup<typeof Debug> = (ctx) => {
     setMotion((value) => !value)
   }
 
-  // Motion tuning is a dev-server tool: no built app (dev, beta or prod channel) ships its button or panel.
-  const motionTools = import.meta.env.DEV
-
   ctx.add(
     Command,
     (): Command => ({
       id: "toggle",
       title: ctx.t("command.toggle"),
       group: ctx.t("command.category.view"),
+      keywords: "dev bar developer tools diagnostics",
       run: toggle,
     }),
   )
-
-  if (motionTools)
-    ctx.add(
-      Command,
-      (): Command => ({
-        id: "motion",
-        title: ctx.t("command.motion"),
-        group: ctx.t("command.category.view"),
-        run: toggleMotion,
-      }),
-    )
 
   ctx.add(Slot, {
     at: "window.bottom",
@@ -51,21 +41,19 @@ const setup: Setup<typeof Debug> = (ctx) => {
           <Suspense>
             <DebugBar
               diagnostics={import.meta.env.DEV}
-              motion={motionTools ? { open: motion(), toggle: toggleMotion } : undefined}
+              motion={Motion ? { open: motion(), toggle: toggleMotion } : undefined}
               inline
             />
           </Suspense>
         </Show>
-        <Show when={motionTools}>
-          <Suspense>
-            <Motion
-              open={motion()}
-              button={import.meta.env.DEV && !visible()}
-              toggle={toggleMotion}
-              title={ctx.t("motion.title")}
-            />
-          </Suspense>
-        </Show>
+        {Motion && (
+          // The Motion workspace opens only from the debug bar's MOTION cell, and shows while the bar does.
+          <Show when={visible() && motion()}>
+            <Suspense>
+              <Motion title={ctx.t("motion.title")} />
+            </Suspense>
+          </Show>
+        )}
       </>
     ),
   })
