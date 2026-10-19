@@ -1,8 +1,111 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
-import { NO_PROVIDER, T0, provider } from "../utils/app"
+import { NO_PROVIDER, T0, provider, session, sessionHref } from "../utils/app"
+import { assistantMessage, textPart, userMessage, userText } from "../utils/timeline"
+import { expectSessionTitle } from "../utils/waits"
 import { openDraft, openSession } from "../utils/workspace"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
+
+test("full session fork selects the returned tab with a blank composer and preserves the source draft", async ({
+  page,
+}) => {
+  const sourceID = "ses_full_fork_source"
+  const targetID = "ses_full_fork_target"
+  const finalText = "The full conversation fixture ends here."
+
+  const history = [
+    userMessage([userText("Review the whole conversation")]),
+    assistantMessage([textPart("prt_full_fork_final", finalText)]),
+  ]
+
+  const calls: unknown[] = []
+  const arrived = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+
+  const view = await openSession(page, {
+    name: "FullFork",
+    sessions: [{ id: sourceID, title: "Original conversation" }],
+    pageMessages: (id) => ({ items: id === sourceID || id === targetID ? history : [] }),
+    onSessionFork: async (input) => {
+      calls.push(input)
+      arrived.resolve()
+      await release.promise
+
+      return session({ id: targetID, title: "Full conversation branch", directory: "C:/OpenCode/FullFork" })
+    },
+  })
+
+  await expect(page.getByText(finalText, { exact: true })).toBeVisible()
+  await view.editor.fill("Unsent source draft")
+  const modifier = await page.evaluate(() => (/Mac/.test(navigator.platform) ? "Meta" : "Control"))
+  await page.keyboard.press(`${modifier}+Shift+P`)
+  const palette = page.getByRole("dialog")
+  await palette.getByRole("textbox").fill("Fork session")
+  await expect(palette.getByRole("option")).toHaveCount(1)
+  await palette.getByRole("textbox").press("Enter")
+
+  const dialog = page.getByRole("dialog", { name: "Fork session", exact: true })
+  const search = dialog.getByRole("textbox")
+  await expect(search).toBeFocused()
+  await expect(dialog.getByRole("button", { name: "Full session", exact: true })).toHaveAttribute("data-active", "true")
+  await search.press("Enter")
+  await arrived.promise
+  // A second selection while the HTTP response is held must not create a second branch.
+  await search.press("Enter")
+  release.resolve()
+  await expect(page).toHaveURL(sessionHref(targetID, view.server))
+  await expectSessionTitle(page, "Full conversation branch")
+  await expect(page.locator('[data-titlebar-tab][data-active="true"]')).toContainText("Full conversation branch")
+  await expect(page.getByText(finalText, { exact: true })).toBeVisible()
+  await expect(view.editor).toBeEditable()
+  await expect(view.editor).toBeEmpty()
+  expect(calls).toEqual([{ sessionID: sourceID, body: {} }])
+
+  await page.locator(`a[data-titlebar-tab-link][href="${sessionHref(sourceID, view.server)}"]`).click()
+  await expect(page).toHaveURL(sessionHref(sourceID, view.server))
+  await expectSessionTitle(page, "Original conversation")
+  await expect(page.getByText(finalText, { exact: true })).toBeVisible()
+  await expect(page.locator('[data-timeline-row="UserMessage"]')).toContainText("Review the whole conversation")
+  await expect(view.editor).toHaveText("Unsent source draft")
+})
+
+test("slash fork from a selected message keeps its boundary and restores prompt context", async ({ page }) => {
+  const sourceID = "ses_message_fork_source"
+  const targetID = "ses_message_fork_target"
+  const message = userMessage([userText("Investigate this file")], { id: "msg_message_fork" })
+  message.files = [
+    {
+      data: "",
+      mime: "text/plain",
+      name: "context.ts",
+      source: { type: "uri", uri: "file:///C:/OpenCode/MessageFork/context.ts" },
+    },
+  ]
+  const calls: unknown[] = []
+
+  const view = await openSession(page, {
+    name: "MessageFork",
+    sessions: [{ id: sourceID, title: "Message conversation" }],
+    pageMessages: (id) => ({ items: id === sourceID ? [message] : [] }),
+    onSessionFork: (input) => {
+      calls.push(input)
+
+      return session({ id: targetID, title: "Selected message branch", directory: "C:/OpenCode/MessageFork" })
+    },
+  })
+
+  await expect(page.locator('[data-timeline-row="UserMessage"]')).toContainText("Investigate this file")
+  await view.editor.fill("/fork")
+  await expect(page.locator('[data-suggestion-id="session.fork"]')).toHaveAttribute("data-active", "")
+  await view.editor.press("Enter")
+  const dialog = page.getByRole("dialog", { name: "Fork session", exact: true })
+  await dialog.getByRole("button", { name: /Investigate this file/ }).click()
+  await expect(page).toHaveURL(sessionHref(targetID, view.server))
+  await expectSessionTitle(page, "Selected message branch")
+  await expect(view.editor).toHaveText("Investigate this file")
+  await expect(page.locator('[data-component="composer"]')).toContainText("context.ts")
+  expect(calls).toEqual([{ sessionID: sourceID, body: { before: message.id } }])
+})
 
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
   const alpha = { id: "alpha", name: "Alpha", variants: { high: {} } }

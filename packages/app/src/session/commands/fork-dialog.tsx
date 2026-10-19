@@ -40,6 +40,7 @@ export const DialogFork: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
   const server = useServer()
+  let pending = false
 
   const messages = createMemo((): ForkableMessage[] => {
     const sessionID = params.id
@@ -72,7 +73,7 @@ export const DialogFork: Component = () => {
   ])
 
   const handleSelect = (item: ForkOption | undefined) => {
-    if (!item) return
+    if (!item || pending) return
 
     const sessionID = params.id
 
@@ -83,24 +84,31 @@ export const DialogFork: Component = () => {
 
     if (before && message?.type !== "user") return
 
+    const snapshot =
+      message?.type === "user"
+        ? {
+            restored: extractPromptFromMessage(message, {
+              directory: location().directory,
+              attachmentName: language.t("common.attachment"),
+            }),
+            context: extractPromptContext(message, { directory: location().directory }),
+            dir: base64Encode(location().directory),
+          }
+        : undefined
+
+    pending = true
+
     serverSDK.api.session
       .fork({ sessionID, before })
       .then((forked) => {
         data.session.remember(forked)
         dialog.close()
 
-        if (message?.type === "user") {
-          const restored = extractPromptFromMessage(message, {
-            directory: location().directory,
-            attachmentName: language.t("common.attachment"),
-          })
+        if (snapshot) {
+          const target = prompt.capture({ dir: snapshot.dir, id: forked.id })
 
-          const context = extractPromptContext(message, { directory: location().directory })
-          const dir = base64Encode(location().directory)
-          const target = prompt.capture({ dir, id: forked.id })
-
-          target.set(restored)
-          target.context.replace([...context.comments, ...context.files])
+          target.set(snapshot.restored)
+          target.context.replace([...snapshot.context.comments, ...snapshot.context.files])
         }
 
         navigate(sessionHref(server.key, forked.id))
@@ -108,6 +116,9 @@ export const DialogFork: Component = () => {
       .catch((cause: unknown) => {
         const message = cause instanceof Error ? cause.message : String(cause)
         showToast({ title: language.t("common.requestFailed"), description: message })
+      })
+      .finally(() => {
+        pending = false
       })
   }
 
