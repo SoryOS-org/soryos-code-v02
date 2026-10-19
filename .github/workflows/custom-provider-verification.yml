@@ -35,17 +35,50 @@ jobs:
           rg --version
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Verify generated clients
+      - name: Generate clients and export changes
+        id: generate
         working-directory: packages/client
-        run: bun run check:generated
+        run: |
+          bun run generate
+          cd ../..
+          git diff --binary -- packages/client/src > generated-client.patch
+          bun -e '
+            const result = Bun.spawnSync(["git", "diff", "--name-only", "--", "packages/client/src"]);
+            if (result.exitCode !== 0) throw new Error("Could not list generated changes");
+            const paths = new TextDecoder().decode(result.stdout).trim().split("\n").filter(Boolean);
+            const files = await Promise.all(paths.map(async (path) => ({ path, content: await Bun.file(path).text() })));
+            await Bun.write("generated-client.json", JSON.stringify({ sourceCommit: process.env.GITHUB_SHA, files }, null, 2));
+          '
+      - name: Upload generated client changes
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generated-client-${{ github.sha }}
+          path: |
+            generated-client.patch
+            generated-client.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Schema tests
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: packages/schema
         run: bun run test
+      - name: Focused config tests
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: packages/core
+        run: bun run script/test.ts test/config/patch.test.ts test/config/config.test.ts
       - name: Core tests
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: packages/core
         run: bun run test
       - name: App tests
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         working-directory: packages/app
         run: bun run test
       - name: Lint and type checks
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
         run: bun run check
+      - name: Verify committed generated clients
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        working-directory: packages/client
+        run: bun run check:generated
