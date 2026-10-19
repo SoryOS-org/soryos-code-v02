@@ -1984,3 +1984,15 @@ describe("WeakMap and WeakSet", () => {
     expect((await error(`structuredClone(new WeakSet())`)).message).toContain("DataCloneError")
   })
 })
+
+describe("flatMap skips holes in the arrays the mapper returns (FlattenIntoArray parity)", () => {
+  test("holes contribute nothing, explicit undefined survives, and the flatten stays one level", async () => {
+    // FlattenIntoArray appends an element only when the index is present on the
+    // mapped array, so `[, 2]` contributes just 2 and `Array(2)` contributes
+    // nothing, while `[undefined]` is a real element.
+    expect(await value(`return [1].flatMap(() => [, 2])`)).toEqual([2])
+    expect(await value(`return [1].flatMap(() => Array(2))`)).toEqual([])
+    expect(await value(`return [1].flatMap(() => [, 2]).length`)).toBe(1)
+    expect(await value(`return [1].flatMap(() => [undefined]).length`)).toBe(1)
+  })
+})

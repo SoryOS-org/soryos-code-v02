@@ -375,8 +375,12 @@ export const arrayGlobal = <R>(ctx: Interpreter<R>) => {
           for (let index = 0; index < length; index += 1) {
             if (!(index in target.items)) continue
             const mapped = yield* apply([target.items[index], index, target], args[1])
-            if (mapped instanceof Arr) values.push(...mapped.items)
-            else values.push(mapped)
+            if (mapped instanceof Arr) {
+              // FlattenIntoArray skips absent (hole) entries but keeps explicit undefined values.
+              for (let inner = 0; inner < mapped.items.length; inner += 1) {
+                if (inner in mapped.items) values.push(mapped.items[inner])
+              }
+            } else values.push(mapped)
           }
           return wrap(values)
         })
