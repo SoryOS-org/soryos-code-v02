@@ -53,6 +53,18 @@ export function rewrite<ID extends string>(
   })
 }
 
+/** Package spelling rewrite() applies for a specifier, so code that resolves
+    against the native package before rewrite runs sees the same value. */
+export function packageFor(
+  specifier: string,
+  context: Context & { readonly settings?: Provider.Settings },
+): string {
+  const plain = resolve(specifier, context)
+  if (!plain) return specifier
+  const settings = decode(context.settings ?? {})
+  return resolve(specifier, { ...context, settings }) ?? plain
+}
+
 const PACKAGES: Readonly<Record<string, string>> = {
   "@ai-sdk/amazon-bedrock": "@opencode/ai/providers/amazon-bedrock",
   "@ai-sdk/alibaba": "@opencode/ai/providers/alibaba/chat",
