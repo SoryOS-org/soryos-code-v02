@@ -40,7 +40,7 @@ import { SessionUsage } from "./usage.js"
 
 export type Settings = {
   auto: boolean
-  /** Tokens kept free below the model's limits before compacting. Unset keeps 10% free. */
+  /** Tokens kept free below the model's limits before compacting. Unset keeps 15%, and at least 16k, free. */
   buffer?: number
   /** Tokens of recent conversation kept verbatim beside the summary. */
   keep: number
@@ -95,6 +95,12 @@ const NOTHING_TO_COMPACT: Failure = { error: { type: "compaction.unavailable", m
 const SHRINK_STEPS = [0.7, 0.5, 0.35]
 // The least of the window kept free for the last reply before compaction and for the summary itself.
 const RESERVE_MIN = 16_000
+/**
+ * Share of the window kept free before automatic compaction. Above `RESERVE_MIN`, the margin between it and
+ * `summaryRoom` absorbs a large step past the trigger, so the whole conversation still goes out unchanged and reuses
+ * the cache. Single steps grew by up to ~22k tokens at p99 in real sessions.
+ */
+const RESERVE_SHARE = 0.15
 /** A common window size, assumed for the compaction request when the model's window is unknown. */
 const UNKNOWN_WINDOW = 200_000
 const TOOL_OUTPUT_MAX_CHARS = 1_250
@@ -316,7 +322,7 @@ export const layer = Layer.effect(
       // Automatic compaction starts past the ceiling, so the whole conversation is sent unchanged while the window can
       // still fit the summary. Below that, the history before the tail is sent instead, as before: unchanged when it fits,
       // which still reuses the cache for that shorter prefix, and as text otherwise. Dropping exchanges to make room
-      // for the tail would leave them in neither the summary nor the tail. Where 10% of the window is under
+      // for the tail would leave them in neither the summary nor the tail. Where 15% of the window is under
       // `RESERVE_MIN`, the ceiling equals `summaryRoom`, so automatic compaction always takes this fallback.
       const fit = trigger.reason === "overflow" ? budget : Math.max(budget, summaryRoom(context.model.limit))
       return yield* deliver(trigger, prepared, recent.text, budget - overhead, send, {
@@ -928,9 +934,9 @@ export const estimatePrompt = (context: SessionContext.Loaded) => {
 }
 
 /**
- * The largest request the model takes while leaving room for its reply: 10% of the window, or `RESERVE_MIN` when that
- * is more. A summary request that must be shrunk is aimed at the same size. A window too small to give up
- * `RESERVE_MIN` keeps 10%.
+ * The largest request the model takes while leaving room for its reply: `RESERVE_SHARE` of the window, or
+ * `RESERVE_MIN` when that is more. A summary request that must be shrunk is aimed at the same size. A window too small
+ * to give up `RESERVE_MIN` keeps `RESERVE_SHARE`.
  */
 const calculateCeiling = (limit: SessionContext.Loaded["model"]["limit"], buffer: number | undefined) => {
   // Unknown limits are reported as 0. An unknown input limit falls back to the context window; with no window at
@@ -938,7 +944,7 @@ const calculateCeiling = (limit: SessionContext.Loaded["model"]["limit"], buffer
   const window = limit.input || limit.context
   if (window <= 0) return Number.POSITIVE_INFINITY
   if (buffer !== undefined) return window - buffer
-  return window - Math.max(Math.floor(window * 0.1), window >= 2 * RESERVE_MIN ? RESERVE_MIN : 0)
+  return window - Math.max(Math.floor(window * RESERVE_SHARE), window >= 2 * RESERVE_MIN ? RESERVE_MIN : 0)
 }
 
 /** The largest summary request that leaves `RESERVE_MIN` of the window for the summary. Zero for an unknown window. */

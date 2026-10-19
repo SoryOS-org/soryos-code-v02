@@ -205,19 +205,19 @@ it.effect("auto compaction estimates current content against the buffered prompt
     const due = (context: SessionContext.Loaded) =>
       compaction.compact({ reason: "auto", context }).pipe(Effect.map((outcome) => outcome.status !== "skipped"))
 
-    // 90% of the input limit, which takes precedence over the context window.
+    // 85% of the input limit, which takes precedence over the context window.
     const inputLimited = { context: 400_000, input: 272_000, output: 128_000 }
-    expect(yield* due(input(244_799, inputLimited))).toBe(false)
-    expect(yield* due(input(244_800, inputLimited))).toBe(true)
+    expect(yield* due(input(231_199, inputLimited))).toBe(false)
+    expect(yield* due(input(231_200, inputLimited))).toBe(true)
     const native = (tokens: number, limit: { context: number; input?: number; output: number } = inputLimited) => {
       const selected = input(tokens, limit)
       return { ...selected, model: { ...selected.model, compaction: { type: "native" as const } } }
     }
-    expect(yield* due(native(244_799))).toBe(false)
-    expect(yield* due(native(244_800))).toBe(true)
+    expect(yield* due(native(231_199))).toBe(false)
+    expect(yield* due(native(231_200))).toBe(true)
     expect(yield* due(native(1_000_000, { context: 0, input: undefined, output: 0 }))).toBe(false)
 
-    // The summary's 16k output limit is more than 10% of a 100k window, so it sets the ceiling.
+    // The summary's 16k output limit is more than 15% of a 100k window, so it sets the ceiling.
     const contextLimited = { context: 100_000, output: 10_000 }
     expect(yield* due(input(83_999, contextLimited))).toBe(false)
     expect(yield* due(input(84_000, contextLimited))).toBe(true)
@@ -460,7 +460,7 @@ it.effect("manual compaction summarizes short context instead of no-op", () =>
       "x-opencode-session": parentID,
       "x-opencode-client": "opencode",
     })
-    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 20_000 }))
+    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 30_000 }))
     expect(JSON.stringify(requests[0]?.messages)).toContain("Manual compaction should include this short conversation.")
     expect(JSON.stringify(requests[0]?.messages)).toContain("Use Effect services and generators.")
     expect(JSON.stringify(requests[0]?.messages)).toContain("User shell pwd completed: /project")
@@ -543,7 +543,7 @@ it.effect("summary compaction past the ceiling keeps the conversation unchanged 
   Effect.gen(function* () {
     requests = []
     const session = yield* insertSession(Session.ID.make("ses_compaction_near_window"))
-    // About 182k estimated tokens: past the 180k ceiling, within the 184k left after reserving room for the summary.
+    // About 182k estimated tokens: past the 170k ceiling, within the 184k left after reserving room for the summary.
     const messages = ["first", "second"].map((label) =>
       SessionMessage.User.make({
         id: SessionMessage.ID.create(),
@@ -567,11 +567,11 @@ it.effect(
     Effect.gen(function* () {
       requests = []
       const session = yield* insertSession(Session.ID.make("ses_compaction_older_fallback"))
-      // About 190k estimated tokens in total, past the 184k left for the summary. The 170k before the retained
-      // 20k latest exchange fits the 180k ceiling.
+      // About 190k estimated tokens in total, past the 184k left for the summary. The 160k before the retained
+      // 30k latest exchange fits the 170k ceiling.
       const messages = [
-        ["older", 680_000],
-        ["latest", 80_000],
+        ["older", 640_000],
+        ["latest", 120_000],
       ].map(([label, size]) =>
         SessionMessage.User.make({
           id: SessionMessage.ID.create(),
@@ -613,19 +613,19 @@ it.effect("compaction keeps the output limit for a request that fits its target"
   Effect.gen(function* () {
     requests = []
     const session = yield* insertSession(Session.ID.make("ses_fitting_compaction"))
-    // About 170k estimated tokens, under the 180k target, leaving 30k of the 200k window.
+    // About 160k estimated tokens, under the 170k target, leaving 40k of the 200k window.
     const messages = [
       SessionMessage.User.make({
         id: SessionMessage.ID.create(),
         type: "user",
-        text: "x".repeat(680_000),
+        text: "x".repeat(640_000),
         time: { created: DateTime.makeUnsafe(0) },
       }),
     ]
 
     expect(yield* compactManually(session, messages)).toEqual({ status: "completed" })
     expect(requests).toHaveLength(1)
-    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 20_000 }))
+    expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 30_000 }))
   }),
 )
 
