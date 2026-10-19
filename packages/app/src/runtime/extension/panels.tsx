@@ -1,4 +1,15 @@
-import { createEffect, createMemo, For, mergeProps, on, onCleanup, Show, type Accessor, type JSX } from "solid-js"
+import {
+  batch,
+  createEffect,
+  createMemo,
+  For,
+  mergeProps,
+  on,
+  onCleanup,
+  Show,
+  type Accessor,
+  type JSX,
+} from "solid-js"
 import { Schema } from "effect"
 import { createMediaQuery } from "@solid-primitives/media"
 import {
@@ -84,6 +95,8 @@ export function createRegion(input: {
   view: Accessor<MountedSession>
   screen: SessionScreen
   tabs: Tabs
+  /** Runs when a close leaves no stored tab, in the same batch as the close. */
+  onEmptied?: () => void
 }) {
   const host = useExtensionHost()
   const stored = () => input.tabs().all()
@@ -205,6 +218,8 @@ export function createRegion(input: {
     entries,
     /** Drawn strip order by key. Renders iterate keys so a provider's fresh tab objects never remount a trigger. */
     keys: createMemo(() => drawn().map((entry) => entry.key), [], { equals: same }),
+    /** The strip holds no tab, hidden ones included. */
+    empty: createMemo(() => strip().length === 0),
     entry: (key: string) => byKey().get(key),
     active,
     selected: createMemo(() => {
@@ -222,7 +237,12 @@ export function createRegion(input: {
     },
     close(key: string) {
       const entry = byKey().get(key)
-      input.tabs().close(key)
+      const last = stored().length === 1 && stored()[0] === key
+      batch(() => {
+        input.tabs().close(key)
+
+        if (last) input.onEmptied?.()
+      })
 
       if (entry)
         entry.provider.close?.(

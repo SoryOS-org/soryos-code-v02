@@ -525,6 +525,7 @@ export const dict = {
   "session.tab.more": "More...",
   "session.view.select": "Session view",
   "session.tab.add": "Add tab",
+  "session.tab.new": "New tab",
   "session.tab.unknown": "Unknown Session",
   "session.panel.reviewAndFiles": "Review and files",
   "session.error.notFound": "This session cannot be found",

@@ -75,6 +75,10 @@ function SessionScreenContent(props: {
     view: props.view,
     screen: props.screen,
     tabs: session.layout.tabs,
+    // Closing the last tab closes the side region, which opens with a new tab next time.
+    onEmptied: () => {
+      if (session.layout.view().side.opened()) session.layout.view().side.toggle()
+    },
   })
 
   onCleanup(attachment.region(region))
