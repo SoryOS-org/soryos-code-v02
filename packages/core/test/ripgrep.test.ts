@@ -32,6 +32,23 @@ describe("Ripgrep", () => {
     }),
   )
 
+  // Broken file symlinks require privileges that Windows test runners do not guarantee.
+  describe.skipIf(process.platform === "win32")("invalid ignore files with broken symlinks", () => {
+    for (const method of ["glob", "find"] as const) {
+      it.live(`keeps valid ${method} results when an ignore glob is invalid and a symlink is broken`, () =>
+        Effect.gen(function* () {
+          const tmp = yield* tmpdirScoped()
+          yield* Effect.promise(() => Bun.write(path.join(tmp.path, "a.ts"), "needle\n"))
+          yield* Effect.promise(() => Bun.write(path.join(tmp.path, ".ignore"), "[z-a]\n"))
+          yield* Effect.promise(() => fs.symlink("missing-target", path.join(tmp.path, "broken")))
+          const ripgrep = yield* Ripgrep.Service
+          const files = yield* ripgrep[method]({ cwd: tmp.path, pattern: "*.ts", follow: true, limit: 10 })
+          expect(files.map((entry) => entry.path)).toEqual([RelativePath.make("a.ts")])
+        }),
+      )
+    }
+  })
+
   for (const hidden of [undefined, false, true]) {
     for (const limit of hidden ? [10] : [1, 10]) {
       it.live(`glob honors hidden=${hidden} before limit=${limit}`, () =>
