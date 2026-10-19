@@ -8,14 +8,17 @@ import { showToast } from "@/shell/notifications/toast"
 import { batch, For } from "solid-js"
 import { createStore, produce } from "solid-js/store"
 import { ExternalLink } from "@/runtime/platform/external-link"
-import { useData } from "@/runtime/server/current"
+import { useData, useServer } from "@/runtime/server/current"
+import { formatServerError } from "@/runtime/server/errors"
 import { useLanguage } from "@/runtime/i18n/language"
 import { type FormState, headerRow, modelRow, validateCustomProvider } from "./form"
+import { CustomProviderExistsError, saveCustomProvider } from "./save"
 import { CustomManagedProviderIcon } from "@/providers/models/provider-group"
 
 export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
   const dialog = useDialog()
   const data = useData()
+  const server = useServer()
   const language = useLanguage()
 
   const [form, setForm] = createStore<FormState>({
@@ -91,8 +94,6 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
     const output = validateCustomProvider({
       form,
       t: language.t,
-      // TODO: Restore disabled-provider validation when V2 exposes config reads.
-      disabledProviders: [],
       existingProviderIDs: new Set((data.location.provider.list() ?? []).map((provider) => provider.id)),
     })
 
@@ -106,11 +107,20 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
   }
 
   const saveMutation = useMutation(() => ({
-    mutationFn: async (result: NonNullable<ReturnType<typeof validate>>): Promise<typeof result> => {
-      // TODO: Restore custom providers when V2 exposes config and arbitrary credential APIs.
-      throw new Error(language.t("provider.custom.unavailable"))
-    },
+    mutationFn: (result: NonNullable<ReturnType<typeof validate>>) => saveCustomProvider(server.ctx.sdk.api, result),
     onSuccess: (result) => {
+      data.location.config.invalidate()
+      data.location.integration.invalidate()
+      data.location.provider.invalidate()
+      data.location.model.invalidate()
+      void Promise.all([
+        data.location.config.sync(),
+        data.location.integration.sync(),
+        data.location.provider.sync(),
+        data.location.model.sync(),
+      ]).catch((error) => {
+        showToast({ title: language.t("common.requestFailed"), description: formatServerError(error, language.t) })
+      })
       dialog.close()
       showToast({
         variant: "success",
@@ -120,7 +130,14 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
       })
     },
     onError: (err) => {
-      const message = err instanceof Error ? err.message : String(err)
+      if (err instanceof CustomProviderExistsError) {
+        setForm("err", "providerID", language.t("provider.custom.error.providerID.exists"))
+        return
+      }
+      const message =
+        err instanceof AggregateError
+          ? err.errors.map((error) => formatServerError(error, language.t)).join("\n")
+          : formatServerError(err, language.t)
       showToast({ title: language.t("common.requestFailed"), description: message })
     },
   }))
