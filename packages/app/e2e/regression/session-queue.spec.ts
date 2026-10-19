@@ -130,6 +130,9 @@ function createQueueMock(seed: string[], messages: SessionMessageInfo[] = []) {
         delivery: "steer",
       })
     },
+    onBackground: () => {
+      log.push("background")
+    },
     onInboxChange: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => {
       changes.push({ inboxID: input.inboxID, action: input.action })
       log.push(`${input.action}:${input.inboxID}`)
@@ -161,9 +164,8 @@ async function openQueue(
   followUpBehavior?: "queue" | "steer",
   revert?: string,
   status: "idle" | "running" = "running",
+  model = { id: "queue-model", name: "Queue Model" },
 ) {
-  const model = { id: "queue-model", name: "Queue Model" }
-
   const options: Parameters<typeof openSession>[1] = {
     name: "SessionQueueRegression",
     sessions: [
@@ -181,6 +183,7 @@ async function openQueue(
     onPrompt: mock.onPrompt,
     onCompact: mock.onCompact,
     onInboxChange: mock.onInboxChange,
+    onBackground: mock.onBackground,
     events: mock.events,
   }
 
@@ -1095,3 +1098,94 @@ for (const delivery of ["steer", "queue"] as const) {
     ])
   })
 }
+
+test("a steer moves a blocking shell to the background after its admission, so the next step reads it", async ({
+  page,
+}, testInfo) => {
+  const model = { id: "alpha", providerID: "opencode" }
+  const assistantID = "msg_steer_background_assistant"
+  const shell = { sessionID, assistantMessageID: assistantID, id: "prt_steer_background_shell" }
+  const steer = "Skip the slow suites and run only the queue tests."
+
+  const mock = createQueueMock(
+    [],
+    [
+      {
+        id: "msg_steer_background_user",
+        type: "user",
+        text: "Run the full test suite.",
+        time: { created: 1700000000000 },
+      },
+      {
+        id: assistantID,
+        type: "assistant",
+        agent: "build",
+        model,
+        content: [
+          {
+            type: "tool",
+            id: shell.id,
+            name: "shell",
+            state: {
+              status: "running",
+              input: { command: "bun test --timeout 600000", description: "Run the full test suite" },
+              metadata: { shellID: "sh_steer_background" },
+            },
+            time: { created: 1700000000002 },
+          },
+        ],
+        time: { created: 1700000000001 },
+      },
+    ],
+  )
+
+  const view = await openQueue(page, mock, "steer", undefined, "running", { id: "alpha", name: "Alpha" })
+  const transcript = page.locator("[data-timeline-virtual-content]")
+  const hint = page.getByRole("button", { name: /move running work to the background/i })
+  await expect(hint).toBeVisible()
+  await transcript.screenshot({ path: testInfo.outputPath("before-steer.png") })
+
+  await view.input.fill(steer)
+  await view.input.press("Enter")
+  // Admission comes first: the steer already waits in the inbox when the moved shell ends the step.
+  await expect.poll(() => mock.log).toEqual(["prompt:steer", "background"])
+
+  const inboxID = mock.rows[0].id
+  const pending = transcript.locator(`[data-timeline-row="UserMessage"][data-message-id="${inboxID}"]`)
+  await expect(pending.locator('[data-component="user-message"]')).toHaveAttribute("data-pending", "true")
+
+  // As the server does, the moved shell's call completes while the command keeps running.
+  mock.emit("session.tool.success", {
+    ...shell,
+    content: [{ type: "text", text: "Command moved to the background (shell ID: sh_steer_background)." }],
+    metadata: { status: "running", shellID: "sh_steer_background" },
+    executed: true,
+  })
+  await expect(hint).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "1 shell", exact: true })).toBeVisible()
+  await transcript.screenshot({ path: testInfo.outputPath("moved-to-background.png") })
+
+  mock.emit("session.step.ended", {
+    sessionID,
+    assistantMessageID: assistantID,
+    finish: "tool-calls",
+    cost: 0,
+    tokens: { input: 100, output: 20, reasoning: 0, cache: { read: 0, write: 0 } },
+  })
+  mock.rows.splice(0, 1)
+  mock.emit("session.inbox.delivered", { sessionID, inboxID })
+
+  const next = { sessionID, assistantMessageID: "msg_steer_background_next" }
+  mock.emit("session.step.started", { ...next, agent: "build", model, started: Date.now() })
+  mock.emit("session.text.started", { ...next, ordinal: 0 })
+  mock.emit("session.text.ended", { ...next, ordinal: 0, text: "Running only the queue tests now." })
+
+  const response = transcript
+    .locator('[data-timeline-row="AssistantPart"]')
+    .filter({ hasText: "Running only the queue tests now." })
+
+  await expect(response).toHaveAttribute("data-message-id", inboxID)
+  await expect(pending.locator('[data-component="user-message"]')).not.toHaveAttribute("data-pending", "true")
+  expect(mock.log).toEqual(["prompt:steer", "background"])
+  await transcript.screenshot({ path: testInfo.outputPath("steer-delivered.png") })
+})

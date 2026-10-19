@@ -20,11 +20,14 @@ export function createSessionComposerController(input: {
   const region = createSessionComposerRegionController(input.dock)
   let editor: HTMLDivElement | undefined
 
+  const background = () => input.dock.state.background.steer(input.sessionID)
+
   const adapter = createActiveComposerAdapter({
     sessionID: input.sessionID,
     sessionKey: input.sessionKey,
     controls: input.controls,
     submitted: region.onResponseSubmit,
+    background,
     setEditor: (element) => {
       editor = element
       region.setPromptRef(element)
@@ -36,6 +39,7 @@ export function createSessionComposerController(input: {
     draft: adapter.state,
     working: adapter.working,
     behavior: settings.general.followUpBehavior,
+    background,
     restoreFocus: (cursor) => {
       const target = editor
 

@@ -10,6 +10,7 @@ import { useWorkspaceLocation } from "@/workspaces/location"
 import { sessionPermissionRequest, sessionFormRequest, sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { createWebSearchRequest } from "./websearch"
 import { createSessionBackground } from "@/session/requests/background"
+import { createSteerBackground } from "@/session/requests/steer-background"
 import { useData } from "@/runtime/server/current"
 
 export function createSessionRequestModel() {
@@ -117,6 +118,12 @@ export function createSessionRequestModel() {
     })
   }
 
+  const steer = createSteerBackground({
+    sessionID: () => params.id,
+    blocking,
+    move: (sessionID) => serverSDK.api.session.background({ sessionID }),
+  })
+
   const [store, setStore] = createStore<{ responding: string | undefined }>({ responding: undefined })
 
   const permissionResponding = createMemo(() => {
@@ -158,6 +165,7 @@ export function createSessionRequestModel() {
       blocking,
       tasks,
       move: moveToBackground,
+      steer,
     },
     decide,
   }

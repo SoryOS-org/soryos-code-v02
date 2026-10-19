@@ -140,6 +140,7 @@ export interface MockServerConfig {
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   generate?: (input: { sessionID: string; prompt: string }) => { text: string } | Promise<{ text: string }>
   onInboxChange?: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => void
+  onBackground?: (input: { sessionID: string }) => void
   // Serves `/api/pty*` and mock PTY WebSockets. Created IDs are the first unused `${prefix}<n>` (prefix must start with "pty").
   // `directory` is the owning workspace (Location); `cwd` is the reported working directory (default: `directory`).
   pty?: { prefix?: string; initial?: { id: string; title: string; directory?: string; cwd?: string }[] }
@@ -1242,7 +1243,8 @@ function mockHandlers(
           }),
         sessionFormReply: () => noContent,
         sessionFormCancel: () => noContent,
-        sessionBackground: () => noContent,
+        sessionBackground: (ctx) =>
+          Effect.sync(() => config.onBackground?.({ sessionID: ctx.params.sessionID })).pipe(Effect.andThen(noContent)),
         sessionInbox: (ctx) =>
           Effect.sync(() => ({
             data: resolve(config.inbox ?? []).filter(

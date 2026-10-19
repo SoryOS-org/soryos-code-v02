@@ -92,6 +92,8 @@ export type ComposerSession = {
     | undefined
   >
   admitted: (messageID: string) => boolean
+  // Claims the run's blocking work for a steer; undefined when there is none or it was already moved.
+  background?: () => { move: () => Promise<void>; release: () => void } | undefined
 }
 
 type ComposerAdapterBase = {

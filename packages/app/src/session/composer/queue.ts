@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/solid-query"
 import { Option, Schema } from "effect"
 import type { SessionInboxInfo } from "@opencode/client/promise"
 import { SessionMessage } from "@opencode/schema/session-message"
-import type { ComposerDelivery } from "@/composer/adapter"
+import type { ComposerDelivery, ComposerSession } from "@/composer/adapter"
 import type { ComposerStateTarget } from "@/composer/submission-state"
 import type { ContextItem, ImageAttachmentPart, PathAttachmentPart, Prompt } from "@/composer/state"
 import { appendPrompt, clonePrompt, isAttachment, promptLength } from "@/composer/prompt-parts"
@@ -33,6 +33,7 @@ export function createSessionQueue(input: {
   working: Accessor<boolean>
   behavior: Accessor<ComposerDelivery>
   restoreFocus: (cursor: number) => void
+  background: NonNullable<ComposerSession["background"]>
 }) {
   const data = useData()
   const server = useServerSDK()
@@ -101,7 +102,12 @@ export function createSessionQueue(input: {
 
       if (!pending.some((item) => item.id === change.original && item.type === "user" && item.delivery === "queue"))
         throw new Error("Queued prompt was delivered before the edit")
-      await data.session.prompt(admission)
+      const background = input.background()
+      await data.session.prompt(admission).catch((error) => {
+        background?.release()
+        throw error
+      })
+      void background?.move()
       await server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: change.original })
       cancelEdit()
     },
@@ -197,10 +203,15 @@ export function createSessionQueue(input: {
 
   const steer = (id: string) => {
     if (state.editing?.id === id) cancelEdit()
+    const background = input.background()
 
-    return server.api.session.inbox
-      .update({ sessionID: input.sessionID, inboxID: id, delivery: "steer" })
-      .catch(() => notify())
+    return server.api.session.inbox.update({ sessionID: input.sessionID, inboxID: id, delivery: "steer" }).then(
+      () => void background?.move(),
+      () => {
+        background?.release()
+        notify()
+      },
+    )
   }
 
   const remove = (id: string) => {
