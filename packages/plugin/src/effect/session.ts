@@ -43,6 +43,8 @@ export interface SessionCompactionResult {
 }
 
 export interface SessionCompaction extends SessionContext {
+  /** Guidance for this summary. Starts as what the user gave with a manual `/compact`; set, change, or clear it. */
+  guidance?: string
   /** Set to use this compaction and skip the model request. */
   result?: SessionCompactionResult
 }
