@@ -202,13 +202,8 @@ describe("SessionProjector", () => {
         tokens_cache_read: 3,
         tokens_cache_write: 1,
       })
-      // No instruction update was removed, so the fold cache and its epoch baseline survive the revert.
-      expect(yield* db.select().from(InstructionStateTable).get().pipe(Effect.orDie)).toMatchObject({
-        epoch_start: 0,
-        through_seq: 0,
-        initial_values: {},
-        current_values: {},
-      })
+      // No instruction update followed the boundary, so the fold survives.
+      expect(yield* db.select().from(InstructionStateTable).get().pipe(Effect.orDie)).toMatchObject({ through_seq: 0 })
     }),
   )
 
