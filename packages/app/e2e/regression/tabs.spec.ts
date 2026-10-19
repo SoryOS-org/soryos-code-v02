@@ -705,6 +705,56 @@ test("inactive tabs stay busy while work waits in their inbox, and pulse on a ne
   await expect(tab(a.id).locator('[data-slot="tab-prompt-pulse"]')).toHaveCount(0)
 })
 
+test("switching between busy sessions keeps the busy indicators and the activity capsule at rest", async ({ page }) => {
+  const children = [
+    { id: "ses_tab_a_child", title: "Map the orchard", parentID: a.id },
+    { id: "ses_tab_b_child", title: "Chart the harbor", parentID: b.id },
+  ]
+
+  await mockWorkspace(page, {
+    name: "TabActivity",
+    sessions: [a, b, ...children],
+    sessionStatus: Object.fromEntries(children.map((child) => [child.id, { type: "running" as const }])),
+    seed: { settings: { appearance: { tabLayout: "vertical" } }, tabs: [a.id, b.id] },
+  })
+  await page.goto(sessionHref(a.id))
+  await expectSessionTitle(page, a.title)
+
+  const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
+  const indicators = sidebar.locator('[data-component="session-progress-indicator-v2"]')
+  const capsule = page.locator('[data-slot="session-activity-chip"]')
+  await expect(indicators).toHaveCount(2)
+  await expect(capsule).toHaveText("1 subagent")
+  await expect(capsule).toHaveCSS("opacity", "1")
+
+  // Record any capsule animation or any moment without a capsule, and mark the indicators to compare them later.
+  await page.evaluate(() => {
+    const record = document.documentElement
+    document.addEventListener("animationstart", (event) => {
+      if (event.target instanceof Element && event.target.closest('[data-slot="session-activity-chip"]'))
+        record.setAttribute("data-test-capsule-animated", "")
+    })
+    new MutationObserver(() => {
+      if (!document.querySelector('[data-slot="session-activity-chip"]'))
+        record.setAttribute("data-test-capsule-missing", "")
+    }).observe(document.body, { childList: true, subtree: true })
+    document
+      .querySelectorAll('[data-slot="vertical-tabs-sidebar"] [data-component="session-progress-indicator-v2"]')
+      .forEach((element) => element.setAttribute("data-test-before-switch", ""))
+  })
+
+  await sidebar.locator(`[data-titlebar-tab-link][href="${sessionHref(b.id)}"]`).click()
+  await expectSessionTitle(page, b.title)
+  await expect(page.locator('[data-component="session-activity-chips"]')).toHaveCount(1)
+  await expect(capsule).toHaveText("1 subagent")
+  await capsule.click()
+  await expect(page.locator('[data-slot="session-activity-panel"]')).toContainText(children[1]!.title)
+
+  await expect(indicators.and(page.locator("[data-test-before-switch]"))).toHaveCount(2)
+  await expect(page.locator("html")).not.toHaveAttribute("data-test-capsule-missing")
+  await expect(page.locator("html")).not.toHaveAttribute("data-test-capsule-animated")
+})
+
 test("selecting a tab with waiting work waits for its transcript instead of showing only the inbox", async ({
   page,
 }) => {

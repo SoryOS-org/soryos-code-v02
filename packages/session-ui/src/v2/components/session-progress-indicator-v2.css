@@ -2,9 +2,14 @@
   display: block;
   flex-shrink: 0;
   color: var(--v2-icon-icon-muted, #808080);
-}
-
-[data-component="session-progress-indicator-v2"] [data-frame-content] {
+  background-color: currentColor;
+  /* The animated frames carry each dot's opacity; the grid keeps the gaps between dots. */
+  mask-image:
+    url("./session-progress-indicator-v2-1x.png"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1h2v2h-2zM4 1h2v2h-2zM7 1h2v2h-2zM10 1h2v2h-2zM13 1h2v2h-2zM1 4h2v2h-2zM4 4h2v2h-2zM7 4h2v2h-2zM10 4h2v2h-2zM13 4h2v2h-2zM1 7h2v2h-2zM4 7h2v2h-2zM7 7h2v2h-2zM10 7h2v2h-2zM13 7h2v2h-2zM1 10h2v2h-2zM4 10h2v2h-2zM7 10h2v2h-2zM10 10h2v2h-2zM13 10h2v2h-2zM1 13h2v2h-2zM4 13h2v2h-2zM7 13h2v2h-2zM10 13h2v2h-2zM13 13h2v2h-2z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
@@ -15,8 +20,9 @@
 }
 
 :root[data-motion="reduce"] {
-  [data-component="session-progress-indicator-v2"] [data-frame-content] {
-    display: none;
+  [data-component="session-progress-indicator-v2"] {
+    background-color: transparent;
+    mask-image: none;
   }
 
   [data-component="session-progress-indicator-v2"] [data-reduced-motion] {
