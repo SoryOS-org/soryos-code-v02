@@ -561,6 +561,34 @@ it.effect("summary compaction past the ceiling keeps the conversation unchanged 
   }),
 )
 
+it.effect(
+  "summary compaction sends the history before the tail unchanged when the whole conversation does not fit",
+  () =>
+    Effect.gen(function* () {
+      requests = []
+      const session = yield* insertSession(Session.ID.make("ses_compaction_older_fallback"))
+      // About 190k estimated tokens in total, past the 184k left for the summary. The 170k before the retained
+      // 20k latest exchange fits the 180k ceiling.
+      const messages = [
+        ["older", 680_000],
+        ["latest", 80_000],
+      ].map(([label, size]) =>
+        SessionMessage.User.make({
+          id: SessionMessage.ID.create(),
+          type: "user",
+          text: `${label} ${"x".repeat(Number(size))}`,
+          time: { created: DateTime.makeUnsafe(0) },
+        }),
+      )
+
+      expect(yield* compactManually(session, messages)).toEqual({ status: "completed" })
+      expect(requests).toHaveLength(1)
+      expect(requests[0].messages).toHaveLength(2)
+      expect(requests[0].messages[0].content).toEqual([{ type: "text", text: messages[0].text }])
+      expect(requests[0].messages[1].content).toEqual([{ type: "text", text: SessionCompaction.buildPrompt(false) }])
+    }),
+)
+
 it.effect("compaction lowers the output limit when it sends a request it could not shrink", () =>
   Effect.gen(function* () {
     requests = []

@@ -314,9 +314,10 @@ export const layer = Layer.effect(
 
       const overhead = Token.estimate(prompt) + Token.estimate(NUDGE)
       // Automatic compaction starts past the ceiling, so the whole conversation is sent unchanged while the window can
-      // still fit the summary. A request that has to be shrunk has lost its cached prefix anyway, so it shrinks only
-      // the history before the tail: dropping exchanges to make room for the tail would leave them in neither the
-      // summary nor the tail.
+      // still fit the summary. Below that, the history before the tail is sent instead, as before: unchanged when it fits,
+      // which still reuses the cache for that shorter prefix, and as text otherwise. Dropping exchanges to make room
+      // for the tail would leave them in neither the summary nor the tail. Where 10% of the window is under
+      // `RESERVE_MIN`, the ceiling equals `summaryRoom`, so automatic compaction always takes this fallback.
       const fit = trigger.reason === "overflow" ? budget : Math.max(budget, summaryRoom(context.model.limit))
       return yield* deliver(trigger, prepared, recent.text, budget - overhead, send, {
         fit: fit - overhead,
@@ -387,8 +388,8 @@ export const layer = Layer.effect(
     })
 
     /**
-     * Sends the request as-is if it is estimated to fit `shrink.fit`, and otherwise `shrink.history` as text aimed at
-     * `target` (see `flattenAndDropOldest`).
+     * Sends the request as-is if it is estimated to fit `shrink.fit`, else `shrink.history` as-is if it fits `target`,
+     * and otherwise `shrink.history` as text aimed at `target` (see `flattenAndDropOldest`).
      * Limits and estimates can be wrong, so until the provider rejects something as too long, a request that cannot
      * be made to fit is sent whole: unchanged, or as text once its media has to go. A "too long" rejection means the
      * estimate ran low, so the next attempts aim at 70%, 50%, then 35% of the first rejected request's estimate, and a
@@ -419,15 +420,21 @@ export const layer = Layer.effect(
       let fit = shrink.fit
 
       while (true) {
-        const fits = !asText && estimateRequest(prepared.request) <= fit
-        const request = fits
-          ? prepared.request
-          : (flattenAndDropOldest(shrink.history, context, target) ??
-            (rejections > 0
-              ? undefined
-              : asText
-                ? flattenAndDropOldest(shrink.history, context, Number.POSITIVE_INFINITY)
-                : prepared.request))
+        const unchanged = asText
+          ? undefined
+          : estimateRequest(prepared.request) <= fit
+            ? prepared.request
+            : estimateRequest(shrink.history) <= target
+              ? shrink.history
+              : undefined
+        const request =
+          unchanged ??
+          flattenAndDropOldest(shrink.history, context, target) ??
+          (rejections > 0
+            ? undefined
+            : asText
+              ? flattenAndDropOldest(shrink.history, context, Number.POSITIVE_INFINITY)
+              : shrink.history)
         if (!request) {
           return yield* Effect.fail<Failure>({
             error: {
@@ -445,7 +452,7 @@ export const layer = Layer.effect(
         const error = toSessionError(cause)
         const tooLarge = cause.reason._tag === "InvalidRequest" && cause.reason.classification === "payload-too-large"
 
-        if (tooLarge && request === prepared.request) {
+        if (tooLarge && (request === prepared.request || request === shrink.history)) {
           asText = true
           continue
         }
