@@ -13,8 +13,10 @@ import {
 import { createStore } from "solid-js/store"
 import type { FileDiffInfo } from "@opencode/client/promise"
 import {
+  Command,
   createKeyed,
   LinkHandler,
+  MenuItem,
   Panel,
   SettingsPage,
   usePanel,
@@ -120,12 +122,10 @@ const setup: Setup<typeof Review> = (ctx) => {
     get title() {
       return count() > 0 ? ctx.plural("tab.count", count()) : ctx.t("tab.title")
     },
-    pinned: true,
     // Without focusable content the panel itself joins the tab order.
     get tabbable() {
       return !(count() > 0 || layout.sidebar.opened())
     },
-    fallback: true,
     dom: { tab: "session-side-panel-review-tab", panel: "session-side-panel-review-tabpanel" },
   }
 
@@ -141,8 +141,6 @@ const setup: Setup<typeof Review> = (ctx) => {
     get wide() {
       return diff.value.diffStyle === "split"
     },
-    // The review tab is pinned, never stored; a stored key, such as one from before extensions, leaves the strip.
-    transient: true,
     legacy: { review: TAB },
     mobile: {
       get title() {
@@ -206,6 +204,46 @@ const setup: Setup<typeof Review> = (ctx) => {
     },
   })
 
+  // Opens the review tab, the side region with it, unless the session has no changes to review.
+  const show = () => {
+    const session = sessions.current()
+
+    if (session?.project && !layout.narrow()) layout.open(KEY, session)
+  }
+
+  const mac = /(Mac|iPhone|iPad)/.test(navigator.platform)
+
+  ctx.add(
+    Command,
+    (): Command => ({
+      id: "open",
+      title: ctx.t("command.open"),
+      group: ctx.t("command.category.view"),
+      bind: mac ? "ctrl+meta+r" : "ctrl+alt+r",
+      editable: true,
+      enabled: !!sessions.current()?.project && !layout.narrow(),
+      run: show,
+    }),
+  )
+
+  ctx.add(MenuItem, (): MenuItem | undefined => {
+    const session = sessions.current()
+
+    if (!session?.project || layout.narrow()) return undefined
+
+    return {
+      menu: "session.panel",
+      id: "open",
+      title: ctx.t("tab.title"),
+      opened: layout.state(KEY, session) !== "closed",
+      description: count() > 0 ? ctx.plural("menu.count", count()) : undefined,
+      icon: "review",
+      keybind: "review.open",
+      order: 10,
+      run: show,
+    }
+  })
+
   const reveals = new Set<() => void>()
 
   // A review comment in the composer reveals its diff.
@@ -262,10 +300,8 @@ const setup: Setup<typeof Review> = (ctx) => {
     details: (session) => modelFor(session)?.details(),
     focus: (session, path) => modelFor(session)?.focusFile(path),
     open(session) {
-      // The session details' changes row: narrow screens switch to the Changes view; wide ones open the side region.
-      if (layout.narrow()) return layout.open(KEY, session)
-
-      if (!layout.side.opened(session)) layout.side.toggle(session)
+      // The session details' changes row: narrow screens switch to the Changes view; wide ones open the review tab.
+      layout.open(KEY, session)
     },
     watch,
     onReveal(listener) {

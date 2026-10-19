@@ -126,15 +126,18 @@ const setup: Setup<typeof definition> = (ctx) => {
     const view = sessions.current()
     const value = model()
 
-    if (!view || !value?.available(view)) return undefined
+    // Only once the desktop's pane answers: an empty side region runs it, and lists the other items until then.
+    if (!view || !value?.available(view) || !value.attached(view)) return undefined
 
+    // The new tab: its page lists the other items.
     return {
       menu: "session.panel",
       id: "open",
-      title: ctx.t("tab.title"),
+      title: ctx.t("tab.new"),
       icon: "globe",
       keybind: "browser.open",
-      order: 20,
+      order: 40,
+      primary: true,
       run: () => value.open(view),
     }
   })

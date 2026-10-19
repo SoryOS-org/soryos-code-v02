@@ -222,9 +222,9 @@ export default function FileBrowser(props: {
   const empty = new Map<string, ChangeKind>()
   const changes = () => current(shared.changes())
 
-  // Change markers in the tree load while a file tab shows, as the side panel did.
+  // Change markers in the tree load while a file tab or the file browser shows.
   createKeyed(
-    () => (panel.visible() && !placeholder() ? changes() : undefined),
+    () => (panel.visible() ? changes() : undefined),
     (service) => onCleanup(service.watch(props.screen, "files")),
   )
 

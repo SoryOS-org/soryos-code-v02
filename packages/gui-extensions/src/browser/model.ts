@@ -68,6 +68,9 @@ type PaneHandle = {
 
 export type Model = ReturnType<typeof createModel>
 
+/** A tab showing the new tab page: no page, and none loading. */
+const blank = (tab: Browser.Tab) => (!tab.url || tab.url === "about:blank") && !tab.loading
+
 // Attachments belong to the shell session tab, not the session route: native pages and the agent's
 // browser survive visiting Settings or another tab and close when the session tab does.
 export function createModel(ctx: SetupContext<typeof definition>) {
@@ -153,8 +156,9 @@ export function createModel(ctx: SetupContext<typeof definition>) {
   )
 
   const close = (id: string) => {
-    live.get(id)?.dispose()
+    const entry = live.get(id)
     live.delete(id)
+    entry?.dispose()
     opening.delete(id)
     Array.from(recorded.keys())
       .filter((item) => item.startsWith(`${id}\n`))
@@ -287,6 +291,28 @@ export function createModel(ctx: SetupContext<typeof definition>) {
             held.mirror?.()
 
             if (held.focus) layout.open(key(held.focus), ref, { tab: "select" })
+          }),
+      )
+
+      // A new tab holds the place of the tab the user picks next: once another tab is selected, it closes unless a
+      // page started loading in it. It leaves the strip in the same update, so the picked tab takes its place without
+      // waiting for the desktop to close its page.
+      createKeyed(
+        () =>
+          state.attachments[id]?.browser?.tabs.find((item) => {
+            const placement = layout.state(key(item.id), ref)
+
+            return blank(item) && (placement === "visible" || placement === "active")
+          })?.id,
+        (tabID) =>
+          onCleanup(() => {
+            const item = state.attachments[id]?.browser?.tabs.find((candidate) => candidate.id === tabID)
+
+            if (live.get(id) !== entry || !item || !blank(item) || layout.state(key(tabID), ref) !== "open") return
+            layout.close(key(tabID), ref)
+
+            // The host calls the panel's `close` for the routed session only; another session's page closes here.
+            if (sessions.current()?.key !== ref.key) command(ref, { type: "tabs.close", tabID })
           }),
       )
 

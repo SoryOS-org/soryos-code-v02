@@ -14,6 +14,7 @@ import { createStore, produce } from "solid-js/store"
 import { Icon } from "@opencode/ui/icon"
 import { encodeFilePath, getFilename } from "@opencode/util/path"
 import {
+  Command,
   createKeyed,
   bindExtension,
   LinkHandler,
@@ -365,22 +366,40 @@ const setup: Setup<typeof File> = (ctx) => {
     },
   })
 
-  ctx.add(MenuItem, {
-    menu: "session.panel",
-    id: "open",
-    get title() {
-      return ctx.t("command.open")
-    },
-    icon: "file-tree",
-    keybind: "file.open",
-    order: 10,
-    run() {
-      const session = sessions.current()
+  const browse = () => {
+    const session = sessions.current()
 
-      if (!session) return
+    if (session) openPicker(session, shared.filter.get(session.key))
+  }
 
-      openPicker(session, shared.filter.get(session.key))
-    },
+  const mac = /(Mac|iPhone|iPad)/.test(navigator.platform)
+
+  ctx.add(
+    Command,
+    (): Command => ({
+      id: "browse",
+      title: ctx.t("command.open"),
+      group: ctx.t("command.category.view"),
+      bind: mac ? "ctrl+meta+p" : "ctrl+alt+p",
+      editable: true,
+      enabled: !!sessions.current(),
+      run: browse,
+    }),
+  )
+
+  ctx.add(MenuItem, (): MenuItem => {
+    const session = sessions.current()
+
+    return {
+      menu: "session.panel",
+      id: "open",
+      title: ctx.t("command.open"),
+      opened: !!session && layout.stored(session).some((id) => id === OPEN || isFileTab(id)),
+      icon: "file-tree",
+      keybind: "file.browse",
+      order: 30,
+      run: browse,
+    }
   })
 
   const OpenInAppButton = lazy(() => import("./open-in-app"))
@@ -643,8 +662,7 @@ const setup: Setup<typeof File> = (ctx) => {
 
     const id = focused.get(screen)
 
-    if (id && active(session, id))
-      void screen.file.sync(fileTabPath(screen.file, id), { force: true, silent: true })
+    if (id && active(session, id)) void screen.file.sync(fileTabPath(screen.file, id), { force: true, silent: true })
   })
 }
 

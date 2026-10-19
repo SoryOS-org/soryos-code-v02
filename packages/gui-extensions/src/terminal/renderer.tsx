@@ -146,7 +146,7 @@ const setup: Setup<typeof Terminal> = (ctx) => {
     },
     icon: "terminal",
     keybind: "terminal.new",
-    order: 30,
+    order: 20,
     run() {
       const target = current()
 
