@@ -41,6 +41,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { AnimatedNumber } from "@opencode/ui/animated-number"
 import { changedFileDiff, patchFileGroups } from "../components/apply-patch-file"
+import { fileToolGroupMetadata } from "./tool-diagnostics"
 import { animate } from "motion"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import type {
@@ -1025,9 +1026,12 @@ export function CurrentFileToolGroup(props: {
       : result
   }, [])
 
-  const metadata = createMemo(() => ({
-    files: files().map((entry) => entry.value),
-  }))
+  const metadata = createMemo(() =>
+    fileToolGroupMetadata(
+      files().map((entry) => entry.value),
+      props.tools.map((tool) => toolMetadata(currentToolMetadata(tool)).diagnostics),
+    ),
+  )
 
   const pending = createMemo(() =>
     props.tools.some((tool) => tool.state.status === "streaming" || tool.state.status === "running"),
@@ -1233,6 +1237,8 @@ function FileAccordionItem(props: {
   type?: string
   header: JSX.Element
   children: JSX.Element
+  // Kept outside the disclosure so grouped tool diagnostics stay visible while collapsed.
+  footer?: JSX.Element
 }) {
   const id = createUniqueId()
 
@@ -1273,6 +1279,7 @@ function FileAccordionItem(props: {
           {props.children}
         </div>
       </Show>
+      {props.footer}
     </div>
   )
 }
@@ -2233,6 +2240,8 @@ ToolRegistry.register({
 
     const [expanded, setExpanded] = createSignal<string[]>([])
 
+    const diagnostics = createMemo(() => toolMetadata(props.metadata).diagnostics)
+
     const title = createMemo(() => {
       if (props.tool === "edit") return i18n.t("ui.messagePart.title.edit")
 
@@ -2289,6 +2298,7 @@ ToolRegistry.register({
                       change(expanded ? [...open(), value()] : open().filter((path) => path !== value()))
                     }
                     type={file().type}
+                    footer={<DiagnosticsDisplay diagnostics={getDiagnostics(diagnostics(), file().path)} />}
                     header={
                       <div data-slot="apply-patch-trigger-content">
                         <div data-slot="apply-patch-file-info">
