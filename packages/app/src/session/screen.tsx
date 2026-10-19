@@ -37,7 +37,7 @@ import { createTimelineQuote, TimelineQuote } from "./timeline/quote"
 import { ActiveSessionComposerRegion, createActiveSessionRegion } from "./composer/region"
 import { SessionIdentityHeader } from "./session-identity-header"
 import { SessionReviewToggle } from "./header/session-header-actions"
-import { createPanelMotion, panelSprings, replayPanelToggle } from "@/shell/panel-motion"
+import { createPanelMotion, panelSpring, replayPanelToggle } from "@/shell/panel-motion"
 import { createTimelineCache } from "./timeline/cache"
 
 export function SessionScreenView(props: { session: SessionModel }) {
@@ -121,7 +121,7 @@ function SessionScreenContent(props: {
 
   const sideMotion = createPanelMotion({
     open: sideVisible,
-    spring: panelSprings.side,
+    spring: panelSpring,
     identity: session.layout.tabKey,
     // The chat's real width moves the side panel's edge, whose contents keep their open width pinned to it.
     paint: (closed) => {
@@ -144,9 +144,8 @@ function SessionScreenContent(props: {
 
   replayPanelToggle({
     id: "sidePanel",
-    group: "Side panel",
+    label: "Side panel",
     toggle: () => session.layout.view().side.toggle(),
-    spring: panelSprings.side,
   })
 
   const sideFileTree = createMemo<boolean>((previous) => (sideVisible() ? screen.files.open() : previous), false)

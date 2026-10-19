@@ -14,7 +14,7 @@ import { ExtensionSlot } from "@/runtime/extension/render"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { CollapsedSidebarToggle } from "@/shell/sidebar-toggle"
-import { createPanelMotion, panelSprings, replayPanelToggle } from "@/shell/panel-motion"
+import { createPanelMotion, panelSpring, replayPanelToggle } from "@/shell/panel-motion"
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
@@ -38,7 +38,7 @@ export default function Layout(props: ParentProps) {
 
   const sidebarMotion = createPanelMotion({
     open: preferences.appearance.sidebarOpen,
-    spring: panelSprings.sidebar,
+    spring: panelSpring,
     // The aside's real width moves main's edge with the sidebar's; its contents keep their width, pinned to that edge.
     paint: (closed) => {
       const aside = state.tabsAside
@@ -49,9 +49,8 @@ export default function Layout(props: ParentProps) {
 
   replayPanelToggle({
     id: "sidebar",
-    group: "Left sidebar",
+    label: "Left sidebar",
     toggle: () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen()),
-    spring: panelSprings.sidebar,
   })
 
   command.register("sidebar", () =>

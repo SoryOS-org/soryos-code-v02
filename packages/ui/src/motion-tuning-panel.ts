@@ -1,14 +1,12 @@
-import type { SpringValue } from "knobs"
-import { motionTuning, type MotionKnob } from "./motion-tuning"
+import type { DurationOptions } from "./motion"
+import { motionPresets, motionTuning, type MotionKnob } from "./motion-tuning"
 
 const global = "Global"
 
-// Kit's palette, applied to every spring at once.
-const durations = { snappy: 0.25, calm: 0.3, smooth: 0.45 }
-
 /**
  * Mounts the Motion workspace into `container`: a tab per surface, Global on every tab, an action row per replay
- * button, a "Jump to" palette over sections, actions and presets, presets and copy as code. knobs loads on first
+ * button, a "Jump to" palette over sections, actions and presets, the Snappy, Smooth and Calm presets for every spring
+ * at once, and copy as code. knobs loads on first
  * mount, so importing this module costs nothing until then. Works anywhere a surface registered its knobs, including
  * Storybook stories. Returns its removal.
  */
@@ -40,10 +38,10 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
       return knob(item.initial, { ...meta, min: item.min, max: item.max, step: item.step, unit: item.unit ?? "×" })
     }
 
-    const apply = (item: MotionKnob, value: SpringValue | boolean | number) => {
+    const apply = (item: MotionKnob, value: MotionKnob["value"]) => {
       if (item.kind === "spring") {
         // SAFETY: a spring knob's field is a spring field.
-        return motionTuning.set(item, value as SpringValue)
+        return motionTuning.set(item, value as DurationOptions)
       }
 
       if (item.kind === "toggle") {
@@ -88,29 +86,36 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
       const controls = defineControls(
         "opencode-motion",
         {
-          ...Object.fromEntries(list.map((item) => [item.id, field(item)])),
-          ...Object.fromEntries(
-            actions.map((item) => [
-              `action.${item.id}`,
-              action(item.label, { group: item.group, tab: item.group, run: item.run }),
-            ]),
-          ),
+          // Global first, then each section's knobs and its replay buttons together, so each shows as one card.
+          ...Object.fromEntries(list.filter((item) => item.group === global).map((item) => [item.id, field(item)])),
           ...Object.fromEntries([["jump", action("Jump to…", { group: global, run: () => palette.open() })]]),
+          ...Object.fromEntries(
+            [...list, ...actions]
+              .filter((item) => item.group !== global)
+              .toSorted((a, b) => sections.indexOf(a.group) - sections.indexOf(b.group))
+              .map((item) =>
+                "run" in item
+                  ? [`action.${item.id}`, action(item.label, { group: item.group, tab: item.group, run: item.run })]
+                  : [item.id, field(item)],
+              ),
+          ),
         },
         {
           // knobs enables itself only on localhost; this module is only loaded in developer channels.
           enabled: true,
           ship: () => import("knobs/panel"),
           persist: "variants",
-          presets: Object.fromEntries(
-            Object.entries(durations).map(([name, duration]) => [
-              name,
-              Object.fromEntries(springs.map((item) => [item.id, { duration, bounce: 0 }])),
-            ]),
-          ),
+          // The defaults are Snappy; the strip names them so rather than "default".
+          defaultLabel: motionPresets.snappy,
+          presetLabels: { smooth: motionPresets.smooth, calm: motionPresets.calm },
+          presets: {
+            smooth: Object.fromEntries(springs.map((item) => [item.id, item.presets.smooth])),
+            calm: Object.fromEntries(springs.map((item) => [item.id, item.presets.calm])),
+          },
           onChange: (patch) =>
             list.forEach((item) => {
-              const value = patch[item.id]
+              // SAFETY: each field was made from its knob above, so its value is that knob's kind.
+              const value = patch[item.id] as MotionKnob["value"] | undefined
 
               if (value !== undefined) apply(item, value)
             }),

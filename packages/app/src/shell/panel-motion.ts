@@ -2,46 +2,39 @@ import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-
 import { frameLoop, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 
-const sidebar = motionTuning.spring("sidebar", { label: "Spring", group: "Left sidebar", duration: 0.2, bounce: 0 })
+const group = "Panels"
 
-const side = motionTuning.spring("sidePanel", { label: "Spring", group: "Side panel", duration: 0.2, bounce: 0 })
-
-const linked = motionTuning.toggle("sidePanelLinked", {
-  label: "Follow the left sidebar's spring",
-  group: "Side panel",
-  value: true,
+// The left sidebar and the side panel are one class of motion, so they share one spring.
+export const panelSpring = motionTuning.spring("panels", {
+  label: "Spring",
+  group,
+  presets: {
+    snappy: { duration: 0.15, bounce: 0 },
+    smooth: { duration: 0.25, bounce: 0 },
+    calm: { duration: 0.4, bounce: 0 },
+  },
 })
 
 const keyboardInstant = motionTuning.toggle("keyboardInstant", {
   label: "Keyboard toggles are instant",
-  group: "Global",
+  group,
   value: true,
 })
 
-export const panelSprings = {
-  sidebar,
-  side: () => (linked() ? sidebar() : side()),
-}
-
-/** Adds buttons that play a panel's toggle to its Motion workspace section while the panel is mounted. */
-export function replayPanelToggle(input: {
-  id: string
-  group: string
-  toggle: () => void
-  spring: () => DurationOptions
-}) {
+/** Adds buttons that play a panel's toggle to the Panels section of the Motion workspace while the panel is mounted. */
+export function replayPanelToggle(input: { id: string; label: string; toggle: () => void }) {
   onCleanup(
-    motionTuning.action({ id: `${input.id}.toggle`, label: "Open / close", group: input.group, run: input.toggle }),
+    motionTuning.action({ id: `${input.id}.toggle`, label: `${input.label}: open / close`, group, run: input.toggle }),
   )
 
   onCleanup(
     motionTuning.action({
       id: `${input.id}.reverse`,
-      label: "Toggle, reverse mid-flight",
-      group: input.group,
+      label: `${input.label}: reverse mid-flight`,
+      group,
       run: () => {
         input.toggle()
-        setTimeout(input.toggle, input.spring().duration * 350)
+        setTimeout(input.toggle, panelSpring().duration * 350)
       },
     }),
   )

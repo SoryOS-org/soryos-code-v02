@@ -58,7 +58,12 @@ const setup: Setup<typeof Debug> = (ctx) => {
         </Show>
         <Show when={motionTools}>
           <Suspense>
-            <Motion open={motion()} button={!visible()} toggle={toggleMotion} title={ctx.t("motion.title")} />
+            <Motion
+              open={motion()}
+              button={import.meta.env.DEV && !visible()}
+              toggle={toggleMotion}
+              title={ctx.t("motion.title")}
+            />
           </Suspense>
         </Show>
       </>
