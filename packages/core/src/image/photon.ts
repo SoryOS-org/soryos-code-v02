@@ -5,7 +5,20 @@ import { fileURLToPath } from "node:url"
 import { FileSystem } from "../filesystem.js"
 import { DecodeError, ResizerUnavailableError, SizeError, type Limits } from "../image.js"
 
-const JPEG_QUALITIES = [80, 85, 70, 55, 40]
+const PNG_PASSTHROUGH_MAX_BASE64_BYTES = 384 * 1024
+const SMALL_PNG_MAX_PIXELS = 256 * 256
+const JPEG_QUALITIES = [80, 70, 55, 40]
+
+function hasTransparency(pixels: Uint8Array) {
+  const samples = Math.min(4_096, Math.floor(pixels.length / 4))
+  if (samples === 0) return false
+  const stride = Math.max(1, Math.floor(pixels.length / 4 / samples)) * 4
+  let transparent = 0
+  for (let index = 3; index < pixels.length; index += stride) {
+    if (pixels[index]! < 250) transparent++
+  }
+  return transparent / samples > 0.05
+}
 
 export const make = Effect.gen(function* () {
   const loadPhoton = yield* Effect.cached(
@@ -44,7 +57,11 @@ export const make = Effect.gen(function* () {
       const width = decoded.get_width()
       const height = decoded.get_height()
       const bytes = Buffer.byteLength(content.content, "utf-8")
-      if (width <= limits.maxWidth && height <= limits.maxHeight && bytes <= limits.maxBase64Bytes) return content
+      const fits = width <= limits.maxWidth && height <= limits.maxHeight && bytes <= limits.maxBase64Bytes
+      const smallPng = bytes <= PNG_PASSTHROUGH_MAX_BASE64_BYTES
+      const transparent =
+        content.mime === "image/png" && !(fits && smallPng) && hasTransparency(decoded.get_raw_pixels())
+      if (fits && (content.mime !== "image/png" || !limits.autoResize || smallPng || transparent)) return content
       if (!limits.autoResize)
         return yield* new SizeError({
           resource,
@@ -71,12 +88,19 @@ export const make = Effect.gen(function* () {
         return acc.some((item) => item.width === next.width && item.height === next.height) ? acc : [...acc, next]
       }, [])
       for (const size of sizes) {
-        const resized = photon.resize(decoded, size.width, size.height, photon.SamplingFilter.Lanczos3)
+        const resized =
+          size.width === width && size.height === height
+            ? decoded
+            : photon.resize(decoded, size.width, size.height, photon.SamplingFilter.Lanczos3)
         try {
-          const encoders: Array<readonly [mime: string, encode: () => Uint8Array]> = [
-            ["image/png", () => resized.get_bytes()],
-            ...JPEG_QUALITIES.map((quality) => ["image/jpeg", () => resized.get_bytes_jpeg(quality)] as const),
-          ]
+          const pngEncoder = ["image/png", () => resized.get_bytes()] as const
+          const jpegEncoders = JPEG_QUALITIES.map(
+            (quality) => ["image/jpeg", () => resized.get_bytes_jpeg(quality)] as const,
+          )
+          const pngFirst = transparent || size.width * size.height <= SMALL_PNG_MAX_PIXELS
+          const encoders: Array<readonly [mime: string, encode: () => Uint8Array]> = pngFirst
+            ? [pngEncoder, ...jpegEncoders]
+            : [...jpegEncoders, pngEncoder]
           for (const [mime, encode] of encoders) {
             const candidate = encode()
             // Base64 uses four bytes per three input bytes, including padding.
@@ -89,7 +113,7 @@ export const make = Effect.gen(function* () {
               }
           }
         } finally {
-          resized.free()
+          if (resized !== decoded) resized.free()
         }
       }
       return yield* new SizeError({
