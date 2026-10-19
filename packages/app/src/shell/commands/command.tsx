@@ -94,6 +94,8 @@ export interface CommandOption {
   id: string
   title: string
   description?: string
+  /** Extra words the command palette matches, separated by spaces. */
+  keywords?: string
   category?: string
   /** Section of Settings > Shortcuts. Host commands leave it unset and are placed by id prefix. */
   section?: CommandSection

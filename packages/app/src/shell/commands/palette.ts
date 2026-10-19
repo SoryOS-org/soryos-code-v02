@@ -22,6 +22,7 @@ export type CommandPaletteEntry = {
   type: "command" | "file" | "session"
   title: string
   description?: string
+  keywords?: string
   keybind?: string
   category: string
   option?: CommandOption
@@ -215,6 +216,7 @@ export function createCommandPaletteCommandEntry(option: CommandOption, category
     type: "command",
     title: option.title,
     description: option.description,
+    keywords: option.keywords,
     keybind: option.keybind,
     category,
     option,

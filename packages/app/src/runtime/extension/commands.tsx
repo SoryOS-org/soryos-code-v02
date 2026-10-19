@@ -21,6 +21,7 @@ export function ExtensionCommands() {
         id: `${item.extension}.${item.value.id}`,
         title: item.value.title,
         description: item.value.description,
+        keywords: item.value.keywords,
         category: item.value.group,
         section: item.value.section,
         keybind: item.value.bind,

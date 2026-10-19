@@ -27,7 +27,9 @@ function groups(entries: CommandPaletteEntry[]) {
 export function matchesCommandPaletteEntry(entry: CommandPaletteEntry, query: string) {
   const value = query.toLowerCase()
 
-  return [entry.title, entry.description, entry.category].some((text) => text?.toLowerCase().includes(value))
+  return [entry.title, entry.description, entry.category, entry.keywords].some((text) =>
+    text?.toLowerCase().includes(value),
+  )
 }
 
 export function DialogCommandPalette(props: { onOpenFile?: (path: string) => void }) {

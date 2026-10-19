@@ -17,6 +17,8 @@ export interface Command {
   readonly title: string
   /** The palette's second line. */
   readonly description?: string
+  /** Extra words the palette matches, separated by spaces, e.g. "dev bar" for the debug bar. */
+  readonly keywords?: string
   /** The palette category the command is listed under; translated text. */
   readonly group?: string
   /**

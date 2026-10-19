@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import type { Project } from "@/runtime/server/types"
 import type { SessionInfo } from "@opencode/client/promise"
 import { createRoot } from "solid-js"
-import { createServerSessionEntries } from "@/shell/commands/palette"
+import { createCommandPaletteCommandEntry, createServerSessionEntries } from "@/shell/commands/palette"
+import { matchesCommandPaletteEntry } from "@/shell/commands/dialog"
 import { ServerConnection } from "@/runtime/server/registry"
 import { getProjectAvatarSource } from "@opencode/ui/project-avatar"
 
@@ -119,5 +120,18 @@ describe("command palette sessions", () => {
 
     expect(gets).toEqual([exact.id])
     expect(result).toMatchObject([{ sessionID: exact.id, title: exact.title }])
+  })
+})
+
+describe("command palette commands", () => {
+  test("match their keywords as well as their title", () => {
+    const entry = createCommandPaletteCommandEntry(
+      { id: "debug.toggle", title: "Toggle debug bar", keywords: "dev bar developer tools diagnostics" },
+      "View",
+    )
+
+    expect(matchesCommandPaletteEntry(entry, "dev bar")).toBe(true)
+    expect(matchesCommandPaletteEntry(entry, "Diagnostics")).toBe(true)
+    expect(matchesCommandPaletteEntry(entry, "terminal")).toBe(false)
   })
 })
