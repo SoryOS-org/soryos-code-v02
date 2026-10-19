@@ -1,15 +1,9 @@
 export * as ConfigPatch from "./patch.js"
 
 import { applyEdits, modify, parse, type ParseError } from "jsonc-parser"
-import type { ConfigProvider } from "@opencode/schema/config/provider"
+import type { Patch } from "@opencode/schema/config"
 
-export function apply(
-  text: string,
-  patch: {
-    readonly shell?: string | null
-    readonly providers?: Readonly<Record<string, ConfigProvider.Info>>
-  },
-) {
+export function apply(text: string, patch: Patch) {
   const errors: ParseError[] = []
   const document: unknown = parse(text, errors, { allowTrailingComma: true })
   if (errors.length || document === null || typeof document !== "object" || Array.isArray(document))

@@ -114,7 +114,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 }) {}
 
 export const Patch = Schema.Struct({
-  shell: Schema.NullOr(Schema.String),
+  shell: Schema.NullOr(Schema.String).pipe(optional),
+  // Keep provider patches in their encoded JSON shape across the HTTP and filesystem boundaries.
+  providers: Schema.Record(Schema.String, Schema.toEncoded(ConfigProvider.Info)).pipe(optional),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 
