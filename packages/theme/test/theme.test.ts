@@ -43,3 +43,13 @@ test("passes a reference error through unchanged", () => {
   ;(copy.base.background as Record<string, unknown>).base = "$missing"
   expect(failure(copy)).toContain('Theme reference "$missing" was not found')
 })
+
+// A union reports one token once per failed alternative, so counting issues claimed a second broken
+// token. Only distinct tokens may be counted (#57108 review).
+test("does not claim a second token when one token fails every alternative", () => {
+  const copy = structuredClone(document)
+  ;(copy.base.border as Record<string, unknown>).base = "#zz"
+  const message = failure(copy)
+  expect(message).toContain("base.border.base")
+  expect(message).not.toContain("more)")
+})

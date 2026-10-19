@@ -45,10 +45,14 @@ export function themeDecodeError(error: unknown, name: string) {
       cause: error,
     })
   const issues = formatIssues(error.issue).issues
-  const details = [...new Set(issues.map((issue) => `${tokenPath(issue)}: ${issue.message}`))]
+  // Decoding stops at the first broken token, so a union that fails every alternative reports one token
+  // more than once. Count distinct tokens, not issues, or the suffix claims a second broken token.
+  const tokens = new Set(issues.map(tokenPath))
+  const first = issues.at(0)
   // The toast shows only this line, so name the token and keep it short enough to read.
-  const rest = details.length > 1 ? ` (+${details.length - 1} more)` : ""
-  return new Error(`Invalid theme: ${name}: ${details[0] ?? "invalid document"}${rest}`, { cause: error })
+  const rest = tokens.size > 1 ? ` (+${tokens.size - 1} more)` : ""
+  const detail = first ? `${tokenPath(first)}: ${first.message}` : "invalid document"
+  return new Error(`Invalid theme: ${name}: ${detail}${rest}`, { cause: error })
 }
 
 /** `["base","background","base"]` as `base.background.base`, so the message names the failing token. */
