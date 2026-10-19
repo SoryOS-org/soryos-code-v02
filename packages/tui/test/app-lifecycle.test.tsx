@@ -1215,7 +1215,7 @@ test("new session inherits the active session model", async () => {
   expect(frame).toContain("Session Model")
 })
 
-test.each(process.platform === "win32" ? ["nested"] : ["nested", "literal\\"])(
+test.each(process.platform === "win32" ? ["nested", "~", ".."] : ["nested", "~", "..", "literal\\"])(
   "/cd Tab completion preserves the directory delimiter for %s",
   async (name) => {
     await using state = await tmpdir()
