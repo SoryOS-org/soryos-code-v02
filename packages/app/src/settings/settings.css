@@ -943,7 +943,7 @@
   opacity: 1;
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   .settings-provider-console-chevron {
     transition: none;
   }
@@ -1459,7 +1459,7 @@
   padding-block: 2px;
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   .settings-models-group-chevron svg,
   .provider-model-group-chevron {
     transition: none;
@@ -1709,7 +1709,7 @@
   overflow: hidden;
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   .settings-workspaces-row-motion {
     transition: none;
   }

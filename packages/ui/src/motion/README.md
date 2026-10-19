@@ -34,7 +34,7 @@ const frameLoop: {
 }
 function createFrameLoop(scheduler?: { request(callback: (time: number) => void): number; cancel(id: number): void })
 
-const prefersReducedMotion: () => boolean // live matchMedia
+const prefersReducedMotion: () => boolean // root data-motion, else live matchMedia
 function observeReducedMotion(listener: () => void): () => void
 
 class VelocityTracker {

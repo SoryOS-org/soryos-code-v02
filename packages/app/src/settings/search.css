@@ -295,7 +295,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-search-target]::before {
     animation-timing-function: steps(1, end);
   }

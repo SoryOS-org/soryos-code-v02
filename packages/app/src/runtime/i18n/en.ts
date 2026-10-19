@@ -753,6 +753,11 @@ export const dict = {
   "settings.general.row.interfaceMode.inbox.description":
     "Every session across your servers, sorted by what needs you next.",
   "settings.general.row.interfaceMode.experimental": "Experimental",
+  "settings.appearance.row.reduceMotion.title": "Reduce motion",
+  "settings.appearance.row.reduceMotion.description": "Reduce animations or match your system",
+  "settings.appearance.row.reduceMotion.system": "System",
+  "settings.appearance.row.reduceMotion.on": "On",
+  "settings.appearance.row.reduceMotion.off": "Off",
   "settings.notifications.description": "Choose when to receive notifications and hear sounds",
   "settings.shortcuts.description": "Customize shortcuts for common actions",
   "settings.servers.description": "Manage server connections",

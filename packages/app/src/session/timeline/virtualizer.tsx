@@ -28,6 +28,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { filterVirtualIndexes } from "./virtual-items"
+import { prefersReducedMotion } from "@opencode/ui/motion"
 
 const fallbackItemSize = 60
 
@@ -869,7 +870,7 @@ export function createTimelineVirtualizer(input: Input) {
               "box-shadow": "var(--v2-elevation-raised), 0px 2px 8px var(--v2-background-bg-base)",
             }}
             onClick={() =>
-              input.onResumeScroll(matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth")
+              input.onResumeScroll(prefersReducedMotion() ? "auto" : "smooth")
             }
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">

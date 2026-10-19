@@ -312,7 +312,7 @@
       transform: none;
     }
 
-    @media (prefers-reduced-motion: reduce) {
+    :root[data-motion="reduce"] & {
       transition: none;
     }
   }

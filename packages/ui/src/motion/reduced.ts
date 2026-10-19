@@ -26,7 +26,20 @@ function media(): MediaQueryList | undefined {
   return result
 }
 
-export const prefersReducedMotion = (): boolean => media()?.matches ?? false
+// The app resolves its reduce motion setting into this attribute; without it the system preference applies.
+function override(): boolean | undefined {
+  const value = globalThis.document?.documentElement.getAttribute("data-motion")
+
+  if (value === "reduce") return true
+
+  if (value === "full") return false
+
+  return undefined
+}
+
+let attribute: MutationObserver | undefined
+
+export const prefersReducedMotion = (): boolean => override() ?? media()?.matches ?? false
 
 /** Also settle active WAAPI jobs when the preference changes mid-animation. SSR-safe. */
 export function observeReducedMotion(listener: () => void): () => void {
@@ -34,11 +47,20 @@ export function observeReducedMotion(listener: () => void): () => void {
 
   if (!preference) return () => {}
 
-  if (listeners.size === 0) preference.addEventListener("change", notify)
+  if (listeners.size === 0) {
+    preference.addEventListener("change", notify)
+
+    if (globalThis.document && globalThis.MutationObserver) {
+      attribute = new MutationObserver(notify)
+      attribute.observe(document.documentElement, { attributes: true, attributeFilter: ["data-motion"] })
+    }
+  }
   listeners.add(listener)
 
   return () => {
     if (!listeners.delete(listener) || listeners.size > 0) return
     result?.removeEventListener("change", notify)
+    attribute?.disconnect()
+    attribute = undefined
   }
 }

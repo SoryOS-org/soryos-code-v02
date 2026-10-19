@@ -314,7 +314,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   .session-summary-popover,
   .session-service-menu {
     animation: none;

@@ -18,6 +18,10 @@
 @source not "../../../src/**/*.test.{ts,tsx}";
 @import "./utilities.css";
 
+/* The app resolves its reduce motion setting, including the system preference, into this attribute. */
+@custom-variant motion-reduce (&:where(:root[data-motion="reduce"] *));
+@custom-variant motion-safe (&:where(:root:not([data-motion="reduce"]) *));
+
 @import "../index.css";
 
 @theme {

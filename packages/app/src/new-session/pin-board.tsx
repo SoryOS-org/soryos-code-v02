@@ -1,6 +1,7 @@
 import { onCleanup, onMount } from "solid-js"
 import { createQuads, type Quads, type Rgba } from "./pin-quads"
 import { PinSound } from "./pin-sound"
+import { prefersReducedMotion } from "@opencode/ui/motion"
 
 // The wordmark as a 78×14 pin grid: 1 = counter shadow, 2 = "open", 3 = "code".
 const GRID = [
@@ -98,7 +99,7 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
   const stage = back.parentElement!
   // The pins behind the composer and the ones popped in front of it are each one layer of quads.
   const layers = { back: createQuads(back, () => wake()), front: createQuads(front, () => wake()) }
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches
+  const still = prefersReducedMotion()
   const pins: Pin[] = GRID.flatMap((row, r) =>
     [...row].flatMap((ch, c) => (ch === "." ? [] : [createPin(c, r, Number(ch))])),
   )

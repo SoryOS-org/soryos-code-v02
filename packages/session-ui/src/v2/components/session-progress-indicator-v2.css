@@ -14,7 +14,7 @@
   fill: currentColor;
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-component="session-progress-indicator-v2"] [data-frame-content] {
     display: none;
   }

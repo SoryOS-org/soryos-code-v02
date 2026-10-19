@@ -430,7 +430,7 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
+  :root[data-motion="reduce"] & {
     [data-slot="question-option"],
     .question-custom-field[data-component="text-input-v2"] {
       transition: none;

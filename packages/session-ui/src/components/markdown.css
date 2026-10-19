@@ -441,7 +441,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-component="markdown"] :is([data-markdown-word], code)[data-markdown-enter] {
     animation: none;
   }

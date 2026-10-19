@@ -52,6 +52,20 @@ const Direction = (props: { value?: unknown }) => {
   return null
 }
 
+// The app derives this attribute from its reduce motion setting; stories follow the system preference.
+const Motion = () => {
+  onMount(() => {
+    const query = matchMedia("(prefers-reduced-motion: reduce)")
+    const apply = () => {
+      document.documentElement.dataset.motion = query.matches ? "reduce" : "full"
+    }
+    apply()
+    query.addEventListener("change", apply)
+    onCleanup(() => query.removeEventListener("change", apply))
+  })
+  return null
+}
+
 const BodyTypography = () => {
   onMount(() => {
     document.body.classList.add("font-(family-name:--font-family-text)", "text-[13px]", "font-[440]")
@@ -74,6 +88,7 @@ const frame = createJSXDecorator((Story, context) => {
           <UiI18nBridge>
             <Scheme value={scheme} />
             <Direction value={context.globals?.direction} />
+            <Motion />
             <BodyTypography />
             <DialogProvider>
               <MarkedProvider>

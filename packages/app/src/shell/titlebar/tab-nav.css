@@ -403,7 +403,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-titlebar-tab] [data-slot="tab-prompt-pulse"] {
     animation: none;
   }
