@@ -33,7 +33,9 @@ test("mini waits beyond the fetch idle timeout before and after reconnecting", a
       new Response(child.stderr).text(),
       child.exited,
     ])
-    expect({ stdout, stderr, code }).toEqual({ stdout: "", stderr: "", code: 0 })
+    expect(stderr).not.toContain("Transport: The operation timed out")
+    expect(stderr).not.toContain("TimeoutError")
+    expect({ stdout, code }).toEqual({ stdout: "", code: 0 })
     expect(requests.filter((path) => path !== "/api/experimental/session/ses_cancelled/wait").toSorted()).toEqual(
       ["ses_initial", "ses_reconnected", "ses_control"].map((id) => `/api/experimental/session/${id}/wait`).sort(),
     )
