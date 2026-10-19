@@ -356,7 +356,14 @@ export function mountBrowserPane(input: PaneHost) {
       uses: { pane: { load: () => live } },
       sessions: { current: session, list: () => Array.from(views.values()).filter((view) => view.key !== "Empty") },
       screen: { current: () => screen },
-      layout: { narrow: () => false, stored: () => [], state: () => "visible", open() {}, close() {} },
+      layout: {
+        narrow: () => false,
+        stored: () => [],
+        state: () => "visible",
+        open() {},
+        close() {},
+        side: { opened: () => true, toggle() {}, menu: () => [] },
+      },
       links: { open() {} },
       stores: {
         history: {
@@ -740,7 +747,7 @@ export function mountBrowserRegion(input: RegionHost) {
         strip(session.key).all.flatMap((key) =>
           key.startsWith(`${extension}:`) ? [key.slice(extension.length + 1)] : [],
         ),
-      side: { opened: () => true, toggle() {} },
+      side: { opened: () => true, toggle() {}, menu: () => [] },
       sidebar: { opened: () => true },
       scroll: { get: () => undefined, set() {} },
       settings() {},

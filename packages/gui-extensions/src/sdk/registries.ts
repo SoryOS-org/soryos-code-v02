@@ -81,6 +81,19 @@ export interface SessionPanelMenuItem extends MenuItemBase {
   readonly icon?: IconName
   /** Published command id whose shortcut the item shows. */
   readonly keybind?: string
+  /** A short muted detail after the title where the item lists as a launcher row, e.g. a count. Omit it for none. */
+  readonly description?: string
+  /**
+   * The tab the item opens is already open. Launcher lists such as the new tab page leave the item out; the + menu
+   * still lists it. Omit it while the tab is closed, or for an item that always opens a new tab.
+   */
+  readonly opened?: boolean
+  /**
+   * Marks the item that opens a new tab: + runs it directly instead of opening the menu, and the side region runs it
+   * when it opens with no tabs. The first primary item in `order` wins. Without one, + opens the menu and an empty side
+   * region lists the items. Omit it for an ordinary item.
+   */
+  readonly primary?: true
   /** Runs the item. */
   run(): void
 }
@@ -119,7 +132,8 @@ export interface ServerRowMenuItem extends MenuItemBase {
 
 /**
  * An item of a host menu, by `menu`. Each menu takes only its own fields, so a field the menu ignores fails to compile.
- * - `session.panel`: the + menu before the side panel tabs; shows `icon` and `keybind`.
+ * - `session.panel`: the + menu before the side panel tabs; shows `icon`, `keybind` and `description`, `primary`
+ *   makes the item the new tab action, and launcher lists skip `opened` items. `Layout.side.menu` lists the items for a launcher of your own.
  * - `server.add`: the Add server menu.
  * - `server.row`: the menu of each server row in Settings; `when` and `enabled` filter it per row, and `run` receives
  *   the row's server key.

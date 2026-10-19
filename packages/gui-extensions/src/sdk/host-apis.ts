@@ -4,7 +4,7 @@ import type { Schema } from "effect"
 import type { JSX } from "solid-js"
 import type { Store } from "solid-js/store"
 import type { Cleanup, OS, Persisted, StoreFrom } from "./core"
-import type { IconName, Link } from "./registries"
+import type { IconName, Link, SessionPanelMenuItem } from "./registries"
 
 /**
  * A server the app lists. One ref per id that follows the live connection: read `client`, `data` and `url` from it
@@ -712,6 +712,16 @@ export interface Layout {
      * @param session - Any session.
      */
     toggle(session: SessionRef): void
+    /**
+     * The + menu's items: every extension's `session.panel` `MenuItem`, in `order`. Use it to list them on a page of
+     * your own, such as a new tab page. Empty before the app interface mounts. Reactive.
+     *
+     * @example
+     * ```ts
+     * const launchers = () => ctx.layout.side.menu().filter((item) => !item.primary && !item.opened)
+     * ```
+     */
+    menu(): readonly SessionPanelMenuItem[]
   }
   /**
    * The inner sidebar preference every side panel shares, which `usePanel().sidebar` also reads inside a panel render.

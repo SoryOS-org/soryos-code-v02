@@ -48,6 +48,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { createEmbeds } from "./embeds"
 import { useExtensionHost, type HostApiFactories } from "./host"
 import { createLocatedWrites } from "./located"
+import { createSessionPanelMenu } from "./panel-menu"
 import type { Region } from "./panels"
 import { deferredHandle, globalStoreTarget, persistedHandle, storeImports, storeName } from "./stores"
 
@@ -306,6 +307,7 @@ export function createHostApis() {
       side: {
         opened: (session) => current()?.layout.side.opened(session) ?? false,
         toggle: (session) => write((value) => value.layout.side.toggle(session)),
+        menu: () => current()?.layout.side.menu() ?? [],
       },
       sidebar: { opened: () => current()?.layout.sidebar.opened() ?? true },
       scroll: {
@@ -365,6 +367,7 @@ export function createExtensionAttachment(apis: HostApis) {
   const host = useExtensionHost()
   const command = useCommand()
   const location = useLocation()
+  const menu = createSessionPanelMenu()
   const desktop = createMediaQuery("(min-width: 768px)")
   const narrow = () => !desktop()
   // The mounted session screen, from its first render, and its object for the session it routes once it has mounted;
@@ -678,7 +681,13 @@ export function createExtensionAttachment(apis: HostApis) {
 
     if (!value) return located.hold(session, () => close(key, session))
     const tab = listed(session, value).find((entry) => entry.key === key)?.tab
-    layout.panel.close(value, key)
+    const all = layout.panel.state(value).all
+    batch(() => {
+      layout.panel.close(value, key)
+
+      // Closing the last tab closes the side region, which opens with a new tab next time.
+      if (all.length === 1 && all[0] === key) tabs.setRegion(shellTab(session), "side", false)
+    })
     const view = mountedSession(session)
     const currentScreen = screen()
 
@@ -808,6 +817,7 @@ export function createExtensionAttachment(apis: HostApis) {
       side: {
         opened: sideOpened,
         toggle: (session) => tabs.setRegion(shellTab(session), "side", !sideOpened(session)),
+        menu,
       },
       // Open is the stored preference's default, which holds until a session screen shows the preference.
       sidebar: { opened: () => sidebar()?.opened() ?? true },
