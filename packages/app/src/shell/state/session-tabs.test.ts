@@ -3,6 +3,8 @@ import { closeSessionTab, openSessionTab, previewSessionTab, type SessionTabStat
 
 const OPEN = "file:open"
 
+const SECOND = "file:open:2"
+
 const launchers = new Set([OPEN])
 
 const state = (all: string[], active?: string, preview?: string): SessionTabState => ({
@@ -30,6 +32,16 @@ test.each([
     name: "preview replaces a restored Open File placeholder",
     run: () => previewSessionTab(state(["file://a.ts", OPEN], OPEN), "file://b.ts", launchers),
     expected: state(["file://a.ts", "file://b.ts"], "file://b.ts", "file://b.ts"),
+  },
+  {
+    name: "preview replaces the selected Open File placeholder among several",
+    run: () =>
+      previewSessionTab(
+        state([OPEN, "file://a.ts", SECOND], SECOND, "file://a.ts"),
+        "file://b.ts",
+        new Set([OPEN, SECOND]),
+      ),
+    expected: state([OPEN, "file://a.ts", "file://b.ts"], "file://b.ts", "file://b.ts"),
   },
   {
     name: "open pins the current preview",

@@ -270,7 +270,10 @@ test("the summary's changes row switches the view and keeps the side tabs", asyn
   const launcher = panel.getByRole("tab", { name: "Open file", exact: true })
   await browseFiles(page)
   await expect(launcher).toHaveAttribute("aria-selected", "true")
+  // The launcher opens beside the preview; closing the file leaves only the launcher stored.
+  await readme.click({ button: "middle" })
   await expect(readme).toHaveCount(0)
+  await expect(launcher).toHaveAttribute("aria-selected", "true")
   await page.reload()
   await expect(launcher).toHaveAttribute("aria-selected", "true")
   await page.setViewportSize({ width: 390, height: 844 })

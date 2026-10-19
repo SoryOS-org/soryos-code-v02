@@ -45,6 +45,8 @@ import tabStyles from "./tabs.css?inline"
 
 const OPEN = "open"
 
+const isLauncher = (id: string) => id === OPEN || id.startsWith(`${OPEN}:`)
+
 const GROUP = "browser"
 
 const TABPANEL = "session-side-panel-file-browser-tabpanel"
@@ -145,10 +147,19 @@ const setup: Setup<typeof File> = (ctx) => {
     shared.reveal.run(session.key, path)
   }
 
-  const openPicker = (session: MountedSession, query: string, options?: OpenOptions) => {
+  // Reuses the selected launcher; otherwise wide screens add another one beside the open tabs, so several can stay
+  // open. Narrow screens never store a launcher, so they keep the one.
+  const openPicker = (session: MountedSession, query: string, options?: OpenOptions & { another?: boolean }) => {
+    const selected = options?.another
+      ? undefined
+      : layout.stored(session).find((id) => isLauncher(id) && active(session, id))
+
     batch(() => {
       updateFilter(session.key, { text: query, browsing: true })
-      layout.open(`file:${OPEN}`, session, { tab: "preview", background: options?.background })
+
+      if (selected || layout.narrow())
+        layout.open(`file:${selected ?? OPEN}`, session, { tab: "preview", background: options?.background })
+      else layout.open(`file:${OPEN}:${crypto.randomUUID()}`, session, { tab: "select" })
 
       if (!options?.background && layout.narrow() && !layout.side.opened(session)) layout.side.toggle(session)
     })
@@ -257,8 +268,8 @@ const setup: Setup<typeof File> = (ctx) => {
     }),
   )
 
-  const launcher: PanelTab = {
-    id: OPEN,
+  const launcher = (id: string): PanelTab => ({
+    id,
     get title() {
       return ctx.t("command.open")
     },
@@ -273,7 +284,7 @@ const setup: Setup<typeof File> = (ctx) => {
     transient: true,
     group: GROUP,
     dom: { panel: TABPANEL },
-  }
+  })
 
   const fileTab = (files: Files, id: string): PanelTab => {
     const path = () => fileTabPath(files, id)
@@ -320,16 +331,14 @@ const setup: Setup<typeof File> = (ctx) => {
     },
     list(input) {
       return input.open.flatMap((id) => {
-        if (id === OPEN) return [launcher]
-
-        if (!isFileTab(id)) return []
+        if (!isLauncher(id) && !isFileTab(id)) return []
 
         const cache = tabsOf(input.screen)
         const existing = cache.get(id)
 
         if (existing) return [existing]
 
-        const created = fileTab(input.screen.file, id)
+        const created = isLauncher(id) ? launcher(id) : fileTab(input.screen.file, id)
 
         cache.set(id, created)
 
@@ -387,20 +396,23 @@ const setup: Setup<typeof File> = (ctx) => {
     }),
   )
 
-  ctx.add(MenuItem, (): MenuItem => {
-    const session = sessions.current()
-
-    return {
+  // A new tab always offers another launcher, however many are open.
+  ctx.add(
+    MenuItem,
+    (): MenuItem => ({
       menu: "session.panel",
       id: "open",
       title: ctx.t("command.open"),
-      opened: !!session && layout.stored(session).some((id) => id === OPEN || isFileTab(id)),
       icon: "file-tree",
       keybind: "file.browse",
       order: 30,
-      run: browse,
-    }
-  })
+      run: () => {
+        const session = sessions.current()
+
+        if (session) openPicker(session, "", { another: true })
+      },
+    }),
+  )
 
   const OpenInAppButton = lazy(() => import("./open-in-app"))
 

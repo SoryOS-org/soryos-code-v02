@@ -8,9 +8,17 @@ export type SessionTabState = {
   preview?: string
 }
 
-/** A launcher tab (e.g. the file browser) stays replaceable by the next preview even after reload. */
-const sessionTabPreview = (current: SessionTabState, launchers: ReadonlySet<string>) =>
-  current.preview ?? current.tabs.all.find((tab) => launchers.has(tab))
+/**
+ * A launcher tab (e.g. the file browser) stays replaceable by the next preview even after reload. With several
+ * launchers open, the selected one is the one its pick replaces.
+ */
+const sessionTabPreview = (current: SessionTabState, launchers: ReadonlySet<string>) => {
+  const active = current.tabs.active
+
+  if (active && launchers.has(active)) return active
+
+  return current.preview ?? current.tabs.all.find((tab) => launchers.has(tab))
+}
 
 export function previewSessionTab(
   current: SessionTabState,

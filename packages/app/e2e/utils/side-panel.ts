@@ -7,7 +7,7 @@ export async function openFileLauncher(panel: Locator) {
   await panel.getByRole("button", { name: /^Open file/ }).click()
 }
 
-/** Opens the file browser with its shortcut, which still works while a file tab hides "Open file" from the New tab view. */
+/** Opens the file browser with its shortcut: it reuses the selected launcher, else opens another. */
 export async function browseFiles(page: Page) {
   await page.keyboard.press("Control+Alt+P")
 }

@@ -171,7 +171,7 @@ test("open file tab browses, searches, and tracks missing files", async ({ page 
   await expect(tab("Context")).toHaveAttribute("aria-selected", "true")
   await expect(tab("Open file")).toHaveAttribute("aria-selected", "false")
   await expect(sidebar).toBeHidden()
-  // The New tab view hides launchers whose tab is open, so the strip's tab returns to it.
+  // The strip's launcher tab returns to it.
   await tab("Open file").click()
   await expect(tab("Open file")).toHaveAttribute("aria-selected", "true")
   await expect(panel.getByText("ReviewOpenFile", { exact: true })).toBeVisible()
@@ -204,8 +204,9 @@ test("open file tab browses, searches, and tracks missing files", async ({ page 
   await expect(tab("README.md")).toHaveAttribute("aria-selected", "true")
   await expect(panel.getByText("contents:README.md", { exact: true })).toBeVisible()
 
+  // A new launcher opens beside the preview rather than replacing it.
   await browseFiles(page)
-  await expect(tab("README.md")).toHaveCount(0)
+  await expect(tab("README.md")).toHaveAttribute("aria-selected", "false")
   await expect(sidebar).toBeVisible()
   await filter.fill("nested")
   const result = panel.getByRole("option", { name: /nested\.ts/ })
@@ -223,6 +224,18 @@ test("open file tab browses, searches, and tracks missing files", async ({ page 
   await expect(sidebarToggle).toBeDisabled()
   await panel.locator("#session-side-panel-review-tab").click()
   await expect(sidebarToggle).toBeEnabled()
+  await tab("Open file").click()
+  await page.keyboard.press("Control+w")
+  await expect(tab("Open file")).toHaveCount(0)
+  await expect(tab("nested.ts")).toHaveAttribute("aria-selected", "true")
+
+  // The New tab view keeps offering Open file, so several launchers stay open; a pick replaces the selected one.
+  await openFileLauncher(panel)
+  await openFileLauncher(panel)
+  await expect(tab("Open file")).toHaveCount(2)
+  await panel.getByRole("button", { name: "README.md" }).click()
+  await expect(tab("README.md")).toHaveAttribute("aria-selected", "true")
+  await expect(tab("Open file")).toHaveCount(1)
   await tab("Open file").click()
   await page.keyboard.press("Control+w")
   await expect(tab("Open file")).toHaveCount(0)
