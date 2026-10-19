@@ -10,9 +10,9 @@ afterEach(() => {
 })
 
 it("offers Snappy, Smooth and Calm for every spring, with one Global card and one card per section", async () => {
-  const panels = motionTuning.spring("test.panels", {
+  const drawer = motionTuning.spring("test.drawer", {
     label: "Spring",
-    group: "Panels",
+    group: "Drawer",
     presets: {
       snappy: { duration: 0.15, bounce: 0 },
       smooth: { duration: 0.25, bounce: 0 },
@@ -30,11 +30,11 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
     },
   })
 
-  cleanups.push(motionTuning.action({ id: "test.replay", label: "Replay", group: "Panels", run: () => {} }))
+  cleanups.push(motionTuning.action({ id: "test.replay", label: "Replay", group: "Drawer", run: () => {} }))
 
   const container = document.createElement("div")
   document.body.append(container)
-  cleanups.push(mountMotionPanel(container, { section: "Panels" }))
+  cleanups.push(mountMotionPanel(container, { section: "Drawer" }))
 
   const chip = await waitFor(() =>
     [...container.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Smooth"),
@@ -52,13 +52,13 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
       element.closest("[hidden]") === null ? [element.textContent?.trim()] : [],
     )
 
-  expect(shown(".knobs-group-label")).toEqual(["Global", "Panels"])
+  expect(shown(".knobs-group-label")).toEqual(["Global", "Drawer"])
   expect(shown(".knobs-subhead-label")).toEqual(["Replay"])
   expect(labels).not.toContain("Jump to…")
-  expect(panels()).toEqual({ duration: 0.15, bounce: 0 })
+  expect(drawer()).toEqual({ duration: 0.15, bounce: 0 })
 
   chip.click()
-  expect(panels()).toEqual({ duration: 0.25, bounce: 0 })
+  expect(drawer()).toEqual({ duration: 0.25, bounce: 0 })
   expect(image()).toEqual({ duration: 0.3, bounce: 0 })
 })
 
