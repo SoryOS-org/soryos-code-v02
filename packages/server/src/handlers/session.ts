@@ -288,6 +288,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 agents: ctx.payload.agents,
                 skills: ctx.payload.skills,
                 metadata: ctx.payload.metadata,
+                agent: ctx.payload.agent,
+                model: ctx.payload.model,
                 delivery: ctx.payload.delivery,
                 resume: ctx.payload.resume,
               })
@@ -323,6 +325,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               files: ctx.payload.files,
               agents: ctx.payload.agents,
               skills: ctx.payload.skills,
+              agent: ctx.payload.agent,
+              model: ctx.payload.model,
               delivery: ctx.payload.delivery,
             })
             .pipe(
