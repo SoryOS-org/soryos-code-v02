@@ -86,11 +86,24 @@ function NewSessionLocationDialog(props: {
 
   const [listed, listedActions] = createResource(
     () => store.drilled,
-    (project) =>
-      context(project)
-        ?.sdk.api.worktree.list({ projectID: project.id! })
-        .catch(() => project.worktrees ?? []) ?? Promise.resolve(project.worktrees ?? []),
+    async (project) => ({
+      projectID: project.id,
+      items:
+        (await context(project)
+          ?.sdk.api.worktree.list({ projectID: project.id! })
+          .catch(() => undefined)) ??
+        project.worktrees ??
+        [],
+    }),
   )
+  // `latest` only skips Suspense once the resource has resolved at least once. Before that it behaves like a plain
+  // read, which suspends the dialog and makes it flash on the first drill into a project.
+  const listedItems = (project: PromptProject) => {
+    if (listed.state !== "ready" && listed.state !== "refreshing") return project.worktrees ?? []
+    const loaded = listed.latest
+
+    return loaded?.projectID === project.id ? loaded.items : (project.worktrees ?? [])
+  }
 
   onCleanup(
     serverSDK.event.listen((event) => {
@@ -124,7 +137,7 @@ function NewSessionLocationDialog(props: {
     const project = store.drilled
 
     if (!project) return []
-    const directories = workspaceSelectionDirectories(project, listed.latest ?? project.worktrees ?? [])
+    const directories = workspaceSelectionDirectories(project, listedItems(project))
 
     return [
       { id: "main", type: "workspace" as const, value: "main", directory: project.worktree },
