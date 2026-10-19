@@ -556,3 +556,18 @@ test("reads models.dev v2 reasoning as variant support", () => {
     { type: "budget_tokens", min: 1024, max: 8000 },
   ])
 })
+
+test("resolves variants for aisdk: packages before the native rewrite runs", () => {
+  const supports: Variant.Support[] = [
+    { type: "effort", values: ["low", "high"] },
+    { type: "budget_tokens", min: 1024 },
+  ]
+  const viaAISDK = resolve(model("aisdk:@ai-sdk/anthropic", "claude-opus-4-5"), supports)
+  const viaNative = resolve(model("@opencode/ai/providers/anthropic", "claude-opus-4-5"), supports)
+  expect(viaAISDK.length).toBeGreaterThan(0)
+  expect(viaAISDK).toEqual(viaNative)
+})
+
+test("unmappable packages still resolve to no variants", () => {
+  expect(resolve(model("aisdk:some-community-package", "m"), [{ type: "effort" }])).toEqual([])
+})
