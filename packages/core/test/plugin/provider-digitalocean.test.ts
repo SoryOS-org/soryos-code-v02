@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { Clock, Effect, Schedule } from "effect"
+import { Clock, Effect, Schedule, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { Bus } from "@opencode/core/bus"
 import { Credential } from "@opencode/core/credential"
 import { Integration } from "@opencode/core/integration"
 import { Model } from "@opencode/core/model"
@@ -70,6 +71,20 @@ const status = Effect.fn(function* (attempt: Integration.Attempt) {
       Effect.repeat({ until: (value) => value.status !== "pending", schedule: Schedule.spaced("10 millis") }),
       Effect.timeout("3 seconds"),
     )
+})
+
+const catalogEvents = Effect.gen(function* () {
+  const bus = yield* Bus.Service
+  const published: string[] = []
+  yield* bus.subscribe(Provider.Event.Updated).pipe(
+    Stream.runForEach(() => Effect.sync(() => void published.push("provider"))),
+    Effect.forkScoped({ startImmediately: true }),
+  )
+  yield* bus.subscribe(Model.Event.Updated).pipe(
+    Stream.runForEach(() => Effect.sync(() => void published.push("model"))),
+    Effect.forkScoped({ startImmediately: true }),
+  )
+  return published
 })
 
 describe("DigitalOceanPlugin", () => {
@@ -203,6 +218,51 @@ describe("DigitalOceanPlugin", () => {
       yield* drain
       expect(fixture.remote.requests).toHaveLength(1)
       expect(yield* fixture.models.get(providerID, Model.ID.make("router:alpha"))).toBeDefined()
+    }),
+  )
+
+  it.effect("keeps the idle poll silent while no DigitalOcean connection exists", () =>
+    Effect.gen(function* () {
+      const fixture = yield* discovery
+      const published = yield* catalogEvents
+      yield* fixture.install
+      yield* drain
+      expect(fixture.remote.requests).toHaveLength(0)
+      const settled = published.length
+
+      yield* TestClock.adjust("5 minutes")
+      yield* drain
+      yield* TestClock.adjust("5 minutes")
+      yield* drain
+      expect(fixture.remote.requests).toHaveLength(0)
+      expect(published.slice(settled)).toEqual([])
+    }),
+  )
+
+  it.effect("republishes the catalogs only when the router inventory changes", () =>
+    Effect.gen(function* () {
+      const fixture = yield* discovery
+      const published = yield* catalogEvents
+      yield* oauthCredential()
+      yield* fixture.install
+      yield* drain
+      expect(fixture.remote.requests).toHaveLength(1)
+      expect(yield* fixture.models.get(providerID, Model.ID.make("router:alpha"))).toBeDefined()
+      const settled = published.length
+
+      yield* TestClock.adjust("5 minutes")
+      yield* drain
+      expect(fixture.remote.requests).toHaveLength(2)
+      expect(published.slice(settled)).toEqual([])
+
+      fixture.remote.body = { model_routers: [{ name: "beta" }] }
+      yield* TestClock.adjust("5 minutes")
+      yield* drain
+      expect(fixture.remote.requests).toHaveLength(3)
+      // Delivery order between the two subscriptions is not fixed; one event of each kind is.
+      expect([...published.slice(settled)].sort()).toEqual(["model", "provider"])
+      expect(yield* fixture.models.get(providerID, Model.ID.make("router:alpha"))).toBeUndefined()
+      expect(yield* fixture.models.get(providerID, Model.ID.make("router:beta"))).toBeDefined()
     }),
   )
 

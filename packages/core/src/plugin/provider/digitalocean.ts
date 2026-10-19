@@ -119,7 +119,11 @@ export const DigitalOceanPlugin = define({
     const loading = Semaphore.makeUnsafe(1)
     const loaded: { access?: string; routers: (typeof RoutersResponse.Type)["model_routers"] } = { routers: [] }
 
-    const load = Effect.fn("DigitalOceanPlugin.load")(function* () {
+    // Reloading the provider catalog rebuilds and republishes this location's provider and model
+    // catalogs, and every loaded location runs its own copy of this plugin. Compare the inventory
+    // before and after a sync so the five-minute poll stays silent while nothing changed.
+    const inventory = () => JSON.stringify([loaded.access, loaded.routers.map((router) => router.name)])
+    const sync = Effect.fn("DigitalOceanPlugin.sync")(function* () {
       const connection = yield* ctx.integration.connection.active(integrationID)
       const credential = connection
         ? yield* ctx.integration.connection.resolve(connection).pipe(Effect.orElseSucceed(() => undefined))
@@ -151,6 +155,11 @@ export const DigitalOceanPlugin = define({
         )
       if (result) loaded.routers = result.model_routers
     })
+    const load = Effect.fn("DigitalOceanPlugin.load")(function* () {
+      const before = inventory()
+      yield* sync()
+      return inventory() !== before
+    })
 
     yield* ctx.integration.transform((draft) => {
       draft.method.update(oauth)
@@ -168,7 +177,8 @@ export const DigitalOceanPlugin = define({
         })
       }
     })
-    const refresh = () => loading.withPermit(load().pipe(Effect.andThen(ctx.provider.reload())))
+    const refresh = () =>
+      loading.withPermit(load().pipe(Effect.flatMap((changed) => (changed ? ctx.provider.reload() : Effect.void))))
     yield* bus.subscribe(Credential.Event.Switched).pipe(
       Stream.filter((event) => event.data.integrationID === integrationID),
       Stream.runForEach(refresh),
