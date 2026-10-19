@@ -156,9 +156,11 @@ function ComposerModelControl(props: {
               onClick={(event: MouseEvent) => {
                 if (!props.paid) return props.onUnpaidClick()
                 // A pointer open keeps focus in the composer, so the dialog returns it to the caret. A keyboard open
-                // returns focus to this trigger instead of moving it to the editor.
-                const keyboard = document.activeElement === event.currentTarget
-                void dialog.show(() => <DialogSelectModel model={props.model} />, keyboard ? undefined : props.onClose)
+                // (a click with no pointer presses) returns focus to this trigger instead of moving it to the editor.
+                void dialog.show(
+                  () => <DialogSelectModel model={props.model} />,
+                  event.detail === 0 ? undefined : props.onClose,
+                )
               }}
             >
               {content()}

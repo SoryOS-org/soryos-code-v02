@@ -11,6 +11,11 @@
   --mask-end: 16px;
 }
 
+/* Focus scrolls a control clear of the 16px fade instead of under it. */
+[data-slot="composer-controls"] {
+  scroll-padding-inline: 16px;
+}
+
 [data-slot="composer-controls"]:dir(rtl) {
   --mask-direction: to left;
 }
@@ -25,9 +30,10 @@
   );
 }
 
-/* The controls viewport scrolls and clips, so toolbar rings hug each control and fit inside its 2px inline padding. */
-[data-component="composer"] :is([data-component="button-v2"], [data-component="icon-button-v2"]):is(:focus-visible, [data-state="focus"]) {
-  outline-offset: 0;
+/* The controls viewport scrolls and clips, so toolbar rings sit inside each control where no edge can cut them. */
+[data-component="composer"]
+  :is([data-component="button-v2"], [data-component="icon-button-v2"]):is(:focus-visible, [data-state="focus"]) {
+  outline-offset: -2px;
 }
 
 @media (hover: hover) {

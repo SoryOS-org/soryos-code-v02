@@ -341,8 +341,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
             data-slot="composer-controls"
             data-overflow-start={overflow.start}
             data-overflow-end={overflow.end}
-            class="ms-0.5 me-2.5 h-full min-w-0 flex-1 overflow-x-auto overscroll-x-contain px-0.5 no-scrollbar"
+            class="ms-1 me-3 h-full min-w-0 flex-1 overflow-x-auto overscroll-x-contain no-scrollbar"
             onScroll={updateOverflow}
+            // Chromium leaves a partly visible control where it is when it takes focus, cut off by the edge.
+            onFocusIn={() => document.activeElement?.scrollIntoView({ block: "nearest", inline: "nearest" })}
             aria-hidden={state.mode === "shell"}
             inert={state.mode === "shell" ? true : undefined}
             style={buttons()}
@@ -822,6 +824,8 @@ export function ComposerEditorAddMenu(props: {
   onContext: () => void
   onShell: () => void
 }) {
+  const focus = pointerFocusReturn()
+
   return (
     <Tooltip
       placement="top"
@@ -834,6 +838,7 @@ export function ComposerEditorAddMenu(props: {
     >
       <Menu gutter={6} modal={false} placement="top-start">
         <Menu.Trigger
+          {...focus.trigger}
           as={IconButton}
           data-action="composer-attach"
           type="button"
@@ -845,6 +850,7 @@ export function ComposerEditorAddMenu(props: {
         />
         <Menu.Portal>
           <Menu.Content
+            onCloseAutoFocus={focus.onCloseAutoFocus}
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
             style={{ "min-width": "180px" }}
           >
@@ -866,6 +872,34 @@ export function ComposerEditorAddMenu(props: {
       </Menu>
     </Tooltip>
   )
+}
+
+/**
+ * A menu returns focus to its trigger when it closes. Closing with Escape counts as keyboard use, so Chromium would
+ * ring a trigger the pointer opened; restore focus without the ring and keep it for keyboard opens.
+ */
+function pointerFocusReturn() {
+  let pointer: HTMLElement | undefined
+
+  return {
+    trigger: {
+      onPointerDown: (event: PointerEvent & { currentTarget: HTMLElement }) => {
+        pointer = event.currentTarget
+      },
+      onKeyDown: (event: KeyboardEvent) => {
+        if (event.key !== "Escape") pointer = undefined
+      },
+    },
+    onCloseAutoFocus: (event: Event) => {
+      if (!pointer) return
+      event.preventDefault()
+      const active = document.activeElement
+
+      // An outside press already moved focus where it belongs.
+      if (active && active !== document.body && !active.closest('[role="menu"]')) return
+      pointer.focus({ preventScroll: true, focusVisible: false })
+    },
+  }
 }
 
 function ComposerEditorConfiguredSelect(props: {
@@ -910,6 +944,7 @@ export function ComposerEditorSelect(props: {
 }) {
   const mobile = createMediaQuery("(max-width: 767px)")
   const [store, setStore] = createStore({ open: false, loaded: false })
+  const focus = pointerFocusReturn()
   let trigger: HTMLButtonElement | undefined
 
   const setOpen = (open: boolean) => {
@@ -951,6 +986,7 @@ export function ComposerEditorSelect(props: {
         fallback={
           <Menu gutter={6} modal={false} placement="top-start" onOpenChange={props.onOpenChange}>
             <Menu.Trigger
+              {...focus.trigger}
               as={Button}
               variant="ghost-muted"
               size="normal"
@@ -960,7 +996,7 @@ export function ComposerEditorSelect(props: {
               {content()}
             </Menu.Trigger>
             <Menu.Portal>
-              <Menu.Content>
+              <Menu.Content onCloseAutoFocus={focus.onCloseAutoFocus}>
                 <Menu.RadioGroup value={props.current} onChange={props.onSelect}>
                   <For each={props.options}>
                     {(option) => (
