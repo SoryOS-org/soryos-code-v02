@@ -1,7 +1,8 @@
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
-import { For, Index, Show } from "solid-js"
+import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
+import { For, Show } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import "./activity-chips.css"
 
@@ -76,7 +77,7 @@ export function SessionActivityChips(props: {
             data-slot="session-activity-chip"
             class="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-v2-border-border-base bg-v2-background-bg-base ps-2 pe-2.5 text-[13px] font-[530] leading-text-compact tracking-[-0.04px] whitespace-nowrap tabular-nums text-v2-text-text-base shadow-[var(--v2-elevation-raised)] outline-none duration-150 ease-out animate-in fade-in motion-reduce:animate-none hover:bg-v2-background-bg-layer-01 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v2-border-border-focus"
           >
-            <SessionActivityGlyph />
+            <SessionProgressIndicatorV2 class="shrink-0" />
             <span class="truncate">{label()}</span>
           </Menu.Trigger>
           <Menu.Portal>
@@ -89,7 +90,7 @@ export function SessionActivityChips(props: {
                   <For each={props.subagents}>
                     {(item) => (
                       <Menu.Item {...row(item)}>
-                        <SessionActivityGlyph class="text-v2-icon-icon-muted" />
+                        <SessionProgressIndicatorV2 class="shrink-0 text-v2-icon-icon-muted" />
                         <span class="shrink-0 font-[530]">
                           {item.agent
                             ? `${item.agent[0].toUpperCase()}${item.agent.slice(1)}`
@@ -137,33 +138,3 @@ export function SessionActivityChips(props: {
   )
 }
 
-// A 5×5 dot matrix with a diagonal wave, ported from the iOS app's AgentActivityGlyph.
-function SessionActivityGlyph(props: { class?: string }) {
-  // Glyphs mounted at different times share one phase, like the iOS glyph's clock-driven wave.
-  const phase = `${-(performance.now() % 1100)}ms`
-
-  return (
-    <svg
-      data-component="session-activity-glyph"
-      class={props.class}
-      width={15}
-      height={15}
-      viewBox="0 0 5 5"
-      aria-hidden="true"
-      style={{ "--session-activity-glyph-phase": phase }}
-    >
-      <Index each={Array.from({ length: 25 })}>
-        {(_, index) => (
-          <circle
-            data-dot
-            cx={(index % 5) + 0.5}
-            cy={Math.floor(index / 5) + 0.5}
-            r={0.31}
-            style={{ "--diagonal": (index % 5) + Math.floor(index / 5) }}
-          />
-        )}
-      </Index>
-      <circle data-reduced-motion cx={2.5} cy={2.5} r={0.75} />
-    </svg>
-  )
-}
