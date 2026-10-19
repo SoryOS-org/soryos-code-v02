@@ -1399,7 +1399,7 @@ describe("OpencodePlugin", () => {
 
           expect((yield* integrations.get(Integration.ID.make("opencode")))?.connections[0]?.status).toEqual({
             status: "needs_auth",
-            message: "Reconnect OpenCode Console to continue; run `opencode auth login`",
+            message: "Reconnect OpenCode Console to continue; use /connect or run `opencode auth login opencode`",
           })
           expect((yield* credentials.get(credential.id))?.value).toMatchObject({ refresh: "revoked" })
         }),
@@ -1444,7 +1444,7 @@ describe("OpencodePlugin", () => {
 
           expect(yield* status()).toEqual({
             status: "needs_auth",
-            message: "Reconnect OpenCode Console to continue; run `opencode auth login`",
+            message: "Reconnect OpenCode Console to continue; use /connect or run `opencode auth login opencode`",
           })
           expect((yield* credentials.get(credential.id))?.value).toMatchObject({ access: "revoked" })
 
