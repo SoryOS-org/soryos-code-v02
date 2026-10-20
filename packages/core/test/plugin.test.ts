@@ -1,11 +1,14 @@
 import { expect } from "bun:test"
 import path from "path"
-import { Clock, Deferred, Effect } from "effect"
+import { Clock, Deferred, Effect, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Command } from "@opencode/core/command"
 import { Bus } from "@opencode/core/bus"
 import { Credential } from "@opencode/core/credential"
 import { Integration } from "@opencode/core/integration"
+import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
+import { Skill } from "@opencode/core/skill"
 import { Plugin } from "@opencode/core/plugin"
 import { PluginModule } from "@opencode/core/plugin/module"
 import { Session } from "@opencode/core/session"
@@ -497,6 +500,51 @@ it.effect("creates child sessions from a plugin at the parent's location", () =>
     const child = yield* sessions.get(ids.childID)
 
     expect(child).toMatchObject({ parentID: parent.id, location: parent.location, metadata: parent.metadata })
+  }),
+)
+
+it.effect("plugin event subscriptions only see their own location", () =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugin.Service
+    const bus = yield* Bus.Service
+    const location = yield* Location.Service
+    const commandUpdates: Array<Location.Ref | undefined> = []
+    yield* bus.subscribe(Command.Event.Updated).pipe(
+      Stream.runForEach((event) => Effect.sync(() => commandUpdates.push(event.location))),
+      Effect.forkScoped({ startImmediately: true }),
+    )
+    const subscribed = yield* Deferred.make<void>()
+    const handled = yield* Deferred.make<void>()
+    yield* plugins.activate([
+      {
+        id: "skill-commands",
+        revision: "1",
+        effect: (ctx) =>
+          Effect.gen(function* () {
+            yield* ctx.event.subscribe().pipe(
+              Stream.tap((event) => (event.type === "skill.updated" ? ctx.command.reload() : Effect.void)),
+              Stream.runForEach((event) =>
+                event.type === "skill.updated" && event.location?.directory === location.directory
+                  ? Deferred.succeed(handled, undefined)
+                  : Effect.void,
+              ),
+              Effect.forkScoped({ startImmediately: true }),
+            )
+            yield* Deferred.succeed(subscribed, undefined)
+          }),
+      },
+    ])
+    yield* plugins.awaitActivation
+    yield* Deferred.await(subscribed)
+    yield* Effect.yieldNow
+    commandUpdates.length = 0
+
+    const other = Location.Ref.make({ directory: AbsolutePath.make(path.join(location.directory, "other")) })
+    yield* bus.publish(Skill.Event.Updated, {}, { location: other })
+    yield* bus.publish(Skill.Event.Updated, {})
+    yield* Deferred.await(handled)
+
+    expect(commandUpdates).toEqual([{ directory: location.directory, workspaceID: location.workspaceID }])
   }),
 )
 

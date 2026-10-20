@@ -8,6 +8,7 @@ import type { PersistentPty } from "./persistent-pty.js"
 import { Cause, Context, Effect, Exit, Latch, Layer, Logger, Queue, References, Scope, Semaphore } from "effect"
 import { Bus } from "./bus.js"
 import { KV } from "./kv.js"
+import { Location } from "./location.js"
 import { PluginHost } from "./plugin/host.js"
 import { type Failure, type Generation, Service } from "./plugin/service.js"
 import { State } from "./state.js"
@@ -19,6 +20,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const bus = yield* Bus.Service
     const kv = yield* KV.Service
+    const location = yield* Location.Service
     const scope = yield* Scope.make()
     // One slot per requested definition in activation order, including ones whose setup failed, so
     // the prefix diff below stays index-aligned and a failed revision is not retried until it changes.
@@ -68,6 +70,8 @@ const layer = Layer.effect(
         inherit,
         Effect.updateContext((context: Context.Context<never>) =>
           Context.make(Scope.Scope, activation.scope).pipe(
+            // Bus subscriptions and publishes route by the ambient Location.
+            Context.add(Location.Service, location),
             Context.add(Logger.CurrentLoggers, Context.get(context, Logger.CurrentLoggers)),
             Context.add(References.MinimumLogLevel, Context.get(context, References.MinimumLogLevel)),
           ),
