@@ -161,6 +161,35 @@ for (const tabLayout of ["horizontal", "vertical"] as const) {
   })
 }
 
+for (const tabLayout of ["horizontal", "vertical"] as const) {
+  test(`a ${tabLayout} tab deletes its session after confirmation`, async ({ page }) => {
+    await mockWorkspace(page, { name: "Tabs", sessions: [a, b], seed: { settings: { appearance: { tabLayout } } } })
+    await page.goto(sessionHref(a.id))
+    const title = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(a.id)}"]) [data-slot="tab-title"]`)
+
+    const remove = page.waitForRequest(
+      (request) => request.method() === "DELETE" && request.url().endsWith(`/api/session/${a.id}`),
+    )
+
+    await expect(title).toHaveText(a.title)
+
+    await title.click({ button: "right" })
+    await page.getByRole("menuitem", { name: "Delete session…", exact: true }).click()
+
+    const dialog = page.getByRole("dialog")
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(title).toHaveText(a.title)
+
+    await title.click({ button: "right" })
+    await page.getByRole("menuitem", { name: "Delete session…", exact: true }).click()
+    await dialog.getByRole("button", { name: "Delete session", exact: true }).click()
+    await remove
+    await expect(title).toHaveCount(0)
+    await expectPath(page, sessionHref(b.id))
+  })
+}
+
 test("keyboard navigation follows the visible tab order and skips unresolved tabs", async ({ page }) => {
   await mockWorkspace(page, { name: "Tabs", sessions: [a, c], seed: { tabs: [a.id, "ses_tab_unresolved", c.id] } })
   await page.route(

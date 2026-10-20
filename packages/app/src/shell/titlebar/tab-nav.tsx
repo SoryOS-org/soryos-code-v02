@@ -32,6 +32,7 @@ export function TabNavItem(props: {
   fallbackDirectory?: string
   onRename: (title: string) => Promise<void>
   onClose: () => void
+  onDelete: () => void
   onNavigate: () => void
   active?: boolean
   suppressNavigation?: boolean
@@ -435,6 +436,10 @@ export function TabNavItem(props: {
             {language.t("common.rename")}
           </Menu.Item>
           <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
+          <Menu.Separator />
+          <Menu.Item data-variant="critical" disabled={!props.session} onSelect={props.onDelete}>
+            {language.t("session.delete.title")}…
+          </Menu.Item>
         </Menu.Context.Content>
       </Menu.Context.Portal>
     </Menu.Context>
