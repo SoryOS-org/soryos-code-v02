@@ -44,7 +44,9 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
             (entry): entry is Document =>
               entry.type === "document" && entry.info.experimental?.location_idle_timeout !== undefined,
           )
-          return configured?.info.experimental?.location_idle_timeout ?? timeToLive
+          const timeout = configured?.info.experimental?.location_idle_timeout
+          if (timeout === undefined) return timeToLive
+          return timeout === false ? false : Duration.millis(timeout)
         }).pipe(
           Effect.scoped,
           Effect.orElseSucceed(() => timeToLive),
