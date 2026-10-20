@@ -14,7 +14,6 @@ import {
   activeTreeNavigation,
   advanceTreePreload,
   nextSuggestionIndex,
-  nextTreeScrollTop,
   pickerFileSearchQuery,
   pickerAbsoluteInput,
   pickerMode,
@@ -389,27 +388,10 @@ export function DirectoryPickerDialog(props: DirectoryPickerDialogProps) {
         <div
           class="directory-picker-browser"
           ref={container}
-          // The modal's scroll lock sees only the shadow host, not the tree's inner scroller.
+          // The modal's scroll lock sees only the shadow host, not the tree's inner scroller. Stopping the event here
+          // keeps the lock from cancelling it, and the passive listener leaves the scroller to the compositor.
           on:touchmove={(event) => event.stopPropagation()}
-          onWheel={(event) => {
-            const scroller = tree
-              ?.getFileTreeContainer()
-              ?.shadowRoot?.querySelector<HTMLElement>("[data-file-tree-virtualized-scroll]")
-
-            if (!scroller) return
-
-            const next = nextTreeScrollTop(
-              scroller.scrollTop,
-              event.deltaY,
-              scroller.scrollHeight,
-              scroller.clientHeight,
-            )
-
-            if (next === scroller.scrollTop) return
-            event.preventDefault()
-            scroller.scrollTop = next
-            scroller.dispatchEvent(new Event("scroll"))
-          }}
+          on:wheel={{ handleEvent: (event: WheelEvent) => event.stopPropagation(), passive: true }}
         >
           <Show when={loading()}>
             <div class="directory-picker-state">{language.t("common.loading")}</div>
