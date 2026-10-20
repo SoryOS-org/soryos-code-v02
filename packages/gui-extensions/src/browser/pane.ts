@@ -559,19 +559,12 @@ export function createBrowserPane(input: {
     if (action.type === "tabs.open") {
       const page = create(entry)
 
-      // A new page already loads about:blank. A blank tab is selected once that load finishes, so the window switches
-      // straight from the previous page to the new tab page, with no loading frame between them.
-      if (action.url === undefined) {
-        await page.ready
-
-        if (action.focus !== false) focus(entry, page.state().id)
-
-        return { value: page.state(), files: [] }
-      }
-
       if (action.focus !== false) focus(entry, page.state().id)
       await page.ready
-      await page.execute({ action: { type: "navigate", tabID: page.state().id, url: action.url }, files: [] }, signal)
+
+      // A new page already loads about:blank, so only another address needs a navigation.
+      if (action.url !== undefined)
+        await page.execute({ action: { type: "navigate", tabID: page.state().id, url: action.url }, files: [] }, signal)
       publishState(entry)
 
       return { value: page.state(), files: [] }

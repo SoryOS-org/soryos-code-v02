@@ -303,13 +303,15 @@ export function createBrowserPage(
   // through later navigations; blank and failed documents hide until a real one is ready.
   let content = false
   let failure: { url: string; message: string } | undefined
+  // A blank document is never shown, so its load does not count as loading: a new tab shows its new tab page at once.
+  let blank = options.initialize !== false && !options.restore?.url
 
   const state = (): Browser.Tab => {
     const page = {
       id: options.id,
       url: (failure?.url ?? contents.getURL()).slice(0, 16_384),
       title: contents.getTitle().slice(0, 2_048),
-      loading: contents.isLoading(),
+      loading: contents.isLoading() && !blank,
     }
 
     const history = {
@@ -327,6 +329,7 @@ export function createBrowserPage(
 
   const reset = (event: Electron.Event<{ url: string; isMainFrame: boolean; isSameDocument: boolean }>) => {
     if (!event.isMainFrame || event.isSameDocument) return
+    blank = event.url === "about:blank"
     failure = undefined
     generation++
     documents.clear()
