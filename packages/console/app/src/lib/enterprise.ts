@@ -4,7 +4,6 @@ import { i18n } from "~/i18n"
 import { localeFromRequest } from "~/lib/language"
 import { createLead } from "~/lib/salesforce"
 import { inferenceSpendOptions } from "~/lib/inference-spend"
-import { lookupConsoleAccount, type ConsoleAccount } from "~/lib/console-account"
 import { ENTERPRISE_SPAM_THRESHOLD, enterpriseSpamProbability } from "~/lib/enterprise-spam"
 
 interface EnterpriseFormData {
@@ -96,7 +95,6 @@ export async function handleEnterpriseRequest(
   options: {
     salesforceSubmit?: (payload: Record<string, unknown>) => Promise<boolean>
     notifications?: boolean
-    accountLookup?: (email: string) => Promise<ConsoleAccount | null>
     spam?: Parameters<typeof enterpriseSpamProbability>[1]
   } = {},
 ) {
@@ -132,11 +130,6 @@ export async function handleEnterpriseRequest(
       return Response.json({ success: true, message: dict["enterprise.form.success.submitted"] }, { status: 200 })
     }
 
-    const account = await (options.accountLookup ?? lookupConsoleAccount)(body.email).catch((err) => {
-      console.error("Failed to look up Console account:", err)
-      return undefined
-    })
-
     const emailContent = enterpriseEmailContent(body, inferenceSpend?.salesforceValue)
 
     const [lead, mail, octopus] = await Promise.all([
@@ -149,7 +142,6 @@ export async function handleEnterpriseRequest(
           phone: body.phone,
           inferenceSpend: inferenceSpend?.salesforceValue,
           message: body.message,
-          consoleAccount: account,
         },
         options.salesforceSubmit,
       ).catch((err) => {

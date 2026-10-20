@@ -1,5 +1,4 @@
 import { Resource } from "@opencode/console-resource"
-import { consoleAccountFields, type ConsoleAccount } from "./console-account"
 
 async function login() {
   const url = Resource.SALESFORCE_INSTANCE_URL.value.replace(/\/$/, "")
@@ -47,7 +46,6 @@ export interface SalesforceLeadInput {
   phone?: string
   inferenceSpend?: string
   message: string
-  consoleAccount?: ConsoleAccount | null
 }
 
 export async function createLead(
@@ -63,7 +61,6 @@ export async function createLead(
     Description: input.message,
     Current_Monthly_Inference_Spend__c: input.inferenceSpend,
     LeadSource: "enterprise website form",
-    ...(input.consoleAccount === undefined ? {} : consoleAccountFields(input.consoleAccount)),
   }
   if (submit) return submit(payload)
   const auth = await login()

@@ -73,7 +73,6 @@ const submit = async (fetch: (request: Request) => Promise<Response>) => {
         return true
       },
       notifications: false,
-      accountLookup: async () => null,
     },
   )
   return { status: response.status, body: await response.json(), leads }
