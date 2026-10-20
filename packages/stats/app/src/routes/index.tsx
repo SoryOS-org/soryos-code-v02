@@ -1007,7 +1007,6 @@ function LeaderboardCard(props: {
 }
 
 function getProviderIconId(author: string) {
-  if (author === "Meituan") return "longcat"
   if (author === "MiniMax") return "minimax"
   if (author === "Moonshot") return "moonshotai"
   if (author === "Qwen") return "alibaba"
