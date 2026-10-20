@@ -1,9 +1,9 @@
 import { currentSession } from "../../utils/mock-server"
 
-export const HOME_INDEX_FIXTURE_VERSION = 2
+export const HOME_INDEX_FIXTURE_VERSION = 1
 
-// Home lists read sessions under Earlier, newest first, up to 8; every fixture session is read, so it shows that many.
-export const HOME_INDEX_VISIBLE_LIMIT = 8
+// Home shows the newest 64 root sessions; the fixture asserts that many rows.
+export const HOME_INDEX_VISIBLE_LIMIT = 64
 
 export type HomeIndexSession = {
   id: string
@@ -14,7 +14,7 @@ export type HomeIndexSession = {
   cost: number
   tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
   outcome: "succeeded" | "failed" | "interrupted"
-  time: { created: number; updated: number; idle: number; viewed: number }
+  time: { created: number; updated: number; idle: number; viewed?: number }
   location: { directory: string }
 }
 
@@ -174,8 +174,7 @@ export function createHomeIndexFixture(input: { count: number; now: number; dire
         created: updated - duration,
         updated,
         idle: updated - Math.floor(random() * 2_000),
-        // Unread sessions list under Done without a cap, which would change the visible rows with the index size.
-        viewed: updated,
+        ...(random() < 0.8 ? { viewed: updated } : {}),
       },
       location: { directory: directory.directory },
     }

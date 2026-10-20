@@ -10,9 +10,9 @@ import {
 import { sessionHref } from "../../utils/app"
 import { waitForStableTimeline } from "./session-tab-switch-probe"
 
-const homeRow = '[data-slot="start-row"]'
+const homeRow = '[data-component="home-session-row"]'
 
-const homeShell = '[data-slot="home-panel"]'
+const homeShell = '[data-component="home-session-search"]'
 
 benchmark.describe("performance: home and tab navigation", () => {
   benchmark("opens a home session and paints its titlebar tab", async ({ page, report }) => {

@@ -7,7 +7,7 @@ import { fixture as stress } from "../../utils/session-fixture"
 import { createHomeIndexFixture, type HomeIndexFixture } from "./home-session-index.fixture"
 
 // Home fetches the root-session index on mount. These cases hold the visible
-// output constant (the 8 newest read sessions under Earlier, same order) while the index size grows, so
+// output constant (newest 64 rows, same order) while the index size grows, so
 // bytes, main-thread work, time to actionable rows, and retained heap can be
 // attributed to index handling rather than to what the user sees.
 const sizes = (process.env.HOME_INDEX_SIZES ?? "500,5000,10000").split(",").map(Number)
@@ -19,7 +19,9 @@ const updates = Number(process.env.HOME_INDEX_UPDATES ?? 20)
 // Forced GC changes timing; retention runs stay separate from clean timing runs.
 const memory = process.env.OPENCODE_PERFORMANCE_MEMORY === "1"
 
-const row = '[data-slot="start-row"]'
+const rowContainer = '[data-component="home-session-row-container"]'
+
+const row = '[data-component="home-session-row"]'
 
 type Probe = {
   expected: number
@@ -56,11 +58,12 @@ benchmark.describe("performance: home session index", () => {
       await page.goto("/")
       const rows = page.locator(row)
       await expect(rows).toHaveCount(fixture.expected.visible, { timeout: APP_READY_TIMEOUT })
+      const first = page.locator(rowContainer).filter({ hasText: fixture.expected.newestTitle })
+      await expect(first).toHaveAttribute("data-session-id", fixture.expected.newestID)
+      await expect(first.locator(row)).toBeEnabled()
       // Row order is part of the held-constant output: the DOM must list the
       // newest session first.
-      const first = rows.nth(0)
-      await expect(first.locator('span[dir="auto"]')).toHaveText(fixture.expected.newestTitle)
-      await expect(first).toHaveAttribute("data-status", "ready")
+      await expect(page.locator(rowContainer).nth(0)).toHaveAttribute("data-session-id", fixture.expected.newestID)
 
       const probe = await readProbe(page)
       const metrics = await performanceMetrics(cdp)
@@ -114,23 +117,25 @@ benchmark.describe("performance: home session index", () => {
       benchmark.setTimeout(180_000)
       const fixture = createHomeIndexFixture({ count: churnSize, now: Date.now() })
       const target = fixture.sessions[fixture.sessions.length - 1]
-      // Home reads every running session, which makes the target locally known
-      // and therefore part of every later index merge, like an open session.
-      // Each completed run then re-reads it and moves it to Done.
-      const network = await setup(page, fixture, { [target.id]: { type: "running" } })
+      const network = await setup(page, fixture)
       const cdp = await page.context().newCDPSession(page)
       await cdp.send("Performance.enable")
 
+      // Home prefetches the two newest sessions, which makes them locally known
+      // and therefore part of every later index merge, like an open session.
       const prefetch = page.waitForResponse(
         (response) => response.request().method() === "GET" && response.url().includes(`/api/session/${target.id}`),
       )
 
       await page.goto("/")
-      const titles = page.locator(row).locator('span[dir="auto"]')
-      await expect(titles.getByText(fixture.expected.newestTitle, { exact: true })).toBeVisible({
-        timeout: APP_READY_TIMEOUT,
-      })
+      await expect(page.locator(row)).toHaveCount(fixture.expected.visible, { timeout: APP_READY_TIMEOUT })
       await prefetch
+
+      const titleLocator = page.locator(
+        `${rowContainer}[data-session-id="${target.id}"] [data-component="home-session-title"]`,
+      )
+
+      await expect(titleLocator).toHaveText(fixture.expected.newestTitle)
 
       const before = await performanceMetrics(cdp)
       const samples: number[] = []
@@ -167,7 +172,7 @@ benchmark.describe("performance: home session index", () => {
           },
         )
 
-        await expect(titles.getByText(title, { exact: true })).toBeVisible()
+        await expect(titleLocator).toHaveText(title)
 
         const seen = await page.evaluate(({ title }) => (window as ProbeWindow).__homeIndexProbe?.titles[title], {
           title,
@@ -206,10 +211,9 @@ benchmark.describe("performance: home session index", () => {
   )
 })
 
-async function setup(page: Page, fixture: HomeIndexFixture, sessionStatus: Record<string, { type: string }> = {}) {
+async function setup(page: Page, fixture: HomeIndexFixture) {
   const primary = fixture.directories[0]
   await mockOpenCodeServer(page, {
-    sessionStatus,
     directory: primary.directory,
     project: {
       id: primary.projectID,
@@ -243,7 +247,7 @@ async function setup(page: Page, fixture: HomeIndexFixture, sessionStatus: Recor
 
       const observer = new MutationObserver(() => {
         if (probe.rows === undefined) {
-          const count = document.querySelectorAll('[data-slot="start-row"]').length
+          const count = document.querySelectorAll('[data-component="home-session-row"]').length
 
           if (count >= probe.expected) {
             probe.rows = performance.now()
@@ -254,9 +258,11 @@ async function setup(page: Page, fixture: HomeIndexFixture, sessionStatus: Recor
         }
 
         for (const [id, title] of Object.entries(probe.pending)) {
-          const titles = [...document.querySelectorAll('[data-slot="start-row"] span[dir="auto"]')]
+          const element = document.querySelector(
+            `[data-component="home-session-row-container"][data-session-id="${id}"] [data-component="home-session-title"]`,
+          )
 
-          if (!titles.some((element) => element.textContent === title)) continue
+          if (element?.textContent !== title) continue
           probe.titles[title] = performance.now()
           delete probe.pending[id]
         }

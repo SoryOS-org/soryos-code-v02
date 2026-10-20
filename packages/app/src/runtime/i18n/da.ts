@@ -35,6 +35,7 @@ export const dict = {
   "server.connect.camera.error":
     "Kunne ikke åbne kameraet. Tillad kameraadgang, eller indtast dine forbindelsesoplysninger manuelt.",
   "dialog.server.menu.remove": "Fjern",
+  "home.workspaceTip": "Start næste session i et nyt arbejdsområde for at holde ændringer isoleret",
   "session.tab.add": "Tilføj fane",
   "session.queue.attachments.one": "Plus {{count}} vedhæftning",
   "session.queue.attachments.other": "Plus {{count}} vedhæftede filer",
@@ -113,6 +114,7 @@ export const dict = {
     "Arbejdsområder med ikke-flettede ændringer, tilknyttede sessioner eller aktive placeringer bevares.",
   "settings.about.writtenByNames": "Skrevet af {{names}}",
   "settings.about.illustratedByNames": "Illustreret af {{names}}",
+  "home.projects.all": "Alle projekter",
   "session.view.select": "Sessionsvisning",
   "session.background.moveRunning": "Flyt til baggrunden",
   "session.timeline.working": "Arbejder",
@@ -469,7 +471,17 @@ export const dict = {
   "home.projects": "Projekter",
   "home.project.add": "Tilføj projekt",
   "home.recentlyClosed": "Lukket for nylig",
+  "home.server.collapse": "Skjul serverprojekter",
+  "home.server.expand": "Udvid serverprojekter",
   "home.sessions.search.placeholder": "Søg i sessioner",
+  "home.sessions.search.placeholder.scoped": "Søg i sessioner i {{scope}}",
+  "home.sessions.search.sessions": "Sessioner",
+  "home.sessions.search.noResults": "Ingen sessioner fundet for {{query}}",
+  "home.sessions.empty": "Intet her endnu",
+  "home.sessions.empty.description": "Opret en session for at komme i gang",
+  "home.sessions.group.today": "I dag",
+  "home.sessions.group.yesterday": "I går",
+  "home.sessions.group.older": "Ældre",
   "home.providerTip":
     "Opret forbindelse til mere end 75 udbydere for at bruge andre modeller, herunder Claude, GPT, Gemini og flere",
 

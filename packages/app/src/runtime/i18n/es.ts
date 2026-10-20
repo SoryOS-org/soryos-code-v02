@@ -36,6 +36,7 @@ export const dict = {
   "server.connect.camera.error":
     "No se pudo abrir la cámara. Permita el acceso a la cámara o ingrese los detalles de su conexión manualmente.",
   "dialog.server.menu.remove": "Quitar",
+  "home.workspaceTip": "Inicie la próxima sesión en un nuevo espacio de trabajo para mantener los cambios aislados",
   "session.tab.add": "Agregar pestaña",
   "session.queue.attachments.one": "Más accesorio {{count}}",
   "session.queue.attachments.other": "Más accesorios {{count}}",
@@ -126,6 +127,7 @@ export const dict = {
     "Se conservarán los espacios de trabajo con cambios sin fusionar, sesiones vinculadas o ubicaciones activas.",
   "settings.about.writtenByNames": "Escrito por {{names}}",
   "settings.about.illustratedByNames": "Ilustrado por {{names}}",
+  "home.projects.all": "Todos los proyectos",
   "session.view.select": "Vista de sesión",
   "session.background.moveRunning": "Mover a segundo plano",
   "session.timeline.working": "Trabajando",
@@ -556,7 +558,17 @@ export const dict = {
   "home.projects": "Proyectos",
   "home.project.add": "Añadir proyecto",
   "home.recentlyClosed": "Proyectos cerrados recientemente",
+  "home.server.collapse": "Contraer proyectos del servidor",
+  "home.server.expand": "Expandir proyectos del servidor",
   "home.sessions.search.placeholder": "Buscar sesiones",
+  "home.sessions.search.placeholder.scoped": "Buscar sesiones en {{scope}}",
+  "home.sessions.search.sessions": "Sesiones",
+  "home.sessions.search.noResults": "No se encontraron sesiones para {{query}}",
+  "home.sessions.empty": "Aún no hay nada",
+  "home.sessions.empty.description": "Crea una sesión para empezar",
+  "home.sessions.group.today": "Hoy",
+  "home.sessions.group.yesterday": "Ayer",
+  "home.sessions.group.older": "Anteriores",
   "home.providerTip":
     "Conéctate a más de 75 proveedores para usar otros modelos, como Claude, GPT, Gemini y muchos más",
 

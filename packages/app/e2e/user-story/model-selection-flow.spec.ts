@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { project, provider, sessionHref } from "../utils/app"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { expectAppVisible } from "../utils/waits"
-import { newSessionLocation, openSession } from "../utils/workspace"
+import { openSession } from "../utils/workspace"
 
 const directory = "C:/OpenCode/NewProject"
 
@@ -72,13 +72,9 @@ test("creates a session in a new project and selects its model", async ({ page }
   })
 
   await page.goto("/")
-  const home = page.locator('[data-slot="home-panel"]')
-  // A server without projects adds them in Settings; Home only lists them.
-  await expectAppVisible(home.getByRole("button", { name: "Settings", exact: true }))
-  await home.getByRole("button", { name: "Settings", exact: true }).click()
-  const settings = page.getByTestId("settings-screen")
-  await settings.getByRole("tab", { name: "Projects", exact: true }).click()
-  await settings.getByRole("button", { name: "Add project", exact: true }).click()
+  const addProject = page.locator('[data-action="home-add-project-row"]')
+  await expectAppVisible(addProject)
+  await addProject.click()
   const picker = page.getByRole("dialog", { name: "Open project", exact: true })
   await expect(picker.getByRole("combobox")).toHaveValue("C:\\OpenCode\\NewProject")
 
@@ -99,12 +95,9 @@ test("creates a session in a new project and selects its model", async ({ page }
   await expect(selectFolder).toBeEnabled()
   await selectFolder.click()
   await expect(picker).toBeHidden()
-  await expect(settings.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue("NewProject")
-  await settings.getByRole("button", { name: "Back to projects", exact: true }).click()
-  await settings.getByRole("button", { name: "Back to app", exact: true }).click()
 
-  await home.getByRole("button", { name: "New session", exact: true }).click()
-  await expect(newSessionLocation(page)).toContainText("NewProject")
+  await page.locator('[data-action="home-new-session"]').click()
+  await expectAppVisible(page.locator('[data-component="composer"]'))
 
   const modelControl = page.locator('[data-action="composer-model"]')
   await expect(modelControl).toContainText("Go Model 1")

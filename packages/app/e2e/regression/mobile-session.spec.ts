@@ -326,10 +326,18 @@ test.describe("touch", () => {
     await mockStressTimeline(page)
     await openStress(page)
     await page.goto("/")
-    await expect(page.locator('[data-slot="start-row"]')).toHaveCount(rows)
+    await expect(page.locator('[data-component="home-session-row"]')).toHaveCount(rows)
   })
 
-  test("mobile drawer navigation preserves session identity", async ({ page }) => {
+  test("mobile project selection and drawer navigation preserve session identity", async ({ page }) => {
+    const projects = page.getByRole("button", { name: "Projects", exact: true })
+    await projects.click()
+    const picker = page.getByRole("dialog", { name: "Projects", exact: true })
+    await expect(picker.getByRole("button", { name: "All projects", exact: true })).toBeVisible()
+    await picker.getByRole("button", { name: new RegExp(` ${fixture.project.name}$`) }).click()
+    await expect(picker).toBeHidden()
+    await expect(projects).toContainText(fixture.project.name)
+
     const trigger = page.locator('[data-slot="mobile-tabs-trigger"]')
     const drawer = page.locator('[data-slot="mobile-tabs-drawer"]')
     await trigger.click()
@@ -349,7 +357,7 @@ test.describe("touch", () => {
     await drawer.getByRole("button", { name: "Home", exact: true }).click()
     await expect(page).toHaveURL("/")
     await expect(drawer).toBeHidden()
-    await expect(page.locator('[data-slot="start-row"]')).toHaveCount(rows)
+    await expect(page.locator('[data-component="home-session-row"]')).toHaveCount(rows)
   })
 
   test("mobile settings section menu stays above a full-width panel", async ({ page }) => {
@@ -386,7 +394,7 @@ test.describe("touch", () => {
     await settings.getByRole("button", { name: "Back to app", exact: true }).click()
     await expect(page).toHaveURL("/")
     await expect(settings).toBeHidden()
-    await expect(page.locator('[data-slot="start-row"]')).toHaveCount(rows)
+    await expect(page.locator('[data-component="home-session-row"]')).toHaveCount(rows)
   })
 
   test.describe("tab drawer", () => {

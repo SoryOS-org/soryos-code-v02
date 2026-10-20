@@ -61,7 +61,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 
   // The inbox stays mounted and rarely refetches the index, so drop sessions the server no longer has.
   const forget = (conn: ServerConnection.Any, sessionID: string) => {
-    queryClient.setQueryData<SessionInfo[]>(["home-sessions", conn], (current) =>
+    queryClient.setQueryData<SessionInfo[]>(["inbox-sessions", conn], (current) =>
       current?.filter((session) => session.id !== sessionID),
     )
     queryClient.setQueryData<SessionInfo[]>(["inbox-archived-sessions", conn], (current) =>
@@ -75,11 +75,12 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
     })
   })
 
+  // Keep this cache separate from Home's paginated index so changing interface modes cannot reuse a partial index.
   // One page of the newest root sessions: what needs a person is recent, and paging the whole history first made the
   // first paint wait on every session the server has.
   const queries = useQueries(() => ({
     queries: connections().map((item) => ({
-      queryKey: ["home-sessions", item.conn] as const,
+      queryKey: ["inbox-sessions", item.conn] as const,
       enabled: item.ctx.sdk.connection.status() === "connected",
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         item.ctx.sdk.api.session
@@ -264,7 +265,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 
     forget(entry.conn, entry.session.id)
     queryClient.setQueryData<SessionInfo[]>(
-      [archivedAt === undefined ? "home-sessions" : "inbox-archived-sessions", entry.conn],
+      [archivedAt === undefined ? "inbox-sessions" : "inbox-archived-sessions", entry.conn],
       (current) => current && [session, ...current],
     )
   }

@@ -601,9 +601,10 @@ test.describe("pages open before slow data", () => {
     inventory.release()
     await expect(settings.getByText(sandboxes[0]!, { exact: true })).toBeVisible()
     await expect(settings.getByText("12 worktrees", { exact: true })).toBeVisible()
+    // Home already listed this session; it renders while the directory reads are still held.
     await sessions.arrived
-    sessions.release()
     await expect(settings.getByText("Workspace 1 session", { exact: true })).toBeVisible()
+    sessions.release()
 
     const refresh = await holdRoute(page, (url) => url.pathname === "/api/worktree", { method: "GET" })
     await settings.getByRole("tab", { name: "Preferences", exact: true }).click()

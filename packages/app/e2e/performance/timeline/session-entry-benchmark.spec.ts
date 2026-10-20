@@ -19,9 +19,7 @@ for (const entry of ["home", "session"] as const) {
     await page.goto(entry === "home" ? "/" : sessionHref(fixture.sourceID))
 
     if (entry === "session") await waitForStableTimeline(page, fixture.expected.sourceMessageIDs.at(-1)!)
-    // New session is Home's only text button here: no fixture session needs the user or is unread, so no row actions render.
-    const trigger =
-      entry === "home" ? '[data-slot="home-panel"] [data-component="button-v2"]' : 'button[aria-label="New session"]'
+    const trigger = entry === "home" ? '[data-action="home-new-session"]' : 'button[aria-label="New session"]'
     await expect(page.locator(trigger)).toBeVisible()
     await expect(page.locator('[data-component="new-session"]')).toHaveCount(0)
     const writes: string[] = []
@@ -70,9 +68,8 @@ benchmark("entry: cold session from Home", async ({ page, report }) => {
   })
   await installStressSessionTabs(page, { sessionIDs: [] })
   await page.goto("/")
-  const selector = '[data-slot="start-row"]'
-  const row = page.locator(selector).filter({ hasText: fixture.expected.targetTitle })
-  await expect(row).toBeVisible()
+  const selector = `[data-component="home-session-row-container"][data-session-id="${fixture.targetID}"] [data-component="home-session-row"]`
+  await expect(page.locator(selector)).toBeVisible()
   expect(requests).not.toContain(fixture.targetID)
   const href = sessionHref(fixture.targetID)
   await benchmarkDiagnostics(page).startTrace()
@@ -85,7 +82,7 @@ benchmark("entry: cold session from Home", async ({ page, report }) => {
     href,
     triggerSelector: selector,
     switch: async () => {
-      await row.click()
+      await page.locator(selector).click()
       await waitForStableTimeline(page, fixture.expected.targetMessageIDs.at(-1)!)
     },
   })
