@@ -110,12 +110,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     })
   }
 
+  // The bottom fade shrinks with the remaining scroll so the last line ends clear of it.
+  const [fadeBottom, setFadeBottom] = createSignal(0)
+
+  const updateScroll = () => {
+    if (!viewport) return
+    setFadeBottom(Math.min(16, Math.max(0, viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop)))
+  }
+
   onMount(() => {
     const observer = new ResizeObserver(updateOverflow)
     observer.observe(controlsViewport)
     observer.observe(controlsContent)
     updateOverflow()
-    onCleanup(() => observer.disconnect())
+    // Typing and width changes both resize the editor, so it is the only element that needs watching.
+    const scrollObserver = new ResizeObserver(updateScroll)
+    if (editor) scrollObserver.observe(editor)
+    onCleanup(() => {
+      observer.disconnect()
+      scrollObserver.disconnect()
+    })
   })
   let localInput = false
 
@@ -225,6 +239,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
         <ScrollView
           data-component="composer-scroll"
           class="min-h-[60px] max-h-[180px]"
+          style={{ "--composer-fade-bottom": `${fadeBottom()}px` }}
+          onScroll={updateScroll}
           viewportRef={(element) => {
             viewport = element
             element.tabIndex = -1

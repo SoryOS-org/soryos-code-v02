@@ -2,6 +2,18 @@
   content: "\200B";
 }
 
+/* Matches the 16px session title fade. The top fade only covers the editor's 16px top padding until text scrolls
+   under it; the mask sits on the viewport so the thumb stays solid. */
+[data-component="composer-scroll"] > .scroll-view__viewport {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 16px,
+    black calc(100% - var(--composer-fade-bottom, 0px)),
+    transparent
+  );
+}
+
 /* Masks only cover hidden content; they do not reserve space in the toolbar. */
 [data-slot="composer-controls"][data-overflow-start="true"] {
   --mask-start: 16px;
