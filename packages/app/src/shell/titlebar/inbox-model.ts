@@ -11,7 +11,8 @@ import { useTabs } from "@/shell/tabs/tabs"
 import { sessionBusy, sessionRequests } from "@/shell/layout/project-avatar-state"
 import { pathKey } from "@/workspaces/path-key"
 import { parseHomeSessionIndex } from "@/home/sessions/index"
-import { sessionFormRequest, sessionPermissionRequest } from "@/session/requests/session-request-tree"
+import { sessionFormRequest, sessionPermissionRequest, sessionTreeIDs } from "@/session/requests/session-request-tree"
+import { notifySessionTabsRemoved } from "./session-events"
 import { errorMessage } from "@/shell/layout/helpers"
 import { showToast } from "@/shell/notifications/toast"
 
@@ -23,6 +24,9 @@ const BRANCH_BATCH = 4
 
 // Root sessions fetched per server.
 const INDEX_LIMIT = 200
+
+// The index excludes archived sessions, so a view that lists them loads the newest archived ones separately.
+const ARCHIVED_LIMIT = 50
 
 export type InboxStatus = "approval" | "input" | "working" | "failed" | "done" | "ready"
 
@@ -37,9 +41,10 @@ export type InboxEntry = {
 
 /**
  * Root sessions across every visible server with the state a person acts on: waiting for an answer, working,
- * finished and unread, or read. Home lists them.
+ * finished and unread, or read. Home and the experimental Inbox sidebar list them; only the sidebar loads archived
+ * sessions.
  */
-export function createSessionInbox() {
+export function createSessionInbox(options: { archived?: boolean } = {}) {
   const global = useGlobal()
   const servers = useServers()
   const settings = useSettings()
@@ -57,6 +62,9 @@ export function createSessionInbox() {
   // The inbox stays mounted and rarely refetches the index, so drop sessions the server no longer has.
   const forget = (conn: ServerConnection.Any, sessionID: string) => {
     queryClient.setQueryData<SessionInfo[]>(["home-sessions", conn], (current) =>
+      current?.filter((session) => session.id !== sessionID),
+    )
+    queryClient.setQueryData<SessionInfo[]>(["inbox-archived-sessions", conn], (current) =>
       current?.filter((session) => session.id !== sessionID),
     )
   }
@@ -77,6 +85,22 @@ export function createSessionInbox() {
         item.ctx.sdk.api.session
           .list({ limit: INDEX_LIMIT, order: "desc", parentID: null }, { signal })
           .then((response) => parseHomeSessionIndex(response.data)),
+      retry: false,
+      staleTime: 30_000,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      select: selectSessions,
+    })),
+  }))
+
+  const archivedQueries = useQueries(() => ({
+    queries: connections().map((item) => ({
+      queryKey: ["inbox-archived-sessions", item.conn] as const,
+      enabled: !!options.archived && item.ctx.sdk.connection.status() === "connected",
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        item.ctx.sdk.api.session
+          .list({ limit: ARCHIVED_LIMIT, order: "desc", parentID: null, archived: true }, { signal })
+          .then((response) => response.data),
       retry: false,
       staleTime: 30_000,
       refetchOnMount: true,
@@ -116,9 +140,11 @@ export function createSessionInbox() {
 
         // Locally known sessions come last so live archive and unarchive events win over cached indexes.
         const sessions = new Map(
-          [...(queries[index]?.data?.() ?? []), ...data.session.list()].map(
-            (session) => [session.id, session] as const,
-          ),
+          [
+            ...(queries[index]?.data?.() ?? []),
+            ...(options.archived ? (archivedQueries[index]?.data?.() ?? []) : []),
+            ...data.session.list(),
+          ].map((session) => [session.id, session] as const),
         )
 
         return data.session.apply([...sessions.values()].filter((session) => !session.parentID)).map(
@@ -232,6 +258,17 @@ export function createSessionInbox() {
       description: errorMessage(cause, language.t("common.requestFailed")),
     })
 
+  // Move the session between the cached indexes so it changes section before either refetches.
+  const move = (entry: InboxEntry, archivedAt: number | undefined) => {
+    const session = { ...entry.session, time: { ...entry.session.time, archived: archivedAt } }
+
+    forget(entry.conn, entry.session.id)
+    queryClient.setQueryData<SessionInfo[]>(
+      [archivedAt === undefined ? "home-sessions" : "inbox-archived-sessions", entry.conn],
+      (current) => current && [session, ...current],
+    )
+  }
+
   // The pending request anywhere in the session's family, for views that answer it inline.
   const family = (entry: InboxEntry) =>
     [...new Set([entry.session.id, ...entry.ctx.data.session.family(entry.session.id)])].flatMap((id) => {
@@ -270,6 +307,43 @@ export function createSessionInbox() {
     markViewed: (entry: InboxEntry) => {
       if (!entry.ctx.data.session.get(entry.session.id)) entry.ctx.data.session.remember(entry.session)
       entry.ctx.notification.session.markViewed(entry.session.id)
+    },
+    archive: (entry: InboxEntry) =>
+      entry.ctx.sdk.api.session
+        .update({ sessionID: entry.session.id, archived: true })
+        .then(() => {
+          move(entry, Date.now())
+          notifySessionTabsRemoved({
+            server: entry.server,
+            directory: entry.session.location.directory,
+            sessionIDs: [entry.session.id],
+          })
+        })
+        .catch(requestFailed),
+    unarchive: (entry: InboxEntry) =>
+      entry.ctx.sdk.api.session
+        .update({ sessionID: entry.session.id, archived: false })
+        .then(() => move(entry, undefined))
+        .catch(requestFailed),
+    remove: (entry: InboxEntry) => {
+      const ids = sessionTreeIDs(entry.ctx.data.session.list(), entry.session.id)
+
+      return entry.ctx.data.session
+        .remove(entry.session.id)
+        .then(() => {
+          forget(entry.conn, entry.session.id)
+          notifySessionTabsRemoved({
+            server: entry.server,
+            directory: entry.session.location.directory,
+            sessionIDs: ids,
+          })
+        })
+        .catch((cause) =>
+          showToast({
+            title: language.t("session.delete.failed.title"),
+            description: errorMessage(cause, language.t("session.delete.failed.title")),
+          }),
+        )
     },
   }
 }

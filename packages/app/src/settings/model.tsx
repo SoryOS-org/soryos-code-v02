@@ -132,13 +132,8 @@ const appearanceSchema = Persistence.struct({
   mono: Schema.String,
   sans: Schema.String,
   terminal: Schema.String,
-  // "inbox" was an experimental vertical layout; its sessions now live on Home, so it reads back as vertical tabs.
-  tabLayout: Schema.Literals(["horizontal", "vertical", "inbox"]).pipe(
-    Schema.decodeTo(Schema.Literals(["horizontal", "vertical"]), {
-      decode: SchemaGetter.transform((value) => (value === "inbox" ? "vertical" : value)),
-      encode: SchemaGetter.transform((value) => value),
-    }),
-  ),
+  // "inbox" is experimental: the vertical layout with a server-wide session inbox in place of tabs.
+  tabLayout: Schema.Literals(["horizontal", "vertical", "inbox"]),
   sidebarOpen: Persistence.optional(Schema.Boolean),
   reduceMotion: Schema.Literals(["system", "on", "off"]),
 })
