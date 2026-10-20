@@ -18,7 +18,6 @@ import { FileIcon } from "@opencode/ui/file-icon"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
-import { resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Button } from "@opencode/ui/button"
@@ -224,6 +223,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             activeCommentID={state.activeContextID}
             removeLabel={i18n.t("ui.promptInput.removeAttachment")}
             onAttachmentClick={props.controller.openAttachment}
+            preview={props.controller.previewAttachment}
             onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
             onUploadCancel={(upload) => props.controller.cancelUpload(upload.id)}
             onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
@@ -608,6 +608,7 @@ export function ComposerAttachments(props: {
   activeCommentID?: string
   removeLabel: string
   onAttachmentClick?: (attachment: ComposerAttachment, origin: HTMLElement) => void
+  preview: (attachment: ComposerAttachment) => Promise<string | undefined>
   onAttachmentRemove: (attachment: ComposerAttachment) => void
   onUploadCancel?: (upload: Upload) => void
   onCommentClick?: (comment: ComposerComment) => void
@@ -724,52 +725,53 @@ export function ComposerAttachments(props: {
             )}
           </For>
           <For each={props.attachments}>
-            {(attachment) => (
-              <div class="relative group shrink-0">
-                <Tooltip
-                  value={attachment.type === "path" ? attachment.path : attachment.filename}
-                  placement="top"
-                  contentClass="break-all"
-                >
-                  <Show
-                    when={attachment.type === "image" && attachment.mime.startsWith("image/") ? attachment : undefined}
-                    fallback={
-                      <AttachmentCard title={attachment.filename}>
-                        {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.common.file"))}
-                      </AttachmentCard>
-                    }
-                  >
-                    {(image) => {
-                      // Restored drafts and history carry image ids only; bytes load when shown.
-                      const [url] = createResource(() => image().blob, resolveBlobUrl)
+            {(attachment) => {
+              const image = attachment.mime.startsWith("image/")
+              // Restored drafts and history carry image ids only, and path attachments carry no bytes; both load when shown.
+              const [url] = createResource(() => image && attachment, props.preview)
+              // Read state rather than the resource so loading never suspends; the route boundary would detach the screen and drop editor focus.
+              const src = () => (url.state === "ready" ? url() : undefined)
+              const missing = () => url.state === "errored" || (url.state === "ready" && !url())
 
-                      return (
-                        <>
-                          {/* Keep loading local; the route boundary would detach the screen and drop editor focus. */}
-                          <Suspense fallback={<div class="w-[58px] h-[46px]" />}>
-                            <img
-                              src={url() ?? ""}
-                              alt={attachment.filename}
-                              class="w-[58px] h-[46px] rounded-[6px] object-cover"
-                              onClick={(event) => props.onAttachmentClick?.(attachment, event.currentTarget)}
-                            />
-                          </Suspense>
-                          <div class="absolute inset-0 rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)] pointer-events-none" />
-                        </>
-                      )
-                    }}
-                  </Show>
-                </Tooltip>
-                <button
-                  type="button"
-                  onClick={() => props.onAttachmentRemove(attachment)}
-                  class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
-                  aria-label={props.removeLabel}
-                >
-                  <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
-                </button>
-              </div>
-            )}
+              return (
+                <div class="relative group shrink-0">
+                  <Tooltip
+                    value={attachment.type === "path" ? attachment.path : attachment.filename}
+                    placement="top"
+                    contentClass="break-all"
+                  >
+                    <Show
+                      when={image && !missing()}
+                      fallback={
+                        <AttachmentCard title={attachment.filename}>
+                          {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.common.file"))}
+                        </AttachmentCard>
+                      }
+                    >
+                      <Show when={src()} fallback={<div class="w-[58px] h-[46px]" />}>
+                        {(value) => (
+                          <img
+                            src={value()}
+                            alt={attachment.filename}
+                            class="w-[58px] h-[46px] rounded-[6px] object-cover"
+                            onClick={(event) => props.onAttachmentClick?.(attachment, event.currentTarget)}
+                          />
+                        )}
+                      </Show>
+                      <div class="absolute inset-0 rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)] pointer-events-none" />
+                    </Show>
+                  </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => props.onAttachmentRemove(attachment)}
+                    class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
+                    aria-label={props.removeLabel}
+                  >
+                    <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
+                  </button>
+                </div>
+              )
+            }}
           </For>
           <For each={props.uploads ?? []}>
             {(upload) => (

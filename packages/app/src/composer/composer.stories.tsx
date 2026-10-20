@@ -12,6 +12,8 @@ import { SessionPreview } from "@/session/story-model"
 import { Skill } from "@opencode/schema/skill"
 import { resolveSessionComposerSelection } from "@/session/composer/selection"
 
+const pixel = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+
 const selectedModel = {
   id: STORY_MODEL.id,
   providerID: STORY_MODEL.providerID,
@@ -147,6 +149,7 @@ function ComposerStory(props: {
     commands: () => commands,
     context: () => context,
     searchContextFiles: () => [],
+    readImage: async () => pixel,
     view: {
       placeholder: () => "Ask anything, / for commands, @ for context...",
       agent: {
@@ -211,8 +214,7 @@ function ComposerStory(props: {
               : `Submitted: ${value}`,
           )
         },
-        onStop: () =>
-          setStory("activity", props.continueOnStop ? "POST /interrupt · resume: true" : "Stop requested"),
+        onStop: () => setStory("activity", props.continueOnStop ? "POST /interrupt · resume: true" : "Stop requested"),
       },
     },
   })
@@ -278,7 +280,14 @@ export const MixedAttachments = {
           id: "image-story",
           filename: "layout.png",
           mime: "image/png",
-          blob: { id: "image-story", url: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" },
+          blob: { id: "image-story", url: pixel },
+        },
+        {
+          type: "path",
+          id: "path-image-story",
+          filename: "screenshot.png",
+          mime: "image/png",
+          path: "C:/shots/screenshot.png",
         },
       ]}
       comments={[
