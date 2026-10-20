@@ -1,7 +1,8 @@
 export * as LocationActivity from "./location-activity.js"
 
-import { Clock, Context, Duration, Effect, Layer, RcMap, Schema } from "effect"
+import { Clock, Context, Duration, Effect, Layer, Option, RcMap, Schema } from "effect"
 import { Bus } from "./bus.js"
+import { Config } from "./config.js"
 import { Job } from "./job.js"
 import { Location } from "./location.js"
 import { LocationServiceMap } from "./location-service-map.js"
@@ -24,12 +25,12 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
       const execution = yield* SessionExecution.Service
       const jobs = yield* Job.Service
       const sessions = yield* SessionStore.Service
-      const timeToLive = Duration.toMillis(options.timeToLive ?? "60 minutes")
-      const entries = new Map<string, { readonly ref: Location.Ref; expiresAt: number }>()
+      const timeToLive = Duration.fromInputUnsafe(options.timeToLive ?? "60 minutes")
+      const entries = new Map<string, { readonly ref: Location.Ref; touchedAt: number }>()
       const key = (ref: Location.Ref) => `${LocationServiceMap.canonical(ref).directory}\0${ref.workspaceID ?? ""}`
       const touch = (ref: Location.Ref) =>
         Effect.sync(() => {
-          entries.set(key(ref), { ref, expiresAt: clock.currentTimeMillisUnsafe() + timeToLive })
+          entries.set(key(ref), { ref, touchedAt: clock.currentTimeMillisUnsafe() })
         })
 
       const unsubscribe = yield* bus.listen((event) => {
@@ -50,7 +51,33 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
           if (!cached.has(id)) entries.delete(id)
         }
         const now = clock.currentTimeMillisUnsafe()
-        const expired = Array.from(entries.values()).filter((entry) => entry.expiresAt <= now)
+        const expired = yield* Effect.filter(Array.from(entries.values()), (entry) =>
+          locations.contextEffectOption(entry.ref).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.succeed(false),
+                onSome: (context) =>
+                  Context.get(context, Config.Service)
+                    .entries()
+                    .pipe(
+                      Effect.map((items) => {
+                        const timeout = items
+                          .flatMap((item) =>
+                            item.type === "document" && item.info.experimental?.location_idle_timeout !== undefined
+                              ? [item.info.experimental.location_idle_timeout]
+                              : [],
+                          )
+                          .at(-1)
+                        if (timeout === false) return false
+                        return entry.touchedAt + Duration.toMillis(timeout ?? timeToLive) <= now
+                      }),
+                    ),
+              }),
+            ),
+            Effect.scoped,
+            Effect.orElseSucceed(() => false),
+          ),
+        )
         if (expired.length === 0) return
         // Waiting on a question, a long tool call, or a background job emits no durable activity.
         const owners = [
