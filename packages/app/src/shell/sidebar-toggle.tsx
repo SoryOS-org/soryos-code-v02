@@ -9,17 +9,10 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
 
-// The traffic lights' top-left corner in native pixels, as Electron's `trafficLightPosition`. The horizontal titlebar keeps
-// the window's default. With vertical tabs they center on the sidebar toggle's row, 32px down (the shell's 8px inset plus
-// half the 48px header), and sit as far in from the window's left edge as from its top, so the corner stays square.
-export const macTrafficLightPosition = { horizontal: { x: 14, y: 14 }, vertical: { x: 25, y: 25 } }
-
-// macOS 26 and later draw 14px buttons on a 23px pitch, so the zoom button ends 60px past the corner. macOS 15 and
-// earlier end 6px sooner.
-export const macTrafficLightsBaseWidth = {
-  horizontal: macTrafficLightPosition.horizontal.x + 60,
-  vertical: macTrafficLightPosition.vertical.x + 60,
-}
+// The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`. macOS 26 and later draw 14px buttons on a 23px
+// pitch, so the zoom button ends 74px from the window edge and the buttons center 21px from the top. macOS 15 and earlier
+// end at 68px and center at 22px.
+export const macTrafficLightsBaseWidth = 74
 
 // Matches the horizontal titlebar, whose first control starts 16px past the traffic lights.
 const macTrafficLightsGap = 16
@@ -80,10 +73,7 @@ function useCollapsedSlot() {
     // Lays the toggle out as if the traffic lights were the header's first control.
     width: () =>
       mac()
-        ? macTrafficLightsBaseWidth.vertical / (platform.webviewZoom?.() ?? 1) +
-          macTrafficLightsGap -
-          contentStart +
-          slotWidth
+        ? macTrafficLightsBaseWidth / (platform.webviewZoom?.() ?? 1) + macTrafficLightsGap - contentStart + slotWidth
         : slotWidth,
   }
 }

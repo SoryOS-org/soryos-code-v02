@@ -86,9 +86,6 @@ type PlatformBase = {
   /** Whether the native desktop window is fullscreen */
   windowFullscreen?: Accessor<boolean>
 
-  /** Move the native macOS window buttons' top-left corner, in native pixels (desktop only) */
-  setTrafficLightPosition?(position: { x: number; y: number }): Promise<void> | void
-
   /** Get whether native pinch/Ctrl-scroll zoom gestures are enabled (desktop only) */
   getPinchZoomEnabled?(): Promise<boolean> | boolean
 

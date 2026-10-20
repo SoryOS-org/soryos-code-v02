@@ -4,9 +4,9 @@ import { type TitlebarTheme } from "../../shared/ipc-contract"
 import { WindowFullscreenChanged, WindowPinchZoomChanged, WindowZoomChanged } from "../../shared/ipc-rpc/events"
 import { emitIpcEvent } from "../ipc-events"
 import type { DesktopPaths } from "../paths"
-import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY, TRAFFIC_LIGHT_POSITION_KEY } from "../storage/keys"
+import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
-import { storedBackgroundColor, storedTrafficLightPosition, titlebarOverlay, tone } from "./defaults"
+import { storedBackgroundColor, titlebarOverlay, tone } from "./defaults"
 
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
 
@@ -28,7 +28,7 @@ export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) 
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hidden" as const,
-          trafficLightPosition: storedTrafficLightPosition(),
+          trafficLightPosition: { x: 14, y: 14 },
         }
       : {}),
     ...(process.platform === "win32"
@@ -81,13 +81,6 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   }
 
   updateTitlebar(win)
-}
-
-export function setTrafficLightPosition(win: BrowserWindow, position: { x: number; y: number }) {
-  const stored = storedTrafficLightPosition()
-
-  if (stored.x !== position.x || stored.y !== position.y) getStore().set(TRAFFIC_LIGHT_POSITION_KEY, position)
-  win.setWindowButtonPosition(position)
 }
 
 export function updateTitlebar(win: BrowserWindow) {

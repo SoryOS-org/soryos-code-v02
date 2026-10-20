@@ -1,9 +1,8 @@
 import { resolveThemeVariant } from "@opencode/ui/theme/resolve"
 import type { DesktopTheme } from "@opencode/ui/theme/types"
-import { Option, Schema } from "effect"
 import { nativeTheme } from "electron"
 import oc2ThemeJson from "../../../../ui/src/theme/themes/oc-2.json"
-import { BACKGROUND_COLOR_KEY, TRAFFIC_LIGHT_POSITION_KEY } from "../storage/keys"
+import { BACKGROUND_COLOR_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
 
 // Frame defaults shared by the early window (created on ready, before the renderer exists) and the
@@ -36,14 +35,4 @@ export function titlebarOverlay(mode: "light" | "dark" = tone(), zoom = 1) {
     symbolColor: mode === "dark" ? "white" : "black",
     height: Math.max(titlebarHeight, Math.round(titlebarHeight * zoom)),
   }
-}
-
-const decodeTrafficLightPosition = Schema.decodeUnknownOption(Schema.Struct({ x: Schema.Number, y: Schema.Number }))
-
-// The macOS window buttons' position the renderer last asked for, which depends on its tab layout, so a new window opens
-// with them already in place.
-export function storedTrafficLightPosition() {
-  const stored = decodeTrafficLightPosition(getStore().get(TRAFFIC_LIGHT_POSITION_KEY))
-
-  return Option.getOrElse(stored, () => ({ x: 14, y: 14 }))
 }
