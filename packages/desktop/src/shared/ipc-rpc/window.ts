@@ -34,9 +34,9 @@ export const WindowSetTitlebar = Rpc.make("WindowSetTitlebar", {
   },
 })
 
-// CSS pixels from the window top where the macOS window buttons should be centered.
-export const WindowSetTrafficLightsCenter = Rpc.make("WindowSetTrafficLightsCenter", {
-  payload: { center: Schema.Number },
+// Moves the macOS window buttons, as Electron's `trafficLightPosition`: their top-left corner in native pixels.
+export const WindowSetTrafficLightPosition = Rpc.make("WindowSetTrafficLightPosition", {
+  payload: { position: Schema.Struct({ x: Schema.Number, y: Schema.Number }) },
 })
 
 export const WindowRpcs = RpcGroup.make(
@@ -50,5 +50,5 @@ export const WindowRpcs = RpcGroup.make(
   WindowGetPinchZoomEnabled,
   WindowSetPinchZoomEnabled,
   WindowSetTitlebar,
-  WindowSetTrafficLightsCenter,
+  WindowSetTrafficLightPosition,
 )

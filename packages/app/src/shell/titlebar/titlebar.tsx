@@ -16,7 +16,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macTrafficLightsBaseWidth, macTrafficLightsCenter, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macTrafficLightPosition, macTrafficLightsBaseWidth, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -80,7 +80,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   createEffect(() => {
     if (!mac()) return
-    void platform.setTrafficLightsCenter?.(macTrafficLightsCenter[props.verticalTabs ? "vertical" : "horizontal"])
+    void platform.setTrafficLightPosition?.(macTrafficLightPosition[props.verticalTabs ? "vertical" : "horizontal"])
   })
 
   const minHeight = () => {
@@ -178,7 +178,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
         "padding-bottom": bottom() ? "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))" : "0px",
         "min-height": minHeight(),
         // Keep native macOS traffic lights clear even when the desktop window is narrow.
-        "padding-left": macTrafficLights() ? `${macTrafficLightsBaseWidth / zoom()}px` : 0,
+        "padding-left": macTrafficLights() ? `${macTrafficLightsBaseWidth.horizontal / zoom()}px` : 0,
         width: windows() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
         "max-width": windows() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
         // Native Windows caption controls remain on the physical right in both writing directions.
@@ -805,7 +805,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                   {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
                                   <div
                                     class="shrink-0"
-                                    style={{ width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)` }}
+                                    style={{ width: `calc(${macTrafficLightsBaseWidth.vertical / zoom()}px - 10px)` }}
                                     aria-hidden="true"
                                   />
                                 </Show>

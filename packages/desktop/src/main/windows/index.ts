@@ -16,7 +16,7 @@ import {
   setDockIcon,
   setPinchZoomEnabled,
   setTitlebar,
-  setTrafficLightsCenter,
+  setTrafficLightPosition,
   setZoomFactor,
   updateTitlebar,
   windowAppearance,
@@ -61,7 +61,7 @@ export {
   setDockIcon,
   setPinchZoomEnabled,
   setTitlebar,
-  setTrafficLightsCenter,
+  setTrafficLightPosition,
   setZoomFactor,
   updateTitlebar,
 }
@@ -237,3 +237,5 @@ export const makeMainWindows = Effect.fn("Window.make")(function* () {
 
   return { create, restore }
 })
+
+

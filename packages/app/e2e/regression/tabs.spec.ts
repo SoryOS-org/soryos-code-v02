@@ -435,10 +435,10 @@ for (const [screen, href] of [
   })
 }
 
-// macOS 26 traffic lights end 74px from the window edge. The collapsed toggle starts 16px past them, as the horizontal
-// titlebar's first control does, and a fullscreen window has no traffic lights to clear.
+// With vertical tabs, macOS 26 traffic lights end 77px from the window edge. The collapsed toggle starts 16px past them, as
+// the horizontal titlebar's first control does, and a fullscreen window has no traffic lights to clear.
 for (const [window, fullscreen, start] of [
-  ["windowed", false, 90],
+  ["windowed", false, 93],
   ["fullscreen", true, 18],
 ] as const) {
   test(`collapsed sidebar toggle clears the macOS traffic lights (${window})`, async ({ page }) => {
@@ -463,8 +463,8 @@ for (const [window, fullscreen, start] of [
   })
 }
 
-// With vertical tabs the traffic lights move down onto the sidebar toggle's center line, and the channel icon moves
-// below them, over Home's icon. A fullscreen window has no traffic lights, so the icon stays beside the toggle.
+// With vertical tabs the 14px traffic lights move onto the sidebar toggle's row and the column of the sidebar's icons, and
+// the channel icon moves below them. A fullscreen window has no traffic lights, so the icon stays beside the toggle.
 for (const [window, fullscreen] of [
   ["windowed", false],
   ["fullscreen", true],
@@ -481,7 +481,7 @@ for (const [window, fullscreen] of [
     const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
     const indicator = sidebar.locator('[data-slot="channel-indicator"]')
     await expect(indicator).toBeVisible()
-    await expect(page.locator("html")).toHaveAttribute("data-traffic-lights-center", "32")
+    await expect(page.locator("html")).toHaveAttribute("data-traffic-light-position", "17,25")
 
     const icon = await indicator.boundingBox()
     const toggle = await sidebar.getByRole("button", { name: "Toggle sidebar", exact: true }).boundingBox()
@@ -489,16 +489,17 @@ for (const [window, fullscreen] of [
     const homeIcon = await sidebar.getByRole("button", { name: "Home", exact: true }).locator("svg").boundingBox()
 
     if (!icon || !toggle || !home || !homeIcon) throw new Error("sidebar header has no bounding boxes")
-    expect(toggle.y + toggle.height / 2).toBe(32)
+    expect(toggle.y + toggle.height / 2).toBe(25 + 7)
+    expect(homeIcon.x + homeIcon.width / 2).toBe(17 + 7)
 
     if (fullscreen) {
       expect(icon.y + icon.height / 2).toBe(toggle.y + toggle.height / 2)
       return
     }
 
-    // Clear of the 14px buttons, centered over Home's icon, and above Home.
-    expect(icon.y).toBeGreaterThan(32 + 7)
-    expect(icon.x + icon.width / 2).toBe(homeIcon.x + homeIcon.width / 2)
+    // Clear of the buttons, in their column, and above Home.
+    expect(icon.y).toBeGreaterThan(25 + 14)
+    expect(icon.x + icon.width / 2).toBe(17 + 7)
     expect(icon.y + icon.height).toBeLessThan(home.y)
   })
 }
@@ -512,7 +513,7 @@ test("horizontal tabs keep the macOS traffic lights on the titlebar", async ({ p
   await page.goto(
     `/e2e/utils/macos-window.html?${new URLSearchParams({ server: SERVER, route: "/", fullscreen: "false" })}`,
   )
-  await expect(page.locator("html")).toHaveAttribute("data-traffic-lights-center", "21")
+  await expect(page.locator("html")).toHaveAttribute("data-traffic-light-position", "14,14")
 })
 
 test("vertical tab gaps hover and select the nearest row", async ({ page }) => {

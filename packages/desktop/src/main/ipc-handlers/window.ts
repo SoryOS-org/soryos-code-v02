@@ -6,7 +6,7 @@ import {
   getPinchZoomEnabled,
   setPinchZoomEnabled,
   setTitlebar,
-  setTrafficLightsCenter,
+  setTrafficLightPosition,
   setWindowThemeReady,
   updateTitlebar,
 } from "../windows"
@@ -50,11 +50,11 @@ export const windowHandlers = WindowRpcs.toLayer(
 
           if (win) setTitlebar(win, theme)
         }),
-      WindowSetTrafficLightsCenter: ({ center }, context) =>
+      WindowSetTrafficLightPosition: ({ position }, context) =>
         Effect.sync(() => {
           const win = BrowserWindow.fromWebContents(sender(handoff, context))
 
-          if (win) setTrafficLightsCenter(win, center)
+          if (win && process.platform === "darwin") setTrafficLightPosition(win, position)
         }),
     })
   }),

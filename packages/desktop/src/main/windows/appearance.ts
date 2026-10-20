@@ -4,15 +4,13 @@ import { type TitlebarTheme } from "../../shared/ipc-contract"
 import { WindowFullscreenChanged, WindowPinchZoomChanged, WindowZoomChanged } from "../../shared/ipc-rpc/events"
 import { emitIpcEvent } from "../ipc-events"
 import type { DesktopPaths } from "../paths"
-import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY, TRAFFIC_LIGHTS_CENTER_KEY } from "../storage/keys"
+import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY, TRAFFIC_LIGHT_POSITION_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
-import { storedBackgroundColor, titlebarOverlay, tone, trafficLightPosition } from "./defaults"
+import { storedBackgroundColor, storedTrafficLightPosition, titlebarOverlay, tone } from "./defaults"
 
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
 
 const pinchZoomEnabled = new WeakMap<BrowserWindow, boolean>()
-
-const trafficLightsCenters = new WeakMap<BrowserWindow, number>()
 
 const maxZoomLevel = 10
 
@@ -30,7 +28,7 @@ export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) 
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hidden" as const,
-          trafficLightPosition: trafficLightPosition(),
+          trafficLightPosition: storedTrafficLightPosition(),
         }
       : {}),
     ...(process.platform === "win32"
@@ -85,23 +83,16 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   updateTitlebar(win)
 }
 
-export function setTrafficLightsCenter(win: BrowserWindow, center: number) {
-  trafficLightsCenters.set(win, center)
+export function setTrafficLightPosition(win: BrowserWindow, position: { x: number; y: number }) {
+  const stored = storedTrafficLightPosition()
 
-  if (getStore().get(TRAFFIC_LIGHTS_CENTER_KEY) !== center) getStore().set(TRAFFIC_LIGHTS_CENTER_KEY, center)
-  updateTitlebar(win)
+  if (stored.x !== position.x || stored.y !== position.y) getStore().set(TRAFFIC_LIGHT_POSITION_KEY, position)
+  win.setWindowButtonPosition(position)
 }
 
 export function updateTitlebar(win: BrowserWindow) {
-  const zoom = win.webContents.getZoomFactor()
-  const center = trafficLightsCenters.get(win)
-
-  // The buttons are native, so they follow the zoomed chrome they line up with.
-  if (process.platform === "darwin" && center !== undefined) {
-    win.setWindowButtonPosition(trafficLightPosition(center, zoom))
-  }
-
-  if (process.platform === "win32") win.setTitleBarOverlay(overlay(titlebarThemes.get(win), zoom))
+  if (process.platform !== "win32") return
+  win.setTitleBarOverlay(overlay(titlebarThemes.get(win), win.webContents.getZoomFactor()))
 }
 
 export function setPinchZoomEnabled(enabled: boolean) {

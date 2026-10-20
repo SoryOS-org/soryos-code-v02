@@ -1,8 +1,9 @@
 import { resolveThemeVariant } from "@opencode/ui/theme/resolve"
 import type { DesktopTheme } from "@opencode/ui/theme/types"
+import { Option, Schema } from "effect"
 import { nativeTheme } from "electron"
 import oc2ThemeJson from "../../../../ui/src/theme/themes/oc-2.json"
-import { BACKGROUND_COLOR_KEY, TRAFFIC_LIGHTS_CENTER_KEY } from "../storage/keys"
+import { BACKGROUND_COLOR_KEY, TRAFFIC_LIGHT_POSITION_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
 
 // Frame defaults shared by the early window (created on ready, before the renderer exists) and the
@@ -36,15 +37,13 @@ export function titlebarOverlay(mode: "light" | "dark" = tone(), zoom = 1) {
     height: Math.max(titlebarHeight, Math.round(titlebarHeight * zoom)),
   }
 }
-// Where the macOS window buttons sit: 14px from the left edge, with their 14px buttons centered `center` CSS pixels from
-// the top. The renderer reports the center its chrome needs, since vertical tabs put the sidebar toggle lower than the
-// horizontal titlebar's controls, and the last one is remembered so a new window opens with the buttons in place.
-export function trafficLightPosition(center = storedTrafficLightsCenter(), zoom = 1) {
-  return { x: 14, y: Math.round(center * zoom - 7) }
-}
 
-function storedTrafficLightsCenter() {
-  const stored = getStore().get(TRAFFIC_LIGHTS_CENTER_KEY)
+const decodeTrafficLightPosition = Schema.decodeUnknownOption(Schema.Struct({ x: Schema.Number, y: Schema.Number }))
 
-  return typeof stored === "number" ? stored : 21
+// The macOS window buttons' position the renderer last asked for, which depends on its tab layout, so a new window opens
+// with them already in place.
+export function storedTrafficLightPosition() {
+  const stored = decodeTrafficLightPosition(getStore().get(TRAFFIC_LIGHT_POSITION_KEY))
+
+  return Option.getOrElse(stored, () => ({ x: 14, y: 14 }))
 }

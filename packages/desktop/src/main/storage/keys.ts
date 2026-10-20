@@ -6,7 +6,7 @@ export const PINCH_ZOOM_ENABLED_KEY = "pinchZoomEnabled"
 
 export const BACKGROUND_COLOR_KEY = "backgroundColor"
 
-export const TRAFFIC_LIGHTS_CENTER_KEY = "trafficLightsCenter"
+export const TRAFFIC_LIGHT_POSITION_KEY = "trafficLightPosition"
 
 export const WINDOW_IDS_KEY = "windowIds"
 
