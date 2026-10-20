@@ -641,6 +641,10 @@ export function Session(props: {
       if (!error) return true
       const label = failureLabel ?? (action === "cancel" ? "delete" : action)
       toast.show({ title: `Failed to ${label} pending prompt`, message: errorMessage(error), variant: "error" })
+      // A failed action often means the input was delivered or cancelled by another
+      // client. Pull the authoritative inbox so a stale card cannot stay on screen.
+      data.session.pending.invalidate(route.sessionID)
+      void data.session.pending.sync(route.sessionID).catch(() => undefined)
       return false
     })
     return result ?? false

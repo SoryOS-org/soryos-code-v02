@@ -133,6 +133,31 @@ test("hydration preserves submission order across optimistic admissions", async 
   }
 })
 
+test("an acknowledged admission cannot stay pending when delivery is missed", async () => {
+  const snapshot = Promise.withResolvers<Response>()
+  const admission = Promise.withResolvers<Response>()
+  const setup = fixture((request) => (request.method === "GET" ? snapshot.promise : admission.promise))
+  try {
+    const sending = setup.data.session.prompt({
+      sessionID: item.sessionID,
+      id: "msg_image",
+      text: "Check the screenshot",
+    })
+    admission.resolve(Response.json({ data: { id: "msg_image" } }))
+    await sending
+    // The delivered event is lost, and the next inbox read no longer contains the
+    // input because the server already promoted it.
+    const reading = setup.data.session.pending.sync(item.sessionID)
+    snapshot.resolve(Response.json({ data: [] }))
+    await reading
+    expect(setup.data.session.input.has(item.sessionID, "msg_image")).toBe(false)
+  } finally {
+    snapshot.resolve(Response.json({ data: [] }))
+    admission.resolve(Response.json({ data: { id: "msg_image" } }))
+    setup.dispose()
+  }
+})
+
 test("hydration coalesces a concurrent optimistic compaction even if its POST fails", async () => {
   const response = Promise.withResolvers<Response>()
   const admission = Promise.withResolvers<Response>()

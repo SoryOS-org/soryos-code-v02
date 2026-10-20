@@ -292,6 +292,8 @@ export function createData(config: CreateDataInput) {
   function removePending(sessionID: string, inboxID?: string) {
     if (!inboxID) return
     pendingUpdates.get(sessionID)?.set(inboxID, undefined)
+    // Delivery and cancellation are durable acknowledgements too.
+    outbox.delete(inboxID)
     if (store.session.pending[sessionID]?.some((item) => item.id === inboxID))
       setStore(
         "session",
@@ -1081,6 +1083,13 @@ export function createData(config: CreateDataInput) {
           if (currentAssistant) currentAssistant.retry = undefined
         })
         if (event.type === "session.execution.interrupted" && event.data.reason === "shutdown") return
+        // A delivery event can be missed across a reconnect. Pull the authoritative
+        // inbox at the turn boundary so a stale queued card cannot outlive the turn
+        // that consumed it.
+        if ((store.session.pending[event.data.sessionID]?.length ?? 0) > 0) {
+          result.session.pending.invalidate(event.data.sessionID)
+          refresh(() => result.session.pending.sync(event.data.sessionID))
+        }
         // Mirror the projected idle marker so turn boundaries match before the next message read.
         message.insert(event.data.sessionID, {
           id: messageIDFromEvent(event.id),
@@ -1649,12 +1658,22 @@ export function createData(config: CreateDataInput) {
             return api().session.prompt({ ...request, id })
           },
           gate,
-        ).catch((error) => {
-          // Roll back only rows this call admitted and the server has not
-          // acknowledged: anything else is server state.
-          if (fresh && outbox.delete(id)) retractLocal(request.sessionID, id)
-          throw error
-        })
+        )
+          .then((value) => {
+            // The admission response is durable acknowledgement. Drop the
+            // optimistic guard here as well as on the echo: if the delivery
+            // event is missed, a later inbox snapshot (which is already empty
+            // because the input was delivered) must be able to reconcile the
+            // row instead of keeping it pending forever.
+            outbox.delete(id)
+            return value
+          })
+          .catch((error) => {
+            // Roll back only rows this call admitted and the server has not
+            // acknowledged: anything else is server state.
+            if (fresh && outbox.delete(id)) retractLocal(request.sessionID, id)
+            throw error
+          })
       },
       sync(sessionID: string, options?: { children?: boolean }) {
         return sync.run(options?.children ? `session.family:${sessionID}` : `session:${sessionID}`, async () => {
