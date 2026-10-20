@@ -82,7 +82,7 @@ export function withCacheTTL(model: LLMRequest["model"], ttlSeconds: number) {
   if (!policy.tools && !policy.system && !policy.messages)
     return Result.fail(`Route ${model.route.id} does not support cache_control for ${model.id}`)
   if (model.route.id === "bedrock-converse") {
-    const supported = BedrockCache.breakpoints(model.id)
+    const supported = BedrockCache.breakpoints(model)
     if (!supported.supported || (ttlSeconds === 3600 && !supported.ttl1h))
       return Result.fail(`Bedrock cache_control TTL ${ttlSeconds}s is not supported for ${model.id}`)
   }
