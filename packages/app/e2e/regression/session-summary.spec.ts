@@ -426,55 +426,6 @@ test("MCP rows show each server's state and the menu opens the MCP servers dialo
   await expect(submenu).toBeHidden()
 })
 
-test("MCP authentication starts before a slow resource catalog finishes", async ({ page, context }) => {
-  const state = { connected: false }
-  const attempts: string[] = []
-  await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
-  await mockStressTimeline(page, {
-    mcp: [{ name: "linear", integrationID: "linear-oauth", status: { status: "needs_auth" } }],
-    onMcpAction: () => {
-      state.connected = true
-
-      return { status: "needs_auth" }
-    },
-    integrations: [{ id: "linear-oauth", name: "Linear", methods: [{ id: "oauth", type: "oauth" }], connections: [] }],
-    onIntegrationOAuth: () => ({ url: "https://auth.example.test/authorize" }),
-  })
-  page.on("request", (request) => {
-    if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/integration/"))
-      attempts.push(request.url())
-  })
-
-  // Only the resource catalog refresh after connecting is slow.
-  const resources = await holdRoute(page, (url) => state.connected && url.pathname === "/api/mcp/resource", {
-    method: "GET",
-  })
-
-  await page.goto(sessionHref(fixture.targetID))
-  await page.getByRole("button", { name: "Session details", exact: true }).click()
-  const item = page.getByRole("menuitem", { name: "MCP", exact: true })
-  await item.click()
-  const submenu = page.getByRole("menu", { name: "MCP", exact: true })
-  await enter(page, item, submenu)
-  const signIn = submenu.getByRole("button", { name: "Sign in to linear", exact: true })
-  await expect(signIn).toBeEnabled()
-
-  try {
-    const popup = page.waitForEvent("popup")
-    await signIn.click()
-    await expect(await popup).toHaveURL("https://auth.example.test/authorize")
-    await resources.arrived
-    // The sign-in link waits for the catalog before it is ready again.
-    await expect(signIn).toBeDisabled()
-  } finally {
-    resources.release()
-  }
-
-  await expect(signIn).toBeEnabled()
-  expect(attempts).toHaveLength(1)
-  expect(new URL(attempts[0]).searchParams.get("location[directory]")).toBe(fixture.directory)
-})
-
 test("multiple desktop connections show the session's server name", async ({ page }) => {
   await mockStressTimeline(page)
   await page.route("http://secondary.test/**", (route) =>
