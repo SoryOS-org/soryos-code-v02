@@ -1,6 +1,7 @@
 export * as LocationActivity from "./location-activity.js"
 
 import { Clock, Context, Duration, Effect, Layer, Option, RcMap, Schema } from "effect"
+import type { Document } from "@opencode/schema/config"
 import { Bus } from "./bus.js"
 import { Config } from "./config.js"
 import { Job } from "./job.js"
@@ -33,6 +34,22 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
           entries.set(key(ref), { ref, touchedAt: clock.currentTimeMillisUnsafe() })
         })
 
+      // Read per location so project config can override the global value.
+      const idleTimeout = (ref: Location.Ref) =>
+        Effect.gen(function* () {
+          const context = yield* locations.contextEffectOption(ref)
+          if (Option.isNone(context)) return timeToLive
+          const entries = yield* Context.get(context.value, Config.Service).entries()
+          const configured = entries.findLast(
+            (entry): entry is Document =>
+              entry.type === "document" && entry.info.experimental?.location_idle_timeout !== undefined,
+          )
+          return configured?.info.experimental?.location_idle_timeout ?? timeToLive
+        }).pipe(
+          Effect.scoped,
+          Effect.orElseSucceed(() => timeToLive),
+        )
+
       const unsubscribe = yield* bus.listen((event) => {
         if (!isSessionEvent(event)) return Effect.void
         const location = event.location
@@ -52,30 +69,8 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
         }
         const now = clock.currentTimeMillisUnsafe()
         const expired = yield* Effect.filter(Array.from(entries.values()), (entry) =>
-          locations.contextEffectOption(entry.ref).pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.succeed(false),
-                onSome: (context) =>
-                  Context.get(context, Config.Service)
-                    .entries()
-                    .pipe(
-                      Effect.map((items) => {
-                        const timeout = items
-                          .flatMap((item) =>
-                            item.type === "document" && item.info.experimental?.location_idle_timeout !== undefined
-                              ? [item.info.experimental.location_idle_timeout]
-                              : [],
-                          )
-                          .at(-1)
-                        if (timeout === false) return false
-                        return entry.touchedAt + Duration.toMillis(timeout ?? timeToLive) <= now
-                      }),
-                    ),
-              }),
-            ),
-            Effect.scoped,
-            Effect.orElseSucceed(() => false),
+          idleTimeout(entry.ref).pipe(
+            Effect.map((timeout) => timeout !== false && entry.touchedAt + Duration.toMillis(timeout) <= now),
           ),
         )
         if (expired.length === 0) return
