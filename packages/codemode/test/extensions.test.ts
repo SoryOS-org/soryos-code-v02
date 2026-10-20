@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Effect, Schema } from "effect"
+import { Context, Effect, Schema } from "effect"
 import { CodeMode, Extension, Tool } from "../src/index.js"
 
 const held: Array<unknown> = []
@@ -349,6 +349,53 @@ describe("host errors", () => {
     expect(await value(`try { boom() } catch (e) { return e.status }`, target)).toBe(404)
     expect(reason.status).toBe(404)
     expect((await failure(`await get()`, target)).message).toBe('Uncaught: {"status":404,"nested":{"a":1}}')
+  })
+})
+
+describe("a global that returns an Effect", () => {
+  class Flag extends Context.Service<Flag, { readonly value: string }>()("@opencode/codemode/test/Flag") {}
+
+  const effects = CodeMode.make({
+    extensions: [
+      Extension.make({
+        name: "fx",
+        globals: {
+          read: () => Effect.map(Flag, (flag) => flag.value),
+          refuse: () => Effect.fail(new RangeError("boom")),
+          wait: () => Effect.never,
+        },
+      }),
+    ],
+  })
+
+  test("the Effect resolves the execution's services, like a Promise resolves its value", async () => {
+    // The point of returning an Effect: a global sees services the host provides per execution, which a
+    // plain function cannot reach because it runs outside the fiber.
+    const result = await Effect.runPromise(
+      effects.execute(`return await read()`).pipe(Effect.provideService(Flag, { value: "held" })),
+    )
+    if (!result.ok) throw new Error(`expected success, got ${result.error.kind}: ${result.error.message}`)
+    expect(result.value).toBe("held")
+  })
+
+  test("a failed Effect reaches the program as its error", async () => {
+    expect(
+      await value(`try { await refuse() } catch (e) { return [e instanceof RangeError, e.message] }`, effects),
+    ).toEqual([true, "boom"])
+  })
+
+  test("an Effect still waiting when the program ends is interrupted with it", async () => {
+    const interrupted = Promise.withResolvers<void>()
+    const target = CodeMode.make({
+      extensions: [
+        Extension.make({
+          name: "fx",
+          globals: { wait: () => Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(interrupted.resolve))) },
+        }),
+      ],
+    })
+    expect(await value(`wait(); return 1`, target)).toBe(1)
+    await interrupted.promise
   })
 })
 

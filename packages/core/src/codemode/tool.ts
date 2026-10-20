@@ -59,6 +59,8 @@ class Run extends Context.Service<
   {
     readonly executeTool: (name: string, tool: Info, input: unknown) => Effect.Effect<unknown, unknown>
     readonly hooks: CodeMode.Hooks
+    /** Runs before a `fetch` reaches the network; a failure denies the call. */
+    readonly guardFetch: (url: string) => Effect.Effect<void, unknown>
   }
 >()("@opencode/CodeModeTool/Run") {}
 
@@ -80,6 +82,7 @@ const description = [
 export const create = (
   inventory: Inventory,
   executeTool: (name: string, tool: Info, input: unknown, context: ToolContext) => Effect.Effect<Result, Error>,
+  guardFetch: (url: string, context: ToolContext) => Effect.Effect<void, unknown>,
 ) => {
   return {
     name: "execute",
@@ -100,6 +103,7 @@ export const create = (
           .execute(code)
           .pipe(
             Effect.provideService(Run, {
+              guardFetch: (url) => guardFetch(url, context),
               executeTool: (name, tool, input) =>
                 Effect.gen(function* () {
                   const index = yield* Ref.getAndUpdate(callIndex, (index) => index + 1)
@@ -250,7 +254,10 @@ function runtime(inventory: Inventory) {
     })
   }
   const tools = renderTools(root)
-  const created = CodeMode.make<typeof tools>({ tools, extensions: [CodeModeWeb.extension], hooks: runHooks })
+  // The guard belongs to one execution while the runtime belongs to the inventory, so `fetch` reads it from
+  // `Run`, the per-execution service, instead of the runtime closing over it.
+  const web = CodeModeWeb.extension((url) => Run.use((run) => run.guardFetch(url)))
+  const created = CodeMode.make<typeof tools>({ tools, extensions: [web], hooks: runHooks })
   runtimes.set(inventory, created)
   return created
 }
