@@ -387,7 +387,7 @@ export const layer = (options?: Options) =>
           const log = failureKey === lastFailure ? Effect.logDebug : Effect.logError
           lastFailure = failureKey
           return log(
-            `Failed to refresh models.dev; the bundled catalog is still in use, retrying in ${Duration.format(ttl)}`,
+            `Failed to refresh models.dev; the current catalog is still in use, retrying in ${Duration.format(ttl)}`,
             { reason: failure.reason, detail: failure.detail, next: failure.next, errors },
           )
         })

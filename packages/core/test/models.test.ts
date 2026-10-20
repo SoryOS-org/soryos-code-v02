@@ -627,7 +627,7 @@ describe("ModelsDev Service", () => {
       // shows one line per distinct failure instead of one per refresh.
       expect(logs.entries.map((entry) => entry.level)).toEqual(["ERROR", "DEBUG"])
       const [message, fields] = logs.entries[0].message
-      expect(message).toContain("the bundled catalog is still in use, retrying in 5m")
+      expect(message).toContain("the current catalog is still in use, retrying in 5m")
       expect(fields.reason).toBe("transport")
       expect(fields.detail).toBe("cannot reach https://models.opencode.ai/api.json (ConnectionRefused)")
       expect(fields.next).toContain("HTTP_PROXY/HTTPS_PROXY")
