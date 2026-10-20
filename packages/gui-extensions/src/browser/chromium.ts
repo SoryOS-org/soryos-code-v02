@@ -12,6 +12,7 @@ import { createProfiling, type Recording } from "./profiling"
 import type { BrowserNetwork } from "./network"
 import {
   allowedDestination,
+  committedLoad,
   destinationOrigin,
   fileURLWithin,
   localFileURL,
@@ -536,12 +537,29 @@ export function createBrowserPage(
   // whether there is a document worth exposing over the themed background.
   const updateVisibility = () => embed.show(content)
 
+  const load = (url: string) => {
+    let committed = false
+
+    const commit = () => {
+      committed = true
+    }
+
+    contents.once("did-navigate", commit)
+
+    return contents
+      .loadURL(url)
+      .catch((error: Error) => {
+        if (!committedLoad(error, committed)) throw error
+      })
+      .finally(() => contents.off("did-navigate", commit))
+  }
+
   const ready = Promise.all([
     files.ready,
     ...(options.initialize === false
       ? []
       : [
-          contents.loadURL(normalizeURL(options.restore?.url || "about:blank", policy)).catch((error: Error) => {
+          load(normalizeURL(options.restore?.url || "about:blank", policy)).catch((error: Error) => {
             if (!options.restore) throw error
             // A dev server may have stopped while this page was unloaded. Keep its tab available to retry.
             options.publish(error.message)
@@ -723,7 +741,7 @@ export function createBrowserPage(
         signal.addEventListener("abort", cancel, { once: true })
 
         try {
-          await contents.loadURL(url)
+          await load(url)
         } finally {
           signal.removeEventListener("abort", cancel)
         }
