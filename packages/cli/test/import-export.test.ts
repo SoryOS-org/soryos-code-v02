@@ -94,6 +94,57 @@ test("export is raw by default and supports explicit sanitization", async () => 
   }
 }, 15_000)
 
+test("export writes a transcript larger than the pipe buffer without truncating it", async () => {
+  // Every write to a pipe is asynchronous, so the export must not let the
+  // process exit before the payload is flushed. 24 x 64 KiB is well past the
+  // 64 KiB pipe buffer and the 4096-byte multiples the truncation showed up in.
+  const body = "x".repeat(64 * 1024)
+  const large = {
+    info,
+    messages: Array.from({ length: 24 }, (_, index) => ({
+      id: `msg_big_${index}`,
+      type: "assistant",
+      text: body,
+      time: { created: index + 1 },
+    })),
+  }
+  const server = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname === "/api/info") return status()
+      if (url.pathname === `/api/experimental/session/${info.id}/export`) return Response.json({ data: large })
+      return new Response("Not found", { status: 404 })
+    },
+  })
+
+  try {
+    const child = Bun.spawn(
+      [process.execPath, "run", "src/index.ts", "session", "export", info.id, "--server", server.url.toString()],
+      {
+        cwd: path.join(import.meta.dir, ".."),
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
+    // A consumer that starts late leaves the payload queued behind the pipe
+    // buffer, and an un-awaited write is dropped when the CLI exits.
+    await Bun.sleep(500)
+    const [stdout, , exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+    const expected = JSON.stringify(large, null, 2) + os.EOL
+
+    expect(exitCode).toBe(0)
+    expect(stdout.length).toBe(expected.length)
+    expect(Buffer.from(stdout).equals(Buffer.from(expected))).toBe(true)
+  } finally {
+    await server.stop(true)
+  }
+}, 30_000)
+
 test("export requires a session outside an interactive terminal", async () => {
   const server = Bun.serve({
     port: 0,

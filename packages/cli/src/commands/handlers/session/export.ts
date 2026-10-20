@@ -7,6 +7,7 @@ import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { ServerConnection } from "../../../services/server-connection"
 import { errorMessage } from "../../../util/error"
+import { writeStdout } from "../../../util/io"
 
 export default Runtime.handler(
   Commands.commands.session.commands.export,
@@ -74,7 +75,10 @@ export default Runtime.handler(
         try: () => client.session.export({ sessionID, sanitize: input.sanitize }),
         catch: (cause) => cause,
       })
-      process.stdout.write(JSON.stringify(data, null, 2) + EOL)
+      yield* Effect.tryPromise({
+        try: () => writeStdout(JSON.stringify(data, null, 2) + EOL),
+        catch: (cause) => cause,
+      })
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
