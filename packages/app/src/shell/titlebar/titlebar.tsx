@@ -16,7 +16,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macTrafficLightsBaseWidth, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macTrafficLightsBaseWidth, macTrafficLightsCenter, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -808,7 +808,19 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                   when={homeInSidebarHeader()}
                                   fallback={
                                     <>
-                                      <ChannelIndicator sidebar />
+                                      {/* Beside the traffic lights, the icon shares their center line rather than the
+                                          header's, whose taller row would leave it sitting low. */}
+                                      <div
+                                        class="flex shrink-0"
+                                        classList={{ "self-start": macTrafficLights() }}
+                                        style={{
+                                          "margin-top": macTrafficLights()
+                                            ? `calc(${macTrafficLightsCenter / zoom()}px - 14px - var(--shell-top-inset, 8px))`
+                                            : undefined,
+                                        }}
+                                      >
+                                        <ChannelIndicator sidebar />
+                                      </div>
                                       <div class="flex-1" />
                                     </>
                                   }

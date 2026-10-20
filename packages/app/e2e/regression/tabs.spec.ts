@@ -463,6 +463,33 @@ for (const [window, fullscreen, start] of [
   })
 }
 
+// macOS 26 traffic lights center 21px from the window top. The channel icon beside them shares their center line, and
+// without them it shares the sidebar toggle's.
+for (const [window, fullscreen] of [
+  ["windowed", false],
+  ["fullscreen", true],
+] as const) {
+  test(`sidebar channel icon lines up with the macOS traffic lights (${window})`, async ({ page }) => {
+    await mockWorkspace(page, {
+      name: "Tabs",
+      sessions: [a],
+      seed: { settings: { appearance: { tabLayout: "vertical" } } },
+    })
+    await page.goto(
+      `/e2e/utils/macos-window.html?${new URLSearchParams({ server: SERVER, route: "/", fullscreen: String(fullscreen) })}`,
+    )
+    const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
+    const indicator = sidebar.locator('[data-slot="channel-indicator"]')
+    await expect(indicator).toBeVisible()
+
+    const icon = await indicator.boundingBox()
+    const toggle = await sidebar.getByRole("button", { name: "Toggle sidebar", exact: true }).boundingBox()
+
+    if (!icon || !toggle) throw new Error("sidebar header has no bounding boxes")
+    expect(icon.y + icon.height / 2).toBe(fullscreen ? toggle.y + toggle.height / 2 : 21)
+  })
+}
+
 test("vertical tab gaps hover and select the nearest row", async ({ page }) => {
   await mockWorkspace(page, {
     name: "Tabs",

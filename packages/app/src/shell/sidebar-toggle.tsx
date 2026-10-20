@@ -14,6 +14,8 @@ import { useSettings } from "@/settings/model"
 // end at 68px and center at 22px.
 export const macTrafficLightsBaseWidth = 74
 
+export const macTrafficLightsCenter = 21
+
 // Matches the horizontal titlebar, whose first control starts 16px past the traffic lights.
 const macTrafficLightsGap = 16
 
