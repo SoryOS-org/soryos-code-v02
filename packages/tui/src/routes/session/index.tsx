@@ -291,6 +291,14 @@ export function Session(props: {
   const [firstJump, setFirstJump] = createSignal<() => void>()
   const [synced, setSynced] = createSignal(false)
   const sessionTabs = useSessionTabs()
+  const [harnessTraceView, setHarnessTraceView] = createStore({
+    all: false,
+    overrides: {} as Record<string, boolean>,
+  })
+  const harnessTraceExpanded = (messageID: string) =>
+    harnessTraceView.overrides[messageID] ?? harnessTraceView.all
+  const setHarnessTracesExpanded = (expanded: boolean) =>
+    setHarnessTraceView({ all: expanded, overrides: {} })
   const [awayFromBottom, setAwayFromBottom] = createSignal(false)
   const [latestHovered, setLatestHovered] = createSignal(false)
   let ensureAllRowsPending: (() => void)[] | undefined
@@ -1070,6 +1078,21 @@ export function Session(props: {
       },
     },
     {
+      title: harnessTraceView.all ? "Collapse coding harness traces" : "Expand coding harness traces",
+      id: "session.toggle.harness_traces",
+      group: "Session",
+      run: () => {
+        const expanded = !harnessTraceView.all
+        setHarnessTracesExpanded(expanded)
+        toast.show({
+          message: expanded ? "Coding harness traces expanded" : "Coding harness traces collapsed",
+          variant: "info",
+          duration: 2000,
+        })
+        dialog.clear()
+      },
+    },
+    {
       title: `Verbosity: ${Locale.titlecase(verbosity())}`,
       id: "session.verbosity.cycle",
       group: "Session",
@@ -1343,6 +1366,11 @@ export function Session(props: {
       value={{
         anchors,
         groupExpanded,
+        harnessTraceExpanded,
+        setHarnessTraceExpanded: (messageID, expanded) =>
+          setHarnessTraceView("overrides", messageID, expanded),
+        harnessTracesExpanded: () => harnessTraceView.all,
+        setHarnessTracesExpanded,
         setGroupExpanded: (id, expanded, anchor) => {
           // A group that ends the transcript would open off screen while the reader follows the bottom.
           const last = rows.findLast((row) => row.type !== "assistant-footer" && row.type !== "turn-usage")
@@ -1972,6 +2000,12 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   const harnessCommand = () => stringValue(metadata()?.command)
   const harnessOutput = () => stringValue(metadata()?.output)
   const harnessExitCode = () => finiteNumber(metadata()?.exitCode)
+  const traceExpanded = () => ctx.harnessTraceExpanded(props.message.id)
+  const toggleTrace = () => {
+    if (renderer.getSelection()?.getSelectedText()) return
+    ctx.setHarnessTraceExpanded(props.message.id, !traceExpanded())
+  }
+  const traceSummary = () => text().split("\n", 1)[0] ?? ""
   const completion = () => source() === "subagent" || source() === "shell"
   const childID = () => (source() === "subagent" ? stringValue(metadata()?.childID) : undefined)
   const state = () => stringValue(metadata()?.state)
@@ -2056,38 +2090,72 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
           >
             <Switch>
               <Match when={harnessEvent() === "command"}>
-                <box paddingLeft={3}>
-                  <ShellDisplay
-                    command={harnessCommand()}
-                    status="completed"
-                    output={harnessOutput()}
-                    error={
-                      harnessExitCode() !== undefined && harnessExitCode() !== 0
-                        ? `Command exited with code ${harnessExitCode()}`
-                        : undefined
-                    }
-                  />
+                <box
+                  paddingLeft={3}
+                  onMouseOver={() => setHover(true)}
+                  onMouseOut={() => setHover(false)}
+                  onMouseUp={toggleTrace}
+                >
+                  <box flexDirection="row">
+                    <box width={INLINE_TOOL_ICON_WIDTH} flexShrink={0}>
+                      <text fg={hover() ? theme.text.base : theme.text.muted}>{traceExpanded() ? "−" : "+"}</text>
+                    </box>
+                    <text
+                      flexGrow={1}
+                      minWidth={0}
+                      wrapMode={traceExpanded() ? "word" : "none"}
+                      truncate={!traceExpanded()}
+                      fg={hover() ? theme.text.base : theme.text.muted}
+                    >
+                      $ {harnessCommand() ?? "Command"}
+                    </text>
+                  </box>
+                  <Show when={traceExpanded()}>
+                    <box paddingLeft={2} flexDirection="column">
+                      <Show when={harnessOutput()}>
+                        <text fg={theme.text.muted}>{stripAnsi(harnessOutput() ?? "").trim()}</text>
+                      </Show>
+                      <Show when={harnessExitCode() !== undefined}>
+                        <text
+                          fg={
+                            harnessExitCode() === 0 ? theme.text.muted : theme.text.feedback.error.base
+                          }
+                        >
+                          Exited with code {harnessExitCode()}
+                        </text>
+                      </Show>
+                    </box>
+                  </Show>
                 </box>
               </Match>
               <Match when={harnessEvent() === "reasoning"}>
-                <InlineToolRow icon="∴" color={theme.text.muted} pending="Thinking…" complete={true}>
-                  {text()}
-                </InlineToolRow>
+                <HarnessTraceDisclosure
+                  messageID={props.message.id}
+                  title="Thinking"
+                  detail={text()}
+                />
               </Match>
               <Match when={harnessEvent() === "file"}>
-                <InlineToolRow icon="←" color={theme.text.muted} pending="Changing files…" complete={true}>
-                  {text()}
-                </InlineToolRow>
+                <HarnessTraceDisclosure
+                  messageID={props.message.id}
+                  title={`File · ${traceSummary()}`}
+                  detail={text()}
+                />
               </Match>
               <Match when={harnessEvent() === "error"}>
-                <InlineToolRow icon="!" color={theme.text.feedback.error.base} pending="Failed" complete={true}>
-                  {text()}
-                </InlineToolRow>
+                <HarnessTraceDisclosure
+                  messageID={props.message.id}
+                  title={`Failed · ${traceSummary()}`}
+                  detail={text()}
+                  error
+                />
               </Match>
               <Match when={true}>
-                <InlineToolRow icon="·" color={theme.text.muted} pending="Working…" complete={true}>
-                  {text()}
-                </InlineToolRow>
+                <HarnessTraceDisclosure
+                  messageID={props.message.id}
+                  title={`${harnessEvent() === "tool" ? "Tool" : "Working"} · ${traceSummary()}`}
+                  detail={text()}
+                />
               </Match>
             </Switch>
           </Show>
@@ -2105,6 +2173,48 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
         </box>
       </Show>
     </Show>
+  )
+}
+
+function HarnessTraceDisclosure(props: {
+  messageID: string
+  title: string
+  detail: string
+  error?: boolean
+}) {
+  const ctx = use()
+  const theme = useTheme()
+  const renderer = useRenderer()
+  const [hover, setHover] = createSignal(false)
+  const expanded = () => ctx.harnessTraceExpanded(props.messageID)
+  const color = () => {
+    if (props.error) return theme.text.feedback.error.base
+    return hover() ? theme.text.base : theme.text.muted
+  }
+  return (
+    <box
+      paddingLeft={3}
+      onMouseOver={() => setHover(true)}
+      onMouseOut={() => setHover(false)}
+      onMouseUp={() => {
+        if (renderer.getSelection()?.getSelectedText()) return
+        ctx.setHarnessTraceExpanded(props.messageID, !expanded())
+      }}
+    >
+      <box flexDirection="row">
+        <box width={INLINE_TOOL_ICON_WIDTH} flexShrink={0}>
+          <text fg={color()}>{expanded() ? "−" : "+"}</text>
+        </box>
+        <text flexGrow={1} minWidth={0} wrapMode="none" truncate fg={color()}>
+          {props.title}
+        </text>
+      </box>
+      <Show when={expanded()}>
+        <box paddingLeft={2}>
+          <text fg={props.error ? theme.text.feedback.error.base : theme.text.muted}>{props.detail}</text>
+        </box>
+      </Show>
+    </box>
   )
 }
 

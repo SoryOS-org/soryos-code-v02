@@ -134,6 +134,7 @@ export const Definitions = {
   "queued_prompt.undo": keybind("ctrl+u", "Undo queued prompt"),
   "queued_prompt.delete": keybind("ctrl+d", "Delete queued prompt"),
   "session.toggle.exploration_grouping": keybind("none", "Toggle related tool call grouping"),
+  "session.toggle.harness_traces": keybind("<leader>h", "Expand or collapse coding harness traces"),
   "session.verbosity.cycle": keybind("none", "Cycle transcript verbosity"),
   "session.child.first": keybind("down", "Toggle subagent picker"),
   "session.child.next": keybind("right", "Go to next child session"),

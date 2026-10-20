@@ -24,6 +24,11 @@ export const context = createContext<{
   groupExpanded: (groupID: string, kind: GroupKind) => boolean
   /** An anchor keeps its viewport row through the layout change the toggle causes. */
   setGroupExpanded: (groupID: string, expanded: boolean, anchor?: Renderable | null) => void
+  /** Harness trace rows start collapsed and may be expanded individually or as a session. */
+  harnessTraceExpanded: (messageID: string) => boolean
+  setHarnessTraceExpanded: (messageID: string, expanded: boolean) => void
+  harnessTracesExpanded: () => boolean
+  setHarnessTracesExpanded: (expanded: boolean) => void
   thinkingMode: () => ThinkingMode
   markdownMode: () => "source" | "rendered"
   groupExploration: () => boolean

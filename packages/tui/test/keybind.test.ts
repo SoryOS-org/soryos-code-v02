@@ -5,3 +5,7 @@ test("binds agent cycling only to shift+tab by default", () => {
   expect(TuiKeybind.Definitions["agent.cycle"].default).toBe("shift+tab")
   expect(TuiKeybind.Definitions["agent.cycle.reverse"].default).toBe("none")
 })
+
+test("binds harness trace disclosure to leader h", () => {
+  expect(TuiKeybind.Definitions["session.toggle.harness_traces"].default).toBe("<leader>h")
+})
