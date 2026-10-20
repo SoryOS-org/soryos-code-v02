@@ -96,13 +96,12 @@ function omit(value: Record<string, unknown>, key: string) {
   return rest
 }
 
-// Result data now lives on the finished state; an unfinished tool had none to keep.
+// Result data now merges into the tool's single `native`, as projection does for current result events.
 function toolResult(value: Record<string, unknown>) {
   if (!("providerResultState" in value)) return value
   const { providerResultState, ...rest } = value
-  const state = rest.state
-  if (!isRecord(state) || (state.status !== "completed" && state.status !== "error") || "native" in state) return rest
-  return { ...rest, state: { ...state, native: providerResultState } }
+  if (!isRecord(providerResultState)) return rest
+  return { ...rest, native: { ...(isRecord(rest.native) ? rest.native : {}), ...providerResultState } }
 }
 
 // The current name wins when a payload carries both.

@@ -1009,9 +1009,9 @@ export function createData(config: CreateDataInput) {
             input: tool.state.input,
             metadata: event.data.metadata,
             content: [...event.data.content],
-            native: event.data.native,
           }
           tool.executed = event.data.executed || tool.executed === true
+          if (event.data.native) tool.native = { ...tool.native, ...event.data.native }
           tool.time.completed = event.created
         })
         return
@@ -1024,9 +1024,9 @@ export function createData(config: CreateDataInput) {
             input: typeof tool.state.input === "string" ? {} : tool.state.input,
             metadata: event.data.metadata,
             content: event.data.content,
-            native: event.data.native,
           }
           tool.executed = event.data.executed || tool.executed === true
+          if (event.data.native) tool.native = { ...tool.native, ...event.data.native }
           tool.time.completed = event.created
         })
         return

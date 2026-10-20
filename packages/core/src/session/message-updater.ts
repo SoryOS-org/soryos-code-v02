@@ -347,6 +347,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           const match = latestTool(draft, event.data.id)
           if (match && match.state.status === "running") {
             match.executed = event.data.executed || match.executed === true
+            if (event.data.native) match.native = { ...match.native, ...event.data.native }
             match.time.completed = created
             match.state = castDraft(
               SessionMessage.ToolStateCompleted.make({
@@ -354,7 +355,6 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
                 input: match.state.input,
                 content: event.data.content,
                 ...(event.data.metadata === undefined ? {} : { metadata: event.data.metadata }),
-                ...(event.data.native === undefined ? {} : { native: event.data.native }),
               }),
             )
           }
@@ -365,6 +365,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           const match = latestTool(draft, event.data.id)
           if (match && (match.state.status === "streaming" || match.state.status === "running")) {
             match.executed = event.data.executed || match.executed === true
+            if (event.data.native) match.native = { ...match.native, ...event.data.native }
             match.time.completed = created
             match.state = castDraft(
               SessionMessage.ToolStateError.make({
@@ -373,7 +374,6 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
                 input: typeof match.state.input === "string" ? {} : match.state.input,
                 ...(event.data.content === undefined ? {} : { content: event.data.content }),
                 ...(event.data.metadata === undefined ? {} : { metadata: event.data.metadata }),
-                ...(event.data.native === undefined ? {} : { native: event.data.native }),
               }),
             )
           }

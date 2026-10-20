@@ -18962,7 +18962,7 @@
             "type": "string"
           },
           "native": {
-            "$ref": "#/components/schemas/Session.Message.Native_5"
+            "$ref": "#/components/schemas/Session.Message.Native_3"
           },
           "cost": {
             "$ref": "#/components/schemas/Money.USD"
@@ -19147,7 +19147,7 @@
             "$ref": "#/components/schemas/Model.Ref"
           },
           "native": {
-            "$ref": "#/components/schemas/Session.Message.Native_6"
+            "$ref": "#/components/schemas/Session.Message.Native_4"
           },
           "summary": {
             "type": "string"
@@ -19426,12 +19426,6 @@
       "Session.Message.Native_4": {
         "type": "object"
       },
-      "Session.Message.Native_5": {
-        "type": "object"
-      },
-      "Session.Message.Native_6": {
-        "type": "object"
-      },
       "Session.Message.Shell": {
         "type": "object",
         "properties": {
@@ -19630,9 +19624,6 @@
           },
           "metadata": {
             "type": "object"
-          },
-          "native": {
-            "$ref": "#/components/schemas/Session.Message.Native_3"
           }
         },
         "required": ["status", "input", "content"],
@@ -19665,9 +19656,6 @@
           },
           "metadata": {
             "type": "object"
-          },
-          "native": {
-            "$ref": "#/components/schemas/Session.Message.Native_4"
           }
         },
         "required": ["status", "input", "error"],

@@ -1334,7 +1334,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
         id: event.data.id,
         name: part?.name ?? "tool",
         executed: event.data.executed,
-        native: part?.native,
+        native: event.data.native ? { ...part?.native, ...event.data.native } : part?.native,
         state: failed
           ? {
               status: "error",
@@ -1342,14 +1342,12 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
               metadata: event.data.metadata,
               content: event.data.content,
               error: event.data.error,
-              native: event.data.native,
             }
           : {
               status: "completed",
               input: part && part.state.status !== "streaming" ? part.state.input : {},
               metadata: event.data.metadata,
               content: event.data.content,
-              native: event.data.native,
             },
         time: { created: part?.time.created ?? event.created, ran: part?.time.ran, completed: event.created },
       }

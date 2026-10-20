@@ -15,7 +15,7 @@ const toolPart = {
   name: "search",
   providerState: native,
   providerResultState: result,
-  state: { status: "completed", input: {}, content: [{ type: "text", text: "done" }] },
+  state: { status: "streaming", input: "" },
   time: { created: 0 },
 }
 
@@ -64,7 +64,7 @@ describe("SessionLegacy", () => {
     ).toMatchObject({
       content: [
         { type: "text", native },
-        { type: "tool", native, state: { status: "completed", native: result } },
+        { type: "tool", native: { ...native, ...result }, state: { status: "streaming", input: "" } },
       ],
     })
   })
@@ -78,17 +78,26 @@ describe("SessionLegacy", () => {
     expect(SessionLegacy.message("user", user)).toBe(user)
   })
 
-  test("drops result native data from an unfinished tool", () => {
-    const running = { status: "running", input: {}, metadata: {} }
-    expect(SessionLegacy.message("assistant", { content: [{ ...toolPart, state: running }] }).content).toEqual([
-      { type: "tool", id: "call", name: "search", native, state: running, time: toolPart.time },
-    ])
-  })
-
   test("keeps the current name when a payload carries both", () => {
     expect(SessionLegacy.event("session.text.ended", { text: "hi", state: { old: true }, native })).toEqual({
       text: "hi",
       native,
+    })
+  })
+
+  test("merges legacy tool result data over call data without touching lifecycle state", () => {
+    expect(
+      SessionLegacy.message("assistant", {
+        content: [
+          {
+            ...toolPart,
+            native: { itemId: "shared", call: true },
+            providerResultState: { itemId: "shared", result: true },
+          },
+        ],
+      }),
+    ).toMatchObject({
+      content: [{ native: { itemId: "shared", call: true, result: true }, state: toolPart.state }],
     })
   })
 
@@ -101,8 +110,8 @@ describe("SessionLegacy", () => {
           type: "tool",
           id: "call",
           name: "search",
-          native,
-          state: { ...toolPart.state, native: result },
+          native: { ...native, ...result },
+          state: toolPart.state,
           time: toolPart.time,
         },
       ],

@@ -763,7 +763,6 @@ Earlier work
               type: "tool",
               id: "completed",
               name: "read",
-              native: { signature: "local-call" },
               state: SessionMessage.ToolStateCompleted.make({
                 status: "completed",
                 input: { path: "README.md" },
@@ -784,10 +783,9 @@ Earlier work
               id: "hosted",
               name: "web_search",
               executed: true,
-              native: { continuation: "hosted-call" },
+              native: { continuation: "hosted" },
               state: SessionMessage.ToolStateCompleted.make({
                 status: "completed",
-                native: { continuation: "hosted-result" },
                 input: { query: "Effect" },
                 content: [{ type: "text", text: "Found it" }],
               }),
@@ -824,7 +822,6 @@ Earlier work
         id: "completed",
         name: "read",
         input: { path: "README.md" },
-        providerMetadata: { provider: { signature: "local-call" } },
       },
       {
         type: "tool-call",
@@ -832,14 +829,14 @@ Earlier work
         name: "web_search",
         input: { query: "Effect" },
         providerExecuted: true,
-        providerMetadata: { provider: { continuation: "hosted-call" } },
+        providerMetadata: { provider: { continuation: "hosted" } },
       },
       {
         type: "tool-result",
         id: "hosted",
         name: "web_search",
         providerExecuted: true,
-        providerMetadata: { provider: { continuation: "hosted-result" } },
+        providerMetadata: { provider: { continuation: "hosted" } },
         result: { type: "text", value: "Found it" },
       },
       {
@@ -855,6 +852,7 @@ Earlier work
         id: "hosted-failed",
         name: "write",
         providerExecuted: true,
+        providerMetadata: { provider: { continuation: "failed" } },
         result: {
           type: "error",
           value: { error: { type: "unknown", message: "Denied" }, content: [] },
@@ -954,10 +952,9 @@ Earlier work
               id: "hosted-completed",
               name: "web_search",
               executed: true,
-              native: { itemId: "call_completed" },
+              native: { itemId: "hosted_completed" },
               state: SessionMessage.ToolStateCompleted.make({
                 status: "completed",
-                native: { itemId: "result_completed" },
                 input: { query: "Effect" },
                 content: [{ type: "text", text: '{"found":true}' }],
               }),
@@ -968,10 +965,9 @@ Earlier work
               id: "hosted-failed",
               name: "web_search",
               executed: true,
-              native: { itemId: "call_failed" },
+              native: { itemId: "hosted_failed" },
               state: SessionMessage.ToolStateError.make({
                 status: "error",
-                native: { itemId: "result_failed" },
                 input: { query: "Effect" },
                 error: { type: "unknown", message: "Step interrupted" },
               }),
@@ -994,7 +990,7 @@ Earlier work
         name: "web_search",
         input: { query: "Effect" },
         providerExecuted: true,
-        providerMetadata: { provider: { itemId: "call_completed" } },
+        providerMetadata: { provider: { itemId: "hosted_completed" } },
       },
       {
         type: "tool-result",
@@ -1004,7 +1000,7 @@ Earlier work
         providerExecuted: true,
         cache: undefined,
         metadata: undefined,
-        providerMetadata: { provider: { itemId: "result_completed" } },
+        providerMetadata: { provider: { itemId: "hosted_completed" } },
       },
       {
         type: "tool-call",
@@ -1012,7 +1008,7 @@ Earlier work
         name: "web_search",
         input: { query: "Effect" },
         providerExecuted: true,
-        providerMetadata: { provider: { itemId: "call_failed" } },
+        providerMetadata: { provider: { itemId: "hosted_failed" } },
       },
       {
         type: "tool-result",
@@ -1028,7 +1024,7 @@ Earlier work
         providerExecuted: true,
         cache: undefined,
         metadata: undefined,
-        providerMetadata: { provider: { itemId: "result_failed" } },
+        providerMetadata: { provider: { itemId: "hosted_failed" } },
       },
     ])
   })
@@ -1083,10 +1079,9 @@ Earlier work
               id: "hosted-old-model",
               name: "web_search",
               executed: true,
-              native: { itemId: "hosted-old-model" },
+              native: { itemId: "hosted-old-model", result: { signature: "result-sig" } },
               state: SessionMessage.ToolStateCompleted.make({
                 status: "completed",
-                native: { itemId: "hosted-old-model" },
                 input: { query: "Effect" },
                 content: [{ type: "text", text: '{"status":"completed"}' }],
               }),
@@ -1100,7 +1095,6 @@ Earlier work
               native: { call: "old" },
               state: SessionMessage.ToolStateCompleted.make({
                 status: "completed",
-                native: { result: "old" },
                 input: { path: "README.md" },
                 content: [{ type: "text", text: "Hello" }],
               }),
@@ -1133,7 +1127,7 @@ Earlier work
         metadata: undefined,
         // Hosted result payloads are provider-format state and must survive a
         // model switch within the same provider for replay to stay valid.
-        providerMetadata: { provider: { itemId: "hosted-old-model" } },
+        providerMetadata: { provider: { itemId: "hosted-old-model", result: { signature: "result-sig" } } },
       },
       {
         type: "tool-call",
