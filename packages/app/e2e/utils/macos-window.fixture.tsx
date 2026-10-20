@@ -44,6 +44,10 @@ export function mount(input: { server: string; route: string; fullscreen: boolea
       os: "macos",
       windowID: "macos-window-test",
       windowFullscreen: () => input.fullscreen,
+      // Records where the app asks for the native buttons, which this page does not draw.
+      setTrafficLightsCenter: (center) => {
+        document.documentElement.dataset.trafficLightsCenter = String(center)
+      },
       openExternal: () => undefined,
       openDirectoryPickerDialog: async () => null,
       notify: async () => undefined,

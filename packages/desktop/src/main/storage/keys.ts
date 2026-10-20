@@ -6,6 +6,8 @@ export const PINCH_ZOOM_ENABLED_KEY = "pinchZoomEnabled"
 
 export const BACKGROUND_COLOR_KEY = "backgroundColor"
 
+export const TRAFFIC_LIGHTS_CENTER_KEY = "trafficLightsCenter"
+
 export const WINDOW_IDS_KEY = "windowIds"
 
 export const BUNDLED_CLI_VERSION_KEY = "bundledCliVersion"

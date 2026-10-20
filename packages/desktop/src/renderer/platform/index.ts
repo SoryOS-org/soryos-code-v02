@@ -38,6 +38,7 @@ export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWind
     windowFullscreen,
     getPinchZoomEnabled: () => api.getPinchZoomEnabled(),
     setPinchZoomEnabled,
+    setTrafficLightsCenter: (center) => api.setTrafficLightsCenter(center),
     onDragCancel: (callback) => {
       window.addEventListener(DragCancelEvent, callback)
 

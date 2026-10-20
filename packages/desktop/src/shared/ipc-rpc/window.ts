@@ -34,6 +34,11 @@ export const WindowSetTitlebar = Rpc.make("WindowSetTitlebar", {
   },
 })
 
+// CSS pixels from the window top where the macOS window buttons should be centered.
+export const WindowSetTrafficLightsCenter = Rpc.make("WindowSetTrafficLightsCenter", {
+  payload: { center: Schema.Number },
+})
+
 export const WindowRpcs = RpcGroup.make(
   WindowThemeReady,
   WindowGetFocused,
@@ -45,4 +50,5 @@ export const WindowRpcs = RpcGroup.make(
   WindowGetPinchZoomEnabled,
   WindowSetPinchZoomEnabled,
   WindowSetTitlebar,
+  WindowSetTrafficLightsCenter,
 )

@@ -4,13 +4,15 @@ import { type TitlebarTheme } from "../../shared/ipc-contract"
 import { WindowFullscreenChanged, WindowPinchZoomChanged, WindowZoomChanged } from "../../shared/ipc-rpc/events"
 import { emitIpcEvent } from "../ipc-events"
 import type { DesktopPaths } from "../paths"
-import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY } from "../storage/keys"
+import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY, TRAFFIC_LIGHTS_CENTER_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
-import { storedBackgroundColor, titlebarOverlay, tone } from "./defaults"
+import { storedBackgroundColor, titlebarOverlay, tone, trafficLightPosition } from "./defaults"
 
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
 
 const pinchZoomEnabled = new WeakMap<BrowserWindow, boolean>()
+
+const trafficLightsCenters = new WeakMap<BrowserWindow, number>()
 
 const maxZoomLevel = 10
 
@@ -28,7 +30,7 @@ export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) 
     ...(process.platform === "darwin"
       ? {
           titleBarStyle: "hidden" as const,
-          trafficLightPosition: { x: 14, y: 14 },
+          trafficLightPosition: trafficLightPosition(),
         }
       : {}),
     ...(process.platform === "win32"
@@ -83,9 +85,23 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   updateTitlebar(win)
 }
 
+export function setTrafficLightsCenter(win: BrowserWindow, center: number) {
+  trafficLightsCenters.set(win, center)
+
+  if (getStore().get(TRAFFIC_LIGHTS_CENTER_KEY) !== center) getStore().set(TRAFFIC_LIGHTS_CENTER_KEY, center)
+  updateTitlebar(win)
+}
+
 export function updateTitlebar(win: BrowserWindow) {
-  if (process.platform !== "win32") return
-  win.setTitleBarOverlay(overlay(titlebarThemes.get(win), win.webContents.getZoomFactor()))
+  const zoom = win.webContents.getZoomFactor()
+  const center = trafficLightsCenters.get(win)
+
+  // The buttons are native, so they follow the zoomed chrome they line up with.
+  if (process.platform === "darwin" && center !== undefined) {
+    win.setWindowButtonPosition(trafficLightPosition(center, zoom))
+  }
+
+  if (process.platform === "win32") win.setTitleBarOverlay(overlay(titlebarThemes.get(win), zoom))
 }
 
 export function setPinchZoomEnabled(enabled: boolean) {

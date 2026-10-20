@@ -9,12 +9,13 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
 
-// The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`. macOS 26 and later draw 14px buttons on a 23px
-// pitch, so the zoom button ends 74px from the window edge and the buttons center 21px from the top. macOS 15 and earlier
-// end at 68px and center at 22px.
+// The desktop window places the traffic lights 14px from its left edge. macOS 26 and later draw 14px buttons on a 23px
+// pitch, so the zoom button ends 74px from the window edge. macOS 15 and earlier end at 68px.
 export const macTrafficLightsBaseWidth = 74
 
-export const macTrafficLightsCenter = 21
+// Where the traffic lights are centered, in CSS pixels from the window top: on the horizontal titlebar's controls, or
+// with vertical tabs on the sidebar toggle, which sits on the session header's 48px row below the shell's 8px inset.
+export const macTrafficLightsCenter = { horizontal: 21, vertical: 32 }
 
 // Matches the horizontal titlebar, whose first control starts 16px past the traffic lights.
 const macTrafficLightsGap = 16

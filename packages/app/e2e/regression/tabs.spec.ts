@@ -463,13 +463,13 @@ for (const [window, fullscreen, start] of [
   })
 }
 
-// macOS 26 traffic lights center 21px from the window top. The channel icon beside them shares their center line, and
-// without them it shares the sidebar toggle's.
+// With vertical tabs the traffic lights move down onto the sidebar toggle's center line, and the channel icon moves
+// below them, over Home's icon. A fullscreen window has no traffic lights, so the icon stays beside the toggle.
 for (const [window, fullscreen] of [
   ["windowed", false],
   ["fullscreen", true],
 ] as const) {
-  test(`sidebar channel icon lines up with the macOS traffic lights (${window})`, async ({ page }) => {
+  test(`vertical tabs line the sidebar header up with the macOS traffic lights (${window})`, async ({ page }) => {
     await mockWorkspace(page, {
       name: "Tabs",
       sessions: [a],
@@ -481,14 +481,39 @@ for (const [window, fullscreen] of [
     const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
     const indicator = sidebar.locator('[data-slot="channel-indicator"]')
     await expect(indicator).toBeVisible()
+    await expect(page.locator("html")).toHaveAttribute("data-traffic-lights-center", "32")
 
     const icon = await indicator.boundingBox()
     const toggle = await sidebar.getByRole("button", { name: "Toggle sidebar", exact: true }).boundingBox()
+    const home = await sidebar.getByRole("button", { name: "Home", exact: true }).boundingBox()
+    const homeIcon = await sidebar.getByRole("button", { name: "Home", exact: true }).locator("svg").boundingBox()
 
-    if (!icon || !toggle) throw new Error("sidebar header has no bounding boxes")
-    expect(icon.y + icon.height / 2).toBe(fullscreen ? toggle.y + toggle.height / 2 : 21)
+    if (!icon || !toggle || !home || !homeIcon) throw new Error("sidebar header has no bounding boxes")
+    expect(toggle.y + toggle.height / 2).toBe(32)
+
+    if (fullscreen) {
+      expect(icon.y + icon.height / 2).toBe(toggle.y + toggle.height / 2)
+      return
+    }
+
+    // Clear of the 14px buttons, centered over Home's icon, and above Home.
+    expect(icon.y).toBeGreaterThan(32 + 7)
+    expect(icon.x + icon.width / 2).toBe(homeIcon.x + homeIcon.width / 2)
+    expect(icon.y + icon.height).toBeLessThan(home.y)
   })
 }
+
+test("horizontal tabs keep the macOS traffic lights on the titlebar", async ({ page }) => {
+  await mockWorkspace(page, {
+    name: "Tabs",
+    sessions: [a],
+    seed: { settings: { appearance: { tabLayout: "horizontal" } } },
+  })
+  await page.goto(
+    `/e2e/utils/macos-window.html?${new URLSearchParams({ server: SERVER, route: "/", fullscreen: "false" })}`,
+  )
+  await expect(page.locator("html")).toHaveAttribute("data-traffic-lights-center", "21")
+})
 
 test("vertical tab gaps hover and select the nearest row", async ({ page }) => {
   await mockWorkspace(page, {
