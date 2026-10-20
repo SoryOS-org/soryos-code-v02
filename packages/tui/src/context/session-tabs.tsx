@@ -437,7 +437,7 @@ export const { use: useSessionTabs, provider: SessionTabsProvider } = createSimp
             config.session.new_location,
             data.location.default().directory,
             currentLocation,
-            location.error?.location,
+            location.missing,
           ),
         })
       },

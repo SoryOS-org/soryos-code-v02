@@ -25,7 +25,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       location: {
         ...data.location,
         async sync(ref?: LocationRef) {
-          await data.location.syncInfo(ref)
+          // The client reads the location before its resources, so the location is not read twice.
           await Promise.all([data.location.sync(ref), data.location.config.sync(ref)])
         },
       },

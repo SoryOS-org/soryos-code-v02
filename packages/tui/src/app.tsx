@@ -766,7 +766,7 @@ function App() {
               config.data.session.new_location,
               data.location.default().directory,
               current,
-              location.error?.location,
+              location.missing,
             ),
           })
           if (agent) local.agent.set(agent.id)
@@ -793,7 +793,7 @@ function App() {
               config.data.session.new_location,
               data.location.default().directory,
               current,
-              location.error?.location,
+              location.missing,
             ),
           })
           if (agent) local.agent.set(agent.id)

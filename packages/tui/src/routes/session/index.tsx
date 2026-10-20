@@ -116,6 +116,7 @@ import { findMessageBoundary, messageNavigationSlack } from "./message-navigatio
 import { stringWidth } from "../../util/string-width"
 import { useArgs } from "../../context/args"
 import { withTimestampedFallback } from "@opencode/util/session-title-fallback"
+import { sameDirectory } from "@opencode/util/path"
 import { useSessionTabs, type ScrollAnchor } from "../../context/session-tabs"
 import { createSingleFlight } from "../../util/single-flight"
 import { createDelayedPresence } from "../../util/delayed-presence"
@@ -1510,7 +1511,8 @@ export function Session(props: {
                 <Match
                   when={
                     session() &&
-                    currentLocation.error?.location.directory === session()!.location.directory
+                    currentLocation.missing &&
+                    sameDirectory(currentLocation.missing.directory, session()!.location.directory)
                   }
                 >
                   <SessionLocationMissing
