@@ -82,19 +82,14 @@ export const Plugin = {
               // After a successful read, discover nearby AGENTS.md walking up to the Location
               // root exclusive and inject them as durable synthetic instructions. For a
               // directory listing the walk starts at the directory itself (so its own AGENTS.md
-              // is discovered); for a file it starts at the file's dirname. External reads are
-              // skipped, and discovery failures never fail the read.
+              // is discovered); for a file it starts at the file's dirname. Reads outside the
+              // Location are skipped, and discovery failures never fail the read.
               yield* Effect.gen(function* () {
                 if (result.target.externalDirectory !== undefined) return
                 const resolved = yield* fs.resolve(result.target.absolute)
                 const root = yield* fs.resolve(location.directory)
-                // The walk below is bounded by the workspace root. A target outside
-                // it (for example a sibling project) never reaches the stop path, so
-                // the walk would run to the filesystem root and inject instructions
-                // from unrelated directories.
                 if (!FSUtil.contains(root, resolved)) return
-                // The Location and its ancestors are already supplied by initial instructions,
-                // even when an upward walk from elsewhere in the project cannot reach root.
+                // The Location and its ancestors are already supplied by initial instructions.
                 const discovered = yield* fs.up({
                   targets: [FILENAME],
                   start: result.content.type === "list-page" ? resolved : dirname(resolved),
