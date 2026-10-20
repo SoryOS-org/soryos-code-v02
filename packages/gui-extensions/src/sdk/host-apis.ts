@@ -957,7 +957,7 @@ export interface Appearance {
   /**
    * The CSS font family the user chose; the default mono font before the app interface mounts. Reactive.
    *
-   * @param kind - `mono`, the terminal and code font.
+   * @param kind - `mono`, the terminal font.
    */
   font(kind: "mono"): string
 }

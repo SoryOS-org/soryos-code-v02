@@ -796,11 +796,16 @@ export const Terminal = (props: TerminalProps) => {
       dir="ltr"
       data-prevent-autofocus
       tabIndex={-1}
-      style={{ "background-color": terminalColors().background, "caret-color": "transparent", opacity: 0 }}
+      style={{
+        "background-color": terminalColors().background,
+        "caret-color": "transparent",
+        "font-family": appearance.font("mono"),
+        opacity: 0,
+      }}
       classList={{
         ...local.classList,
         "select-text": true,
-        "size-full px-6 py-3 font-mono relative overflow-hidden": true,
+        "size-full px-6 py-3 relative overflow-hidden": true,
         [local.class ?? ""]: !!local.class,
       }}
       {...others}

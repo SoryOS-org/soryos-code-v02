@@ -130,7 +130,7 @@ export function SessionActivityChips(props: {
                     {(item) => (
                       <Menu.Item {...row(item)}>
                         <Icon name="console" class="shrink-0 text-v2-icon-icon-muted" />
-                        <span dir="ltr" class="min-w-0 flex-1 truncate font-mono text-[12px] text-v2-text-text-base">
+                        <span dir="ltr" class="min-w-0 flex-1 truncate font-mono text-[13px] tracking-[-0.04px] text-v2-text-text-base">
                           {item.label}
                         </span>
                         {stop(item)}
