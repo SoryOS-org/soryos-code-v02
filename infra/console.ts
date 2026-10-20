@@ -1,19 +1,6 @@
 import { domain } from "./stage"
 import { EMAILOCTOPUS_API_KEY } from "./app"
 
-// Preview stages have no new Console deployment to forward to.
-const migrationDomain =
-  $app.stage === "production" ? "opencode.ai" : $app.stage === "dev" ? "dev.opencode.ai" : undefined
-const consoleMigration = new sst.Linkable("ConsoleMigration", {
-  properties: {
-    consoleUrl: migrationDomain ? `https://${migrationDomain}/console` : "",
-  },
-})
-
-////////////////
-// CONSOLE
-////////////////
-
 // Archived Zen request/response dumps (writer removed May 2026). Retained on purpose; nothing reads or writes them.
 new sst.cloudflare.Bucket("ZenData")
 new sst.cloudflare.Bucket("ZenDataNew")
@@ -36,7 +23,6 @@ new sst.cloudflare.x.SolidStart("Console", {
   domain,
   path: "packages/console/app",
   link: [
-    consoleMigration,
     EMAILOCTOPUS_API_KEY,
     AWS_SES_ACCESS_KEY_ID,
     AWS_SES_SECRET_ACCESS_KEY,
