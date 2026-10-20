@@ -1003,6 +1003,62 @@ describe("Set", () => {
 })
 
 describe("Uint8Array", () => {
+  test("from maps original iterable values before converting them to bytes", async () => {
+    expect(
+      await value(`
+        return [
+          [...Uint8Array.from([300, 2], (value, index) => value / 2 + index)],
+          [...Uint8Array.from(new Set([300, 2]), (value, index) => value / 2 + index)],
+          [...Uint8Array.from(new Uint8Array([2, 3]), (value, index) => value + 255 + index)],
+          [...Uint8Array.from([300, 2], undefined)],
+        ]
+      `),
+    ).toEqual([
+      [150, 2],
+      [150, 2],
+      [1, 3],
+      [44, 2],
+    ])
+  })
+
+  test("from passes thisArg, the original value and the index to its mapper", async () => {
+    expect(
+      await value(`
+        return [...Uint8Array.from([1, 2], function(value, index) {
+          return value + index + this.offset
+        }, { offset: 5 })]
+      `),
+    ).toEqual([6, 8])
+  })
+
+  test("from rejects a non-callable mapper even for an empty iterable", async () => {
+    for (const mapper of ["42", "null", "{}"]) {
+      expect((await error(`return [...Uint8Array.from([], ${mapper})]`)).message).toContain("TypeError")
+    }
+  })
+
+  test("from consumes the iterable before mapping and propagates mapper errors", async () => {
+    expect(
+      await value(`
+        const events = []
+        function* source() {
+          events.push("start")
+          yield 300
+          events.push("end")
+        }
+        try {
+          Uint8Array.from(source(), () => {
+            events.push("map")
+            throw new Error("mapper failed")
+          })
+        } catch (error) {
+          events.push(error.message)
+        }
+        return events
+      `),
+    ).toEqual(["start", "end", "map", "mapper failed"])
+  })
+
   test("constructs from a length, an array, an iterable, or another Uint8Array", async () => {
     expect(
       await value(`
