@@ -4,6 +4,7 @@ import {
   connectionSummary,
   connectMethods,
   credentialConnections,
+  goConnectionSource,
   integrationOptions,
 } from "../../../../src/component/dialog-integration"
 
@@ -24,7 +25,7 @@ describe("integrationOptions", () => {
         integration({ id: "opencode", name: "OpenCode Zen" }),
         integration({ id: "opencode-go", name: "OpenCode Go" }),
       ]).map((item) => item.id),
-    ).toEqual(["opencode-go", "opencode", "openai", "anthropic", "mistral", "custom-z"])
+    ).toEqual(["opencode", "opencode-go", "openai", "anthropic", "mistral", "custom-z"])
   })
 
   test("keeps MCP integrations above popular integrations without relying on their IDs", () => {
@@ -36,7 +37,7 @@ describe("integrationOptions", () => {
         integration({ id: "opencode", name: "OpenCode Zen" }),
         integration({ id: "opencode-go", name: "OpenCode Go" }),
       ]).map((item) => item.id),
-    ).toEqual(["github", "linear", "opencode-go", "opencode", "openai"])
+    ).toEqual(["github", "linear", "opencode", "opencode-go", "openai"])
   })
 })
 
@@ -89,5 +90,31 @@ describe("connectionSummary", () => {
         }),
       ),
     ).toBe("2 connections")
+  })
+})
+
+describe("goConnectionSource", () => {
+  test("shows whether OpenCode Go uses a dedicated Go API key or the shared OpenCode account", () => {
+    const consoleAccount = integration({
+      id: "opencode",
+      name: "OpenCode Console",
+      connections: [{ type: "credential", method: "oauth", id: "cred_alpha", label: "Alpha" }],
+    })
+    const goWithKey = integration({
+      id: "opencode-go",
+      name: "OpenCode Go",
+      methods: [
+        { type: "oauth", id: "device", integrationID: "opencode", label: "Sign in with your OpenCode account" },
+        { type: "key", label: "Use an API key" },
+      ],
+      connections: [{ type: "credential", method: "key", id: "cred_go", label: "OpenCode Go" }],
+    })
+    const goWithAccount = integration({
+      ...goWithKey,
+      connections: [{ type: "credential", method: "oauth", id: "cred_alpha", label: "Alpha" }],
+    })
+
+    expect(goConnectionSource(goWithKey, [consoleAccount, goWithKey])).toBe("Using your Go API key")
+    expect(goConnectionSource(goWithAccount, [consoleAccount, goWithAccount])).toBe("Using your OpenCode account")
   })
 })

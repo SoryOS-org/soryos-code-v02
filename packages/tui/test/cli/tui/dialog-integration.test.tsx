@@ -247,6 +247,215 @@ test("uses the active location for integration data without scoping credential r
   }
 })
 
+test("lists OpenCode Console above OpenCode Go, whose sign-in comes before an API key", async () => {
+  const events = createEventStream()
+  const oauth: unknown[] = []
+  const calls = createFetch(async (url, request) => {
+    const directory = process.cwd()
+    const location = { directory, project: { id: "proj_test", directory, canonical: directory } }
+    if (url.pathname === "/api/integration")
+      return json({
+        location,
+        data: [
+          {
+            id: "opencode-go",
+            name: "OpenCode Go",
+            methods: [
+              { type: "key", label: "Use an API key" },
+              {
+                type: "oauth",
+                id: "device",
+                integrationID: "opencode",
+                label: "Sign in with your OpenCode account",
+              },
+            ],
+            connections: [],
+          },
+          {
+            id: "opencode",
+            name: "OpenCode Console",
+            methods: [{ type: "oauth", id: "device", label: "Sign in with your OpenCode account" }],
+            connections: [],
+          },
+          { id: "anthropic", name: "Anthropic", methods: [{ type: "key", label: "API key" }], connections: [] },
+        ],
+      })
+    if (url.pathname === "/api/integration/opencode-go/connect/oauth" && request.method === "POST") {
+      oauth.push(await request.json())
+      return json({
+        location,
+        data: {
+          attemptID: "attempt_go",
+          mode: "auto",
+          url: "https://opencode.ai/console/device?user_code=ABCD-EFGH",
+          instructions: "Enter code: ABCD-EFGH",
+        },
+      })
+    }
+    if (url.pathname === "/api/integration/opencode-go/connect/oauth/attempt_go") {
+      if (request.method === "DELETE") return new Response(null, { status: 204 })
+      return json({ location, data: { status: "pending" } })
+    }
+    if (url.pathname === "/api/model" || url.pathname === "/api/provider") return json({ location, data: [] })
+    return undefined
+  }, events)
+
+  function Probe() {
+    const data = useData()
+    const dialog = useDialog()
+    onMount(() => void data.location.integration.sync().then(() => dialog.replace(() => <DialogIntegration />)))
+    return null
+  }
+
+  const app = await testRender(
+    () => (
+      <TestTuiContexts>
+        <ConfigProvider config={createTuiResolvedConfig()}>
+          <Keymap.Provider>
+            <ToastProvider>
+              <ClientProvider api={createApi(calls.fetch)}>
+                <DataProvider directory={process.cwd()}>
+                  <LocationProvider>
+                    <ThemeProvider mode="dark" source={emptyThemeSource}>
+                      <DialogProvider>
+                        <Probe />
+                      </DialogProvider>
+                    </ThemeProvider>
+                  </LocationProvider>
+                </DataProvider>
+              </ClientProvider>
+            </ToastProvider>
+          </Keymap.Provider>
+        </ConfigProvider>
+      </TestTuiContexts>
+    ),
+    { width: 100, height: 30, kittyKeyboard: true },
+  )
+
+  try {
+    app.renderer.start()
+    await app.waitForFrame((frame) => frame.includes("Anthropic"))
+    const frame = app.captureCharFrame()
+    expect(frame.indexOf("OpenCode Console")).toBeLessThan(frame.indexOf("OpenCode Go"))
+
+    app.mockInput.pressArrow("down")
+    app.mockInput.pressEnter()
+    await app.waitForFrame((frame) => frame.includes("Sign in with your OpenCode account"))
+    const methods = app.captureCharFrame()
+    expect(methods).toContain("Connect OpenCode Go")
+    expect(methods.indexOf("Sign in with your OpenCode account")).toBeLessThan(methods.indexOf("Use an API key"))
+
+    app.mockInput.pressEnter()
+    await app.waitForFrame((frame) => frame.includes("ABCD-EFGH"))
+    expect(oauth).toEqual([{ methodID: "device" }])
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("shows Using your Go API key on the Go row and hands Go back to the OpenCode account when the Go key is removed", async () => {
+  const events = createEventStream()
+  let hasGoKey = true
+  const removed: string[] = []
+  const calls = createFetch(async (url, request) => {
+    const directory = process.cwd()
+    const location = { directory, project: { id: "proj_test", directory, canonical: directory } }
+    if (url.pathname === "/api/integration")
+      return json({
+        location,
+        data: [
+          {
+            id: "opencode",
+            name: "OpenCode Console",
+            methods: [{ type: "oauth", id: "device", label: "Sign in with your OpenCode account" }],
+            connections: [{ type: "credential", method: "oauth", id: "cred_alpha", label: "Alpha" }],
+          },
+          {
+            id: "opencode-go",
+            name: "OpenCode Go",
+            methods: [
+              {
+                type: "oauth",
+                id: "device",
+                integrationID: "opencode",
+                label: "Sign in with your OpenCode account",
+              },
+              { type: "key", label: "Use an API key" },
+            ],
+            connections: hasGoKey
+              ? [{ type: "credential", method: "key", id: "cred_go", label: "Go key" }]
+              : [{ type: "credential", method: "oauth", id: "cred_alpha", label: "Alpha" }],
+          },
+        ],
+      })
+    if (url.pathname === "/api/credential/cred_go" && request.method === "DELETE") {
+      removed.push("cred_go")
+      hasGoKey = false
+      events.emit({ id: "evt_deleted_go", created: Date.now(), type: "credential.updated", data: {} })
+      events.emit({
+        id: "evt_switched_go",
+        created: Date.now(),
+        type: "credential.switched",
+        data: { integrationID: "opencode-go", credentialID: "cred_alpha" },
+      })
+      return new Response(null, { status: 204 })
+    }
+    if (url.pathname === "/api/model" || url.pathname === "/api/provider") return json({ location, data: [] })
+    return undefined
+  }, events)
+
+  function Probe() {
+    const data = useData()
+    const dialog = useDialog()
+    onMount(() => void data.location.integration.sync().then(() => dialog.replace(() => <DialogIntegration />)))
+    return null
+  }
+
+  const app = await testRender(
+    () => (
+      <TestTuiContexts>
+        <ConfigProvider config={createTuiResolvedConfig()}>
+          <Keymap.Provider>
+            <ToastProvider>
+              <ClientProvider api={createApi(calls.fetch)}>
+                <DataProvider directory={process.cwd()}>
+                  <LocationProvider>
+                    <ThemeProvider mode="dark" source={emptyThemeSource}>
+                      <DialogProvider>
+                        <Probe />
+                      </DialogProvider>
+                    </ThemeProvider>
+                  </LocationProvider>
+                </DataProvider>
+              </ClientProvider>
+            </ToastProvider>
+          </Keymap.Provider>
+        </ConfigProvider>
+      </TestTuiContexts>
+    ),
+    { width: 100, height: 30, kittyKeyboard: true },
+  )
+
+  try {
+    app.renderer.start()
+    await app.waitForFrame((frame) => frame.includes("Using your Go API key"))
+    expect(app.captureCharFrame()).toContain("Using your Go API key")
+
+    // Open OpenCode Go -> move to Go key -> delete (ctrl+d twice) -> hands back to OpenCode account.
+    app.mockInput.pressArrow("down")
+    app.mockInput.pressEnter()
+    await app.waitForFrame((frame) => frame.includes("Connected accounts"))
+    app.mockInput.pressArrow("down")
+    app.mockInput.pressKey("d", { ctrl: true })
+    await app.waitForFrame((frame) => frame.includes("again to confirm"))
+    app.mockInput.pressKey("d", { ctrl: true })
+    await app.waitForFrame((frame) => frame.includes("Using your OpenCode account") && frame.includes("Alpha"))
+    expect(removed).toEqual(["cred_go"])
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
 async function renderIntegration(activeLocation?: LocationRef, form?: FormFields) {
   const events = createEventStream()
   const requests: Array<{ method: string; path: string; body?: unknown }> = []
