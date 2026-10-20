@@ -111,6 +111,11 @@ describe("command keybinds", () => {
     { config: "mod+alt+[", event: { key: "[", ctrlKey: true, altKey: true }, match: true },
     { config: "mod+alt+]", event: { key: "]", ctrlKey: true, altKey: true }, match: true },
     { config: "mod+alt+[", event: { key: "[", metaKey: true, altKey: true }, match: false },
+    // ⇧[ types { on US layouts; Dvorak's slash on the physical bracket stays a slash; Russian's х falls back to it.
+    { config: "mod+shift+[", event: { key: "{", code: "BracketLeft", ctrlKey: true, shiftKey: true }, match: true },
+    { config: "mod+shift+]", event: { key: "}", code: "Equal", ctrlKey: true, shiftKey: true }, match: true },
+    { config: "mod+shift+[", event: { key: "?", code: "BracketLeft", ctrlKey: true, shiftKey: true }, match: false },
+    { config: "mod+shift+[", event: { key: "Х", code: "BracketLeft", ctrlKey: true, shiftKey: true }, match: true },
     // macOS Option turns L into ¬; the physical key still matches.
     { config: "meta+alt+l", event: { key: "¬", code: "KeyL", metaKey: true, altKey: true }, match: true },
   ])("matchKeybind $config with $event.key is $match", (row) => {

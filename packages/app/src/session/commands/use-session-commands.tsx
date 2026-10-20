@@ -17,7 +17,7 @@ import type { SessionModel } from "@/session/model"
 import type { SessionRevert } from "@/session/revert"
 import { useExtensionScoped } from "@/runtime/extension/commands"
 import type { Region } from "@/runtime/extension/panels"
-import { createSideFocus, sideTabNumbers } from "@/runtime/extension/closed-tabs"
+import { createSideFocus, sideTabShortcuts } from "@/runtime/extension/closed-tabs"
 
 type SessionCommandSource = {
   identity: SessionModel["identity"]
@@ -431,7 +431,12 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
           onSelect: () => selectAdjacentSideTab(1),
         }),
       ...(actions.session.layout.view().side.opened()
-        ? sideTabNumbers({ keys: actions.region.keys, select: selectSideTab, when: inSide }).map(fileCommand)
+        ? sideTabShortcuts({
+            keys: actions.region.keys,
+            active: actions.region.active,
+            select: selectSideTab,
+            when: inSide,
+          }).map(fileCommand)
         : []),
     ].filter((v) => !!v)
   }

@@ -15,9 +15,9 @@ export type PageShortcut = {
 const shellKeys = ["t", "w", "n", "1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "\\"]
 
 // Shifted chords with the platform's modifier that belong to the app shell rather than the page: reopening a tab,
-// toggling the side panel, opening the command palette, or running session commands. New Window and Close Window
+// switching side-panel tabs, toggling the side panel, opening the command palette, or running session commands. New Window and Close Window
 // (⇧⌘N, ⇧⌘W) stay unclaimed: only their menu accelerators handle them, and claiming a chord also blocks the menu.
-const shellShiftKeys = ["t", "r", "p", "l", "e", "o", "s"]
+const shellShiftKeys = ["t", "[", "]", "r", "p", "l", "e", "o", "s"]
 
 /**
  * The letter a page key press names, as the app's keybinds read it: the layout's character, so Dvorak's C is "c"
@@ -25,6 +25,12 @@ const shellShiftKeys = ["t", "r", "p", "l", "e", "o", "s"]
  */
 export function pageLetter(input: Pick<Electron.Input, "key" | "code">) {
   const key = input.key.toLowerCase()
+
+  // ⇧[ types { on US layouts; a layout that types no ASCII on the bracket keys falls back to them.
+  if (key === "{" || key === "}") return key === "{" ? "[" : "]"
+
+  if (/^[^\x00-\x7f]$/u.test(key) && /^Bracket(Left|Right)$/.test(input.code))
+    return input.code === "BracketLeft" ? "[" : "]"
 
   if (/^[a-z]$/.test(key) || !/^Key[A-Z]$/.test(input.code)) return key
 
@@ -52,7 +58,7 @@ export function pageShortcut(input: PageKey, mac: boolean): PageShortcut | undef
   if (!matched) return undefined
 
   return {
-    key: /^[a-z]$/.test(key) ? key : input.key,
+    key: /^[a-z[\]]$/.test(key) ? key : input.key,
     code: input.code,
     ctrl: input.control,
     meta: input.meta,

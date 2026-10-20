@@ -93,7 +93,7 @@ story.beforeEach(async ({ mount, page }) => {
         reopenSession: () => void
         reopenSide: () => void
         switchSession: () => void
-        side: () => { keys: () => readonly string[]; select: (key: string) => void } | undefined
+        side: () => { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void } | undefined
         shortcut: (shortcut: Accessor<string>) => void
       }) => {
         const command = commands.useCommand()
@@ -130,8 +130,9 @@ story.beforeEach(async ({ mount, page }) => {
             onSelect: props.reopenSide,
           },
           { id: "tab.2", title: "", keybind: "mod+2", hidden: true, onSelect: props.switchSession },
-          ...closed.sideTabNumbers({
+          ...closed.sideTabShortcuts({
             keys: () => props.side()?.keys() ?? [],
+            active: () => props.side()?.active(),
             select: (key: string) => props.side()?.select(key),
             when: (event: Event) => inSide(event),
           }),
@@ -384,7 +385,7 @@ story("reopens a closed browser tab with ⌘⇧T after the side panel and a sess
   await expect(opens).toHaveText("1")
 })
 
-story("selects side tabs with ⌘1–9 inside the side panel and session tabs elsewhere", async ({ page }) => {
+story("selects side tabs with ⌘1–9 and ⇧⌘[ ] inside the side panel and session tabs elsewhere", async ({ page }) => {
   const root = page.getByTestId("browser-region-fixture")
   const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"
   const outside = root.getByRole("button", { name: "Beta", exact: true })
@@ -406,6 +407,10 @@ story("selects side tabs with ⌘1–9 inside the side panel and session tabs el
   await panel.press(`${mod}+1`)
   await expect(selected).toHaveText("file://beta.ts")
   await panel.press(`${mod}+9`)
+  await expect(selected).toHaveText(/^browser:/)
+  await editor.press(`${mod}+Shift+BracketLeft`)
+  await expect(selected).toHaveText("file://beta.ts")
+  await panel.press(`${mod}+Shift+BracketRight`)
   await expect(selected).toHaveText(/^browser:/)
   await expect(root.getByTestId("session-switches")).toHaveText("0")
 

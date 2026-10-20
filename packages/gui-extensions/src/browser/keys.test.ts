@@ -25,6 +25,11 @@ test.each([
   { layout: "Dvorak", input: { key: "J", code: "KeyC" }, letter: "j" },
   { layout: "Russian", input: { key: "\u0421", code: "KeyC" }, letter: "c" },
   { layout: "QWERTY", input: { key: "=", code: "Equal" }, letter: "=" },
+  { layout: "QWERTY", input: { key: "{", code: "BracketLeft" }, letter: "[" },
+  // Dvorak types brackets on the physical minus and equal keys, and slash on the physical left bracket.
+  { layout: "Dvorak", input: { key: "}", code: "Equal" }, letter: "]" },
+  { layout: "Dvorak", input: { key: "/", code: "BracketLeft" }, letter: "/" },
+  { layout: "Russian", input: { key: "\u0445", code: "BracketLeft" }, letter: "[" },
 ])("$layout $input.key on $input.code is $letter", (row) => {
   expect(pageLetter(row.input)).toBe(row.letter)
 })
@@ -52,6 +57,8 @@ test("forwards browser and shell shortcuts while leaving page editing, find, rel
     ["mod+shift", "P", true, "p"],
     ["mod+shift", "L", true, "l"],
     ["mod+shift", "E", true, "e"],
+    ["mod+shift", "{", true, "[", "BracketLeft"],
+    ["mod+shift", "}", false, "]", "BracketRight"],
     ["mod+alt", "ArrowLeft", true, "ArrowLeft"],
     ["mod+alt", "ArrowRight", false, "ArrowRight"],
     ["ctrl", "Tab", true, "Tab"],

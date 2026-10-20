@@ -57,13 +57,22 @@ function normalizeKey(key: string) {
 }
 
 export function keyFromKeyboardEvent(event: KeyboardEvent) {
-  const key = normalizeKey(event.key)
+  const key = normalizeKey(bracketKey(event))
 
   if (!event.altKey || /^[a-z0-9]$/.test(key)) return key
 
   if (!event.code.startsWith("Key") || event.code.length !== 4) return key
 
   return event.code.slice(3).toLowerCase()
+}
+
+// ⇧[ types { on US layouts, so ⇧⌘[ binds as written; a layout that types no ASCII there falls back to the physical key.
+function bracketKey(event: Pick<KeyboardEvent, "key" | "code">) {
+  if (event.key === "{" || event.key === "}") return event.key === "{" ? "[" : "]"
+
+  if (!/^[^\x00-\x7f]$/u.test(event.key) || !/^Bracket(Left|Right)$/.test(event.code)) return event.key
+
+  return event.code === "BracketLeft" ? "[" : "]"
 }
 
 function signature(key: string, ctrl: boolean, meta: boolean, shift: boolean, alt: boolean) {

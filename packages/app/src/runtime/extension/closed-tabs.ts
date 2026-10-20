@@ -1,4 +1,5 @@
 import { createEventListener } from "@solid-primitives/event-listener"
+import { adjacentTabKey } from "@/shell/titlebar/tab-order"
 
 /** Side tabs the user closed in this window, newest last, each with how its panel brings it back. */
 export function createClosedTabs(limit = 25) {
@@ -31,24 +32,35 @@ export function createSideFocus() {
   return (event: Event) => inSide(event, last)
 }
 
-/** As in a browser: inside the side panel, ⌘1–8 select that side tab and ⌘9 the last one. */
-export function sideTabNumbers(input: {
+/** As in a browser: inside the side panel, ⌘1–8 select that side tab, ⌘9 the last one, and ⇧⌘[ and ⇧⌘] the previous and next. */
+export function sideTabShortcuts(input: {
   keys: () => readonly string[]
+  active: () => string | undefined
   select: (key: string) => void
   when: (event: KeyboardEvent) => boolean
 }) {
-  return Array.from({ length: 9 }, (_, index) => ({
-    id: `file.tab.${index + 1}`,
+  const shortcut = (id: string, keybind: string, target: () => string | undefined) => ({
+    id,
     title: "",
-    keybind: `mod+${index + 1}`,
+    keybind,
     hidden: true,
     when: input.when,
     onSelect: () => {
-      const key = index === 8 ? input.keys().at(-1) : input.keys()[index]
+      const key = target()
 
       if (key) input.select(key)
     },
-  }))
+  })
+
+  return [
+    ...Array.from({ length: 9 }, (_, index) =>
+      shortcut(`file.tab.${index + 1}`, `mod+${index + 1}`, () =>
+        index === 8 ? input.keys().at(-1) : input.keys()[index],
+      ),
+    ),
+    shortcut("file.tab.left", "mod+shift+[", () => adjacentTabKey([...input.keys()], input.active(), -1)),
+    shortcut("file.tab.right", "mod+shift+]", () => adjacentTabKey([...input.keys()], input.active(), 1)),
+  ]
 }
 
 function inSide(event: Event, fallback: boolean) {

@@ -615,8 +615,8 @@ type RegionHost = {
     reopenSession: () => void
     reopenSide: () => void
     switchSession: () => void
-    /** The side region, for its numbered tab shortcuts. */
-    side: () => { keys: () => readonly string[]; select: (key: string) => void } | undefined
+    /** The side region, for its tab shortcuts. */
+    side: () => { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void } | undefined
     /** The shortcut the browser's + menu item shows, as the host formats it; empty when it shows none. */
     shortcut: (shortcut: Accessor<string>) => void
   }>
