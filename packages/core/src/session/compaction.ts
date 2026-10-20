@@ -484,6 +484,7 @@ export const layer = Layer.effect(
       const lead = summary
         ? toLLMMessages([{ ...summary, metadata: { ...summary.metadata, recent: "" } }], context.model.ref)
         : request.messages.slice(0, end)
+      const recent = summary ? SessionRecentText.kept(summary) : ""
 
       // A user message and everything after it, up to the next one, is one exchange: kept or dropped whole.
       const exchanges = request.messages.slice(end).reduce<string[]>(
@@ -494,7 +495,7 @@ export const layer = Layer.effect(
           else groups[groups.length - 1] += `\n${text}`
           return groups
         },
-        summary && SessionRecentText.kept(summary) ? [SessionRecentText.kept(summary)] : [],
+        recent ? [recent] : [],
       )
 
       const note = (omitted: number) =>
