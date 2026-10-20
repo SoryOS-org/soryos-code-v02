@@ -146,6 +146,13 @@ const load = Effect.fn("cli.acp.catalog.load")(function* (client: OpenCodeClient
           error.cause.service === "plugin"),
       schedule: poll,
     }),
+    Effect.mapError((error) =>
+      error._tag === "ACPCatalogLoadError" &&
+      error.cause instanceof ServiceUnavailableError &&
+      error.cause.service === "plugin"
+        ? new ACPError.CatalogNotReadyError({ reason: "plugins" })
+        : error,
+    ),
   )
 })
 

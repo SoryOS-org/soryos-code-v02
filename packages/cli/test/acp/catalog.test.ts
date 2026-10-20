@@ -126,6 +126,32 @@ describe("ACP transient plugin activation failures", () => {
     })
   }
 
+  test("reports retryable activation exhaustion and can resume the same session later", async () => {
+    let activating = true
+    await using acp = await startWire({
+      fetch(request) {
+        if (request.path !== "/api/model" || !activating) return
+        return Response.json(
+          { _tag: "ServiceUnavailableError", service: "plugin", message: "Location plugins did not finish activating" },
+          { status: 503 },
+        )
+      },
+    })
+    const session = makeSession("ses_pending")
+    acp.server.sessions.set(session.id, session)
+    await acp.initialize()
+    const params = { cwd: "/workspace", sessionId: session.id, mcpServers: [] }
+    expect(await rpcError(acp.request("session/resume", params))).toEqual({
+      code: -32603,
+      message: "Internal error: Location plugins are still activating; retry this request",
+      data: { errorName: "CatalogNotReady", service: "plugin", retryable: true },
+    })
+    expect(acp.server.sessions.get(session.id)).toEqual(session)
+    activating = false
+    expect(await acp.request("session/resume", params)).toHaveProperty("configOptions")
+    expect(acp.server.sessions.size).toBe(1)
+  }, 10000)
+
   test("closing ACP cancels a catalog load that is retrying activation", async () => {
     let reads = 0
     const acp = await startWire({
