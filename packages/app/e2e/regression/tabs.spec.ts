@@ -497,6 +497,8 @@ for (const [window, fullscreen] of [
     expect(icon.y).toBeGreaterThan(14 + 14)
     expect(icon.x + icon.width / 2).toBe(homeIcon.x + homeIcon.width / 2)
     expect(icon.y + icon.height).toBeLessThan(home.y)
+    // The toggle keeps the session header's center line beside the icon.
+    expect(toggle.y + toggle.height / 2).toBe(32)
   })
 }
 

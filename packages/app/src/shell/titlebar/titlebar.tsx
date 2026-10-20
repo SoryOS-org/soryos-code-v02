@@ -114,6 +114,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const titlebarItems = useTitlebarItems()
   const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
   const homeInSidebarHeader = () => !windows() && !macTrafficLights() && !channelIndicatorVisible
+  const channelIndicatorBelowTrafficLights = () => macTrafficLights() && channelIndicatorVisible
 
   const back = () => {
     const next = backPath(history)
@@ -782,12 +783,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                           >
                             <Show when={!windows()}>
                               {/* Shares the session header's 48px center line. Without traffic lights or a channel
-                                  icon, Home fills the start so the row doesn't leave an empty band. */}
+                                  icon, Home fills the start so the row doesn't leave an empty band. With both, the
+                                  channel icon goes under the traffic lights and the row grows only by what it needs. */}
                               <div
                                 class="flex w-full shrink-0 gap-2"
                                 classList={{
                                   "items-start pt-2.5": homeInSidebarHeader(),
-                                  "mb-2 h-12 items-center": !homeInSidebarHeader(),
+                                  "mb-2 h-12 items-center":
+                                    !homeInSidebarHeader() && !channelIndicatorBelowTrafficLights(),
+                                  "mb-2 items-start": channelIndicatorBelowTrafficLights(),
                                 }}
                                 style={{
                                   "min-height": macVerticalTabs()
@@ -799,10 +803,16 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 <Show when={macTrafficLights()}>
                                   {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
                                   <div
-                                    class="shrink-0"
-                                    style={{ width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)` }}
-                                    aria-hidden="true"
-                                  />
+                                    class="flex shrink-0"
+                                    style={{
+                                      width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)`,
+                                      "padding-top": channelIndicatorBelowTrafficLights()
+                                        ? `${macTrafficLightsTopClearance / zoom()}px`
+                                        : undefined,
+                                    }}
+                                  >
+                                    <ChannelIndicator sidebar />
+                                  </div>
                                 </Show>
                                 <Show
                                   when={homeInSidebarHeader()}
@@ -817,15 +827,13 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 >
                                   <div class="min-w-0 flex-1">{homeButton(true)}</div>
                                 </Show>
-                                <SidebarToggle />
-                              </div>
-                              {/* The traffic lights take the header's start, so the channel icon sits below them,
-                                  over Home's icon. */}
-                              <Show when={macTrafficLights() && channelIndicatorVisible}>
-                                <div class="mb-3 flex shrink-0">
-                                  <ChannelIndicator sidebar />
+                                <div
+                                  class="flex shrink-0"
+                                  classList={{ "mt-2.5": channelIndicatorBelowTrafficLights() }}
+                                >
+                                  <SidebarToggle />
                                 </div>
-                              </Show>
+                              </div>
                             </Show>
                             <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
                             {searchButton(true)}
