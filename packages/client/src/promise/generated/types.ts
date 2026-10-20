@@ -2331,6 +2331,10 @@ export type ConfigEntry =
           portable_shell_scanner?: boolean
           todo?: boolean
           subagent_depth?: number
+          decision_gate?: {
+            mode: "observe" | "route"
+            model?: string | { providerID: string; model: string; variant?: string }
+          }
           policies?: Array<{
             action: "provider.use" | "tool.use" | "integration.use"
             resource: string
