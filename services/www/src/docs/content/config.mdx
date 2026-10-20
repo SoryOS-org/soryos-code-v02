@@ -652,6 +652,14 @@ its services. It takes a duration such as `"2 hours"` and defaults to `"60 minut
 jobs keep a location loaded. Set it to `false` to never unload idle locations. Project config can override the global
 value.
 
+```jsonc
+{
+  "experimental": {
+    "location_idle_timeout": false,
+  },
+}
+```
+
 ### Deprecated policies
 
 `experimental.policies` is deprecated. Use top-level [`policies`](/policies) instead. The old key still works and
