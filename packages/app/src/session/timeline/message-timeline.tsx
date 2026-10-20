@@ -81,7 +81,6 @@ type MessageTimelineProps = {
   reserveReviewToggle: boolean
   setContentRef: (el: HTMLDivElement) => void
   bottomInset?: number
-  fadeInset?: number
   setVisibleRef?: (el: HTMLDivElement | undefined) => void
   anchor: (id: string) => string
   setRevealMessage?: (fn: (id: string, partID?: string) => void) => void
@@ -177,7 +176,6 @@ function MessageTimelineView(
     setScrollRef: props.setScrollRef,
     setContentRef: props.setContentRef,
     bottomInset: () => props.bottomInset ?? 0,
-    fadeInset: () => props.fadeInset ?? 0,
     setVisibleRef: props.setVisibleRef,
     onScheduleScrollState: props.onScheduleScrollState,
     onPin: props.onPin,
@@ -401,37 +399,36 @@ function MessageTimelineView(
   // Undelivered input waits below the work the model has seen, so live status moves into the row above it.
   const activityRow = createMemo(() => projection.rows().some((row) => Predicate.isTagged(row, "Activity")))
 
+  // The lane keeps its height while empty, so Working and the hint come and go without moving the rows around it.
   const activity = () => (
-    <Show when={showWorking() || backgroundHintPresence.present()}>
-      <div
-        classList={{
-          "min-w-0 w-full max-w-full": true,
-          "md:max-w-session md:mx-auto": props.centered,
-        }}
-      >
-        <div class={`flex h-9 items-center gap-2 pt-3 text-[13px] font-[530] leading-text-compact ${turnPadding()}`}>
-          <Show when={showWorking()}>
-            <div data-component="session-working" role="status">
-              <TextShimmer text={language.t("session.timeline.working")} active />
-            </div>
-          </Show>
-          <Show when={backgroundHintPresence.present()}>
-            <div
-              ref={setBackgroundHintRef}
-              data-component="session-background-hint-row"
-              class="duration-150 motion-reduce:animate-none"
-              classList={{
-                "animate-in fade-in": backgroundHintPresence.animate() && backgroundHintPresence.show(),
-                "animate-out fade-out fill-mode-forwards":
-                  backgroundHintPresence.animate() && !backgroundHintPresence.show(),
-              }}
-            >
-              <BackgroundMoveHint onMove={props.background.move} />
-            </div>
-          </Show>
-        </div>
+    <div
+      classList={{
+        "min-w-0 w-full max-w-full": true,
+        "md:max-w-session md:mx-auto": props.centered,
+      }}
+    >
+      <div class={`flex h-9 items-center gap-2 pt-3 text-[13px] font-[530] leading-text-compact ${turnPadding()}`}>
+        <Show when={showWorking()}>
+          <div data-component="session-working" role="status">
+            <TextShimmer text={language.t("session.timeline.working")} active />
+          </div>
+        </Show>
+        <Show when={backgroundHintPresence.present()}>
+          <div
+            ref={setBackgroundHintRef}
+            data-component="session-background-hint-row"
+            class="duration-150 motion-reduce:animate-none"
+            classList={{
+              "animate-in fade-in": backgroundHintPresence.animate() && backgroundHintPresence.show(),
+              "animate-out fade-out fill-mode-forwards":
+                backgroundHintPresence.animate() && !backgroundHintPresence.show(),
+            }}
+          >
+            <BackgroundMoveHint onMove={props.background.move} />
+          </div>
+        </Show>
       </div>
-    </Show>
+    </div>
   )
 
   return (

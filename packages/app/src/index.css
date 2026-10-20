@@ -69,11 +69,11 @@
     visibility: hidden;
   }
 
-  /* The timeline scrolls on under the composer region, passing behind its pill and docks, and fades out as it reaches
-     the composer card. A mask fades the content itself, so the edge works over any theme's background; smoothstep
-     stops avoid a visible horizon. */
+  /* The timeline scrolls on under the composer region, passing behind its floating pill, and fades out as it reaches
+     the region's opaque card. A mask fades the content itself, so the edge works over any theme's background;
+     smoothstep stops avoid a visible horizon. */
   [data-slot="session-timeline-scroll"] > .scroll-view__viewport {
-    --session-timeline-fade-start: var(--session-timeline-fade-edge, 0px);
+    --session-timeline-fade-start: var(--session-timeline-inset, 0px);
     scroll-padding-bottom: var(--session-timeline-inset, 0px);
     mask-image: linear-gradient(
       to top,
