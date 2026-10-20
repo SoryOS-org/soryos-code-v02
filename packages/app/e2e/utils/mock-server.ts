@@ -119,6 +119,9 @@ export interface MockServerConfig {
   onWorktreeRemove?: (input: Worktree.RemoveInput) => void | Promise<void>
   // POST /api/session keeps the client-reserved `id` and `location`. Return an answer to fail the attempt (1-based).
   onSessionCreate?: (body: Schema.JsonObject, attempt: number) => void | MockAnswer
+  // Supplies and registers the fork response. Histories stay under pageMessages; this does not implement server copying.
+  // The hook may hold a request. Without it, forks answer 501 MockUnsupported.
+  onSessionFork?: (input: { sessionID: string; body: Schema.JsonObject }) => MockSession | Promise<MockSession>
   // Title of created sessions (default: the request's title, else "New session").
   createdSessionTitle?: string
   // Slash commands served by `/api/command`.
@@ -833,6 +836,29 @@ function mockHandlers(
               title: config.createdSessionTitle ?? fields?.title ?? "New session",
               parentID: fields?.parentID,
             },
+            config.directory,
+          )
+
+          config.sessions.push(created)
+
+          return HttpServerResponse.jsonUnsafe({ data: created })
+        }),
+      )
+      .handleRaw("sessionFork", (ctx) =>
+        Effect.gen(function* () {
+          const fork = config.onSessionFork
+
+          if (!fork) return yield* unsupported("fork sessions", "onSessionFork")
+
+          if (!config.sessions.some((item) => item.id === ctx.params.sessionID))
+            return yield* Effect.fail(new MockNotFound({ message: "Session not found" }))
+
+          const body = yield* Effect.orDie(
+            ctx.request.json.pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.JsonObject))),
+          )
+
+          const created = currentSession(
+            yield* Effect.promise(async () => fork({ sessionID: ctx.params.sessionID, body })),
             config.directory,
           )
 

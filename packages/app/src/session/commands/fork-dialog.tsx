@@ -17,8 +17,14 @@ import { sessionHref } from "@/shell/routes/session"
 interface ForkableMessage {
   id: string
   text: string
-  time: string
+  time?: string
 }
+
+interface ForkOption extends ForkableMessage {
+  full?: boolean
+}
+
+const FULL_SESSION_ID = "__full_session__"
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString(undefined, { timeStyle: "short" })
@@ -34,6 +40,7 @@ export const DialogFork: Component = () => {
   const dialog = useDialog()
   const language = useLanguage()
   const server = useServer()
+  let pending = false
 
   const messages = createMemo((): ForkableMessage[] => {
     const sessionID = params.id
@@ -56,37 +63,62 @@ export const DialogFork: Component = () => {
     return result.reverse()
   })
 
-  const handleSelect = (item: ForkableMessage | undefined) => {
-    if (!item) return
+  const items = createMemo((): ForkOption[] => [
+    {
+      id: FULL_SESSION_ID,
+      text: language.t("dialog.fork.fullSession"),
+      full: true,
+    },
+    ...messages(),
+  ])
+
+  const handleSelect = (item: ForkOption | undefined) => {
+    if (!item || pending) return
 
     const sessionID = params.id
 
     if (!sessionID) return
-    const message = data.session.message.get(sessionID, item.id)
 
-    if (message?.type !== "user") return
+    const before = item.full ? undefined : item.id
+    const message = before ? data.session.message.get(sessionID, before) : undefined
 
-    const restored = extractPromptFromMessage(message, {
-      directory: location().directory,
-      attachmentName: language.t("common.attachment"),
-    })
+    if (before && message?.type !== "user") return
 
-    const context = extractPromptContext(message, { directory: location().directory })
-    const dir = base64Encode(location().directory)
+    const snapshot =
+      message?.type === "user"
+        ? {
+            restored: extractPromptFromMessage(message, {
+              directory: location().directory,
+              attachmentName: language.t("common.attachment"),
+            }),
+            context: extractPromptContext(message, { directory: location().directory }),
+            dir: base64Encode(location().directory),
+          }
+        : undefined
+
+    pending = true
 
     serverSDK.api.session
-      .fork({ sessionID, before: item.id })
+      .fork({ sessionID, before })
       .then((forked) => {
         data.session.remember(forked)
         dialog.close()
-        const target = prompt.capture({ dir, id: forked.id })
-        target.set(restored)
-        target.context.replace([...context.comments, ...context.files])
+
+        if (snapshot) {
+          const target = prompt.capture({ dir: snapshot.dir, id: forked.id })
+
+          target.set(snapshot.restored)
+          target.context.replace([...snapshot.context.comments, ...snapshot.context.files])
+        }
+
         navigate(sessionHref(server.key, forked.id))
       })
       .catch((cause: unknown) => {
         const message = cause instanceof Error ? cause.message : String(cause)
         showToast({ title: language.t("common.requestFailed"), description: message })
+      })
+      .finally(() => {
+        pending = false
       })
   }
 
@@ -101,14 +133,14 @@ export const DialogFork: Component = () => {
           search={{ placeholder: language.t("common.search.placeholder"), autofocus: true }}
           emptyMessage={language.t("dialog.fork.empty")}
           key={(x) => x.id}
-          items={messages}
+          items={items}
           filterKeys={["text"]}
           onSelect={handleSelect}
         >
           {(item) => (
             <div class="w-full flex items-center gap-2">
               <span class="truncate flex-1 min-w-0 text-left font-normal">{item.text}</span>
-              <span class="text-text-weak shrink-0 font-normal">{item.time}</span>
+              {item.time && <span class="text-text-weak shrink-0 font-normal">{item.time}</span>}
             </div>
           )}
         </List>
