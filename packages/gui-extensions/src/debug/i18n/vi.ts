@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Bật/tắt thanh gỡ lỗi",
-  "status.toggle": "Chuyển đổi công cụ gỡ lỗi",
   ariaLabel: "Chẩn đoán hiệu suất phát triển",
   providerAriaLabel: "Chẩn đoán hiệu suất nhà cung cấp",
   na: "không có",

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Aktifkan/nonaktifkan bilah debug",
-  "status.toggle": "Alihkan alat debug",
   ariaLabel: "Diagnostik kinerja pengembangan",
   providerAriaLabel: "Diagnostik kinerja penyedia",
   na: "n/a",

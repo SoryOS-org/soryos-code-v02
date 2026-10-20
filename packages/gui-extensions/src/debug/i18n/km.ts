@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "បិទ/បើករបារបំបាត់កំហុស",
-  "status.toggle": "បិទបើកឧបករណ៍បំបាត់កំហុស",
   ariaLabel: "ការវិនិច្ឆ័យដំណើរការអភិវឌ្ឍន៍",
   providerAriaLabel: "ការវិនិច្ឆ័យដំណើរការរបស់អ្នកផ្តល់សេវា",
   na: "n/a",

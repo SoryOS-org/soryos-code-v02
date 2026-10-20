@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Afișează sau ascunde bara de depanare",
-  "status.toggle": "Comutați instrumentele de depanare",
   ariaLabel: "Diagnosticare performanță dezvoltare",
   providerAriaLabel: "Diagnosticarea performanței furnizorului",
   na: "n/a",

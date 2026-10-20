@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "ڈی بگ بار کو ٹوگل کریں",
-  "status.toggle": "ڈیبگ ٹولز ٹوگل کریں",
   ariaLabel: "ترقیاتی کارکردگی کی تشخیص",
   providerAriaLabel: "فراہم کنندہ کی کارکردگی کی تشخیص",
   na: "n/a",

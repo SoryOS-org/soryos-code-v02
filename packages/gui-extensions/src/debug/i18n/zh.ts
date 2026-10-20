@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "切换调试栏",
-  "status.toggle": "切换调试工具",
   ariaLabel: "开发性能诊断",
   providerAriaLabel: "提供商性能诊断",
   na: "不适用",

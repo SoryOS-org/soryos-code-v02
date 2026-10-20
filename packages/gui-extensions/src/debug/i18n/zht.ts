@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "切換偵錯列",
-  "status.toggle": "切換除錯工具",
   ariaLabel: "開發效能診斷",
   providerAriaLabel: "提供者效能診斷",
   na: "不適用",

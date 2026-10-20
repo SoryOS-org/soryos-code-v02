@@ -616,9 +616,6 @@ export const dict = {
   "common.copied": "Copied",
 
   "titlebar.tabs": "Tabs",
-  "titlebar.channel.local": "Local",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
 
   "common.closeTab": "Close tab",
   "common.dismiss": "Dismiss",

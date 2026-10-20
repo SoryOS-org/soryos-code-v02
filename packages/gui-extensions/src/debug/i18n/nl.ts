@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Debugbalk in-/uitschakelen",
-  "status.toggle": "Debughulpmiddelen in-/uitschakelen",
   ariaLabel: "Diagnostiek voor ontwikkelprestaties",
   providerAriaLabel: "Prestatiediagnose van provider",
   na: "n.v.t.",

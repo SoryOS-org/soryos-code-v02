@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "สลับแถบดีบัก",
-  "status.toggle": "สลับเครื่องมือแก้ไขข้อบกพร่อง",
   ariaLabel: "การวินิจฉัยประสิทธิภาพการพัฒนา",
   providerAriaLabel: "การวินิจฉัยประสิทธิภาพผู้ให้บริการ",
   na: "n/a",

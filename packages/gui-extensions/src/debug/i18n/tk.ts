@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Düzediş zolagyny aç/ýap",
-  "status.toggle": "Düzediş gurallaryny aç/ýap",
   ariaLabel: "Ösüş öndürijiligini anyklaýyş",
   providerAriaLabel: "Hyzmat üpjünçiniň öndürijilik diagnostikasy",
   na: "n / a",

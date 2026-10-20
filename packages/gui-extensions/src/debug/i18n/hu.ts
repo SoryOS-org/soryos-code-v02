@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Hibakeresési sáv be- vagy kikapcsolása",
-  "status.toggle": "Hibakereső eszközök váltása",
   ariaLabel: "Fejlesztési teljesítmény diagnosztika",
   providerAriaLabel: "Szolgáltatói teljesítménydiagnosztika",
   na: "n/a",

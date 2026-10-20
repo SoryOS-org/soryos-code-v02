@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Prepnúť panel ladenia",
-  "status.toggle": "Prepínanie nástrojov na ladenie",
   ariaLabel: "Diagnostika výkonu vývoja",
   providerAriaLabel: "Diagnostika výkonu poskytovateľa",
   na: "n/a",

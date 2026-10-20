@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Sýna eða fela villuleitarstiku",
-  "status.toggle": "Skiptu um villuleitarverkfæri",
   ariaLabel: "Þróunarárangursgreiningar",
   providerAriaLabel: "Afkastagreining þjónustuveitu",
   na: "n/a",

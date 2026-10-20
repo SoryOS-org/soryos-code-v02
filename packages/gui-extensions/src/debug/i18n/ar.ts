@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "تبديل إظهار شريط تصحيح الأخطاء",
-  "status.toggle": "إظهار أدوات التصحيح أو إخفاؤها",
   ariaLabel: "تشخيص أداء التطوير",
   providerAriaLabel: "تشخيص أداء المزوّد",
   na: "غير متاح",

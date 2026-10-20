@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "ڈی بگ بار نوں ٹوگل کرو",
-  "status.toggle": "ڈی بگ ٹول ٹوگل کرو",
   ariaLabel: "ترقی دی کارکردگی دی تشخیص",
   providerAriaLabel: "فراہم کنندہ دی کارکردگی دی تشخیص",
   na: "لاگو نئیں",

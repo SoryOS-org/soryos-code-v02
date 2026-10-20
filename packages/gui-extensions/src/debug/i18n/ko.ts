@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "디버그 표시줄 전환",
-  "status.toggle": "디버그 도구 전환",
   ariaLabel: "개발 성능 진단",
   providerAriaLabel: "공급자 성능 진단",
   na: "해당 없음",

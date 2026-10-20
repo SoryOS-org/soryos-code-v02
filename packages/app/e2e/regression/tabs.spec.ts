@@ -463,45 +463,6 @@ for (const [window, fullscreen, start] of [
   })
 }
 
-// macOS 26 traffic lights sit 14px down and are 14px tall. With vertical tabs the channel icon goes below them, over
-// Home's icon. A fullscreen window has no traffic lights, so the icon stays in the header beside the sidebar toggle.
-for (const [window, fullscreen] of [
-  ["windowed", false],
-  ["fullscreen", true],
-] as const) {
-  test(`sidebar channel icon sits below the macOS traffic lights (${window})`, async ({ page }) => {
-    await mockWorkspace(page, {
-      name: "Tabs",
-      sessions: [a],
-      seed: { settings: { appearance: { tabLayout: "vertical" } } },
-    })
-    await page.goto(
-      `/e2e/utils/macos-window.html?${new URLSearchParams({ server: SERVER, route: "/", fullscreen: String(fullscreen) })}`,
-    )
-    const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
-    const indicator = sidebar.locator('[data-slot="channel-indicator"]')
-    await expect(indicator).toBeVisible()
-
-    const icon = await indicator.boundingBox()
-    const toggle = await sidebar.getByRole("button", { name: "Toggle sidebar", exact: true }).boundingBox()
-    const home = await sidebar.getByRole("button", { name: "Home", exact: true }).boundingBox()
-    const homeIcon = await sidebar.getByRole("button", { name: "Home", exact: true }).locator("svg").boundingBox()
-
-    if (!icon || !toggle || !home || !homeIcon) throw new Error("sidebar header has no bounding boxes")
-
-    if (fullscreen) {
-      expect(icon.y + icon.height / 2).toBe(toggle.y + toggle.height / 2)
-      return
-    }
-
-    expect(icon.y).toBeGreaterThan(14 + 14)
-    expect(icon.x + icon.width / 2).toBe(homeIcon.x + homeIcon.width / 2)
-    expect(icon.y + icon.height).toBeLessThan(home.y)
-    // The toggle keeps the session header's center line beside the icon.
-    expect(toggle.y + toggle.height / 2).toBe(32)
-  })
-}
-
 test("vertical tab gaps hover and select the nearest row", async ({ page }) => {
   await mockWorkspace(page, {
     name: "Tabs",

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "ສະຫຼັບແຖບດີບັກ",
-  "status.toggle": "ສະຫຼັບເຄື່ອງມືດີບັກ",
   ariaLabel: "ການວິນິດໄສປະສິດທິພາບການພັດທະນາ",
   providerAriaLabel: "ການວິນິດໄສປະສິດທິພາບຜູ້ໃຫ້ບໍລິການ",
   na: "n/a",

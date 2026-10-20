@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, Match, Show, Switch, untrack } from "solid-js"
 import { createStore, unwrap } from "solid-js/store"
-import { Dynamic, Portal } from "solid-js/web"
+import { Portal } from "solid-js/web"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -34,11 +34,7 @@ import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-prog
 import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
 import { useSettingsDialog } from "@/settings/command"
 import { rootSession } from "@/shell/routes/session"
-import { TitlebarItem } from "@opencode/gui-extensions/sdk"
-import { useExtensionHost } from "@/runtime/extension/host"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/extension/titlebar-items"
-import devIcon from "../../../../desktop/icons/dev/64x64.png"
-import betaIcon from "../../../../desktop/icons/beta/64x64.png"
 
 const titlebarHeight = 36
 
@@ -53,9 +49,6 @@ const macTrafficLightsTopClearance = 28
 // iOS blurs page content just below the status bar in Home Screen web apps, so with a top safe area the phone
 // titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
 const mobileTopClearance = "max(8px, min(16px, env(safe-area-inset-top, 0px) * 1000))"
-
-const channelIndicatorVisible =
-  !!import.meta.env.VITE_OPENCODE_CHANNEL && import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const platform = usePlatform()
@@ -113,8 +106,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   const titlebarItems = useTitlebarItems()
   const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
-  const homeInSidebarHeader = () => !windows() && !macTrafficLights() && !channelIndicatorVisible
-  const channelIndicatorBelowTrafficLights = () => macTrafficLights() && channelIndicatorVisible
+  const homeInSidebarHeader = () => !windows() && !macTrafficLights()
 
   const back = () => {
     const next = backPath(history)
@@ -594,9 +586,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   "ps-3.5": windows(),
                 }}
               >
-                <Show when={!mobile() && (!props.verticalTabs || windows())}>
-                  <ChannelIndicator horizontal />
-                </Show>
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
@@ -782,16 +771,13 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             ref={(element) => (element.className = "flex size-full min-h-0 flex-col")}
                           >
                             <Show when={!windows()}>
-                              {/* Shares the session header's 48px center line. Without traffic lights or a channel
-                                  icon, Home fills the start so the row doesn't leave an empty band. With both, the
-                                  channel icon goes under the traffic lights and the row grows only by what it needs. */}
+                              {/* Shares the session header's 48px center line. Without traffic lights, Home fills the
+                                  start so the row doesn't leave an empty band. */}
                               <div
                                 class="flex w-full shrink-0 gap-2"
                                 classList={{
                                   "items-start pt-2.5": homeInSidebarHeader(),
-                                  "mb-2 h-12 items-center":
-                                    !homeInSidebarHeader() && !channelIndicatorBelowTrafficLights(),
-                                  "mb-2 items-start": channelIndicatorBelowTrafficLights(),
+                                  "mb-2 h-12 items-center": !homeInSidebarHeader(),
                                 }}
                                 style={{
                                   "min-height": macVerticalTabs()
@@ -803,36 +789,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 <Show when={macTrafficLights()}>
                                   {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
                                   <div
-                                    class="flex shrink-0"
-                                    style={{
-                                      width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)`,
-                                      "padding-top": channelIndicatorBelowTrafficLights()
-                                        ? `${macTrafficLightsTopClearance / zoom()}px`
-                                        : undefined,
-                                    }}
-                                  >
-                                    <ChannelIndicator sidebar />
-                                  </div>
+                                    class="shrink-0"
+                                    style={{ width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)` }}
+                                    aria-hidden="true"
+                                  />
                                 </Show>
-                                <Show
-                                  when={homeInSidebarHeader()}
-                                  fallback={
-                                    <>
-                                      <Show when={!macTrafficLights()}>
-                                        <ChannelIndicator sidebar />
-                                      </Show>
-                                      <div class="flex-1" />
-                                    </>
-                                  }
-                                >
+                                <Show when={homeInSidebarHeader()} fallback={<div class="flex-1" />}>
                                   <div class="min-w-0 flex-1">{homeButton(true)}</div>
                                 </Show>
-                                <div
-                                  class="flex shrink-0"
-                                  classList={{ "mt-2.5": channelIndicatorBelowTrafficLights() }}
-                                >
-                                  <SidebarToggle />
-                                </div>
+                                <SidebarToggle />
                               </div>
                             </Show>
                             <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
@@ -893,51 +858,5 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
         </Match>
       </Switch>
     </header>
-  )
-}
-
-function ChannelIndicator(props: { horizontal?: boolean; sidebar?: boolean }) {
-  const language = useLanguage()
-  const platform = usePlatform()
-  const host = useExtensionHost()
-  const channel = import.meta.env.VITE_OPENCODE_CHANNEL
-
-  if (!channel || channel === "prod") return null
-
-  const label = () => language.t(`titlebar.channel.${channel}`)
-
-  // An extension may turn the badge into a toggle (the debug bar does).
-  const debug = () => host.list(TitlebarItem).find((item) => item.placement === "channel")
-
-  return (
-    <Tooltip
-      placement={props.sidebar ? "right" : "bottom"}
-      value={label()}
-      class={`shrink-0 [app-region:no-drag] ${props.sidebar ? "ms-0.5" : ""} ${props.horizontal ? "me-1.5" : ""} ${props.horizontal && platform.platform === "web" ? "ps-2.5" : ""}`}
-    >
-      <Dynamic
-        component={debug() ? "button" : "div"}
-        type={debug() ? "button" : undefined}
-        data-slot="channel-indicator"
-        class="flex h-7 shrink-0 items-center rounded-[6px] [app-region:no-drag]"
-        classList={{
-          "w-6": props.sidebar,
-          "w-5": !props.sidebar,
-          "cursor-pointer hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02":
-            !!debug(),
-        }}
-        onClick={() => debug()?.run?.()}
-        aria-label={debug()?.label}
-        aria-pressed={debug()?.pressed}
-      >
-        <img
-          src={channel === "beta" ? betaIcon : devIcon}
-          alt={debug() ? "" : label()}
-          class="shrink-0 rounded-[4px] shadow-[var(--v2-elevation-raised)]"
-          classList={{ "size-6": props.sidebar, "size-5": !props.sidebar }}
-          draggable={false}
-        />
-      </Dynamic>
-    </Tooltip>
   )
 }

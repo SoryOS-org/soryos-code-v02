@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "تغییر وضعیت نوار اشکال‌زدایی",
-  "status.toggle": "نمایش یا پنهان کردن ابزارهای اشکال‌زدایی",
   ariaLabel: "تشخیص عملکرد توسعه",
   providerAriaLabel: "عیب‌یابی عملکرد ارائه‌دهنده",
   na: "n/a",

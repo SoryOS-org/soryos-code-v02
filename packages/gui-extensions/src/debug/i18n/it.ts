@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Mostra o nascondi la barra di debug",
-  "status.toggle": "Attiva/disattiva strumenti di debug",
   ariaLabel: "Diagnostica delle prestazioni di sviluppo",
   providerAriaLabel: "Diagnostica delle prestazioni del provider",
   na: "n/d",

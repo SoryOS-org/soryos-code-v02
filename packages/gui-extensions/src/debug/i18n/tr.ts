@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Hata ayıklama çubuğunu aç/kapat",
-  "status.toggle": "Hata ayıklama araçlarını değiştir",
   ariaLabel: "Geliştirme performansı teşhisi",
   providerAriaLabel: "Sağlayıcı performansı tanılaması",
   na: "yok",

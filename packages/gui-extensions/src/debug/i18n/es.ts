@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Alternar barra de depuración",
-  "status.toggle": "Alternar herramientas de depuración",
   ariaLabel: "Diagnóstico de rendimiento de desarrollo",
   providerAriaLabel: "Diagnóstico del rendimiento del proveedor",
   na: "n/d",

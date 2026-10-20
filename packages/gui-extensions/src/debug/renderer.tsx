@@ -1,5 +1,5 @@
 import { createSignal, lazy, Show, Suspense } from "solid-js"
-import { Command, Slot, TitlebarItem, type Setup } from "../sdk"
+import { Command, Slot, type Setup } from "../sdk"
 import type Debug from "./index"
 
 const setup: Setup<typeof Debug> = (ctx) => {
@@ -8,7 +8,6 @@ const setup: Setup<typeof Debug> = (ctx) => {
   // builds, prod included, drop the import and never contain knobs.
   const motionTools = import.meta.env.DEV || import.meta.env.VITE_OPENCODE_CHANNEL === "beta"
   const Motion = motionTools ? lazy(() => import("./motion")) : undefined
-  const channel = ctx.build.channel
   // Window-local; every window starts with the bar hidden.
   const [visible, setVisible] = createSignal(false)
 
@@ -57,18 +56,6 @@ const setup: Setup<typeof Debug> = (ctx) => {
       </>
     ),
   })
-
-  if (channel !== "dev" && channel !== "local") return
-  ctx.add(
-    TitlebarItem,
-    (): TitlebarItem => ({
-      id: "toggle",
-      placement: "channel",
-      label: ctx.t("status.toggle"),
-      pressed: visible(),
-      run: toggle,
-    }),
-  )
 }
 
 export default setup

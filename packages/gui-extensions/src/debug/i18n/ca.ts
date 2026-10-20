@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Commuta la barra de depuració",
-  "status.toggle": "Commuta les eines de depuració",
   ariaLabel: "Diagnòstic de rendiment del desenvolupament",
   providerAriaLabel: "Diagnòstic del rendiment del proveïdor",
   na: "n/a",

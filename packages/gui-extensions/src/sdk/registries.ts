@@ -537,16 +537,10 @@ export interface LinkHandler {
   exists?(link: Link): boolean | Promise<boolean>
 }
 
-/** A titlebar pill, or the channel badge as a toggle. */
+/** A pill in the titlebar or tabs footer; the label shows on hover. */
 export interface TitlebarItem {
   /** The item's id; the host keeps the pill's element while the id stays. */
   readonly id: string
-  /**
-   * Where the item shows. Defaults to `titlebar`.
-   * - `titlebar`: a pill in the titlebar or tabs footer; the label shows on hover.
-   * - `channel`: makes the channel badge a toggle that runs the item.
-   */
-  readonly placement?: "titlebar" | "channel"
   /** The visible label. */
   readonly label: string
   /** Accessible name when it differs from the visible label. */
@@ -557,7 +551,7 @@ export interface TitlebarItem {
   readonly busy?: boolean
   /** Shows the pill pressed (`aria-pressed`). */
   readonly pressed?: boolean
-  /** Runs when the user clicks the pill, or the channel badge it toggles. Omit it for an item that only shows. */
+  /** Runs when the user clicks the pill. Omit it for an item that only shows. */
   run?(): void
 }
 

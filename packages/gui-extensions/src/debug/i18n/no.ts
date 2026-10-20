@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Vis eller skjul feilsøkingslinjen",
-  "status.toggle": "Slå feilsøkingsverktøy av/på",
   ariaLabel: "Utviklingsytelsesdiagnostikk",
   providerAriaLabel: "Ytelsesdiagnostikk for leverandør",
   na: "i/t",
