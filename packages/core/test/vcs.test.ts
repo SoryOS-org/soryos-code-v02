@@ -627,33 +627,49 @@ describe("Vcs", () => {
     ),
   )
 
-  it.live("discovers child repositories in workspaces that are not repositories themselves", () =>
-    withTmp((directory) =>
+  it.live("leaves uninitialized submodule gitlinks as single entries", () =>
+    withGit((directory) =>
       Effect.gen(function* () {
         yield* Effect.promise(async () => {
-          const first = path.join(directory, "first")
-          const second = path.join(directory, "nested", "second")
-          await fs.mkdir(path.join(directory, "nested"), { recursive: true })
-          await initGit(first, "-b", "main")
-          await initGit(second, "-b", "main")
-          await fs.writeFile(path.join(first, "one.txt"), "one\ntwo\n")
-          await fs.writeFile(path.join(second, "two.txt"), "two\nthree\n")
+          await fs.writeFile(path.join(directory, "root.txt"), "root\n")
+          await commitAll(directory, "initial")
+          await $`git update-index --add --cacheinfo 160000,5ee719e92056a0f886a5ada95af6dc0c7e8ccbb0,sub`
+            .cwd(directory)
+            .quiet()
+          await fs.mkdir(path.join(directory, "sub"), { recursive: true })
         })
         const vcs = yield* Vcs.Service
-        const context = host()
-        yield* VcsGitPlugin.Plugin.effect({
-          ...context,
-          vcs: { ...context.vcs, transform: vcs.transform, reload: vcs.reload },
-        })
         const status = yield* vcs.status()
-        expect(status.map((row) => row.file)).toEqual(["first/one.txt", "nested/second/two.txt"])
+        expect(status.map((row) => row.file)).toEqual(["sub"])
+        expect(status[0]).toMatchObject({ status: "added" })
         const diff = yield* vcs.diff("working")
-        expect(diff.map((row) => row.file)).toEqual(["first/one.txt", "nested/second/two.txt"])
-        expect(diff.find((row) => row.file === "nested/second/two.txt")).toMatchObject({
-          status: "added",
-          additions: 2,
-        })
-      }).pipe(provide(directory, { git: true, worktree: directory })),
+        expect(diff.map((row) => row.file)).toEqual(["sub"])
+      }),
+    ),
+  )
+
+  it.live("expands nested repositories for a session scoped to a subdirectory", () =>
+    withGit(
+      (directory) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            await fs.writeFile(path.join(directory, "pkg", "root.txt"), "root\n")
+            await commitAll(directory, "initial")
+            const child = path.join(directory, "pkg", "child")
+            await fs.mkdir(child)
+            await initGit(child, "-b", "main")
+            await fs.writeFile(path.join(child, "base.txt"), "a\nb\n")
+            await commitAll(child, "child initial")
+            await fs.writeFile(path.join(child, "base.txt"), "a\nc\n")
+          })
+          const vcs = yield* Vcs.Service
+          const status = yield* vcs.status()
+          expect(status.map((row) => row.file)).toEqual(["pkg/child/base.txt"])
+          const diff = yield* vcs.diff("working")
+          expect(diff.map((row) => row.file)).toEqual(["pkg/child/base.txt"])
+          expect(diff[0]).toMatchObject({ status: "modified", additions: 1, deletions: 1 })
+        }),
+      { scope: "pkg" },
     ),
   )
 
