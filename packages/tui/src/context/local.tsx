@@ -45,9 +45,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const providers = () => data.location.provider.list(location.ref)
 
     function isModelValid(model: ModelPreferenceModel) {
-      return !!models()?.some(
-        (item) => item.providerID === model.providerID && item.id === model.modelID && item.status !== "deprecated",
-      )
+      return !!models()?.some((item) => item.providerID === model.providerID && item.id === model.modelID)
     }
 
     function getFirstValidModel(...modelFns: (() => ModelPreferenceModel | undefined)[]) {

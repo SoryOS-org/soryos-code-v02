@@ -108,7 +108,7 @@ function executionSucceeded(id: string, sessionID = "session"): OpenCodeEvent {
   }
 }
 
-function executionFailed(id: string, sessionID = "session", type = "unknown"): OpenCodeEvent {
+function executionFailed(id: string, sessionID = "session"): OpenCodeEvent {
   return {
     id,
     created: 0,
@@ -116,7 +116,7 @@ function executionFailed(id: string, sessionID = "session", type = "unknown"): O
     durable: durable(sessionID),
     data: {
       sessionID,
-      error: { type, message: "boom" },
+      error: { type: "unknown", message: "boom" },
     },
   }
 }
@@ -157,14 +157,6 @@ describe("internal notifications TUI plugin", () => {
     harness.emit(executionStarted("retry"))
     harness.emit(executionFailed("failed-again"))
     expect(harness.toasts).toHaveLength(2)
-  })
-
-  test("leaves a retired model to the transcript instead of an error toast", async () => {
-    const harness = await setup()
-    harness.emit(executionStarted("started"))
-    harness.emit(executionFailed("failed", "session", "provider.model-retired"))
-    expect(harness.toasts).toEqual([])
-    expect(harness.notifications).toHaveLength(1)
   })
 
   test.each<Route>([{ type: "home" }, { type: "session", sessionID: "other" }])(

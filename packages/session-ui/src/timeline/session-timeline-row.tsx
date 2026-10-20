@@ -30,7 +30,6 @@ import { ToolRegistry, type ContextGroupPart } from "../tools/tool-renderer"
 import { GenericTool } from "../components/basic-tool"
 import { SessionRetry } from "../components/session-retry"
 import { SessionError } from "../components/session-error"
-import { SessionModelRetired } from "../components/session-model-retired"
 import { timelineCategory, type TimelineDetail } from "./detail"
 import { currentToolFailed } from "../message/current-tool-state"
 import {
@@ -1014,12 +1013,7 @@ export function createSessionTimelineRowRenderer(input: {
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <Show
-            when={current().kind === "model-retired" && input.actions?.modelRetired}
-            fallback={<SessionError message={current().text} />}
-          >
-            {(actions) => <SessionModelRetired actions={actions()} />}
-          </Show>
+          <SessionError message={current().text} />
         </div>
       </Frame>
     )

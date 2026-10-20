@@ -392,17 +392,6 @@ export function Session(props: {
     seeded = true
     r.set(route.prompt)
   }
-  // A retired model fails the prompt after it was sent. Hand its text back so picking another model and resending is
-  // one step, unless something else is already being typed.
-  onCleanup(
-    data.on("session.step.failed", (event) => {
-      const current = prompt()
-      if (event.data.sessionID !== route.sessionID || event.data.error.type !== "provider.model-retired") return
-      if (!current || current.current.text.trim()) return
-      const message = messages().findLast((item) => item.type === "user")
-      if (message?.type === "user") current.set({ ...projectedPromptInput(message), pasted: [] })
-    }),
-  )
 
   /** Runs after layout has settled (two frames), unless the transcript was torn down. */
   const afterLayout = (continuation: () => void) => {
@@ -1922,16 +1911,9 @@ function AssistantFooter(props: { message: SessionMessageAssistant }) {
   return (
     <>
       <Show when={props.message.error && !interrupted() && !props.message.retry}>
-        <Show
-          when={props.message.error?.type === "provider.model-retired"}
-          fallback={
-            <box paddingLeft={3}>
-              <text fg={theme.text.feedback.error.base}>Error: {errorMessage(props.message.error)}</text>
-            </box>
-          }
-        >
-          <ModelRetiredNotice message={props.message} />
-        </Show>
+        <box paddingLeft={3}>
+          <text fg={theme.text.feedback.error.base}>Error: {errorMessage(props.message.error)}</text>
+        </box>
       </Show>
       <AssistantRetry retry={props.message.retry} />
       <box paddingLeft={3} marginTop={props.message.retry || (props.message.error && !interrupted()) ? 1 : 0}>
@@ -2397,21 +2379,6 @@ function QueuedPromptDock(props: { prompts: { id: string; text: string }[]; onOp
           <span style={{ fg: theme.text.base }}>{props.prompts.length} queued</span>
           <Show when={next()}>{(text) => <> · {text()}</>}</Show>
         </text>
-      </box>
-    </box>
-  )
-}
-
-// The provider no longer serves this model. The prompt keeps focus for the restored text, so the way forward is a
-// command to type or a click rather than a key binding.
-function ModelRetiredNotice(props: { message: SessionMessageAssistant }) {
-  const theme = useTheme()
-  const keymap = Keymap.use()
-  return (
-    <box paddingLeft={3} flexDirection="column">
-      <text fg={theme.text.feedback.error.base}>{props.message.error?.message}</text>
-      <box onMouseUp={() => keymap.dispatch("model.list")}>
-        <text fg={theme.text.base}>/models</text>
       </box>
     </box>
   )

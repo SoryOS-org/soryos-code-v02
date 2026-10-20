@@ -67,14 +67,7 @@ export default Plugin.define({
         }
         errored.add(sessionID)
         notify(context, sessionID, event.data.error.message, "error")
-        // The transcript already explains a retired model and points to /models; an error toast would repeat it.
-        if (event.data.error.type !== "provider.model-retired")
-          context.ui.toast.show({
-            sessionID,
-            title: "Session failed",
-            message: event.data.error.message,
-            variant: "error",
-          })
+        context.ui.toast.show({ sessionID, title: "Session failed", message: event.data.error.message, variant: "error" })
         ended(sessionID)
       }),
     ]

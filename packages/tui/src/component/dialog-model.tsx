@@ -37,9 +37,7 @@ export function DialogModel(props: { providerID?: string }) {
     function toOptions(items: typeof favorites, category: string) {
       if (!showSections) return []
       return items.flatMap((item) => {
-        const model = models().find(
-          (model) => model.providerID === item.providerID && model.id === item.modelID && model.status !== "deprecated",
-        )
+        const model = models().find((model) => model.providerID === item.providerID && model.id === item.modelID)
         if (!model) return []
         const provider = providers().get(model.providerID)
         return [

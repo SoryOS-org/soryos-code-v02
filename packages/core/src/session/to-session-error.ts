@@ -94,19 +94,8 @@ export function contentFilterError(summary: string, reason: FinishReasonDetails)
   }
 }
 
-const retiredModelMessage = "This model was retired, pick another"
-
 function providerError(type: string, reason: AIError["reason"]): SessionError.Error {
   const status = reason.http?.status
-  // Providers answer 410 Gone for a model they no longer serve; clients that know `provider.model-retired` offer a
-  // way to pick another one.
-  if (status === 410)
-    return {
-      type: "provider.model-retired",
-      message: retiredModelMessage,
-      status,
-      ...(reason.body === undefined ? {} : { response: { body: reason.body } }),
-    }
   return {
     type,
     message: Object.entries(tokenSharingMessages).find(([code]) => reason.body?.includes(code))?.[1] ?? reason.message,
