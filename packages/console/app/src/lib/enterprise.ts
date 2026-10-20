@@ -5,7 +5,6 @@ import { localeFromRequest } from "~/lib/language"
 import { createLead } from "~/lib/salesforce"
 import { inferenceSpendOptions } from "~/lib/inference-spend"
 import { lookupConsoleAccount, type ConsoleAccount } from "~/lib/console-account"
-import { ENTERPRISE_SPAM_THRESHOLD, enterpriseSpamProbability } from "~/lib/enterprise-spam"
 import { verifyHcaptcha } from "~/lib/hcaptcha"
 
 interface EnterpriseFormData {
@@ -99,7 +98,6 @@ export async function handleEnterpriseRequest(
     salesforceSubmit?: (payload: Record<string, unknown>) => Promise<boolean>
     notifications?: boolean
     accountLookup?: (email: string) => Promise<ConsoleAccount | null>
-    spam?: Parameters<typeof enterpriseSpamProbability>[1]
     captcha?: Parameters<typeof verifyHcaptcha>[1]
   } = {},
 ) {
@@ -136,15 +134,6 @@ export async function handleEnterpriseRequest(
     })
     if (human === false) {
       return Response.json({ error: dict["enterprise.form.error.captcha"] }, { status: 400 })
-    }
-
-    // Fail open: a missing score never blocks a lead. Confident spam gets the same
-    // response as the honeypot and never reaches Salesforce, email, or EmailOctopus.
-    const spam = await enterpriseSpamProbability(body, options.spam)
-    if (spam !== undefined) console.info("Enterprise inquiry spam score", { probability: spam })
-    if (spam !== undefined && spam >= ENTERPRISE_SPAM_THRESHOLD) {
-      console.warn("Enterprise inquiry dropped as spam", { email: body.email, probability: spam })
-      return Response.json({ success: true, message: dict["enterprise.form.success.submitted"] }, { status: 200 })
     }
 
     const account = await (options.accountLookup ?? lookupConsoleAccount)(body.email).catch((err) => {

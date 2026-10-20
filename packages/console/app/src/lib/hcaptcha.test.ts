@@ -66,7 +66,6 @@ const submit = async (captcha: string | undefined, verify: () => Promise<Respons
     }),
     {
       captcha: { secret: "test-secret", fetch: verify },
-      spam: { inferenceUrl: "" },
       salesforceSubmit: async (payload) => {
         leads.push(payload)
         return true
