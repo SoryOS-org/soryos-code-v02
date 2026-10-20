@@ -478,6 +478,7 @@ export function createSessionTimelineRowRenderer(input: {
         label: i18n.t(outcomeNoticeKey(outcome), { actor }),
         data: message.description,
         outcome,
+        icon: source === "shell" && outcome === "completed" ? undefined : outcomeNoticeIcon(outcome),
       }
     }
 
@@ -628,12 +629,12 @@ export function createSessionTimelineRowRenderer(input: {
                           onClick={navigate}
                           onKeyDown={navigateKey}
                         >
-                          <Show when={content().outcome}>
-                            {(outcome) => (
+                          <Show when={content().icon}>
+                            {(icon) => (
                               <Icon
-                                name={outcomeNoticeIcon(outcome())}
+                                name={icon()}
                                 size="normal"
-                                class={`inline-block align-top me-1.5 ${outcomeNoticeColor(outcome())}`}
+                                class={`inline-block align-top me-1.5 ${outcomeNoticeColor(content().outcome)}`}
                               />
                             )}
                           </Show>
