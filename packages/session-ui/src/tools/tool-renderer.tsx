@@ -1028,8 +1028,11 @@ export function CurrentFileToolGroup(props: {
 
   const metadata = createMemo(() =>
     fileToolGroupMetadata(
-      files().map((entry) => entry.value),
-      props.tools.map((tool) => toolMetadata(currentToolMetadata(tool)).diagnostics),
+      files(),
+      props.tools.map((tool) => ({
+        id: tool.id,
+        diagnostics: toolMetadata(currentToolMetadata(tool)).diagnostics,
+      })),
     ),
   )
 
