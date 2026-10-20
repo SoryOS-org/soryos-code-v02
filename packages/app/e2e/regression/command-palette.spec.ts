@@ -260,3 +260,118 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   )
   expect(warnings).toEqual([])
 })
+
+test("keeps matching session and file results steady across keystrokes while searches are pending", async ({
+  page,
+}) => {
+  await openPaletteWorkspace(page)
+  const mac = await page.evaluate(() => /(Mac|iPod|iPhone|iPad)/.test(navigator.platform))
+  await page.keyboard.press(mac ? "Meta+Shift+P" : "Control+Shift+P")
+  const dialog = page.getByRole("dialog")
+  const input = dialog.getByRole("textbox")
+  await expect(input).toBeFocused()
+  const sessionOption = dialog.getByRole("option", { name: /Palette fixture session/ })
+  const matchingFile = dialog.getByRole("option", { name: "packages/desktop/ palette.ts", exact: true })
+  const nonMatchingFile = dialog.getByRole("option", { name: "src/app/ other.ts", exact: true })
+  await expect(sessionOption).toBeVisible()
+
+  const pendingFiles = Promise.withResolvers<void>()
+  const pendingSessions = Promise.withResolvers<void>()
+
+  await page.route("**/api/fs/find?*", async (route) => {
+    const query = new URL(route.request().url()).searchParams.get("query") ?? ""
+
+    if (query !== "p") await pendingFiles.promise
+    await route.fulfill({
+      json: {
+        data:
+          query === "p"
+            ? [
+                { path: "packages/desktop/palette.ts", type: "file" },
+                { path: "src/app/other.ts", type: "file" },
+              ]
+            : [{ path: "packages/desktop/palette.ts", type: "file" }],
+      },
+    })
+  })
+
+  await page.route("**/api/session?*", async (route) => {
+    await pendingSessions.promise
+    await route.fulfill({
+      json: {
+        data: [{ ...paletteSession, location: { directory: paletteSession.directory } }],
+      },
+    })
+  })
+
+  await input.press("p")
+  await expect(matchingFile).toBeVisible()
+  await expect(nonMatchingFile).toBeVisible()
+  await expect(sessionOption).toBeVisible()
+
+  const probe = await page.evaluateHandle(() => {
+    const results = document.querySelector(".command-palette-results")!
+
+    const state = {
+      emptyFrames: 0,
+      initialSessionEl:
+        Array.from(results.querySelectorAll('[role="option"]')).find((el) =>
+          el.textContent?.includes("Palette fixture session"),
+        ) ?? null,
+      initialFileEl:
+        Array.from(results.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes("palette.ts")) ??
+        null,
+    }
+
+    const observer = new MutationObserver(() => {
+      if (results.querySelectorAll('[role="option"]').length === 0 || results.querySelector(".command-palette-state")) {
+        state.emptyFrames++
+      }
+    })
+
+    observer.observe(results, { childList: true, subtree: true })
+
+    return {
+      finish() {
+        observer.disconnect()
+
+        const currentSessionEl = Array.from(results.querySelectorAll('[role="option"]')).find((el) =>
+          el.textContent?.includes("Palette fixture session"),
+        )
+
+        const currentFileEl = Array.from(results.querySelectorAll('[role="option"]')).find((el) =>
+          el.textContent?.includes("palette.ts"),
+        )
+
+        return {
+          emptyFrames: state.emptyFrames,
+          sameSessionNode: Boolean(state.initialSessionEl && state.initialSessionEl === currentSessionEl),
+          sameFileNode: Boolean(state.initialFileEl && state.initialFileEl === currentFileEl),
+        }
+      },
+    }
+  })
+
+  for (const key of "alette") {
+    await input.press(key)
+    await expect(sessionOption).toBeVisible()
+    await expect(matchingFile).toBeVisible()
+    await expect(nonMatchingFile).toHaveCount(0)
+  }
+
+  await expect(sessionOption).toHaveAttribute("aria-selected", "true")
+
+  pendingFiles.resolve()
+  pendingSessions.resolve()
+
+  await expect(sessionOption).toBeVisible()
+  await expect(matchingFile).toBeVisible()
+
+  const stability = await probe.evaluate((tracker) => tracker.finish())
+
+  expect(stability).toEqual({
+    emptyFrames: 0,
+    sameSessionNode: true,
+    sameFileNode: true,
+  })
+})

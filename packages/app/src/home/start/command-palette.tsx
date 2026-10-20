@@ -6,6 +6,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import {
   createCommandPaletteCommandEntry,
+  createKnownServerSessions,
   createServerSessionEntries,
   type CommandPaletteEntry,
   type PaletteHighlight,
@@ -31,6 +32,7 @@ export function HomeCommandPalette(props: {
 
   const sessions = createServerSessionEntries({
     server: ServerConnection.key(props.server),
+    known: createKnownServerSessions(server),
     projects: server.projects.list,
     load: (search, signal) => server.sdk.api.session.list({ parentID: null, search, limit: 50 }, { signal }),
     get: (sessionID, signal) => server.sdk.api.session.get({ sessionID }, { signal }),
@@ -63,9 +65,12 @@ export function HomeCommandPalette(props: {
   }
 
   const items = (query: string) => {
-    if (!query) return commandEntries().slice(0, 5)
+    if (!query) return [...commandEntries().slice(0, 5), ...sessions.items("")]
 
-    return commandEntries().filter((entry) => matchesCommandPaletteEntry(entry, query))
+    return [
+      ...commandEntries().filter((entry) => matchesCommandPaletteEntry(entry, query)),
+      ...sessions.items(query),
+    ]
   }
 
   onCleanup(() => {
@@ -77,7 +82,7 @@ export function HomeCommandPalette(props: {
     <CommandPaletteView
       placeholder={language.t("palette.search.placeholder.home")}
       items={items}
-      sources={[sessions]}
+      sources={[sessions.search]}
       highlight={highlight}
       select={select}
       close={() => dialog.close()}

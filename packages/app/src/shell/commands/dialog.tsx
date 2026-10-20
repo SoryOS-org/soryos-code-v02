@@ -13,32 +13,25 @@ import { useTabs } from "@/shell/tabs/tabs"
 import { SessionTabAvatar } from "@/shell/layout/session-tab-avatar"
 import { getRelativeTime } from "@/shell/time"
 import { createCommandPaletteFileEntry, createCommandPaletteModel, type CommandPaletteEntry } from "./palette"
-import { createCommandPaletteSearch } from "./search"
+import { createCommandPaletteSearch, matchesCommandPaletteEntry } from "./search"
 import "./dialog.css"
 
-function groups(entries: CommandPaletteEntry[]) {
-  const map = new Map<string, CommandPaletteEntry[]>()
+export { matchesCommandPaletteEntry }
 
-  for (const entry of entries) map.set(entry.category, [...(map.get(entry.category) ?? []), entry])
-
-  return Array.from(map.entries()).map(([category, entries]) => ({ category, entries }))
-}
-
-export function matchesCommandPaletteEntry(entry: CommandPaletteEntry, query: string) {
-  const value = query.toLowerCase()
-
-  return [entry.title, entry.description, entry.category, entry.keywords].some((text) =>
-    text?.toLowerCase().includes(value),
-  )
+function groupKey(entry: CommandPaletteEntry) {
+  return entry.type === "session" ? "session" : `${entry.type}:${entry.category}`
 }
 
 export function DialogCommandPalette(props: { onOpenFile?: (path: string) => void }) {
   const palette = createCommandPaletteModel(props)
 
   const items = (q: string) => {
-    if (!q) return [...palette.preferredCommandEntries(), ...palette.recentFileEntries()]
+    if (!q) return [...palette.preferredCommandEntries(), ...palette.recentFileEntries(), ...palette.sessions.items("")]
 
-    return palette.commandEntries().filter((entry) => matchesCommandPaletteEntry(entry, q))
+    return [
+      ...palette.commandEntries().filter((entry) => matchesCommandPaletteEntry(entry, q)),
+      ...palette.sessions.items(q),
+    ]
   }
 
   return (
@@ -46,9 +39,9 @@ export function DialogCommandPalette(props: { onOpenFile?: (path: string) => voi
       placeholder={palette.language.t("palette.search.placeholder")}
       items={items}
       sources={[
-        palette.sessions,
+        palette.sessions.search,
         async (query, signal) => {
-          if (!query) return []
+          if (!query) return palette.recentFileEntries()
           const files = await palette.file.searchFiles(query, { signal })
           const category = palette.language.t("palette.group.files")
 
@@ -76,7 +69,13 @@ export function CommandPaletteView(props: {
 
   const search = createCommandPaletteSearch({ query: () => store.query, items: props.items, sources: props.sources })
   const visibleEntries = search.items
-  const groupedEntries = createMemo(() => groups(visibleEntries()))
+  const entryById = createMemo(() => new Map(visibleEntries().map((entry) => [entry.id, entry] as const)))
+
+  const groupKeys = createMemo<string[]>((prev) => {
+    const next = [...new Set(visibleEntries().map(groupKey))]
+
+    return prev && prev.length === next.length && prev.every((key, index) => key === next[index]) ? prev : next
+  })
 
   // Follow the first result until the user explicitly chooses a row.
   const activeEntry = createMemo(
@@ -154,7 +153,14 @@ export function CommandPaletteView(props: {
             appearance="large"
             placeholder={props.placeholder}
             leadingIcon={<Icon name="magnifying-glass" />}
-            onInput={(event) => setStore({ query: event.currentTarget.value, active: undefined })}
+            onInput={(event) => {
+              const query = event.currentTarget.value
+              const active = store.active ? entryById().get(store.active) : undefined
+              setStore({
+                query,
+                active: active && matchesCommandPaletteEntry(active, query) ? store.active : undefined,
+              })
+            }}
             onKeyDown={handleKeyDown}
           />
         </div>
@@ -164,34 +170,55 @@ export function CommandPaletteView(props: {
               when={visibleEntries().length > 0}
               fallback={
                 <div class="command-palette-state">
-                  {search.loading() ? language.t("common.loading") : language.t("palette.empty")}
+                  {search.loading()
+                    ? language.t("common.loading")
+                    : search.failed()
+                      ? language.t("common.requestFailed")
+                      : language.t("palette.empty")}
                 </div>
               }
             >
-              <For each={groupedEntries()}>
-                {(group) => (
-                  <div class="command-palette-group">
-                    <Show when={group.category}>
-                      <div class="command-palette-group-title">{group.category}</div>
-                    </Show>
-                    <For each={group.entries}>
-                      {(item) => (
-                        <PaletteRow
-                          item={item}
-                          active={activeEntry()?.id === item.id}
-                          language={language}
-                          sessionOpen={
-                            item.server && item.sessionID
-                              ? openSessions().has(`${item.server}\0${item.sessionID}`)
-                              : false
-                          }
-                          onActive={() => setStore("active", item.id)}
-                          onSelect={() => props.select(item)}
-                        />
-                      )}
-                    </For>
-                  </div>
-                )}
+              <For each={groupKeys()}>
+                {(key) => {
+                  const entries = createMemo(() => visibleEntries().filter((entry) => groupKey(entry) === key))
+                  const category = createMemo(() => entries()[0]?.category ?? "")
+
+                  const ids = createMemo<string[]>((prev) => {
+                    const next = entries().map((entry) => entry.id)
+
+                    return prev && prev.length === next.length && prev.every((id, index) => id === next[index])
+                      ? prev
+                      : next
+                  })
+
+                  return (
+                    <div class="command-palette-group">
+                      <Show when={category()}>
+                        <div class="command-palette-group-title">{category()}</div>
+                      </Show>
+                      <For each={ids()}>
+                        {(id) => {
+                          const item = () => entryById().get(id) ?? entries()[0]!
+
+                          return (
+                            <PaletteRow
+                              item={item()}
+                              active={activeEntry()?.id === id}
+                              language={language}
+                              sessionOpen={
+                                item().server && item().sessionID
+                                  ? openSessions().has(`${item().server}\0${item().sessionID}`)
+                                  : false
+                              }
+                              onActive={() => setStore("active", id)}
+                              onSelect={() => props.select(item())}
+                            />
+                          )
+                        }}
+                      </For>
+                    </div>
+                  )
+                }}
               </For>
             </Show>
           </div>

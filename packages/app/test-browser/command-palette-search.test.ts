@@ -111,4 +111,36 @@ describe("command palette search", () => {
     expect(root.search.items()).toEqual([copy, file])
     root.dispose()
   })
+
+  test("filters previous remote results synchronously while a refined query is pending", async () => {
+    const first = Promise.withResolvers<CommandPaletteEntry[]>()
+    const second = Promise.withResolvers<CommandPaletteEntry[]>()
+    const otherFile: CommandPaletteEntry = { id: "file: readme.md", type: "file", title: "readme.md", category: "Files" }
+    const ready = Promise.withResolvers<void>()
+
+    const root = createRoot((dispose) => {
+      const [query, setQuery] = createSignal("c")
+
+      const search = createCommandPaletteSearch({
+        query,
+        items: (q) => (q === "c" ? [copy] : []),
+        sources: [(q) => (q === "c" ? first.promise : second.promise)],
+      })
+
+      createComputed(() => {
+        if (search.items().some((entry) => entry.id === file.id)) ready.resolve()
+      })
+
+      return { search, setQuery, dispose }
+    })
+
+    first.resolve([file, otherFile])
+    await ready.promise
+    expect(root.search.items()).toEqual([copy, file, otherFile])
+
+    root.setQuery("copy")
+    expect(root.search.loading()).toBe(true)
+    expect(root.search.items()).toEqual([file])
+    root.dispose()
+  })
 })

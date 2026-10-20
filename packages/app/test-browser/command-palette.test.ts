@@ -121,6 +121,47 @@ describe("command palette sessions", () => {
     expect(gets).toEqual([exact.id])
     expect(result).toMatchObject([{ sessionID: exact.id, title: exact.title }])
   })
+
+  test("matches known and loaded sessions synchronously while remote search is pending", async () => {
+    const server = ServerConnection.Key.make("selected-server")
+
+    const remote = {
+      ...session,
+      id: "session-2",
+      title: "Remote palette session",
+      time: { created: 2, updated: 4 },
+    }
+
+    await createRoot(async (dispose) => {
+      try {
+        const sessions = createServerSessionEntries({
+          server,
+          known: () => [session],
+          projects: () => [project],
+          load: async () => ({ data: [remote] }),
+          get: async () => session,
+          untitled: () => "Untitled",
+          category: () => "Session",
+          recentCategory: () => "Recent sessions",
+        })
+
+        expect(sessions.items("")).toMatchObject([
+          { sessionID: session.id, title: session.title, category: "Recent sessions" },
+        ])
+        expect(sessions.items("palette")).toMatchObject([
+          { sessionID: session.id, title: session.title, category: "Session" },
+        ])
+
+        await sessions.search("remote")
+        expect(sessions.items("palette")).toMatchObject([
+          { sessionID: remote.id, title: remote.title, category: "Session" },
+          { sessionID: session.id, title: session.title, category: "Session" },
+        ])
+      } finally {
+        dispose()
+      }
+    })
+  })
 })
 
 describe("command palette commands", () => {
