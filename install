@@ -306,7 +306,17 @@ download_with_progress() {
 
 download_and_install() {
     print_message info "\n${MUTED}Installing ${NC}$APP ${MUTED}version: ${NC}$specific_version"
-    local tmp_dir="${TMPDIR:-/tmp}/opencode_install_$$"
+    local tmp_root="${TMPDIR:-/tmp}"
+    # Git Bash and MSYS inherit TMPDIR as a Windows path, and tar reads the drive
+    # letter as a remote host ("C:path"), so convert it to a POSIX path.
+    if [[ "${os:-}" == "windows" && "$tmp_root" =~ ^[A-Za-z]: ]]; then
+        if command -v cygpath >/dev/null 2>&1; then
+            tmp_root=$(cygpath -u "$tmp_root")
+        else
+            tmp_root=/tmp
+        fi
+    fi
+    local tmp_dir="$tmp_root/opencode_install_$$"
     mkdir -p "$tmp_dir"
 
     if [[ "$os" == "windows" ]] || ! [ -t 2 ] || ! download_with_progress "$url" "$tmp_dir/$filename"; then
