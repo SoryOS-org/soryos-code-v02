@@ -714,6 +714,22 @@ const detectMaxTokensField = (
   return "max_completion_tokens"
 }
 
+// `store` defaults to false on OpenAI and Azure, but org-level logging can still
+// store requests that omit it, so send an explicit `store: false` there. Strict
+// OpenAI-style APIs reject the field with a 400, so omit it everywhere else.
+const detectSupportsStore = (provider: string, baseURL: string | undefined): boolean => {
+  const p = provider.toLowerCase()
+  const url = (baseURL ?? "").toLowerCase()
+  return (
+    p === "openai" ||
+    p === "azure" ||
+    url.includes("api.openai.com") ||
+    url.includes(".openai.azure.com") ||
+    url.includes(".cognitiveservices.azure.com") ||
+    url.includes(".services.ai.azure.com")
+  )
+}
+
 const detectSupportsUsageInStreaming = (): boolean => true
 
 const detectSupportsStrictMode = (provider: string, baseURL: string | undefined): boolean => {
@@ -750,9 +766,6 @@ const lowerOptions = (request: LLMRequest, supportsStore: boolean) => {
   const cacheKey =
     (request.model.compatibility?.supportsPromptCacheKey ?? false) ? ProviderShared.promptCacheKey(request) : undefined
   return {
-    // Strict OpenAI-style APIs reject `store` with a 400, so only send it where
-    // compatibility opts in. Those providers get an explicit `store: false`
-    // because org-level logging settings can store omitted requests.
     ...(supportsStore ? { store: options.store ?? false } : {}),
     ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
     ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
@@ -776,7 +789,7 @@ export const fromRequest = Effect.fn("OpenAIChat.fromRequest")(function* (
   const baseURL = request.model.route.endpoint.baseURL
   const detectedMaxTokensField = detectMaxTokensField(provider, baseURL)
   const maxTokensField = request.model.compatibility?.maxTokensField ?? detectedMaxTokensField
-  const supportsStore = request.model.compatibility?.supportsStore ?? false
+  const supportsStore = request.model.compatibility?.supportsStore ?? detectSupportsStore(provider, baseURL)
   const supportsUsageInStreaming =
     request.model.compatibility?.supportsUsageInStreaming ?? detectSupportsUsageInStreaming()
   const supportsStrictMode =

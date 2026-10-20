@@ -57,21 +57,33 @@ describe("OpenAI Chat route", () => {
         ],
         stream: true,
         stream_options: { include_usage: true },
+        store: false,
         max_completion_tokens: 20,
         temperature: 0,
       })
     }),
   )
 
-  it.effect("sends store only when compatibility opts in", () =>
+  it.effect("sends store only to OpenAI and Azure unless compatibility opts in", () =>
     Effect.gen(function* () {
+      const compatible = OpenAICompatible.configure({ baseURL: "https://api.compatible.test/v1", apiKey: "test" })
       const omitted = yield* compileRequest(
-        LLM.request({ model, prompt: "Say hello.", providerOptions: { store: true } }),
+        LLM.request({ model: compatible.model("compatible-model"), prompt: "Hello", providerOptions: { store: true } }),
       )
-      const stateless = yield* compileRequest(
+      const optedIn = yield* compileRequest(
         LLM.request({
-          model: LanguageModel.update(model, { compatibility: { supportsStore: true } }),
-          prompt: "Say hello.",
+          model: LanguageModel.update(compatible.model("compatible-model"), {
+            compatibility: { supportsStore: true },
+          }),
+          prompt: "Hello",
+        }),
+      )
+      const openaiHost = yield* compileRequest(
+        LLM.request({
+          model: OpenAICompatible.configure({ baseURL: "https://api.openai.com/v1", apiKey: "test" }).model(
+            "gpt-4o-mini",
+          ),
+          prompt: "Hello",
         }),
       )
       const azure = yield* compileRequest(
@@ -79,12 +91,13 @@ describe("OpenAI Chat route", () => {
           model: Azure.configure({ baseURL: "https://opencode-test.openai.azure.com/openai/", apiKey: "test" }).chat(
             "gpt-4o-mini",
           ),
-          prompt: "Say hello.",
+          prompt: "Hello",
         }),
       )
 
       expect(omitted.body).not.toHaveProperty("store")
-      expect(stateless.body.store).toBe(false)
+      expect(optedIn.body.store).toBe(false)
+      expect(openaiHost.body.store).toBe(false)
       expect(azure.body.store).toBe(false)
     }),
   )
@@ -492,6 +505,7 @@ describe("OpenAI Chat route", () => {
         tools: [],
         stream: true,
         stream_options: { include_usage: true },
+        store: false,
       })
     }),
   )
