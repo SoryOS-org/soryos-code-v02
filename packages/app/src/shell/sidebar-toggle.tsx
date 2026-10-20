@@ -11,8 +11,8 @@ import { useSettings } from "@/settings/model"
 
 // The traffic lights' top-left corner in native pixels, as Electron's `trafficLightPosition`. The horizontal titlebar keeps
 // the window's default. With vertical tabs they center on the sidebar toggle's row, 32px down (the shell's 8px inset plus
-// half the 48px header), and on the column of the sidebar's icons below them, 24px in.
-export const macTrafficLightPosition = { horizontal: { x: 14, y: 14 }, vertical: { x: 17, y: 25 } }
+// half the 48px header), and sit as far in from the window's left edge as from its top, so the corner stays square.
+export const macTrafficLightPosition = { horizontal: { x: 14, y: 14 }, vertical: { x: 25, y: 25 } }
 
 // macOS 26 and later draw 14px buttons on a 23px pitch, so the zoom button ends 60px past the corner. macOS 15 and
 // earlier end 6px sooner.
