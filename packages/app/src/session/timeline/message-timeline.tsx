@@ -127,6 +127,7 @@ function MessageTimelineView(
   },
 ) {
   const language = useLanguage()
+  const command = useCommand()
   const server = useServer()
   const data = server.ctx.data
   const sdk = useWorkspaceLocation()
@@ -287,6 +288,21 @@ function MessageTimelineView(
 
     if (await props.action.rename(title.draft)) setTitle("editing", false)
   }
+
+  command.register(() =>
+    props.active === false || props.hideHeader
+      ? []
+      : [
+          {
+            id: "session.rename",
+            category: language.t("command.category.session"),
+            title: language.t("command.session.rename"),
+            keybind: "ctrl+r",
+            disabled: !sessionID() || !!parentID() || title.editing,
+            onSelect: openTitleEditor,
+          },
+        ],
+  )
 
   createEffect(() => {
     if (props.active !== false) return
