@@ -16,7 +16,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macTrafficLightsBaseWidth, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macTrafficLightsBaseWidth, macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -45,6 +45,9 @@ const minTitlebarZoom = 0.25
 const windowsControlsBaseWidth = 138 // 3 native Windows caption buttons at 46px each.
 
 const macTrafficLightsTopClearance = 28
+
+// Matches the desktop window's `trafficLightPosition`.
+const macTrafficLightsDefaultPosition = { x: 14, y: 14 }
 
 // iOS blurs page content just below the status bar in Home Screen web apps, so with a top safe area the phone
 // titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
@@ -80,6 +83,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   }
 
   const windowsControlsWidth = () => `${windowsControlsBaseWidth / Math.max(titlebarZoom(), 1)}px`
+
+  // The vertical sidebar header's center line scales with zoom, so the 14pt traffic lights follow it. The horizontal
+  // titlebar stays at the window's default position.
+  createEffect(() => {
+    if (!mac()) return
+    void platform.setTrafficLightsPosition?.(
+      macVerticalTabs() ? macVerticalTrafficLights(zoom()) : macTrafficLightsDefaultPosition,
+    )
+  })
 
   const [history, setHistory] = createStore<{
     stack: HistoryLocation[]
@@ -790,7 +802,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                   {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
                                   <div
                                     class="shrink-0"
-                                    style={{ width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)` }}
+                                    style={{
+                                      width: `calc(${macVerticalTrafficLights(zoom()).width / zoom()}px - 10px)`,
+                                    }}
                                     aria-hidden="true"
                                   />
                                 </Show>

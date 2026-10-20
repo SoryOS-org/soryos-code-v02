@@ -9,10 +9,19 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
 
-// The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`. macOS 26 and later draw 14px buttons on a 23px
-// pitch, so the zoom button ends 74px from the window edge and the buttons center 21px from the top. macOS 15 and earlier
-// end at 68px and center at 22px.
+// The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`, and the titlebar moves the buttons down to share the
+// header's center line in vertical tabs. macOS 26 and later draw 14px buttons on a 23px pitch, so the zoom button ends
+// 74px from the window edge. macOS 15 and earlier end at 68px.
 export const macTrafficLightsBaseWidth = 74
+
+// Vertical tabs center the 14pt traffic lights on the session header's center line, 32px from the top, and inset them as
+// far from the left edge as from the top. The center scales with zoom. Returns window points; `width` is where the zoom
+// button ends.
+export function macVerticalTrafficLights(zoom: number) {
+  const inset = 32 * zoom - 7
+
+  return { x: inset, y: inset, width: inset + macTrafficLightsBaseWidth - 14 }
+}
 
 // Matches the horizontal titlebar, whose first control starts 16px past the traffic lights.
 const macTrafficLightsGap = 16
@@ -73,7 +82,10 @@ function useCollapsedSlot() {
     // Lays the toggle out as if the traffic lights were the header's first control.
     width: () =>
       mac()
-        ? macTrafficLightsBaseWidth / (platform.webviewZoom?.() ?? 1) + macTrafficLightsGap - contentStart + slotWidth
+        ? macVerticalTrafficLights(platform.webviewZoom?.() ?? 1).width / (platform.webviewZoom?.() ?? 1) +
+          macTrafficLightsGap -
+          contentStart +
+          slotWidth
         : slotWidth,
   }
 }
