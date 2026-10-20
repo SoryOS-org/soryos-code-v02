@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, type Ref } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, Show, type Ref } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Predicate } from "effect"
 import { makeEventListener } from "@solid-primitives/event-listener"
@@ -70,10 +70,6 @@ export function TabNavItem(props: {
   }
 
   const dotted = () => status() === "attention" || status() === "unread"
-
-  // Status marks fade in only after the first paint, so tabs open at rest.
-  const [settled, setSettled] = createSignal(false)
-  onMount(() => requestAnimationFrame(() => setSettled(true)))
 
   const project = createMemo(() => {
     const session = props.session
@@ -254,7 +250,6 @@ export function TabNavItem(props: {
       classList={{ invisible: props.hidden }}
       data-active={props.active}
       data-status={status()}
-      data-settled={settled() || undefined}
       data-dragging={props.dragging}
       data-state={props.active || props.pressed ? "pressed" : undefined}
       onMouseDown={(event) => {

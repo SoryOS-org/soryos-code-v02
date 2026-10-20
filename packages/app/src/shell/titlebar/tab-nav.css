@@ -32,31 +32,7 @@
   top: -3px;
 }
 
-/*
- * Status sits where the close button appears. Marks change on Kit's snappy spring (.25 s, bounce 0, sampled);
- * hover cross-fades status out (110 ms) and the close button in (150 ms), and back.
- */
-[data-titlebar-tab] {
-  --tab-status-spring: linear(
-    0,
-    0.091,
-    0.266,
-    0.445,
-    0.597,
-    0.715,
-    0.803,
-    0.866,
-    0.91,
-    0.94,
-    0.96,
-    0.974,
-    0.983,
-    0.989,
-    0.993,
-    1
-  );
-}
-
+/* Status sits where the close button appears; marks and the hover swap change instantly. */
 [data-titlebar-tab] [data-slot="tab-status"] {
   position: absolute;
   inset-block: 0;
@@ -67,50 +43,32 @@
   height: 20px;
   place-items: center;
   pointer-events: none;
-  transition: opacity 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 [data-titlebar-tab] [data-slot="tab-status"] > [data-mark] {
   grid-area: 1 / 1;
   display: none;
-  opacity: 0;
-  transition:
-    opacity 250ms var(--tab-status-spring),
-    display 250ms allow-discrete;
 }
 
 [data-titlebar-tab][data-status="busy"] [data-mark="busy"],
 [data-titlebar-tab][data-status="attention"] [data-mark="attention"],
 [data-titlebar-tab][data-status="unread"] [data-mark="unread"] {
   display: block;
-  opacity: 1;
-  transition:
-    opacity 300ms var(--tab-status-spring),
-    display 300ms allow-discrete;
-}
-
-@starting-style {
-  [data-titlebar-tab][data-settled] [data-slot="tab-status"] > [data-mark] {
-    opacity: 0;
-  }
 }
 
 [data-titlebar-tab] [data-slot="tab-close"] > button {
-  transition: opacity 110ms cubic-bezier(0.4, 0, 1, 1);
+  transition: none;
 }
 
 /* Every row, the active one included, shows the close button only on hover or keyboard focus. */
 [data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-editing="true"]) [data-slot="tab-close"] > button {
   opacity: 1;
-  transition: opacity 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (hover: hover) {
   [data-titlebar-tab]:not(:where([data-slot="mobile-tabs-drawer"] *)):is(:hover, :has(:focus-visible))
     [data-slot="tab-status"] {
     opacity: 0;
-    transition-duration: 110ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
   }
 }
 
