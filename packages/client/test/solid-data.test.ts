@@ -1245,3 +1245,215 @@ async function wait(check: () => boolean) {
     await Bun.sleep(10)
   }
 }
+
+for (const children of [false, true]) {
+  for (const cached of [false, true]) {
+    test(`preserves live movement across a delayed ${children ? "family" : "single"} read with cached=${cached}`, async () => {
+      const started = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<void>()
+      const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+      const original = session(0)
+      const child: SessionInfo = { ...original, id: "ses_child", parentID: original.id }
+      const target = children ? child : original
+      let moved = false
+      const api = OpenCode.make({
+        baseUrl: "http://opencode.local",
+        fetch: async (input, init) => {
+          const url = new URL((input instanceof Request ? input : new Request(input, init)).url)
+          if (url.pathname === `/api/session/${original.id}`) {
+            const snapshot =
+              moved && !children
+                ? { ...original, location: { directory: "/moved" }, projectID: "new-project" }
+                : original
+            if (!children) {
+              started.resolve()
+              await release.promise
+            }
+            return Response.json({ data: snapshot })
+          }
+          if (url.pathname === "/api/session") {
+            const snapshot = moved ? { ...child, location: { directory: "/moved" }, projectID: "new-project" } : child
+            started.resolve()
+            await release.promise
+            return Response.json({ data: [snapshot], cursor: {} })
+          }
+          if (url.pathname === `/api/session/${child.id}`)
+            return Response.json({ data: { ...child, location: { directory: "/moved" }, projectID: "new-project" } })
+          throw new Error(`Unexpected request: ${url}`)
+        },
+      })
+      const setup = createRoot((dispose) => ({
+        data: createData({
+          api: () => api,
+          directory: "/project",
+          event: {
+            on: () => () => {},
+            listen(handler) {
+              listeners.add(handler)
+              return () => listeners.delete(handler)
+            },
+          },
+        }),
+        dispose,
+      }))
+      try {
+        if (cached) setup.data.session.remember(structuredClone(target))
+        // Family reads use their own sync key, including when the child is already cached.
+        if (cached && !children) setup.data.session.invalidate(original.id)
+        const pending = setup.data.session.sync(original.id, { children })
+        await started.promise
+        const event: OpenCodeEvent = {
+          id: "evt_moved_read",
+          created: 3,
+          type: "session.moved",
+          durable: { aggregateID: target.id, seq: 1, version: 1 },
+          data: { sessionID: target.id, location: { directory: "/moved" }, projectID: "new-project" },
+        }
+        moved = true
+        listeners.forEach((listener) => listener({ name: event.type, details: event }))
+        release.resolve()
+        await pending
+        expect(setup.data.session.get(target.id)).toMatchObject({
+          location: { directory: "/moved" },
+          projectID: "new-project",
+        })
+      } finally {
+        release.resolve()
+        setup.dispose()
+      }
+    })
+  }
+}
+
+test("preserves the latest movement across concurrent single and family snapshots", async () => {
+  const single = Promise.withResolvers<void>()
+  const family = Promise.withResolvers<void>()
+  const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+  const original = {
+    ...session(0),
+    location: { directory: "/project", workspaceID: "workspace_old" },
+    subpath: "old-subdirectory",
+  }
+  let requests = 0
+  const api = OpenCode.make({
+    baseUrl: "http://opencode.local",
+    fetch: async (input, init) => {
+      const url = new URL((input instanceof Request ? input : new Request(input, init)).url)
+      if (url.pathname === "/api/session") return Response.json({ data: [], cursor: {} })
+      requests++
+      if (requests > 2) throw new Error("The transport became unavailable after the admitted reads")
+      await (requests === 1 ? single.promise : family.promise)
+      return Response.json({ data: original })
+    },
+  })
+  const setup = createRoot((dispose) => ({
+    data: createData({
+      api: () => api,
+      directory: "/project",
+      event: {
+        on: () => () => {},
+        listen(handler) {
+          listeners.add(handler)
+          return () => listeners.delete(handler)
+        },
+      },
+    }),
+    dispose,
+  }))
+  try {
+    setup.data.session.remember(structuredClone(original))
+    setup.data.session.invalidate(original.id)
+    const a = setup.data.session.sync(original.id)
+    const b = setup.data.session.sync(original.id, { children: true })
+    await wait(() => requests === 2)
+    for (const [index, directory] of ["/first", "/latest"].entries()) {
+      const event: OpenCodeEvent = {
+        id: `evt_move_${index}`,
+        created: index + 3,
+        type: "session.moved",
+        durable: { aggregateID: original.id, seq: index + 1, version: 1 },
+        data: { sessionID: original.id, location: { directory }, ...(index === 0 ? { projectID: "new-project" } : {}) },
+      }
+      listeners.forEach((listener) => listener({ name: event.type, details: event }))
+    }
+    family.resolve()
+    await b
+    single.resolve()
+    await a
+    expect(setup.data.session.get(original.id)?.location.directory).toBe("/latest")
+    expect(setup.data.session.get(original.id)?.projectID).toBe("new-project")
+    expect(setup.data.session.get(original.id)?.location.workspaceID).toBeUndefined()
+    expect(setup.data.session.get(original.id)?.subpath).toBeUndefined()
+  } finally {
+    single.resolve()
+    family.resolve()
+    setup.dispose()
+  }
+})
+
+for (const children of [false, true]) {
+  for (const freshFails of [false, true]) {
+    test(`retries a pre-move ${children ? "family" : "single"} failure without hiding a fresh failure=${freshFails}`, async () => {
+      const started = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<void>()
+      const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+      let requests = 0
+      const target: SessionInfo = children ? { ...session(0), id: "ses_child", parentID: "ses_refresh" } : session(0)
+      const api = OpenCode.make({
+        baseUrl: "http://opencode.local",
+        fetch: async (input, init) => {
+          const url = new URL((input instanceof Request ? input : new Request(input, init)).url)
+          if (children && url.pathname !== "/api/session") return Response.json({ data: session(0) })
+          requests++
+          if (requests === 1) {
+            started.resolve()
+            await release.promise
+            return new Response("Old location unavailable", { status: 500 })
+          }
+          if (requests === 2 && freshFails) return new Response("Still unavailable", { status: 500 })
+          const moved = { ...target, location: { directory: "/moved" } }
+          return Response.json(children ? { data: [moved], cursor: {} } : { data: moved })
+        },
+      })
+      const setup = createRoot((dispose) => ({
+        data: createData({
+          api: () => api,
+          directory: "/project",
+          event: {
+            on: () => () => {},
+            listen(handler) {
+              listeners.add(handler)
+              return () => listeners.delete(handler)
+            },
+          },
+        }),
+        dispose,
+      }))
+      try {
+        const pending = setup.data.session.sync("ses_refresh", { children })
+        // Observe rejection immediately, before deliberately releasing the failed transport.
+        const outcome = pending.then(
+          () => "resolved",
+          () => "rejected",
+        )
+        await started.promise
+        const event: OpenCodeEvent = {
+          id: "evt_move_failure",
+          created: 3,
+          type: "session.moved",
+          durable: { aggregateID: target.id, seq: 1, version: 1 },
+          data: { sessionID: target.id, location: { directory: "/moved" } },
+        }
+        listeners.forEach((listener) => listener({ name: event.type, details: event }))
+        release.resolve()
+        expect(await outcome).toBe(freshFails ? "rejected" : "resolved")
+        if (freshFails) await setup.data.session.sync("ses_refresh", { children })
+        expect(setup.data.session.get(target.id)?.location.directory).toBe("/moved")
+        expect(requests).toBe(freshFails ? 3 : 2)
+      } finally {
+        release.resolve()
+        setup.dispose()
+      }
+    })
+  }
+}
