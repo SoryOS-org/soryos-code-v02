@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { currentValue } from "./select-options"
-import { rpcError, secondModel, startWire } from "./wire-fixture"
+import { makeSession, rpcError, secondModel, startWire } from "./wire-fixture"
 
 describe("acp catalog and config options over the wire", () => {
   test("switches model, effort, and mode against the warm catalog", async () => {
@@ -67,5 +67,92 @@ describe("acp catalog and config options over the wire", () => {
       }),
     )
     expect(currentValue(selected, "model")).toBe("test/second-model")
+  })
+})
+
+describe("ACP transient plugin activation failures", () => {
+  for (const method of ["session/new", "session/load", "session/resume"] as const) {
+    test(`${method} retries a catalog read while plugins are still activating`, async () => {
+      let reads = 0
+      let checks = 0
+      await using acp = await startWire({
+        fetch(request) {
+          if (request.path === "/api/plugin" && ++checks === 2) {
+            return Response.json({
+              location: { directory: "/workspace", project: { id: "global", directory: "/workspace" } },
+              data: [],
+            })
+          }
+          if (request.path !== "/api/model" || ++reads !== 1) return
+          return Response.json(
+            {
+              _tag: "ServiceUnavailableError",
+              service: "plugin",
+              message: "Location plugins did not finish activating",
+            },
+            { status: 503 },
+          )
+        },
+      })
+      acp.server.sessions.set("ses_cold", makeSession("ses_cold"))
+      await acp.initialize()
+      const response =
+        method === "session/new"
+          ? await acp.newSession()
+          : await acp.request(method, { cwd: "/workspace", sessionId: "ses_cold", mcpServers: [] })
+      expect(response.configOptions).toContainEqual(expect.objectContaining({ id: "model" }))
+      expect(reads).toBe(2)
+      expect(checks).toBe(3)
+    })
+  }
+
+  for (const service of ["database", undefined]) {
+    test(`does not retry unavailable ${service ?? "unspecified"} services`, async () => {
+      let reads = 0
+      await using acp = await startWire({
+        fetch(request) {
+          if (request.path !== "/api/model") return
+          reads++
+          return Response.json({ _tag: "ServiceUnavailableError", service, message: "unavailable" }, { status: 503 })
+        },
+      })
+      await acp.initialize()
+      expect(await rpcError(acp.newSession())).toMatchObject({
+        code: -32603,
+        data: { errorName: "ServiceUnavailableError" },
+      })
+      expect(reads).toBe(1)
+      expect(acp.server.sessions.size).toBe(0)
+    })
+  }
+
+  test("closing ACP cancels a catalog load that is retrying activation", async () => {
+    let reads = 0
+    const acp = await startWire({
+      fetch(request) {
+        if (request.path !== "/api/model") return
+        reads++
+        return Response.json(
+          {
+            _tag: "ServiceUnavailableError",
+            service: "plugin",
+            message: "Location plugins did not finish activating",
+          },
+          { status: 503 },
+        )
+      },
+    })
+    try {
+      await acp.initialize()
+      const pending = acp.newSession().then(
+        () => "completed",
+        () => "cancelled",
+      )
+      await acp.until(() => reads >= 2, "activation retry")
+      await acp[Symbol.asyncDispose]()
+      expect(await pending).toBe("cancelled")
+    } finally {
+      await acp[Symbol.asyncDispose]()
+    }
   })
 })
