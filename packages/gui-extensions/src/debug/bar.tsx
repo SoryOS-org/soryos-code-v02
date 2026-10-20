@@ -196,6 +196,7 @@ export default function DebugBar(props: {
   diagnostics?: boolean
   inline?: boolean
   motion?: { open: boolean; toggle: () => void }
+  type?: { open: boolean; toggle: () => void }
 }) {
   const ctx = useExtension()
   const router = ctx.router
@@ -757,6 +758,14 @@ export default function DebugBar(props: {
               tip={ctx.t("slow.tip")}
               value={ctx.t(globals().slow ? "focus.on" : "focus.off")}
               onClick={() => motionTuning.set(motionGlobals.slow, !globals().slow)}
+            />
+            <ToggleCell
+              active={!!props.type?.open}
+              inline={props.inline}
+              label={ctx.t("type.label")}
+              tip={ctx.t("type.tip")}
+              value={ctx.t(props.type?.open ? "focus.on" : "focus.off")}
+              onClick={() => props.type?.toggle()}
             />
             <ToggleCell
               active={!!props.motion?.open}
