@@ -68,7 +68,7 @@
   h3 {
     font-size: 14px;
     color: var(--v2-text-text-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-bold);
     margin-top: 20px;
     margin-bottom: 8px;
     line-height: var(--line-height-large);
