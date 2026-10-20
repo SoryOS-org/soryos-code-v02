@@ -27,6 +27,7 @@ import { parseCommentNote, readPromptPresentation } from "@/composer/comment-not
 import { parseVoiceDelegation } from "./voice-delegation"
 import { useCommand } from "@/shell/commands/command"
 import { useExtensionScoped } from "@/runtime/extension/commands"
+import { useSettings } from "@/settings/model"
 import {
   SessionAncestorTrail,
   SessionHeaderLayout,
@@ -132,6 +133,7 @@ function MessageTimelineView(
   const language = useLanguage()
   const command = useCommand()
   const extensionScoped = useExtensionScoped()
+  const settings = useSettings()
   const server = useServer()
   const data = server.ctx.data
   const sdk = useWorkspaceLocation()
@@ -464,7 +466,7 @@ function MessageTimelineView(
   return (
     <VirtualizedTimeline
       navigator={
-        <Show when={props.onRevealTurn && sessionID()} keyed>
+        <Show when={settings.general.showTurnNavigator() && props.onRevealTurn && sessionID()} keyed>
           {(id) => (
             <TurnNavigator
               sessionID={id}
