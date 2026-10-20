@@ -35,6 +35,7 @@
   "exports": {
     "./package.json": "./package.json",
     "./accordion": "./src/data-display/accordion/accordion.tsx",
+    "./activity-ring": "./src/feedback/activity-ring/activity-ring.tsx",
     "./avatar": "./src/data-display/avatar/avatar.tsx",
     "./badge": "./src/data-display/badge/badge.tsx",
     "./button": "./src/actions/button/button.tsx",

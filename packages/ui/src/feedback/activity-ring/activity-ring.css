@@ -1,0 +1,32 @@
+[data-component="activity-ring"] {
+  display: block;
+  flex-shrink: 0;
+  color: var(--v2-icon-icon-muted);
+  /* The tail fades in to a solid head; the head's round cap still gets full colour just past the arc. */
+  mask-image: conic-gradient(from 90deg, transparent 0turn, black 0.72turn, black 0.78turn, transparent 0.9turn);
+  animation: activity-ring-spin 800ms linear infinite;
+}
+
+[data-component="activity-ring"] circle {
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+@keyframes activity-ring-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-contrast: more) {
+  [data-component="activity-ring"] {
+    mask-image: none;
+  }
+}
+
+:root[data-motion="reduce"] {
+  [data-component="activity-ring"] {
+    animation: none;
+  }
+}

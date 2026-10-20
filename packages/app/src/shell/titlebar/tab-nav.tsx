@@ -1,8 +1,9 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show, type Ref } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, onMount, Show, type Ref } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Predicate } from "effect"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
+import { ActivityRing } from "@opencode/ui/activity-ring"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
@@ -11,7 +12,6 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { displayName } from "@opencode/ui/project-avatar"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
-import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import type { SessionInfo } from "@opencode/client/promise"
 import { sessionTabTitle } from "./tab-title"
 import { TabPreviewPopover } from "./tab-popover"
@@ -27,6 +27,7 @@ export function TabNavItem(props: {
   session: SessionInfo | undefined
   preparing: boolean
   unread: boolean
+  attention: boolean
   loading: boolean
   fallbackTitle?: string
   fallbackDirectory?: string
@@ -57,7 +58,22 @@ export function TabNavItem(props: {
   const servers = useServers()
   const serverCtx = useServerCtx(() => servers.list.find((item) => ServerConnection.key(item) === props.server))
 
-  const unread = () => !!props.session && !props.active && props.unread
+  // The project icon stays put; status shows where the close button appears on hover.
+  const status = () => {
+    if (props.preparing || props.loading) return "busy"
+
+    if (!props.session || props.active) return
+
+    if (props.attention) return "attention"
+
+    if (props.unread) return "unread"
+  }
+
+  const dotted = () => status() === "attention" || status() === "unread"
+
+  // Status marks fade in only after the first paint, so tabs open at rest.
+  const [settled, setSettled] = createSignal(false)
+  onMount(() => requestAnimationFrame(() => setSettled(true)))
 
   const project = createMemo(() => {
     const session = props.session
@@ -237,7 +253,8 @@ export function TabNavItem(props: {
       class="group relative flex h-7 w-full min-w-0 select-none flex-row items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-[6px] px-1.5 [container-type:inline-size]"
       classList={{ invisible: props.hidden }}
       data-active={props.active}
-      data-unread={unread()}
+      data-status={status()}
+      data-settled={settled() || undefined}
       data-dragging={props.dragging}
       data-state={props.active || props.pressed ? "pressed" : undefined}
       onMouseDown={(event) => {
@@ -290,47 +307,14 @@ export function TabNavItem(props: {
       >
         <span data-slot="project-avatar-slot" class="flex size-4 shrink-0 items-center justify-center">
           <Show
-            when={props.session}
-            keyed
+            when={props.session?.location.directory ?? props.fallbackDirectory}
             fallback={
-              <Show
-                when={props.preparing}
-                fallback={
-                  // The remembered directory keeps the project avatar while the server is unreachable.
-                  <Show
-                    when={props.fallbackDirectory}
-                    fallback={
-                      <span
-                        class="block size-4 rounded-[3px] border border-v2-border-border-muted"
-                        aria-hidden="true"
-                      />
-                    }
-                  >
-                    {(directory) => (
-                      <SessionTabAvatarView
-                        project={project()}
-                        directory={directory()}
-                        unread={false}
-                        loading={false}
-                      />
-                    )}
-                  </Show>
-                }
-              >
-                <SessionProgressIndicatorV2 />
-              </Show>
+              <span class="block size-4 rounded-[3px] border border-v2-border-border-muted" aria-hidden="true" />
             }
           >
-            {(session) => (
-              <SessionTabAvatarView
-                project={project()}
-                directory={session.location.directory}
-                unread={false}
-                loading={props.loading}
-              />
-            )}
+            {(directory) => <SessionTabAvatarView project={project()} directory={directory()} unread={false} />}
           </Show>
-          <Show when={unread()}>
+          <Show when={dotted()}>
             <span data-slot="tab-avatar-unread-dot" aria-hidden="true" />
           </Show>
         </span>
@@ -377,15 +361,15 @@ export function TabNavItem(props: {
       </Menu.Context.Trigger>
 
       <div data-slot="tab-close">
-        <Show when={unread()}>
-          <span data-slot="tab-unread-slot" aria-hidden="true">
-            <span data-slot="tab-unread-dot" />
-          </span>
-        </Show>
+        <span data-slot="tab-status" aria-hidden="true">
+          <ActivityRing data-mark="busy" />
+          <span data-mark="attention" data-slot="tab-status-dot" />
+          <span data-mark="unread" data-slot="tab-status-dot" />
+        </span>
         <IconButton
           size="small"
           variant="ghost-muted"
-          class="hover-reveal relative z-10 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 group-data-[active=true]:opacity-100 group-data-[editing=true]:opacity-100"
+          class="hover-reveal relative z-10"
           onPointerDown={(event) => {
             event.preventDefault()
             event.stopPropagation()

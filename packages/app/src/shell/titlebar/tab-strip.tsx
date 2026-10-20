@@ -29,6 +29,7 @@ function SessionTabSlot(props: {
   session: SessionInfo | undefined
   preparing: boolean
   unread: boolean
+  attention: boolean
   loading: boolean
   fallbackTitle?: string
   fallbackDirectory?: string
@@ -72,6 +73,7 @@ function SessionTabSlot(props: {
         session={props.session}
         preparing={props.preparing}
         unread={props.unread}
+        attention={props.attention}
         loading={props.loading}
         fallbackTitle={props.fallbackTitle}
         fallbackDirectory={props.fallbackDirectory}
@@ -224,13 +226,14 @@ function SessionTabEntry(props: {
         session={session()}
         preparing={!!pending()}
         unread={unread()}
+        attention={status.attention()}
         loading={status.loading()}
         fallbackTitle={
           pending()
             ? language.t("session.tab.session")
             : (persisted()?.title ?? (missingSession() ? language.t("session.tab.unknown") : undefined))
         }
-        fallbackDirectory={persisted()?.directory}
+        fallbackDirectory={pending()?.draft.directory ?? persisted()?.directory}
         onRename={rename}
         onNavigate={props.onNavigate}
         onClose={props.onClose}

@@ -75,7 +75,8 @@ test("inactive session attention dots share the close control without marking th
   await page.goto(sessionHref(a.id))
   const tabA = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(a.id)}"])`)
   const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(b.id)}"])`)
-  const dot = tabB.locator('[data-slot="tab-unread-dot"]')
+  const dot = tabB.locator('[data-mark="attention"]')
+  const status = tabB.locator('[data-slot="tab-status"]')
   const close = tabB.getByRole("button", { name: "Close tab", exact: true })
   await expect(tabA.locator('[data-slot="tab-title"]')).toHaveText(a.title)
   await expect(tabB.locator('[data-slot="tab-title"]')).toHaveText(b.title)
@@ -99,21 +100,21 @@ test("inactive session attention dots share the close control without marking th
     .toBeLessThan(1)
 
   await tabB.hover()
-  await expect(dot).toBeHidden()
+  await expect(status).toHaveCSS("opacity", "0")
   await expect(close).toHaveCSS("opacity", "1")
   await page.mouse.move(0, 0)
   await tabB.locator("[data-titlebar-tab-link]").focus()
   await page.keyboard.press("Tab")
   await expect(close).toBeFocused()
-  await expect(dot).toBeHidden()
+  await expect(status).toHaveCSS("opacity", "0")
   await expect(close).toHaveCSS("opacity", "1")
   await close.blur()
-  await expect(dot).toBeVisible()
+  await expect(status).toHaveCSS("opacity", "1")
 
   await tabB.locator("[data-titlebar-tab-link]").click()
   await expectPath(page, sessionHref(b.id))
   await expect(tabB).toHaveAttribute("data-active", "true")
-  await expect(dot).toHaveCount(0)
+  await expect(dot).toBeHidden()
   await tabA.locator("[data-titlebar-tab-link]").click()
   await expectPath(page, sessionHref(a.id))
   await page.mouse.move(0, 0)
@@ -189,7 +190,7 @@ test("option arrows move to the previous or next tab, and with shift to the next
   await page.goto(sessionHref(a.id))
   await page.mouse.move(0, 0)
   await expect(
-    page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(c.id)}"]) [data-slot="tab-unread-dot"]`),
+    page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(c.id)}"]) [data-mark="attention"]`),
   ).toBeVisible()
 
   await page.keyboard.press("Alt+ArrowDown")
@@ -281,13 +282,13 @@ for (const row of [
       await expect(tabA).toHaveAttribute("data-active", "true")
       await expect(tabA.locator('[data-slot="tab-close"]')).toBeVisible()
       await expect(tabB.locator('[data-slot="tab-close"]')).toBeVisible()
-      await expect(tabB.locator('[data-slot="tab-unread-dot"]')).toBeVisible()
-      await expect(tabB.locator('[data-slot="tab-unread-slot"]')).toHaveCSS("width", "20px")
-      await expect(tabB.locator('[data-slot="tab-unread-slot"]')).toHaveCSS("height", "20px")
+      await expect(tabB.locator('[data-mark="attention"]')).toBeVisible()
+      await expect(tabB.locator('[data-slot="tab-status"]')).toHaveCSS("width", "20px")
+      await expect(tabB.locator('[data-slot="tab-status"]')).toHaveCSS("height", "20px")
       await expect
         .poll(() =>
           tabB.evaluate((element) => {
-            const dot = element.querySelector('[data-slot="tab-unread-slot"]')!.getBoundingClientRect()
+            const dot = element.querySelector('[data-slot="tab-status"]')!.getBoundingClientRect()
             const close = element.querySelector('[data-slot="tab-close"]')!.getBoundingClientRect()
 
             return dot.right <= close.left || dot.left >= close.right
@@ -633,9 +634,9 @@ test("a remote tab stays busy while a child session runs", async ({ page }) => {
 
   const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(sessionB.id, REMOTE_SERVER)}"])`)
   const tabA = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(sessionA.id)}"])`)
-  await expect(tabB.locator('[data-component="session-progress-indicator-v2"]')).toBeVisible()
+  await expect(tabB.locator('[data-component="activity-ring"]')).toBeVisible()
   await expect(tabA.locator("[data-titlebar-tab-title]")).toHaveText(sessionA.title)
-  await expect(tabA.locator('[data-component="session-progress-indicator-v2"]')).toHaveCount(0)
+  await expect(tabA.locator('[data-component="activity-ring"]')).toBeHidden()
 })
 
 test("inactive tabs stay busy while work waits in their inbox, and pulse on a new prompt, as in the TUI", async ({
@@ -666,11 +667,11 @@ test("inactive tabs stay busy while work waits in their inbox, and pulse on a ne
   })
 
   const tab = (id: string) => page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(id)}"])`)
-  const progress = '[data-component="session-progress-indicator-v2"]'
+  const progress = '[data-component="activity-ring"]'
 
   await expect(tab(b.id).locator(progress)).toBeVisible()
   await expect(tab(c.id).locator("[data-titlebar-tab-title]")).toHaveText(c.title)
-  await expect(tab(c.id).locator(progress)).toHaveCount(0)
+  await expect(tab(c.id).locator(progress)).toBeHidden()
   await expect(tab(c.id).locator('[data-slot="tab-prompt-pulse"]')).toHaveCount(0)
   // The pulse lasts one animation, so record that it appeared rather than racing its removal.
   await tab(c.id).evaluate((element) => {
@@ -719,7 +720,7 @@ test("switching between busy sessions keeps the busy indicators and the activity
   await expectSessionTitle(page, a.title)
 
   const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
-  const indicators = sidebar.locator('[data-component="session-progress-indicator-v2"]')
+  const indicators = sidebar.locator('[data-component="activity-ring"]')
   const capsule = page.locator('[data-slot="session-activity-chip"]')
   await expect(indicators).toHaveCount(2)
   await expect(capsule).toHaveText("1 subagent")
@@ -737,7 +738,7 @@ test("switching between busy sessions keeps the busy indicators and the activity
         record.setAttribute("data-test-capsule-missing", "")
     }).observe(document.body, { childList: true, subtree: true })
     document
-      .querySelectorAll('[data-slot="vertical-tabs-sidebar"] [data-component="session-progress-indicator-v2"]')
+      .querySelectorAll('[data-slot="vertical-tabs-sidebar"] [data-component="activity-ring"]')
       .forEach((element) => element.setAttribute("data-test-before-switch", ""))
   })
 
@@ -776,7 +777,7 @@ test("selecting a tab with waiting work waits for its transcript instead of show
   })
   const tabB = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(b.id)}"])`)
   // The inactive tab read its inbox, which materializes the pending steer as a transcript row.
-  await expect(tabB.locator('[data-component="session-progress-indicator-v2"]')).toBeVisible()
+  await expect(tabB.locator('[data-component="activity-ring"]')).toBeVisible()
 
   const transcript = await holdRoute(page, (url) => url.pathname === `/api/session/${b.id}/message`)
   await page.locator(`[data-titlebar-tab-link][href="${sessionHref(b.id)}"]`).click()

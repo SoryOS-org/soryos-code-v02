@@ -49,7 +49,7 @@ export function useSessionTabAvatarState(
     return sessionBusy(data, sessionId())
   })
 
-  return { unread, loading }
+  return { unread, loading, attention: needsAttention }
 }
 
 // Pending permission and form requests anywhere in the session (or its family, for roots).
