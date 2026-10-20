@@ -61,6 +61,10 @@ import type {
   SessionRevertClearOutput,
   SessionRevertCommitInput,
   SessionRevertCommitOutput,
+  SessionReviewKeepInput,
+  SessionReviewKeepOutput,
+  SessionReviewDiscardInput,
+  SessionReviewDiscardOutput,
   SessionContextInput,
   SessionContextOutput,
   SessionDiffInput,
@@ -835,7 +839,7 @@ export function make(options: ClientOptions) {
             {
               method: "POST",
               path: `/api/session/${encodeURIComponent(input.sessionID)}/revert/stage`,
-              body: { messageID: input["messageID"], files: input["files"] },
+              body: { messageID: input["messageID"], files: input["files"], messages: input["messages"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 404, 409, 500],
               empty: false,
@@ -860,6 +864,32 @@ export function make(options: ClientOptions) {
               path: `/api/session/${encodeURIComponent(input.sessionID)}/revert/commit`,
               successStatus: 204,
               declaredStatuses: [400, 401, 404, 409],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      review: {
+        keep: (input: SessionReviewKeepInput, requestOptions?: RequestOptions) =>
+          request<SessionReviewKeepOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/review/keep`,
+              body: { messageID: input["messageID"], partID: input["partID"], changes: input["changes"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        discard: (input: SessionReviewDiscardInput, requestOptions?: RequestOptions) =>
+          request<SessionReviewDiscardOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/review/discard`,
+              body: { messageID: input["messageID"], partID: input["partID"], changes: input["changes"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 500],
               empty: true,
             },
             requestOptions,

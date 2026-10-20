@@ -28,6 +28,19 @@ export function failedMessageDecode(error: Session.MessageDecodeError) {
   )
 }
 
+/** Host or IO failure a client cannot repair, so surface only a log reference. */
+export function failedUnexpected(operation: string, sessionID: Session.ID) {
+  return (error: unknown) => {
+    const ref = `err_${crypto.randomUUID().slice(0, 8)}`
+    return Effect.logError(`failed to ${operation}`, { cause: error }).pipe(
+      Effect.annotateLogs({ ref, sessionID }),
+      Effect.andThen(
+        Effect.fail(new UnknownError({ message: "Unexpected server error. Check server logs for details.", ref })),
+      ),
+    )
+  }
+}
+
 /** Snapshot repositories are host state clients cannot repair, so surface only a log reference. */
 export function failedSnapshot(operation: string, sessionID: Session.ID) {
   return (error: Snapshot.Error) => {

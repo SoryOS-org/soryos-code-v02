@@ -479,6 +479,18 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           if (current?.status === "running") return yield* adapter.updateCompaction(failed)
           yield* adapter.appendMessage(failed)
         }),
+      "session.tool.reviewed": (event) => {
+        return updateOwnedAssistant(event.data.assistantMessageID, (draft) => {
+          const match = latestTool(draft, event.data.id)
+          if (!match) return
+          const changes = match.review?.changes ? [...match.review.changes] : []
+          for (const change of event.data.changes) {
+            while (changes.length <= change) changes.push("pending")
+            changes[change] = event.data.decision === "keep" ? "kept" : "discarded"
+          }
+          match.review = { changes }
+        })
+      },
       "session.revert.staged": () => Effect.void,
       "session.revert.cleared": () => Effect.void,
       "session.revert.committed": () => Effect.void,

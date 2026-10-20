@@ -578,6 +578,18 @@ export namespace Tool {
     },
   })
   export type Failed = typeof Failed.Type
+
+  /** Review decision for completed changes of a mutation tool call, one entry per affected change index. */
+  export const Reviewed = Event.durable({
+    type: "session.tool.reviewed",
+    ...options,
+    schema: {
+      ...ToolBase,
+      changes: Schema.Array(NonNegativeInt),
+      decision: Schema.Literals(["keep", "discard"]),
+    },
+  })
+  export type Reviewed = typeof Reviewed.Type
 }
 
 export const RetryScheduled = Event.durable({
@@ -659,7 +671,7 @@ export namespace RevertEvent {
   export const Committed = Event.durable({
     type: "session.revert.committed",
     ...options,
-    schema: { ...Base, to: SessionMessage.ID },
+    schema: { ...Base, to: SessionMessage.ID, messages: Schema.Boolean.pipe(optional) },
   })
 }
 
@@ -707,6 +719,7 @@ export const Definitions = Event.inventory(
   Tool.Progress,
   Tool.Success,
   Tool.Failed,
+  Tool.Reviewed,
   RetryScheduled,
   Compaction.Started,
   Compaction.Delta,

@@ -343,6 +343,7 @@ export type SessionRevertStageInput = {
   readonly sessionID: Session.ID
   readonly messageID: SessionMessage.ID
   readonly files?: boolean | undefined
+  readonly messages?: boolean | undefined
 }
 export type SessionRevertStageOutput = Session.Revert
 export type SessionRevertStageOperation<E = never> = (
@@ -360,6 +361,28 @@ export type SessionRevertCommitOutput = void
 export type SessionRevertCommitOperation<E = never> = (
   input: SessionRevertCommitInput,
 ) => Effect.Effect<SessionRevertCommitOutput, E>
+
+export type SessionReviewKeepInput = {
+  readonly sessionID: Session.ID
+  readonly messageID: SessionMessage.ID
+  readonly partID: string
+  readonly changes?: ReadonlyArray<number> | undefined
+}
+export type SessionReviewKeepOutput = void
+export type SessionReviewKeepOperation<E = never> = (
+  input: SessionReviewKeepInput,
+) => Effect.Effect<SessionReviewKeepOutput, E>
+
+export type SessionReviewDiscardInput = {
+  readonly sessionID: Session.ID
+  readonly messageID: SessionMessage.ID
+  readonly partID: string
+  readonly changes?: ReadonlyArray<number> | undefined
+}
+export type SessionReviewDiscardOutput = void
+export type SessionReviewDiscardOperation<E = never> = (
+  input: SessionReviewDiscardInput,
+) => Effect.Effect<SessionReviewDiscardOutput, E>
 
 export type SessionContextInput = { readonly sessionID: Session.ID }
 export type SessionContextOutput = ReadonlyArray<SessionMessage.Info>
@@ -1072,6 +1095,23 @@ export type SessionLogOutput =
           readonly id: Event.ID
           readonly created: number
           readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.tool.reviewed"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly assistantMessageID: SessionMessage.ID
+            readonly id: string
+            readonly changes: ReadonlyArray<number>
+            readonly decision: "keep" | "discard"
+          }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
           readonly type: "session.retry.scheduled"
           readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
           readonly location?:
@@ -1208,7 +1248,11 @@ export type SessionLogOutput =
           readonly location?:
             | { readonly directory: AbsolutePath; readonly workspaceID?: Workspace.ID | undefined }
             | undefined
-          readonly data: { readonly sessionID: Session.ID; readonly to: SessionMessage.ID }
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly to: SessionMessage.ID
+            readonly messages?: boolean | undefined
+          }
         }
       | {
           readonly id: Event.ID
@@ -1349,6 +1393,7 @@ export interface SessionApi<E = never> {
     readonly clear: SessionRevertClearOperation<E>
     readonly commit: SessionRevertCommitOperation<E>
   }
+  readonly review: { readonly keep: SessionReviewKeepOperation<E>; readonly discard: SessionReviewDiscardOperation<E> }
   readonly context: SessionContextOperation<E>
   readonly diff: SessionDiffOperation<E>
   readonly inbox: {

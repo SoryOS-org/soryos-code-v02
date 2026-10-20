@@ -40,7 +40,6 @@ export const toModelContent = (output: Output) =>
 
 /** Deferred write UX integrations remain visible at the model-facing seam. */
 // TODO: Publish watcher/file-edit events after watcher integration exists.
-// TODO: Add snapshots / undo after design exists.
 // TODO: Add LSP notification and diagnostics after LSP runtime exists.
 
 export const Plugin = {
@@ -89,9 +88,17 @@ export const Plugin = {
               if (yield* formatter.file(target.absolute)) {
                 yield* FileMutation.syncTextBom(environment.files, target.absolute, bom)
               }
-              return result
+              const formatted = (yield* FileMutation.readText(environment.files, target.absolute)).text
+              return {
+                result,
+                files: [fileDiff(target.resource, current?.text ?? "", formatted, current ? "modified" : "added")],
+              }
             }).pipe(
-              Effect.map((output) => ({ output, content: toModelContent(output) })),
+              Effect.map((output) => ({
+                output: output.result,
+                content: toModelContent(output.result),
+                metadata: { files: output.files },
+              })),
               Effect.mapError((error) => new ToolFailure({ message: `Unable to write ${input.path}`, error })),
             ),
         }),

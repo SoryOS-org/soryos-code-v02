@@ -11,6 +11,8 @@ export const Revert = Schema.Struct({
   partID: Schema.String.pipe(optional),
   snapshot: Snapshot.ID.pipe(optional),
   files: Schema.Array(FileDiff.Info).pipe(optional),
+  /** False for a files-only restore that keeps conversation messages (a checkpoint restore). */
+  messages: Schema.Boolean.pipe(optional),
 }).annotate({ identifier: "Session.Revert" })
 
 const FileDiffV1 = Schema.Struct({

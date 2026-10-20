@@ -739,6 +739,7 @@ const layer = Layer.effectDiscard(
     yield* bus.project(SessionEvent.Tool.Called, (event) => run(db, event))
     yield* bus.project(SessionEvent.Tool.Success, (event) => run(db, event))
     yield* bus.project(SessionEvent.Tool.Failed, (event) => run(db, event))
+    yield* bus.project(SessionEvent.Tool.Reviewed, (event) => run(db, event))
     yield* bus.project(SessionEvent.Reasoning.Started, (event) => run(db, event))
     yield* bus.project(SessionEvent.Reasoning.Ended, (event) => run(db, event))
     yield* bus.project(SessionEvent.RetryScheduled, (event) => run(db, event))
@@ -774,39 +775,43 @@ const layer = Layer.effectDiscard(
     )
     yield* bus.project(SessionEvent.RevertEvent.Committed, (event) =>
       Effect.gen(function* () {
-        const boundary = yield* db
-          .select({ seq: SessionMessageTable.seq })
-          .from(SessionMessageTable)
-          .where(
-            and(eq(SessionMessageTable.session_id, event.data.sessionID), eq(SessionMessageTable.id, event.data.to)),
-          )
-          .get()
-          .pipe(Effect.orDie)
-        if (!boundary) return yield* Effect.die(new Error(`Revert boundary message not found: ${event.data.to}`))
-        yield* db
-          .delete(SessionMessageTable)
-          .where(
-            and(eq(SessionMessageTable.session_id, event.data.sessionID), gte(SessionMessageTable.seq, boundary.seq)),
-          )
-          .run()
-          .pipe(Effect.orDie)
-        yield* db
-          .delete(SessionInboxTable)
-          .where(
-            and(
-              eq(SessionInboxTable.session_id, event.data.sessionID),
-              gte(SessionInboxTable.enqueued_seq, boundary.seq),
-            ),
-          )
-          .run()
-          .pipe(Effect.orDie)
+        // A files-only commit (checkpoint restore) keeps the conversation; only the staged
+        // revert record is settled.
+        if (event.data.messages !== false) {
+          const boundary = yield* db
+            .select({ seq: SessionMessageTable.seq })
+            .from(SessionMessageTable)
+            .where(
+              and(eq(SessionMessageTable.session_id, event.data.sessionID), eq(SessionMessageTable.id, event.data.to)),
+            )
+            .get()
+            .pipe(Effect.orDie)
+          if (!boundary) return yield* Effect.die(new Error(`Revert boundary message not found: ${event.data.to}`))
+          yield* db
+            .delete(SessionMessageTable)
+            .where(
+              and(eq(SessionMessageTable.session_id, event.data.sessionID), gte(SessionMessageTable.seq, boundary.seq)),
+            )
+            .run()
+            .pipe(Effect.orDie)
+          yield* db
+            .delete(SessionInboxTable)
+            .where(
+              and(
+                eq(SessionInboxTable.session_id, event.data.sessionID),
+                gte(SessionInboxTable.enqueued_seq, boundary.seq),
+              ),
+            )
+            .run()
+            .pipe(Effect.orDie)
+          yield* InstructionState.rewind(db, event.data.sessionID, boundary.seq)
+        }
         yield* db
           .update(SessionTable)
           .set({ revert: null, time_updated: event.created })
           .where(eq(SessionTable.id, event.data.sessionID))
           .run()
           .pipe(Effect.orDie)
-        yield* InstructionState.rewind(db, event.data.sessionID, boundary.seq)
       }),
     )
     yield* bus.subscribe([SessionEvent.Step.Ended, SessionEvent.Step.Failed, SessionEvent.UsageRecorded]).pipe(

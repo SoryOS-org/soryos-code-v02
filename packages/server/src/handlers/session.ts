@@ -23,7 +23,7 @@ import {
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
 import { locationErrors } from "../location"
-import { failedMessageDecode, failedSnapshot, missingMessage, missingSession } from "./session-error"
+import { failedMessageDecode, failedSnapshot, failedUnexpected, missingMessage, missingSession } from "./session-error"
 
 function missingForm(id: Form.ID) {
   return new FormNotFoundError({ id, message: `Form not found: ${id}` })
@@ -475,6 +475,58 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             .pipe(
               Effect.catchTag("Session.NotFoundError", missingSession),
               Effect.catchTag("Session.BusyError", busySession),
+            )
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.review.keep",
+        Effect.fn(function* (ctx) {
+          yield* Effect.log("session.review.keep", {
+            sessionID: ctx.params.sessionID,
+            messageID: ctx.payload.messageID,
+            partID: ctx.payload.partID,
+            changes: ctx.payload.changes,
+          })
+          yield* session.review
+            .keep({ ...ctx.params, ...ctx.payload })
+            .pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+              Effect.catchTag("Session.MessageNotFoundError", missingMessage),
+              Effect.catchTag("Session.BusyError", busySession),
+              Effect.catchTag(
+                "Session.ReviewNotFoundError",
+                (error) => new InvalidRequestError({ message: error.message }),
+              ),
+              Effect.catch(failedUnexpected("keep reviewed changes", ctx.params.sessionID)),
+            )
+          return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.review.discard",
+        Effect.fn(function* (ctx) {
+          yield* Effect.log("session.review.discard", {
+            sessionID: ctx.params.sessionID,
+            messageID: ctx.payload.messageID,
+            partID: ctx.payload.partID,
+            changes: ctx.payload.changes,
+          })
+          yield* session.review
+            .discard({ ...ctx.params, ...ctx.payload })
+            .pipe(
+              Effect.catchTag("Session.NotFoundError", missingSession),
+              Effect.catchTag("Session.MessageNotFoundError", missingMessage),
+              Effect.catchTag("Session.BusyError", busySession),
+              Effect.catchTag(
+                "Session.ReviewNotFoundError",
+                (error) => new InvalidRequestError({ message: error.message }),
+              ),
+              Effect.catchTag(
+                "Session.ReviewConflictError",
+                (error) => new ConflictError({ message: error.message, resource: error.file }),
+              ),
+              Effect.catch(failedUnexpected("discard reviewed changes", ctx.params.sessionID)),
             )
           return HttpApiSchema.NoContent.make()
         }),

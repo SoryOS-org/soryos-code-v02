@@ -458,7 +458,11 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
     .add(
       HttpApiEndpoint.post("session.revert.stage", "/api/session/:sessionID/revert/stage", {
         params: { sessionID: Session.ID },
-        payload: Schema.Struct({ messageID: SessionMessage.ID, files: Schema.Boolean.pipe(Schema.optional) }),
+        payload: Schema.Struct({
+          messageID: SessionMessage.ID,
+          files: Schema.Boolean.pipe(Schema.optional),
+          messages: Schema.Boolean.pipe(Schema.optional),
+        }),
         success: Schema.Struct({ data: Session.Revert }),
         error: [MessageNotFoundError, SessionNotFoundError, SessionBusyError, UnknownError],
       })
@@ -467,7 +471,8 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           OpenApi.annotations({
             identifier: "session.revert.stage",
             summary: "Stage session revert",
-            description: "Stage or move a reversible session boundary and optionally apply its file changes.",
+            description:
+              "Stage or move a reversible session boundary and optionally apply its file changes. `messages: false` restores files only, keeping conversation messages (a checkpoint restore).",
           }),
         ),
     )
@@ -488,6 +493,48 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
       })
         .middleware(sessionLocationMiddleware)
         .annotateMerge(OpenApi.annotations({ identifier: "session.revert.commit", summary: "Commit staged revert" })),
+    )
+    .add(
+      HttpApiEndpoint.post("session.review.keep", "/api/session/:sessionID/review/keep", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          messageID: SessionMessage.ID,
+          partID: Schema.String,
+          changes: Schema.Array(NonNegativeInt).pipe(Schema.optional),
+        }),
+        success: HttpApiSchema.NoContent,
+        error: [InvalidRequestError, MessageNotFoundError, SessionNotFoundError, SessionBusyError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.review.keep",
+            summary: "Keep reviewed changes",
+            description:
+              "Mark changes of a completed edit, write, or patch tool call as kept. Omit `changes` to keep every change of the call.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.review.discard", "/api/session/:sessionID/review/discard", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({
+          messageID: SessionMessage.ID,
+          partID: Schema.String,
+          changes: Schema.Array(NonNegativeInt).pipe(Schema.optional),
+        }),
+        success: HttpApiSchema.NoContent,
+        error: [ConflictError, InvalidRequestError, MessageNotFoundError, SessionNotFoundError, SessionBusyError, UnknownError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.review.discard",
+            summary: "Discard reviewed changes",
+            description:
+              "Revert changes of a completed edit, write, or patch tool call back to their pre-call text, leaving kept changes applied. Omit `changes` to discard every change of the call. Fails with ConflictError when a region changed after the call.",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.context", "/api/session/:sessionID/context", {

@@ -119,6 +119,17 @@ describe("WriteTool", () => {
               existed: false,
             },
             content: [{ type: "text", text: "Created file successfully: src/new.txt" }],
+            metadata: {
+              files: [
+                {
+                  file: "src/new.txt",
+                  status: "added",
+                  additions: 1,
+                  deletions: 0,
+                  patch: expect.stringContaining("+created"),
+                },
+              ],
+            },
           })
           expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "src", "new.txt"), "utf8"))).toBe(
             "created",

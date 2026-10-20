@@ -236,6 +236,8 @@ export interface Interface {
       sessionID: SessionSchema.ID
       messageID: SessionMessage.ID
       files?: boolean
+      /** False restores files only and keeps conversation messages (a checkpoint restore). */
+      messages?: boolean
     }) => Effect.Effect<
       SessionSchema.Revert,
       NotFoundError | MessageNotFoundError | BusyError | Snapshot.Error | FileSystem.DirectoryNotFoundError
@@ -244,6 +246,14 @@ export interface Interface {
       sessionID: SessionSchema.ID,
     ) => Effect.Effect<void, NotFoundError | BusyError | Snapshot.Error | FileSystem.DirectoryNotFoundError>
     readonly commit: (sessionID: SessionSchema.ID) => Effect.Effect<void, NotFoundError | BusyError>
+  }
+  readonly review: {
+    readonly keep: (
+      input: Parameters<Session.Handle["review"]["keep"]>[0] & { sessionID: SessionSchema.ID },
+    ) => ReturnType<Session.Handle["review"]["keep"]>
+    readonly discard: (
+      input: Parameters<Session.Handle["review"]["discard"]>[0] & { sessionID: SessionSchema.ID },
+    ) => ReturnType<Session.Handle["review"]["discard"]>
   }
 }
 
@@ -500,6 +510,10 @@ const layer = Layer.effect(
         stage: (input) => sessions.forSession(input.sessionID).revert.stage(input),
         clear: (sessionID) => sessions.forSession(sessionID).revert.clear(),
         commit: (sessionID) => sessions.forSession(sessionID).revert.commit(),
+      },
+      review: {
+        keep: (input) => sessions.forSession(input.sessionID).review.keep(input),
+        discard: (input) => sessions.forSession(input.sessionID).review.discard(input),
       },
     })
 

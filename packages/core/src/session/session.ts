@@ -25,6 +25,7 @@ import { SessionInbox } from "./inbox.js"
 import { SessionMessage } from "./message.js"
 import { SessionPrompt } from "./prompt.js"
 import { SessionRevert } from "./revert.js"
+import { SessionReview } from "./review.js"
 import { SessionShell } from "./shell.js"
 import { SessionSkill } from "./skill.js"
 import { SessionSchema } from "./schema.js"
@@ -328,11 +329,16 @@ export const make = Effect.fn("Session.make")(function* () {
   )
   const stage = Effect.fn("Session.revert.stage")(function* (
     sessionID: SessionSchema.ID,
-    input: { messageID: SessionMessage.ID; files?: boolean },
+    input: { messageID: SessionMessage.ID; files?: boolean; messages?: boolean },
   ) {
     const session = yield* get(sessionID)
     if (yield* execution.isActive(sessionID)) return yield* new BusyError({ sessionID })
-    return yield* SessionRevert.stage({ session, messageID: input.messageID, files: input.files }).pipe(
+    return yield* SessionRevert.stage({
+      session,
+      messageID: input.messageID,
+      files: input.files,
+      messages: input.messages,
+    }).pipe(
       Effect.provideService(Instance.Service, instances),
       Effect.provideService(Database.Service, database),
       Effect.provideService(Bus.Service, bus),
@@ -353,6 +359,20 @@ export const make = Effect.fn("Session.make")(function* () {
     return yield* SessionRevert.commit(bus, session)
   })
   const revert = { stage, clear, commit }
+  const decide = (decision: "keep" | "discard") =>
+    Effect.fn(`Session.review.${decision}`)(function* (
+      sessionID: SessionSchema.ID,
+      input: { messageID: SessionMessage.ID; partID: string; changes?: readonly number[] },
+    ) {
+      const session = yield* get(sessionID)
+      if (yield* execution.isActive(sessionID)) return yield* new BusyError({ sessionID })
+      return yield* (decision === "keep" ? SessionReview.keep : SessionReview.discard)({ session, ...input }).pipe(
+        Effect.provideService(Instance.Service, instances),
+        Effect.provideService(Database.Service, database),
+        Effect.provideService(Bus.Service, bus),
+      )
+    })
+  const review = { keep: decide("keep"), discard: decide("discard") }
   const operations = {
     get,
     message,
@@ -377,6 +397,7 @@ export const make = Effect.fn("Session.make")(function* () {
     steerInbox,
     queueInbox,
     revert,
+    review,
   }
 
   const forSession = (sessionID: SessionSchema.ID) => {
@@ -406,6 +427,9 @@ export const make = Effect.fn("Session.make")(function* () {
     const clear = operations.revert.clear.bind(undefined, sessionID)
     const commit = operations.revert.commit.bind(undefined, sessionID)
     const revert = { stage, clear, commit }
+    const keep = operations.review.keep.bind(undefined, sessionID)
+    const discard = operations.review.discard.bind(undefined, sessionID)
+    const review = { keep, discard }
 
     return {
       id: sessionID,
@@ -432,6 +456,7 @@ export const make = Effect.fn("Session.make")(function* () {
       steerInbox,
       queueInbox,
       revert,
+      review,
     }
   }
   return { forSession }

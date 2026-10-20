@@ -22,6 +22,8 @@ export const stage = Effect.fn("SessionRevert.stage")(function* (input: {
   session: SessionSchema.Info
   messageID: SessionMessage.ID
   files?: boolean
+  /** False restores files only and keeps conversation messages (a checkpoint restore). */
+  messages?: boolean
 }) {
   const instances = yield* Instance.Service
   const database = yield* Database.Service
@@ -47,6 +49,7 @@ export const stage = Effect.fn("SessionRevert.stage")(function* (input: {
       messageID: input.messageID,
       snapshot: original,
       files,
+      ...(input.messages === false ? { messages: false as const } : {}),
     } satisfies SessionSchema.Info["revert"]
     yield* bus.publish(SessionEvent.RevertEvent.Staged, {
       sessionID: input.session.id,
@@ -78,6 +81,7 @@ export const commit = Effect.fn("SessionRevert.commit")(function* (bus: Bus.Inte
   yield* bus.publish(SessionEvent.RevertEvent.Committed, {
     sessionID: session.id,
     to: session.revert.messageID,
+    ...(session.revert.messages === false ? { messages: false as const } : {}),
   })
 })
 

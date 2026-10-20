@@ -110,6 +110,8 @@ export type ToolFileContent = { type: "file"; uri: string; mime: string; name?: 
 
 export type SessionStructuredError = { type: string; message: string; status?: number; response?: { body: string } }
 
+export type SessionMessageToolReview = { changes: Array<"pending" | "kept" | "discarded"> }
+
 export type SessionActive = { type: "running" }
 
 export type SessionInboxDelivery = "steer" | "queue"
@@ -411,6 +413,7 @@ export type SessionRevert = {
   partID?: string
   snapshot?: SnapshotID
   files?: Array<FileDiffInfo>
+  messages?: boolean
 }
 
 export type SessionStatsTools =
@@ -1360,6 +1363,22 @@ export type SessionToolCalled = {
   }
 }
 
+export type SessionToolReviewed = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.tool.reviewed"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: {
+    sessionID: SessionID
+    assistantMessageID: SessionMessageID
+    id: string
+    changes: Array<number>
+    decision: "keep" | "discard"
+  }
+}
+
 export type SessionRetryScheduled = {
   id: EventID
   created: number
@@ -1430,7 +1449,7 @@ export type SessionRevertCommitted = {
   type: "session.revert.committed"
   durable: { aggregateID: string; seq: EventSeq; version: 1 }
   location?: LocationRef
-  data: { sessionID: SessionID; to: SessionMessageID }
+  data: { sessionID: SessionID; to: SessionMessageID; messages?: boolean }
 }
 
 export type SessionUsageRecorded = {
@@ -2379,6 +2398,7 @@ export type SessionMessageAssistantTool = {
     | SessionMessageToolStateRunning
     | SessionMessageToolStateCompleted
     | SessionMessageToolStateError
+  review?: SessionMessageToolReview
   time: { created: number; ran?: number; completed?: number }
 }
 
@@ -2400,6 +2420,7 @@ export type SessionMessageAssistantTool1 = {
     | SessionMessageToolStateRunning1
     | SessionMessageToolStateCompleted1
     | SessionMessageToolStateError1
+  review?: SessionMessageToolReview
   time: { created: number; ran?: number; completed?: number }
 }
 
@@ -2566,6 +2587,7 @@ export type SessionEventDurable =
   | SessionToolCalled
   | SessionToolSuccess
   | SessionToolFailed
+  | SessionToolReviewed
   | SessionRetryScheduled
   | SessionCompactionStarted
   | SessionCompactionEnded
@@ -2636,6 +2658,7 @@ export type V2Event =
   | SessionToolProgress
   | SessionToolSuccess
   | SessionToolFailed
+  | SessionToolReviewed
   | SessionRetryScheduled
   | SessionCompactionStarted
   | SessionCompactionDelta
@@ -3296,6 +3319,7 @@ export type SessionImportInput = {
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
         }>
+        readonly messages?: boolean
       }
       readonly location: { readonly directory: string }
     }
@@ -3481,6 +3505,7 @@ export type SessionImportInput = {
                       ]
                       readonly metadata?: { readonly [x: string]: JsonValue }
                     }
+                readonly review?: { readonly changes: ReadonlyArray<"pending" | "kept" | "discarded"> }
                 readonly time: { readonly created: number; readonly ran?: number; readonly completed?: number }
               }
           >
@@ -3639,6 +3664,7 @@ export type SessionImportInput = {
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
         }>
+        readonly messages?: boolean
       }
       readonly location: { readonly directory: string }
     }
@@ -3824,6 +3850,7 @@ export type SessionImportInput = {
                       ]
                       readonly metadata?: { readonly [x: string]: JsonValue }
                     }
+                readonly review?: { readonly changes: ReadonlyArray<"pending" | "kept" | "discarded"> }
                 readonly time: { readonly created: number; readonly ran?: number; readonly completed?: number }
               }
           >
@@ -3982,6 +4009,7 @@ export type SessionImportInput = {
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
         }>
+        readonly messages?: boolean
       }
       readonly location: { readonly directory: string }
     }
@@ -4167,6 +4195,7 @@ export type SessionImportInput = {
                       ]
                       readonly metadata?: { readonly [x: string]: JsonValue }
                     }
+                readonly review?: { readonly changes: ReadonlyArray<"pending" | "kept" | "discarded"> }
                 readonly time: { readonly created: number; readonly ran?: number; readonly completed?: number }
               }
           >
@@ -4749,8 +4778,21 @@ export type SessionWaitOutput = void
 
 export type SessionRevertStageInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
-  readonly messageID: { readonly messageID: string; readonly files?: boolean | undefined }["messageID"]
-  readonly files?: { readonly messageID: string; readonly files?: boolean | undefined }["files"]
+  readonly messageID: {
+    readonly messageID: string
+    readonly files?: boolean | undefined
+    readonly messages?: boolean | undefined
+  }["messageID"]
+  readonly files?: {
+    readonly messageID: string
+    readonly files?: boolean | undefined
+    readonly messages?: boolean | undefined
+  }["files"]
+  readonly messages?: {
+    readonly messageID: string
+    readonly files?: boolean | undefined
+    readonly messages?: boolean | undefined
+  }["messages"]
 }
 
 export type SessionRevertStageOutput = { data: SessionRevert }["data"]
@@ -4762,6 +4804,48 @@ export type SessionRevertClearOutput = void
 export type SessionRevertCommitInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 
 export type SessionRevertCommitOutput = void
+
+export type SessionReviewKeepInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly messageID: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["messageID"]
+  readonly partID: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["partID"]
+  readonly changes?: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["changes"]
+}
+
+export type SessionReviewKeepOutput = void
+
+export type SessionReviewDiscardInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly messageID: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["messageID"]
+  readonly partID: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["partID"]
+  readonly changes?: {
+    readonly messageID: string
+    readonly partID: string
+    readonly changes?: ReadonlyArray<number> | undefined
+  }["changes"]
+}
+
+export type SessionReviewDiscardOutput = void
 
 export type SessionContextInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
 

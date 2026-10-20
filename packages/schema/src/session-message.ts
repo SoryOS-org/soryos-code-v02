@@ -158,6 +158,12 @@ export const ToolState = Schema.Union([ToolStateStreaming, ToolStateRunning, Too
 )
 export type ToolState = ToolStateStreaming | ToolStateRunning | ToolStateCompleted | ToolStateError
 
+export interface ToolReview extends Schema.Schema.Type<typeof ToolReview> {}
+export const ToolReview = Schema.Struct({
+  /** Per-change review state, indexed by change (hunk) order across `metadata.files`. */
+  changes: Schema.Array(Schema.Literals(["pending", "kept", "discarded"])),
+}).annotate({ identifier: "Session.Message.ToolReview" })
+
 export interface AssistantTool extends Schema.Schema.Type<typeof AssistantTool> {}
 export const AssistantTool = Schema.Struct({
   type: Schema.tag("tool"),
@@ -167,6 +173,7 @@ export const AssistantTool = Schema.Struct({
   providerState: ProviderState.pipe(optional),
   providerResultState: ProviderState.pipe(optional),
   state: ToolState,
+  review: ToolReview.pipe(optional),
   time: Schema.Struct({
     created: DateTimeUtcFromMillis,
     ran: DateTimeUtcFromMillis.pipe(optional),

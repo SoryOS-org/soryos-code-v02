@@ -67,6 +67,10 @@ import type {
   SessionRevertClearOutput,
   SessionRevertCommitInput,
   SessionRevertCommitOutput,
+  SessionReviewKeepInput,
+  SessionReviewKeepOutput,
+  SessionReviewDiscardInput,
+  SessionReviewDiscardOutput,
   SessionContextInput,
   SessionContextOutput,
   SessionDiffInput,
@@ -598,7 +602,7 @@ const EndpointSessionRevertStage = (raw: RawClient["server.session"]) => (input:
   preserveEffect<SessionRevertStageOutput>()(
     raw["session.revert.stage"]({
       params: { sessionID: input["sessionID"] },
-      payload: { messageID: input["messageID"], files: input["files"] },
+      payload: { messageID: input["messageID"], files: input["files"], messages: input["messages"] },
     }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),
@@ -613,6 +617,22 @@ const EndpointSessionRevertClear = (raw: RawClient["server.session"]) => (input:
 const EndpointSessionRevertCommit = (raw: RawClient["server.session"]) => (input: SessionRevertCommitInput) =>
   preserveEffect<SessionRevertCommitOutput>()(
     raw["session.revert.commit"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionReviewKeep = (raw: RawClient["server.session"]) => (input: SessionReviewKeepInput) =>
+  preserveEffect<SessionReviewKeepOutput>()(
+    raw["session.review.keep"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { messageID: input["messageID"], partID: input["partID"], changes: input["changes"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointSessionReviewDiscard = (raw: RawClient["server.session"]) => (input: SessionReviewDiscardInput) =>
+  preserveEffect<SessionReviewDiscardOutput>()(
+    raw["session.review.discard"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { messageID: input["messageID"], partID: input["partID"], changes: input["changes"] },
+    }).pipe(Effect.mapError(mapClientError)),
   )
 
 const EndpointSessionContext = (raw: RawClient["server.session"]) => (input: SessionContextInput) =>
@@ -808,6 +828,7 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     clear: EndpointSessionRevertClear(raw),
     commit: EndpointSessionRevertCommit(raw),
   },
+  review: { keep: EndpointSessionReviewKeep(raw), discard: EndpointSessionReviewDiscard(raw) },
   context: EndpointSessionContext(raw),
   diff: EndpointSessionDiff(raw),
   inbox: {

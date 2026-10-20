@@ -43,6 +43,50 @@
       {
         "command": "opencode.addFilepathToTerminal",
         "title": "Add Filepath to Terminal"
+      },
+      {
+        "command": "opencode.review.keep",
+        "title": "opencode: Keep AI Edit"
+      },
+      {
+        "command": "opencode.review.discard",
+        "title": "opencode: Discard AI Edit"
+      },
+      {
+        "command": "opencode.review.keepAll",
+        "title": "opencode: Keep All AI Edits"
+      },
+      {
+        "command": "opencode.review.discardAll",
+        "title": "opencode: Discard All AI Edits"
+      },
+      {
+        "command": "opencode.review.nextChange",
+        "title": "opencode: Next AI Edit"
+      },
+      {
+        "command": "opencode.review.previousChange",
+        "title": "opencode: Previous AI Edit"
+      },
+      {
+        "command": "opencode.review.openDiff",
+        "title": "opencode: Review AI Edits in Diff"
+      },
+      {
+        "command": "opencode.review.showChanges",
+        "title": "opencode: Show AI Edits to Review"
+      },
+      {
+        "command": "opencode.review.selectSession",
+        "title": "opencode: Switch Review Session"
+      },
+      {
+        "command": "opencode.review.restoreCheckpoint",
+        "title": "opencode: Restore Checkpoint"
+      },
+      {
+        "command": "opencode.review.restoreLatest",
+        "title": "opencode: Restore Edits to Latest State"
       }
     ],
     "menus": {
@@ -77,8 +121,43 @@
         "mac": "cmd+alt+k",
         "win": "ctrl+alt+K",
         "linux": "ctrl+alt+K"
+      },
+      {
+        "command": "opencode.review.keep",
+        "key": "ctrl+alt+enter",
+        "when": "opencode.review.pending > 0"
+      },
+      {
+        "command": "opencode.review.discard",
+        "key": "ctrl+alt+backspace",
+        "when": "opencode.review.pending > 0"
+      },
+      {
+        "command": "opencode.review.keepAll",
+        "key": "ctrl+alt+shift+enter",
+        "when": "opencode.review.pending > 0"
+      },
+      {
+        "command": "opencode.review.nextChange",
+        "key": "ctrl+alt+down",
+        "when": "opencode.review.pending > 0"
+      },
+      {
+        "command": "opencode.review.previousChange",
+        "key": "ctrl+alt+up",
+        "when": "opencode.review.pending > 0"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "opencode",
+      "properties": {
+        "opencode.review.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the review diff for files an agent turn changed as soon as the turn finishes."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "bun run package",

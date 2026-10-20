@@ -97,3 +97,24 @@ export class InboxConflictError extends Schema.TaggedError<InboxConflictError>()
 export class SkillNotFoundError extends Schema.TaggedError<SkillNotFoundError>()("Session.SkillNotFoundError", {
   skill: Skill.ID,
 }) {}
+
+export class ReviewNotFoundError extends Schema.TaggedError<ReviewNotFoundError>()("Session.ReviewNotFoundError", {
+  sessionID: SessionSchema.ID,
+  messageID: SessionMessage.ID,
+  partID: Schema.String,
+}) {
+  override get message() {
+    return `Tool call ${this.partID} has no reviewable changes`
+  }
+}
+
+export class ReviewConflictError extends Schema.TaggedError<ReviewConflictError>()("Session.ReviewConflictError", {
+  sessionID: SessionSchema.ID,
+  messageID: SessionMessage.ID,
+  partID: Schema.String,
+  file: Schema.String,
+}) {
+  override get message() {
+    return `${this.file} changed after this edit; restore a checkpoint instead of discarding individual changes`
+  }
+}

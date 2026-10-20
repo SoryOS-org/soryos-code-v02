@@ -147,6 +147,8 @@
   "ignorePatterns": [
     "**/node_modules",
     "**/dist",
+    "**/out",
+    "**/.vscode-test",
     "**/.build",
     "**/.sst",
     "**/*.d.ts",
