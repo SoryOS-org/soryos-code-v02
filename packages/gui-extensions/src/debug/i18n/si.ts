@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "නිදොස් කිරීමේ තීරුව ටොගල් කරන්න",
-  "status.toggle": "නිදොස්කරණ මෙවලම් ටොගල් කරන්න",
   ariaLabel: "සංවර්ධන කාර්ය සාධන රෝග විනිශ්චය",
   providerAriaLabel: "සපයන්නාගේ කාර්යසාධන රෝග නිර්ණය",
   na: "n/a",

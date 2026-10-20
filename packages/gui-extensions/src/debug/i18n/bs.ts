@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Uključi/isključi traku za otklanjanje grešaka",
-  "status.toggle": "Prebaci alate za otklanjanje grešaka",
   ariaLabel: "Dijagnostika performansi razvoja",
   providerAriaLabel: "Dijagnostika performansi pružaoca usluge",
   na: "n/a",

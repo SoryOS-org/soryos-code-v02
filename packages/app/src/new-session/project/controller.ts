@@ -2,7 +2,7 @@ import { createMemo } from "solid-js"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { type ServerCtx, useGlobal, useServerCtx } from "@/runtime/server/runtime"
 import { useServerSDK } from "@/runtime/server/client"
-import { serverName, ServerConnection, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { workspaceSelectionDestination } from "@/workspaces/paths"
 import { useTabs } from "@/shell/tabs/tabs"
@@ -30,6 +30,16 @@ export function createComposerProjectControls(props: { draftId: string; worktree
         .filter((project) => !ids.has(project.id))
         .map((project) => ({ ...project, used: false, server })),
     ]
+  }
+
+  function promptServer(connection: ServerConnection.Any): PromptServer {
+    return {
+      key: ServerConnection.key(connection),
+      name: servers.label(connection),
+      hint: servers.hint(connection),
+      kind: servers.current(connection) ? "current" : connection.type === "extension" ? "extension" : "remote",
+      label: connection.label,
+    }
   }
 
   // Servers that are down or still connecting contribute nothing.
@@ -92,13 +102,4 @@ export function createComposerProjectControls(props: { draftId: string; worktree
     select: selectProject,
     add: addProject,
   }))
-}
-
-function promptServer(connection: ServerConnection.Any): PromptServer {
-  return {
-    key: ServerConnection.key(connection),
-    name: serverName(connection),
-    kind: ServerConnection.local(connection) ? "local" : connection.type === "extension" ? "extension" : "remote",
-    label: connection.label,
-  }
 }

@@ -9,7 +9,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
-import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { displayName } from "@opencode/ui/project-avatar"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
@@ -94,12 +94,12 @@ export function TabNavItem(props: {
     return home ? session.location.directory.replace(home, "~") : session.location.directory
   })
 
-  // Only label the server when multiple servers are connected.
+  // Only label the server when multiple servers are connected, and never the current one.
   const serverLabel = createMemo(() => {
     if (servers.list.length <= 1) return
     const conn = servers.list.find((item) => ServerConnection.key(item) === props.server)
 
-    return conn ? serverName(conn) : undefined
+    return conn ? servers.tag(conn) : undefined
   })
 
   // Like the TUI, a prompt sent to a background tab's session pulses the tab once.

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Rodyti arba slėpti derinimo juostą",
-  "status.toggle": "Perjungti derinimo įrankius",
   ariaLabel: "Vystymosi veiklos diagnostika",
   providerAriaLabel: "Teikėjo našumo diagnostika",
   na: "n/a",

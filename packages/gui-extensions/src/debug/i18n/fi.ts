@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Näytä tai piilota virheenkorjauspalkki",
-  "status.toggle": "Näytä tai piilota virheenkorjaustyökalut",
   ariaLabel: "Kehityksen suorituskyvyn diagnostiikka",
   providerAriaLabel: "Palveluntarjoajan suorituskyvyn diagnostiikka",
   na: "n/a",

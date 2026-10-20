@@ -62,10 +62,10 @@ for (const width of [1440, 390]) {
       const reveal = await page.evaluate(() => window.__coldReveal)
       expect(reveal).toMatchObject({ pending: 0, clipped: [], tables: 1, codeBlocks: 4 })
       expect(Math.abs(reveal?.bottomError ?? Infinity)).toBeLessThanOrEqual(1)
-      // The gap above the composer is part of the tail.
+      // The gap above the composer is part of the tail: the status lane, then the activity pill's lane.
       const spacer = page.locator('[data-timeline-row="bottom-spacer"]')
       await expect(spacer).toBeVisible()
-      expect(await spacer.evaluate((element) => element.getBoundingClientRect().height)).toBe(64)
+      expect(await spacer.evaluate((element) => element.getBoundingClientRect().height)).toBe(80)
     } finally {
       release.resolve()
     }

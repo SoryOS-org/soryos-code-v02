@@ -18,7 +18,6 @@ import { FileIcon } from "@opencode/ui/file-icon"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
-import { resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { ProviderModelIcon } from "@/providers/models/provider-group"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Button } from "@opencode/ui/button"
@@ -110,12 +109,26 @@ export function ComposerEditor(props: ComposerEditorProps) {
     })
   }
 
+  // The bottom fade shrinks with the remaining scroll so the last line ends clear of it.
+  const [fadeBottom, setFadeBottom] = createSignal(0)
+
+  const updateScroll = () => {
+    if (!viewport) return
+    setFadeBottom(Math.min(16, Math.max(0, viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop)))
+  }
+
   onMount(() => {
     const observer = new ResizeObserver(updateOverflow)
     observer.observe(controlsViewport)
     observer.observe(controlsContent)
     updateOverflow()
-    onCleanup(() => observer.disconnect())
+    // Typing and width changes both resize the editor, so it is the only element that needs watching.
+    const scrollObserver = new ResizeObserver(updateScroll)
+    if (editor) scrollObserver.observe(editor)
+    onCleanup(() => {
+      observer.disconnect()
+      scrollObserver.disconnect()
+    })
   })
   let localInput = false
 
@@ -210,6 +223,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             activeCommentID={state.activeContextID}
             removeLabel={i18n.t("ui.promptInput.removeAttachment")}
             onAttachmentClick={props.controller.openAttachment}
+            preview={props.controller.previewAttachment}
             onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
             onUploadCancel={(upload) => props.controller.cancelUpload(upload.id)}
             onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
@@ -225,6 +239,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
         <ScrollView
           data-component="composer-scroll"
           class="min-h-[60px] max-h-[180px]"
+          style={{ "--composer-fade-bottom": `${fadeBottom()}px` }}
+          onScroll={updateScroll}
           viewportRef={(element) => {
             viewport = element
             element.tabIndex = -1
@@ -247,7 +263,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             // @ts-expect-error
             autocomplete="off"
             class="relative z-10 block min-h-[60px] w-full whitespace-pre-wrap bg-transparent px-4 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
-            classList={{ "font-mono!": state.mode === "shell", "opacity-50": props.disabled }}
+            classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell", "opacity-50": props.disabled }}
             style={{
               "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined,
               "text-align": "start",
@@ -303,7 +319,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <div
               dir={state.mode === "normal" ? "auto" : "ltr"}
               class="pointer-events-none absolute inset-x-0 top-0 px-4 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
-              classList={{ "font-mono!": state.mode === "shell" }}
+              classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell" }}
               style={{ "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined, "text-align": "start" }}
             >
               {view.placeholder?.() ??
@@ -341,8 +357,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
             data-slot="composer-controls"
             data-overflow-start={overflow.start}
             data-overflow-end={overflow.end}
-            class="ms-0.5 me-2.5 h-full min-w-0 flex-1 overflow-x-auto overscroll-x-contain px-0.5 no-scrollbar"
+            class="ms-1 me-3 h-full min-w-0 flex-1 overflow-x-auto overscroll-x-contain no-scrollbar"
             onScroll={updateOverflow}
+            // Chromium leaves a partly visible control where it is when it takes focus, cut off by the edge.
+            onFocusIn={() => document.activeElement?.scrollIntoView({ block: "nearest", inline: "nearest" })}
             aria-hidden={state.mode === "shell"}
             inert={state.mode === "shell" ? true : undefined}
             style={buttons()}
@@ -590,6 +608,7 @@ export function ComposerAttachments(props: {
   activeCommentID?: string
   removeLabel: string
   onAttachmentClick?: (attachment: ComposerAttachment, origin: HTMLElement) => void
+  preview: (attachment: ComposerAttachment) => Promise<string | undefined>
   onAttachmentRemove: (attachment: ComposerAttachment) => void
   onUploadCancel?: (upload: Upload) => void
   onCommentClick?: (comment: ComposerComment) => void
@@ -706,52 +725,53 @@ export function ComposerAttachments(props: {
             )}
           </For>
           <For each={props.attachments}>
-            {(attachment) => (
-              <div class="relative group shrink-0">
-                <Tooltip
-                  value={attachment.type === "path" ? attachment.path : attachment.filename}
-                  placement="top"
-                  contentClass="break-all"
-                >
-                  <Show
-                    when={attachment.type === "image" && attachment.mime.startsWith("image/") ? attachment : undefined}
-                    fallback={
-                      <AttachmentCard title={attachment.filename}>
-                        {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.common.file"))}
-                      </AttachmentCard>
-                    }
-                  >
-                    {(image) => {
-                      // Restored drafts and history carry image ids only; bytes load when shown.
-                      const [url] = createResource(() => image().blob, resolveBlobUrl)
+            {(attachment) => {
+              const image = attachment.mime.startsWith("image/")
+              // Restored drafts and history carry image ids only, and path attachments carry no bytes; both load when shown.
+              const [url] = createResource(() => image && attachment, props.preview)
+              // Read state rather than the resource so loading never suspends; the route boundary would detach the screen and drop editor focus.
+              const src = () => (url.state === "ready" ? url() : undefined)
+              const missing = () => url.state === "errored" || (url.state === "ready" && !url())
 
-                      return (
-                        <>
-                          {/* Keep loading local; the route boundary would detach the screen and drop editor focus. */}
-                          <Suspense fallback={<div class="w-[58px] h-[46px]" />}>
-                            <img
-                              src={url() ?? ""}
-                              alt={attachment.filename}
-                              class="w-[58px] h-[46px] rounded-[6px] object-cover"
-                              onClick={(event) => props.onAttachmentClick?.(attachment, event.currentTarget)}
-                            />
-                          </Suspense>
-                          <div class="absolute inset-0 rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)] pointer-events-none" />
-                        </>
-                      )
-                    }}
-                  </Show>
-                </Tooltip>
-                <button
-                  type="button"
-                  onClick={() => props.onAttachmentRemove(attachment)}
-                  class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
-                  aria-label={props.removeLabel}
-                >
-                  <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
-                </button>
-              </div>
-            )}
+              return (
+                <div class="relative group shrink-0">
+                  <Tooltip
+                    value={attachment.type === "path" ? attachment.path : attachment.filename}
+                    placement="top"
+                    contentClass="break-all"
+                  >
+                    <Show
+                      when={image && !missing()}
+                      fallback={
+                        <AttachmentCard title={attachment.filename}>
+                          {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.common.file"))}
+                        </AttachmentCard>
+                      }
+                    >
+                      <Show when={src()} fallback={<div class="w-[58px] h-[46px]" />}>
+                        {(value) => (
+                          <img
+                            src={value()}
+                            alt={attachment.filename}
+                            class="w-[58px] h-[46px] rounded-[6px] object-cover"
+                            onClick={(event) => props.onAttachmentClick?.(attachment, event.currentTarget)}
+                          />
+                        )}
+                      </Show>
+                      <div class="absolute inset-0 rounded-[6px] shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)] pointer-events-none" />
+                    </Show>
+                  </Tooltip>
+                  <button
+                    type="button"
+                    onClick={() => props.onAttachmentRemove(attachment)}
+                    class="absolute -top-1 -end-1 size-4 rounded-full bg-v2-icon-icon-muted outline-solid outline-1 outline-v2-icon-icon-contrast flex items-center justify-center hover-reveal group-hover:opacity-100"
+                    aria-label={props.removeLabel}
+                  >
+                    <Icon name="outline-xmark" class="text-v2-icon-icon-contrast" />
+                  </button>
+                </div>
+              )
+            }}
           </For>
           <For each={props.uploads ?? []}>
             {(upload) => (
@@ -822,6 +842,8 @@ export function ComposerEditorAddMenu(props: {
   onContext: () => void
   onShell: () => void
 }) {
+  const focus = pointerFocusReturn()
+
   return (
     <Tooltip
       placement="top"
@@ -834,6 +856,7 @@ export function ComposerEditorAddMenu(props: {
     >
       <Menu gutter={6} modal={false} placement="top-start">
         <Menu.Trigger
+          {...focus.trigger}
           as={IconButton}
           data-action="composer-attach"
           type="button"
@@ -845,6 +868,7 @@ export function ComposerEditorAddMenu(props: {
         />
         <Menu.Portal>
           <Menu.Content
+            onCloseAutoFocus={focus.onCloseAutoFocus}
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
             style={{ "min-width": "180px" }}
           >
@@ -866,6 +890,34 @@ export function ComposerEditorAddMenu(props: {
       </Menu>
     </Tooltip>
   )
+}
+
+/**
+ * A menu returns focus to its trigger when it closes. Closing with Escape counts as keyboard use, so Chromium would
+ * ring a trigger the pointer opened; restore focus without the ring and keep it for keyboard opens.
+ */
+function pointerFocusReturn() {
+  let pointer: HTMLElement | undefined
+
+  return {
+    trigger: {
+      onPointerDown: (event: PointerEvent & { currentTarget: HTMLElement }) => {
+        pointer = event.currentTarget
+      },
+      onKeyDown: (event: KeyboardEvent) => {
+        if (event.key !== "Escape") pointer = undefined
+      },
+    },
+    onCloseAutoFocus: (event: Event) => {
+      if (!pointer) return
+      event.preventDefault()
+      const active = document.activeElement
+
+      // An outside press already moved focus where it belongs.
+      if (active && active !== document.body && !active.closest('[role="menu"]')) return
+      pointer.focus({ preventScroll: true, focusVisible: false })
+    },
+  }
 }
 
 function ComposerEditorConfiguredSelect(props: {
@@ -910,6 +962,7 @@ export function ComposerEditorSelect(props: {
 }) {
   const mobile = createMediaQuery("(max-width: 767px)")
   const [store, setStore] = createStore({ open: false, loaded: false })
+  const focus = pointerFocusReturn()
   let trigger: HTMLButtonElement | undefined
 
   const setOpen = (open: boolean) => {
@@ -951,6 +1004,7 @@ export function ComposerEditorSelect(props: {
         fallback={
           <Menu gutter={6} modal={false} placement="top-start" onOpenChange={props.onOpenChange}>
             <Menu.Trigger
+              {...focus.trigger}
               as={Button}
               variant="ghost-muted"
               size="normal"
@@ -960,7 +1014,7 @@ export function ComposerEditorSelect(props: {
               {content()}
             </Menu.Trigger>
             <Menu.Portal>
-              <Menu.Content>
+              <Menu.Content onCloseAutoFocus={focus.onCloseAutoFocus}>
                 <Menu.RadioGroup value={props.current} onChange={props.onSelect}>
                   <For each={props.options}>
                     {(option) => (

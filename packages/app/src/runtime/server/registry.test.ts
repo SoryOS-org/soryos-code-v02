@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { canRemoveServer, createServerProjects, resolveServerList, ServerConnection } from "./registry"
+import { canRemoveServer, createServerProjects, resolveServerList, ServerConnection, serverLabel } from "./registry"
 import { Schema } from "effect"
 import { ServerState } from "./persistence"
 import { createStore } from "solid-js/store"
@@ -12,9 +12,23 @@ function serverSchema() {
     hidden: {},
     lastProjectID: {},
     usedProjectIDs: {},
+    hostnames: {},
     projects: {},
   })
 }
+
+test("the current server is named by its hostname, a custom name wins, and other servers show their address", () => {
+  const sidecar: ServerConnection.Sidecar = { type: "sidecar", variant: "base", http: { url: "http://127.0.0.1:4096" } }
+  const remote: ServerConnection.Http = { type: "http", http: { url: "https://apollo.example.test:4096/" } }
+  const current = { hostname: "hailmary", fallback: "This computer" }
+
+  expect(serverLabel(sidecar, current)).toBe("hailmary")
+  expect(serverLabel(sidecar, { fallback: "This computer" })).toBe("This computer")
+  expect(serverLabel(sidecar, { hostname: "", fallback: "This computer" })).toBe("This computer")
+  expect(serverLabel({ ...sidecar, displayName: "Studio" }, current)).toBe("Studio")
+  expect(serverLabel(remote)).toBe("apollo.example.test:4096")
+  expect(serverLabel({ ...remote, displayName: "apollo" })).toBe("apollo")
+})
 
 test("startup auth_token credentials override a persisted same-url server; without one the persisted password stays", () => {
   const url = "https://server.example.test"

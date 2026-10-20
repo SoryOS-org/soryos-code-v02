@@ -13,7 +13,13 @@ const isSessionEvent = Schema.is(SessionEvent.Durable)
 
 export class Service extends Context.Service<Service, {}>()("@opencode/LocationActivity") {}
 
-export function layer(options: { readonly timeToLive?: Duration.Input; readonly sweepInterval?: Duration.Input } = {}) {
+export function layer(
+  options: {
+    readonly timeToLive?: Duration.Input
+    readonly maxActiveHold?: Duration.Input
+    readonly sweepInterval?: Duration.Input
+  } = {},
+) {
   return Layer.effect(
     Service,
     Effect.gen(function* () {
@@ -23,11 +29,14 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
       const execution = yield* SessionExecution.Service
       const sessions = yield* SessionStore.Service
       const timeToLive = Duration.toMillis(options.timeToLive ?? "60 minutes")
-      const entries = new Map<string, { readonly ref: Location.Ref; expiresAt: number }>()
+      const maxActiveHold = Duration.toMillis(options.maxActiveHold ?? "24 hours")
+      // `activeAt` is the last durable session event; `expiresAt` also moves with keep-alive.
+      const entries = new Map<string, { readonly ref: Location.Ref; expiresAt: number; readonly activeAt: number }>()
       const key = (ref: Location.Ref) => `${LocationServiceMap.canonical(ref).directory}\0${ref.workspaceID ?? ""}`
       const touch = (ref: Location.Ref) =>
         Effect.sync(() => {
-          entries.set(key(ref), { ref, expiresAt: clock.currentTimeMillisUnsafe() + timeToLive })
+          const now = clock.currentTimeMillisUnsafe()
+          entries.set(key(ref), { ref, expiresAt: now + timeToLive, activeAt: now })
         })
 
       const unsubscribe = yield* bus.listen((event) => {
@@ -46,10 +55,16 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
         for (const id of entries.keys()) {
           if (!cached.has(id)) entries.delete(id)
         }
-        const now = clock.currentTimeMillisUnsafe()
-        const expired = Array.from(entries.values()).filter((entry) => entry.expiresAt <= now)
-        if (expired.length === 0) return
+        // A long tool call or a pending question emits no durable events, so count active
+        // execution as activity, but only up to `maxActiveHold` of silence so nothing lives forever.
         const active = yield* Effect.forEach(yield* execution.active, (sessionID) => sessions.get(sessionID))
+        const now = clock.currentTimeMillisUnsafe()
+        for (const session of active) {
+          const entry = session && entries.get(key(session.location))
+          if (entry)
+            entry.expiresAt = Math.max(entry.expiresAt, Math.min(now + timeToLive, entry.activeAt + maxActiveHold))
+        }
+        const expired = Array.from(entries.values()).filter((entry) => entry.expiresAt <= now)
         yield* Effect.forEach(
           expired,
           (entry) =>

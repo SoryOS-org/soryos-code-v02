@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Afficher ou masquer la barre de débogage",
-  "status.toggle": "Afficher ou masquer les outils de débogage",
   ariaLabel: "Diagnostics de performance de développement",
   providerAriaLabel: "Diagnostic des performances du fournisseur",
   na: "n/a",

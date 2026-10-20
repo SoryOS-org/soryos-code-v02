@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Debug-Leiste ein-/ausblenden",
-  "status.toggle": "Debugging-Tools umschalten",
   ariaLabel: "Leistungsdiagnose für die Entwicklung",
   providerAriaLabel: "Leistungsdiagnose des Anbieters",
   na: "n.v.",

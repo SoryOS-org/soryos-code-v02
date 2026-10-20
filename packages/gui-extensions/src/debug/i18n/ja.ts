@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "デバッグバーを切り替え",
-  "status.toggle": "デバッグツールの切り替え",
   ariaLabel: "開発パフォーマンス診断",
   providerAriaLabel: "プロバイダーのパフォーマンス診断",
   na: "n/a",

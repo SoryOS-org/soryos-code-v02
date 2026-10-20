@@ -136,6 +136,32 @@ story("does not mask or pad controls when they fit", async ({ mount }) => {
   await expect(controls).toHaveCSS("padding-inline-end", "0px")
 })
 
+story("keeps toolbar focus rings whole and keyboard-only", async ({ mount, page }) => {
+  const component = await mount("opencode-composer-flow--toolbar-overflow", { args: { alternate: "none" } })
+  const controls = component.locator('[data-slot="composer-controls"]')
+  const agent = controls.getByRole("button", { name: "Choose agent" })
+  const variant = controls.getByRole("button", { name: "Choose model variant" })
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
+
+  // Arriving from the keyboard on a control parked half under the edge scrolls all of it, ring included, into view.
+  await controls.evaluate((element) => {
+    const control = element.querySelector('[aria-label="Choose agent"]')!.getBoundingClientRect()
+    element.scrollLeft = control.width / 2
+  })
+  await page.keyboard.press("Shift")
+  await agent.focus()
+  await expect(agent).toHaveCSS("outline-style", "solid")
+  await expect(agent).toHaveCSS("outline-offset", "-2px")
+  await expect.poll(() => controls.evaluate((element) => element.scrollLeft)).toBe(0)
+
+  // A menu the pointer opened returns focus to its trigger without a ring, even when Escape closes it.
+  await variant.click()
+  await expect(page.getByRole("menuitemradio", { name: "high", exact: true })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(variant).toBeFocused()
+  await expect(variant).toHaveCSS("outline-style", "none")
+})
+
 story("grows suggestions while preserving visible timeline context", async ({ mount }) => {
   const component = await mount("opencode-composer-flow--constrained-command-suggestions")
   const boundary = component.locator('[data-slot="composer-suggestion-boundary-story"]')
@@ -231,6 +257,7 @@ for (const draft of ["empty-draft", "multiline-draft", "mixed-attachments"]) {
 
     if (draft === "mixed-attachments") {
       await expect(component.getByAltText("layout.png")).toBeVisible()
+      await expect(component.getByAltText("screenshot.png")).toBeVisible()
       await expect(component.getByText("Keep the normal flow flat", { exact: true })).toBeVisible()
     }
   })

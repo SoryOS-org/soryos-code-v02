@@ -872,6 +872,23 @@
             "required": false
           },
           {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by archive state. Use true to return only archived sessions or false to exclude them. Omit to include both."
+            },
+            "required": false
+          },
+          {
             "name": "directory",
             "in": "query",
             "schema": {
@@ -1715,6 +1732,17 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "archived": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Archive the session with true or restore it with false. Repeating the current state is a no-op."
                   }
                 },
                 "additionalProperties": false
@@ -18292,6 +18320,16 @@
           "pid": {
             "type": "integer",
             "minimum": 0
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "urls": {
             "type": "array",

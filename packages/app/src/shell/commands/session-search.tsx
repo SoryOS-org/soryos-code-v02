@@ -2,7 +2,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { startTransition } from "solid-js"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
-import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useTabs } from "@/shell/tabs/tabs"
 import { createServerSessionEntries, type CommandPaletteEntry } from "./palette"
 import { CommandPaletteView } from "./dialog"
@@ -14,7 +14,8 @@ export function DialogSessionSearch() {
   const global = useGlobal()
   const language = useLanguage()
   const tabs = useTabs()
-  const servers = useServers().visible.filter(
+  const registry = useServers()
+  const servers = registry.visible.filter(
     (conn) => global.servers.health[ServerConnection.key(conn)]?.healthy !== false,
   )
 
@@ -31,16 +32,15 @@ export function DialogSessionSearch() {
       recentLimit: RECENT_LIMIT,
     })
 
-    if (servers.length < 2) return load
+    const tag = registry.tag(conn)
+
+    if (servers.length < 2 || !tag) return load
 
     return (query: string) =>
       load(query).then((entries) =>
         entries.map((entry) => ({
           ...entry,
-          description: language.t("palette.session.location", {
-            project: entry.description ?? "",
-            server: serverName(conn),
-          }),
+          description: language.t("palette.session.location", { project: entry.description ?? "", server: tag }),
         })),
       )
   })

@@ -1,21 +1,19 @@
-import { Component, For, createEffect, createMemo, createResource, type JSX } from "solid-js"
+import { Component, For, Show, createEffect, createMemo, createResource, type JSX } from "solid-js"
+import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
+import { StatusLink } from "@opencode/ui/status-link"
 import { Switch } from "@opencode/ui/switch"
 import { Tabs } from "@opencode/ui/tabs"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useData } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
 import { useMcpToggle } from "@/providers/connect/mcp"
+import { DialogMcp } from "@/providers/connect/mcp-dialog"
 import { pluginLabels } from "@/providers/catalog/plugin"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { SettingsList } from "@/settings/list"
 import type { SettingsView } from "@/settings/surface"
 import "@/settings/settings.css"
-
-interface McpRowItem {
-  name: string
-  enabled: boolean
-}
 
 interface PluginRowItem {
   name: string
@@ -29,30 +27,22 @@ export const SettingsExtensions: Component<{
   const language = useLanguage()
   const serverSdk = useServerSDK()
   const data = useData()
+  const dialog = useDialog()
+  const toggleMcp = useMcpToggle()
 
-  // Reading `.latest` rethrows a failed fetch, so these lists fall back to empty instead of crashing the page.
-  const [mcpList, { refetch: refetchMcp }] = createResource(
-    () => serverSdk.connection.status() === "connected",
-    () =>
-      serverSdk.api.mcp
-        .list()
-        .then((result) => result.data)
-        .catch(() => []),
-    { initialValue: [] },
-  )
-
-  const toggleMcp = useMcpToggle(() => undefined, refetchMcp)
-
-  const mcps = createMemo<McpRowItem[]>(() => {
-    return (mcpList.latest ?? []).map((server) => ({
-      name: server.name,
-      enabled: server.status.status === "connected",
-    }))
+  // The synced list follows mcp.status.changed, so a finished sign-in shows up without a refetch.
+  createEffect(() => {
+    if (serverSdk.connection.status() !== "connected") return
+    void data.location.mcp.server.sync(data.location.default()).catch(() => undefined)
   })
 
-  const handleMcpToggle = (item: McpRowItem, checked: boolean) => {
-    if (item.enabled === checked || toggleMcp.isPending) return
-    toggleMcp.mutate(item.name)
+  const mcps = createMemo(() =>
+    (data.location.mcp.server.list(data.location.default()) ?? []).toSorted((a, b) => a.name.localeCompare(b.name)),
+  )
+
+  const toggle = (name: string) => {
+    if (toggleMcp.isPending) return
+    toggleMcp.mutate(name)
   }
 
   const [pluginList] = createResource(
@@ -112,17 +102,60 @@ export const SettingsExtensions: Component<{
               </div>
               <SettingsList variant="catalog">
                 <For each={mcps()}>
-                  {(item) => (
-                    <div class="settings-extension-row">
-                      <div class="settings-extension-lead">
-                        <Icon name="mcp" class="text-v2-icon-icon-muted shrink-0" />
-                        <span class="settings-extension-name truncate">{item.name}</span>
+                  {(item) => {
+                    const busy = () => toggleMcp.isPending && toggleMcp.variables === item.name
+
+                    return (
+                      <div class="settings-extension-row">
+                        <div class="settings-extension-lead">
+                          <Icon name="mcp" class="text-v2-icon-icon-muted shrink-0" />
+                          <span class="settings-extension-name truncate">{item.name}</span>
+                        </div>
+                        {/* The same slot as the MCPs dialog, so switches and links line up. */}
+                        <div class="settings-extension-trailing">
+                          <Show
+                            when={item.status.status === "failed"}
+                            fallback={
+                              <Show
+                                when={item.status.status === "needs_auth" && item.integrationID}
+                                fallback={
+                                  <Switch
+                                    checked={item.status.status === "connected"}
+                                    disabled={item.status.status === "pending" || busy()}
+                                    onChange={() => toggle(item.name)}
+                                    hideLabel
+                                  >
+                                    {item.name}
+                                  </Switch>
+                                }
+                              >
+                                <StatusLink
+                                  tone="accent"
+                                  busy={busy()}
+                                  aria-label={language.t("dialog.mcp.signIn.open", { name: item.name })}
+                                  onClick={() => toggle(item.name)}
+                                >
+                                  {language.t("dialog.mcp.signIn")}
+                                </StatusLink>
+                              </Show>
+                            }
+                          >
+                            <StatusLink
+                              tone="danger"
+                              aria-label={language.t("dialog.mcp.error.open", { name: item.name })}
+                              onClick={() =>
+                                dialog.show(() => (
+                                  <DialogMcp directory={data.location.default().directory} server={item.name} />
+                                ))
+                              }
+                            >
+                              {language.t("mcp.status.failed")}
+                            </StatusLink>
+                          </Show>
+                        </div>
                       </div>
-                      <Switch checked={item.enabled} onChange={(checked) => handleMcpToggle(item, checked)} hideLabel>
-                        {item.name}
-                      </Switch>
-                    </div>
-                  )}
+                    )
+                  }}
                 </For>
               </SettingsList>
             </div>

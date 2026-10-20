@@ -15,7 +15,8 @@ export type SessionActivityItem = {
   target: string
 }
 
-// Live work above the composer, one capsule like the iOS app's background-work summary.
+// Live work above the composer, one capsule like the iOS app's background-work summary. It floats out of flow in a
+// lane the timeline reserves at its tail, so coming and going never resizes the composer region or moves the timeline.
 export function SessionActivityChips(props: {
   subagents: readonly SessionActivityItem[]
   shells: readonly SessionActivityItem[]
@@ -77,7 +78,10 @@ export function SessionActivityChips(props: {
 
   return (
     <Show when={active()}>
-      <div data-component="session-activity-chips" class="pointer-events-none flex items-center pb-2">
+      <div
+        data-component="session-activity-chips"
+        class="pointer-events-none absolute inset-x-0 bottom-full flex items-center pb-2"
+      >
         <Menu gutter={6} placement="top-start">
           <Menu.Trigger
             as="button"
@@ -130,7 +134,7 @@ export function SessionActivityChips(props: {
                     {(item) => (
                       <Menu.Item {...row(item)}>
                         <Icon name="console" class="shrink-0 text-v2-icon-icon-muted" />
-                        <span dir="ltr" class="min-w-0 flex-1 truncate font-mono text-[12px] text-v2-text-text-base">
+                        <span dir="ltr" class="min-w-0 flex-1 truncate font-mono text-[13px] tracking-[-0.04px] text-v2-text-text-base">
                           {item.label}
                         </span>
                         {stop(item)}

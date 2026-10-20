@@ -670,15 +670,17 @@ test("scrolls the timeline behind the composer region, fading at the card, and k
   const dock = page.locator('[data-component="session-composer-dock"]')
   const editor = page.locator('[data-component="composer"]').getByRole("textbox")
   await expect(page.getByRole("button", { name: "1 subagent", exact: true })).toBeVisible()
+  await expect(page.locator('[data-component="session-background-hint-row"]')).toBeVisible()
   await expect(page.getByText("The last answer ends above the composer region.", { exact: true })).toBeVisible()
 
   const geometry = () =>
     page.evaluate(() => {
-      const edge = "--session-timeline-fade-edge"
       const viewport = document.querySelector<HTMLElement>('[data-slot="session-timeline-scroll"] > *')!
       const region = document.querySelector('[data-component="session-composer-dock"]')!
       const dock = region.getBoundingClientRect()
       const card = region.querySelector('[data-component="composer"]')!.getBoundingClientRect()
+      const pill = region.querySelector('[data-slot="session-activity-chip"]')!.getBoundingClientRect()
+      const hint = viewport.querySelector('[data-component="session-background-hint-row"]')!.getBoundingClientRect()
       const parts = [...viewport.querySelectorAll("[data-timeline-part-id]")]
       const last = parts.find((element) => element.textContent?.includes("The last answer ends"))!
 
@@ -686,15 +688,19 @@ test("scrolls the timeline behind the composer region, fading at the card, and k
         // The scroll area runs on behind the composer region to the panel's bottom edge.
         behind: Math.round(viewport.getBoundingClientRect().bottom - dock.bottom),
         inset: Math.round(viewport.querySelector<HTMLElement>("[data-timeline-inset]")!.offsetHeight - dock.height),
-        // Content stays visible behind the pill and fades out where the composer card starts.
-        fade: Math.round(dock.bottom - card.top - parseFloat(getComputedStyle(viewport).getPropertyValue(edge))),
-        behindPill: card.top - dock.top > 20,
+        // Content fades out where the composer card starts.
+        fade: Math.round(
+          dock.bottom - card.top - parseFloat(getComputedStyle(viewport).getPropertyValue("--session-timeline-inset")),
+        ),
+        // The pill floats above the region out of flow, so it never changes the inset the timeline scrolls above.
+        floats: pill.bottom <= dock.top,
+        // It floats in the timeline's reserved tail, below the background hint and the last answer.
+        reserved: hint.bottom <= pill.top && last.getBoundingClientRect().bottom <= hint.top,
         atEnd: viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 1,
-        clear: last.getBoundingClientRect().bottom <= dock.top,
       }
     })
 
-  const expected = { behind: 0, inset: 0, fade: 0, behindPill: true, atEnd: true, clear: true }
+  const expected = { behind: 0, inset: 0, fade: 0, floats: true, reserved: true, atEnd: true }
   await expect.poll(geometry).toEqual(expected)
   const before = (await dock.boundingBox())!.height
 

@@ -33,4 +33,12 @@ export default {
   "workspace.existing": "Worktree",
   "workspace.new": "New worktree",
   "mcp.interactiveAuth": "MCP server {{name}} requires an interactive authentication form",
+  "mcp.signIn": "Sign in",
+  "mcp.signIn.open": "Sign in to {{name}}",
+  "mcp.error.open": "{{name}} failed, view error",
+  "mcp.error.title": "MCP server: {{name}}",
+  "mcp.error.copy": "Copy details",
+  "mcp.error.copyFailed": "Couldn't copy error details",
+  "mcp.error.disable": "Disable",
+  "mcp.error.details": "MCP server: {{name}}\nStatus: failed\nConfiguration: mcp.servers.{{name}}\nError: {{error}}",
 }

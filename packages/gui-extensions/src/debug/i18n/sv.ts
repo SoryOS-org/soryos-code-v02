@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Visa eller dölj felsökningsfältet",
-  "status.toggle": "Växla felsökningsverktyg",
   ariaLabel: "Utvecklingsprestandadiagnostik",
   providerAriaLabel: "Prestandadiagnostik för leverantör",
   na: "n/a",

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Vís ella fjala kembibjálkan",
-  "status.toggle": "Skift feilsøkingartól",
   ariaLabel: "Menningar avriksdiagnostikk",
   providerAriaLabel: "Avriksgreining hjá veitara",
   na: "n/a",

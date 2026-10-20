@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Lülita silumisriba",
-  "status.toggle": "Silumistööriistade sisse- ja väljalülitamine",
   ariaLabel: "Arendustegevuse diagnostika",
   providerAriaLabel: "Pakkuja jõudluse diagnostika",
   na: "n/a",

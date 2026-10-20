@@ -479,13 +479,14 @@ test("every MCP row hit area toggles exactly once and keeps the submenu open", a
     .filter({ has: page.getByRole("switch", { name: "figma", exact: true }) })
 
   await expect(toggle).toBeChecked()
-  await expect(submenu.getByRole("switch", { name: "playwright", exact: true })).toBeChecked()
-  await expect(submenu.getByRole("switch", { name: "playwright", exact: true })).toHaveAccessibleDescription("Failed")
+  // A pointer open focuses the menu itself, so its first row shows no focus ring; a keyboard open focuses that row.
+  await expect(submenu).toBeFocused()
+  await page.keyboard.press("Escape")
+  await expect(submenu).toBeHidden()
+  await page.getByRole("button", { name: "MCP", exact: true }).press("Enter")
+  await expect(toggle).toBeFocused()
   await expect(submenu.getByRole("switch", { name: "waiting", exact: true })).toBeDisabled()
   await expect(submenu.getByRole("switch", { name: "waiting", exact: true })).toHaveAccessibleDescription("Connecting…")
-  await expect(submenu.getByRole("switch", { name: "linear", exact: true })).toHaveAccessibleDescription(
-    "Sign in required",
-  )
 
   for (const [index, target] of ["label", "dot", "padding", "control", "keyboard"].entries()) {
     const enabled = index % 2 !== 0
@@ -542,6 +543,7 @@ test("MCP authentication starts before a slow resource catalog finishes", async 
   await page.getByRole("button", { name: "MCP", exact: true }).click()
   const submenu = page.getByRole("dialog", { name: "MCP", exact: true })
   const toggle = submenu.getByRole("switch", { name: "linear", exact: true })
+  const signIn = submenu.getByRole("button", { name: "Sign in to linear", exact: true })
   await expect(toggle).toBeEnabled()
 
   try {
@@ -549,13 +551,13 @@ test("MCP authentication starts before a slow resource catalog finishes", async 
     await submenu.getByText("linear", { exact: true }).click()
     await expect(await popup).toHaveURL("https://auth.example.test/authorize")
     await resources.arrived
-    await expect(toggle).toBeChecked()
-    await expect(toggle).toHaveAccessibleDescription("Sign in required")
+    // The switch hands over to the sign-in link, which waits for the catalog before it is ready again.
+    await expect(signIn).toBeDisabled()
   } finally {
     resources.release()
   }
 
-  await expect(toggle).toBeEnabled()
+  await expect(signIn).toBeEnabled()
   expect(attempts).toHaveLength(1)
   expect(new URL(attempts[0]).searchParams.get("location[directory]")).toBe(fixture.directory)
 })

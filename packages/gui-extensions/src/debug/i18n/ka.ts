@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "გამართვის ზოლის გადართვა",
-  "status.toggle": "გამართვის ხელსაწყოების გადართვა",
   ariaLabel: "განვითარების შესრულების დიაგნოსტიკა",
   providerAriaLabel: "პროვაიდერის წარმადობის დიაგნოსტიკა",
   na: "n/a",

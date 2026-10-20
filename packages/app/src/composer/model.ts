@@ -2,7 +2,7 @@ import { ImagePreview } from "@opencode/ui/image-preview"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/gui-extensions/sdk"
-import { createComponent, createEffect, createMemo, on } from "solid-js"
+import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
 import { createComposerEditor, createComposerEditorState, type ComposerEditorModel } from "./editor/interaction"
@@ -15,8 +15,9 @@ import { useExtensionHost } from "@/runtime/extension/host"
 import { useExtensionAttachment } from "@/runtime/extension/host-apis"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
-import { resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { useData, useServer } from "@/runtime/server/current"
+import { useServerSDK } from "@/runtime/server/client"
+import { readLocalImage } from "@/runtime/server/image"
 import { showToast } from "@/shell/notifications/toast"
 import { formatServerError } from "@/runtime/server/errors"
 import { Skill } from "@opencode/schema/skill"
@@ -56,8 +57,16 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const language = useLanguage()
   const settings = useSettings()
   const platform = usePlatform()
+  const serverSDK = useServerSDK()
   const prompt = adapter.state
   let editor: HTMLDivElement | undefined
+  // A path attachment's image is read through the server, which can see both local and uploaded paths.
+  const pathImages = new Map<string, Promise<string | undefined>>()
+  const pathImageReads = new AbortController()
+  onCleanup(() => {
+    pathImageReads.abort()
+    pathImages.forEach((url) => void url.then((value) => value && URL.revokeObjectURL(value)))
+  })
 
   const interaction = createComposerEditorState(prompt.mode.current())
   createEffect(
@@ -333,11 +342,23 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     onContextRemove(item) {
       if (item.type === "file" && item.commentID) comments.remove(item.path, item.commentID)
     },
-    openAttachment: (attachment, origin) => {
-      if (attachment.type !== "image") return
-      void resolveBlobUrl(attachment.blob).then((src) => {
+    openAttachment(attachment, origin) {
+      void controller.previewAttachment(attachment).then((src) => {
         if (src) dialog.show(() => createComponent(ImagePreview, { src, alt: attachment.filename, origin }))
       })
+    },
+    readImage(path) {
+      const existing = pathImages.get(path)
+
+      if (existing) return existing
+      const url = readLocalImage(serverSDK.api, sdk().directory, path, pathImageReads.signal)
+        .then((blob) => blob && URL.createObjectURL(blob))
+        .catch(() => undefined)
+      pathImages.set(path, url)
+      // A failed read retries the next time the attachment shows.
+      void url.then((value) => value || pathImages.delete(path))
+
+      return url
     },
     openContext(key) {
       const item = controller.contextItem(key)

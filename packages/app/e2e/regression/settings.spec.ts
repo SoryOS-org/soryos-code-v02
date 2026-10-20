@@ -112,7 +112,7 @@ test("another server's settings page survives refresh", async ({ page }) => {
 })
 
 test("single-server settings expose scoped pages without a server picker", async ({ page }) => {
-  const { settings } = await open(page)
+  const { settings } = await open(page, { hostname: "hailmary" })
   await expect(settings.getByRole("tab", { name: "Server", exact: true })).toBeVisible()
   await expect(settings.getByRole("tab", { name: "Servers", exact: true })).toHaveCount(0)
 
@@ -120,6 +120,7 @@ test("single-server settings expose scoped pages without a server picker", async
     await settings.getByRole("tab", { name, exact: true }).click()
     await expect(settings.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true")
     await expect(settings.locator('[data-action="settings-server-select"]')).toHaveCount(0)
+    await expect(settings.getByText(/hailmary|This computer|Local server/i)).toHaveCount(0)
   }
 
   await settings.getByRole("tab", { name: "Server", exact: true }).click()
@@ -153,14 +154,16 @@ test("several servers share one selected server across per-server pages", async 
       { url: offline, name: "Offline box" },
     ],
   })
-  const { settings } = await open(page)
+  const { settings } = await open(page, { hostname: "hailmary" })
   const switcher = settings.locator('[data-action="settings-server-select"]:visible')
   const connected = settings.locator('[data-component="connected-providers-section"]')
 
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
-  await expect(switcher).toHaveText("Server127.0.0.1:4096")
+  // The server the app runs beside is named by its hostname; only the menu that chooses a server adds "This computer".
+  await expect(switcher).toHaveText("Serverhailmary")
   await expect(connected.getByText("No connected providers")).toBeVisible()
   await switcher.click()
+  await expect(page.getByRole("menuitemradio")).toHaveText(["hailmary· This computer", "Build server", /^Offline box/])
   await page.getByRole("menuitemradio", { name: "Build server", exact: true }).click()
   await expect(connected.getByText("OpenRouter", { exact: true })).toBeVisible()
   await expect(page).toHaveURL(
@@ -483,6 +486,42 @@ test.describe("pages open before slow data", () => {
     mcp.release()
     await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
     await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
+  })
+
+  test("extensions show failed and auth-gated MCPs as links", async ({ page, context }) => {
+    const error = "Connection closed: MCP server process exited with code 1"
+    const signIns: string[] = []
+    await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
+
+    const { settings } = await open(page, {
+      mcp: [
+        { name: "blender", status: { status: "failed", error } },
+        { name: "demo-mcp", status: { status: "connected" } },
+        { name: "stripe", integrationID: "stripe-oauth", status: { status: "needs_auth", error: "Sign in required" } },
+      ],
+      integrations: [
+        { id: "stripe-oauth", name: "Stripe", methods: [{ id: "oauth", type: "oauth" }], connections: [] },
+      ],
+      onIntegrationOAuth: (input) => {
+        signIns.push(input.integrationID)
+
+        return { url: "https://auth.example.test/authorize" }
+      },
+    })
+
+    await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+    await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
+    await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
+    await expect(settings.getByRole("switch")).toHaveCount(1)
+
+    const popup = page.waitForEvent("popup")
+    await settings.getByRole("button", { name: "Sign in to stripe", exact: true }).click()
+    await expect(await popup).toHaveURL("https://auth.example.test/authorize")
+    expect(signIns).toEqual(["stripe-oauth"])
+
+    await settings.getByRole("button", { name: "blender failed, view error", exact: true }).click()
+    const details = page.getByRole("dialog", { name: "MCP server: blender", exact: true })
+    await expect(details.getByText(error, { exact: true })).toBeVisible()
   })
 
   for (const fails of [false, true]) {

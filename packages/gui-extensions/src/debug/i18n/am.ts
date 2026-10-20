@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "የማረሚያ አሞሌን ቀይር",
-  "status.toggle": "የማረሚያ መሳሪያዎችን ቀይር",
   ariaLabel: "የልማት አፈጻጸም ምርመራዎች",
   providerAriaLabel: "የአቅራቢ አፈጻጸም ምርመራ",
   na: "n/a",

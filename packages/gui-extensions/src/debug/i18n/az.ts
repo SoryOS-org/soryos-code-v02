@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Sazlama panelini göstər/gizlət",
-  "status.toggle": "Sazlama alətlərini göstər/gizlət",
   ariaLabel: "Tərtibatçı performans diaqnostikası",
   providerAriaLabel: "Provayder performansının diaqnostikası",
   na: "yox",

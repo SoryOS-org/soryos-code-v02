@@ -4,6 +4,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { useFilteredList } from "@opencode/ui/hooks"
 import { createComposerAttachments, type ComposerAttachmentConfig } from "../attachments/attachments"
 import type { Upload } from "../attachments/uploads"
+import { resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { createComposerEditorActions, type ComposerStateStoreInput } from "./actions"
 import type {
   ComposerAttachment,
@@ -65,6 +66,8 @@ export function createComposerEditor(input: {
   context: Accessor<ComposerSuggestion[]>
   searchContextFiles: (query: string) => ComposerSuggestion[] | Promise<ComposerSuggestion[]>
   openAttachment?: (attachment: ComposerAttachment, origin?: HTMLElement) => void
+  /** An object URL for the image file at this path, which a path attachment references without its bytes. */
+  readImage?: (path: string) => Promise<string | undefined>
   openContext?: (key: string) => void
   onContextRemove?: (item: ComposerComment) => void
   onQuoteComment?: (item: Extract<ComposerComment, { type: "quote" }>, comment: string) => void
@@ -424,6 +427,14 @@ export function createComposerEditor(input: {
     },
     openAttachment(attachment: ComposerAttachment, origin?: HTMLElement) {
       input.openAttachment?.(attachment, origin)
+    },
+    /** The image an attachment shows, whether its bytes are in the draft store or in a file at its path. */
+    previewAttachment(attachment: ComposerAttachment): Promise<string | undefined> {
+      if (!attachment.mime.startsWith("image/")) return Promise.resolve(undefined)
+
+      if (attachment.type === "image") return resolveBlobUrl(attachment.blob)
+
+      return input.readImage?.(attachment.path) ?? Promise.resolve(undefined)
     },
     removeAttachment(id: string) {
       draft.removeAttachment(id)

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Togol bar nyahpepijat",
-  "status.toggle": "Togol alat nyahpepijat",
   ariaLabel: "Diagnostik prestasi pembangunan",
   providerAriaLabel: "Diagnostik prestasi penyedia",
   na: "tiada",

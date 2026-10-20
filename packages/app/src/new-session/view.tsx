@@ -42,7 +42,6 @@ export const ProviderTipSchema = Persistence.struct({
   dismissedAt: Schema.Finite,
 })
 
-export const WorkspaceTipSchema = ProviderTipSchema
 
 export function NewSessionView(props: {
   composer: ComposerModel
@@ -58,12 +57,6 @@ export function NewSessionView(props: {
 
   const settings = useSettings()
   const [wordmark, setWordmark] = createSignal<HTMLDivElement>()
-
-  const select = (value: string) => {
-    props.workspace.selection.set(value)
-
-    if (value !== "main") setOnboarding("used", true)
-  }
 
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
@@ -113,28 +106,13 @@ export function NewSessionView(props: {
         <Show when={wordmark()}>
           {(logo) => <NewSessionPinBoard logo={logo()} sound={settings.sounds.interfaceEnabled} />}
         </Show>
-        <NewSessionTips
-          selection={props.composer.model.selection}
-          onDone={props.composer.restoreFocus}
-          workspaceEligible={
-            !!props.project.selected() &&
-            props.workspace.bar.visible() &&
-            props.workspace.selection.value() !== "create" &&
-            props.workspace.project.managed() === 0
-          }
-          onWorkspace={() => select("create")}
-        />
+        <NewSessionTips selection={props.composer.model.selection} onDone={props.composer.restoreFocus} />
       </div>
     </div>
   )
 }
 
-function NewSessionTips(props: {
-  selection: ComposerModel["model"]["selection"]
-  onDone: () => void
-  workspaceEligible: boolean
-  onWorkspace: () => void
-}) {
+function NewSessionTips(props: { selection: ComposerModel["model"]["selection"]; onDone: () => void }) {
   const language = useLanguage()
   const dialog = useDialog()
   const sdk = useWorkspaceLocation()
@@ -146,19 +124,6 @@ function NewSessionTips(props: {
     { dismissedAt: 0 },
   )
 
-  const [workspaceState, setWorkspaceState, , workspaceReady] = persisted(
-    Persist.global("new-session.workspace-tip"),
-    WorkspaceTipSchema,
-    { dismissedAt: 0 },
-  )
-
-  const workspaceVisible = createMemo(
-    () =>
-      props.workspaceEligible &&
-      workspaceReady() &&
-      Date.now() - workspaceState.dismissedAt >= providerTipDismissalDuration,
-  )
-
   const providerVisible = createMemo(
     () =>
       providerReady() &&
@@ -166,31 +131,16 @@ function NewSessionTips(props: {
       Date.now() - providerState.dismissedAt >= providerTipDismissalDuration,
   )
 
-  const tip = createMemo<"workspace" | "provider" | undefined>(() => {
-    if (providerVisible()) return "provider"
-
-    if (workspaceVisible()) return "workspace"
-  })
-
-  const displayed = createMemo<"workspace" | "provider" | undefined>((previous) => tip() ?? previous)
+  const tip = providerVisible
   const [ref, setRef] = createSignal<HTMLDivElement>()
 
   const presence = createPresence({
-    show: () => tip() !== undefined,
+    show: tip,
     element: () => ref() ?? null,
   })
 
   const open = () => {
-    const current = tip()
-
-    if (!current) return
-
-    if (current === "workspace") {
-      setWorkspaceState("dismissedAt", Date.now())
-      props.onWorkspace()
-
-      return
-    }
+    if (!tip()) return
 
     void import("@/providers/connect/dialog").then(({ DialogConnectProvider }) => {
       void dialog.show(() => (
@@ -200,15 +150,7 @@ function NewSessionTips(props: {
   }
 
   const dismiss = () => {
-    const current = tip()
-
-    if (!current) return
-
-    if (current === "workspace") {
-      setWorkspaceState("dismissedAt", Date.now())
-
-      return
-    }
+    if (!tip()) return
 
     setProviderState("dismissedAt", Date.now())
   }
@@ -219,7 +161,7 @@ function NewSessionTips(props: {
         <div
           ref={setRef}
           data-component="new-session-tip"
-          data-visible={tip() !== undefined}
+          data-visible={tip()}
           class="group/new-session-tip pointer-events-auto relative flex h-6 max-w-full items-center transition-[opacity,transform] duration-[250ms] ease-[cubic-bezier(0.215,0.61,0.355,1)] motion-reduce:transition-none"
           classList={{ "data-[visible=false]:animate-out fade-out slide-out-to-bottom-4": true }}
         >
@@ -229,7 +171,7 @@ function NewSessionTips(props: {
             onClick={open}
           >
             <span class="truncate">
-              {language.t(displayed() === "workspace" ? "home.workspaceTip" : "home.providerTip")}
+              {language.t("home.providerTip")}
             </span>
             <span class="flex size-6 shrink-0 items-center justify-center" aria-hidden="true">
               <Icon name="chevron-down" size="small" class="-rotate-90" />

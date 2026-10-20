@@ -44,6 +44,8 @@ export type MockFileContent =
 
 export interface MockServerConfig {
   server?: string
+  // The machine name `/api/info` reports; omitted like a server that predates it.
+  hostname?: string
   provider: Resolvable<MockProviderCatalog>
   integrations?: Resolvable<unknown[]>
   // Runs on POST /api/credential/:id/activate; the fixture swaps its integrations and catalog to the new account.
@@ -852,6 +854,7 @@ function mockHandlers(
           Effect.succeed({
             version: "2.0.0",
             pid: 1,
+            hostname: config.hostname,
             urls: config.server ? [config.server] : [],
             paths: { tmp: "/tmp/opencode" },
           }),

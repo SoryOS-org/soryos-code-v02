@@ -354,7 +354,7 @@ test("multi-server results follow the selected server and keep the query on retu
   await expect(view.results.getByRole("option")).toHaveCount(1)
   await view.search.clear()
   await view.settings.getByRole("tab", { name: "Providers", exact: true }).click()
-  await view.settings.getByRole("button", { name: "Server 127.0.0.1:4096", exact: true }).click()
+  await view.settings.getByRole("button", { name: "Server This computer", exact: true }).click()
   await page.getByRole("menuitemradio", { name: "Build server", exact: true }).click()
 
   await view.search.fill("MCPs")

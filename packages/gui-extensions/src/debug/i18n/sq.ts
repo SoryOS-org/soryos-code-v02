@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Shfaq ose fshih shiritin e diagnostikimit",
-  "status.toggle": "Ndrysho mjetet e korrigjimit",
   ariaLabel: "Diagnostifikimi i performancës së zhvillimit",
   providerAriaLabel: "Diagnostikimi i performancës së ofruesit",
   na: "n/a",

@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createUniqueId } from "solid-js"
+import { For, Match, Switch, createUniqueId } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { type TabLayout, useSettings } from "@/settings/model"
 import "./interface-mode.css"
@@ -6,7 +6,6 @@ import "./interface-mode.css"
 const modes = [
   { id: "top", layout: "horizontal" },
   { id: "side", layout: "vertical" },
-  { id: "inbox", layout: "inbox" },
 ] as const satisfies { id: string; layout: TabLayout }[]
 
 export function InterfaceModeSetting() {
@@ -40,20 +39,12 @@ export function InterfaceModeSetting() {
                 <Match when={mode.id === "side"}>
                   <SideTabsPreview />
                 </Match>
-                <Match when={mode.id === "inbox"}>
-                  <InboxPreview />
-                </Match>
               </Switch>
             </div>
             <div data-slot="interface-mode-copy">
               <span data-slot="interface-mode-title">
                 <span data-slot="interface-mode-radio" />
                 <span id={`${id}-${mode.id}-title`}>{language.t(`settings.general.row.interfaceMode.${mode.id}`)}</span>
-                <Show when={mode.id === "inbox"}>
-                  <span data-slot="interface-mode-badge">
-                    {language.t("settings.general.row.interfaceMode.experimental")}
-                  </span>
-                </Show>
               </span>
               <span id={`${id}-${mode.id}`} data-slot="interface-mode-description">
                 {language.t(`settings.general.row.interfaceMode.${mode.id}.description`)}
@@ -95,48 +86,6 @@ function SideTabsPreview() {
               <i />
               <span style={{ width: `${width}%` }} />
             </span>
-          )}
-        </For>
-      </div>
-      <PreviewWorkspace />
-    </div>
-  )
-}
-
-// Mirrors the inbox: sessions that need you, then finished work, then sessions still running.
-const inboxSections = [
-  { rows: [{ width: 68, status: "approval" }] },
-  {
-    rows: [
-      { width: 56, status: "done" },
-      { width: 72, status: "done" },
-    ],
-  },
-  {
-    rows: [
-      { width: 48, status: "working" },
-      { width: 62, status: "working" },
-    ],
-  },
-] as const
-
-function InboxPreview() {
-  return (
-    <div data-slot="preview-body">
-      <div data-slot="preview-rail">
-        <For each={inboxSections}>
-          {(section, sectionIndex) => (
-            <>
-              <span data-slot="preview-rail-heading" />
-              <For each={section.rows}>
-                {(row, index) => (
-                  <span data-slot="preview-tab" data-active={sectionIndex() === 1 && index() === 0 ? "" : undefined}>
-                    <i data-status={row.status} />
-                    <span style={{ width: `${row.width}%` }} />
-                  </span>
-                )}
-              </For>
-            </>
           )}
         </For>
       </div>

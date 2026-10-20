@@ -430,17 +430,18 @@ test("the location dialog lists every ready server's projects in one list and ta
     pageMessages: () => ({ items: [] }),
     fileList: () => [],
   })
-  // hailmary is listed but unreachable, so it contributes no projects and cannot take a new one.
+  // romulus is listed but unreachable, so it contributes no projects and cannot take a new one.
   await seed(page, {
     servers: [
       { url: apollo, name: "apollo" },
-      { url: "http://127.0.0.1:4999", name: "hailmary" },
+      { url: "http://127.0.0.1:4999", name: "romulus" },
     ],
     usedProjects: { [apollo]: [remote.id] },
   })
   const local = entry("proj_opencode", "C:/work/opencode", 2)
   await openDraft(page, {
     name: "opencode",
+    hostname: "hailmary",
     directory: local.worktree,
     project: { time: local.time },
     projects: () => [local, entry("proj_console", "C:/work/console", 9)],
@@ -484,7 +485,8 @@ test("the location dialog lists every ready server's projects in one list and ta
   await expect(options.nth(4)).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("ArrowRight")
   await expect(chip).toHaveText("Add project")
-  await expect(options).toHaveText([/^127\.0\.0\.1:\d+$/, "apollo"])
+  // The server the app runs beside shows its hostname and "This computer" instead of its address.
+  await expect(options).toHaveText(["hailmaryThis computer", "apollo"])
   await options.filter({ hasText: "apollo" }).click()
   await expect(page.getByRole("button", { name: "Select folder", exact: true })).toBeEnabled()
   await expect.poll(() => files.length).toBeGreaterThan(0)

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Przełącz pasek debugowania",
-  "status.toggle": "Przełącz narzędzia debugowania",
   ariaLabel: "Diagnostyka wydajności w środowisku deweloperskim",
   providerAriaLabel: "Diagnostyka wydajności dostawcy",
   na: "n.d.",

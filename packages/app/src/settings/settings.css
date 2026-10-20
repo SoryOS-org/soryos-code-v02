@@ -2137,6 +2137,16 @@
   border-bottom: 0;
 }
 
+.settings-extension-trailing {
+  display: flex;
+  min-width: 60px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  font-size: 13px;
+  font-weight: 440;
+  line-height: var(--line-height-compact);
+}
+
 .settings-extension-lead {
   display: flex;
   flex: 1;

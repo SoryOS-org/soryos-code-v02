@@ -32,6 +32,10 @@ import { prefersReducedMotion } from "@opencode/ui/motion"
 
 const fallbackItemSize = 60
 
+// Reserved below the last row: a 36px lane for the live status row and its background hint, an 8px gap, then a 36px
+// lane that the composer's activity pill floats in. Both come and go inside it, so neither moves the rows above.
+const tailSize = 80
+
 const pendingMarkdown = '[data-component="markdown"]:not([data-markdown-ready])'
 
 // Distance from the bottom that counts as "at the end". Deliberately tight: a collapse clamps
@@ -67,10 +71,8 @@ type Input = {
   onResumeScroll: (behavior?: ScrollBehavior) => void
   setScrollRef: (element: HTMLDivElement | undefined) => void
   setContentRef: (element: HTMLDivElement) => void
-  /** Height of the composer region floating over the timeline's bottom edge. */
+  /** Height of the composer region floating over the timeline's bottom edge, where the timeline fades out. */
   bottomInset?: Accessor<number>
-  /** Height from the bottom edge to where the timeline fades out, the top of the composer region's card. */
-  fadeInset?: Accessor<number>
   setVisibleRef?: (element: HTMLDivElement | undefined) => void
   onScheduleScrollState: (element: HTMLDivElement) => void
   onPin: () => void
@@ -298,7 +300,7 @@ export function createTimelineVirtualizer(input: Input) {
       // Empty projections still need the bottom spacer for running status.
       return rows().length > 0 ? topOffset() : 0
     },
-    paddingEnd: 64,
+    paddingEnd: tailSize,
     get rangeExtractor() {
       return rangeExtractor()
     },
@@ -877,7 +879,6 @@ export function createTimelineVirtualizer(input: Input) {
         class="relative w-full h-full min-w-0"
         style={{
           "--session-timeline-inset": `${bottomInset()}px`,
-          "--session-timeline-fade-edge": `${input.fadeInset?.() ?? 0}px`,
         }}
       >
         <div
@@ -945,8 +946,11 @@ export function createTimelineVirtualizer(input: Input) {
             <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
             <div
               data-timeline-row="bottom-spacer"
-              class="h-16 absolute top-0 left-0 w-full"
-              style={{ transform: `translateY(${virtualizer.getTotalSize() - 64 - rendering.scrollAdjustment}px)` }}
+              class="absolute top-0 left-0 w-full"
+              style={{
+                height: `${tailSize}px`,
+                transform: `translateY(${virtualizer.getTotalSize() - tailSize - rendering.scrollAdjustment}px)`,
+              }}
             >
               {props.bottomSpacer}
             </div>

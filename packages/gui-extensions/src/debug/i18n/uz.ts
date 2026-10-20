@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Nosozliklarni tuzatish panelini almashtirish",
-  "status.toggle": "Nosozliklarni tuzatish vositalarini yoqish/o‘chirish",
   ariaLabel: "Rivojlanish samaradorligi diagnostikasi",
   providerAriaLabel: "Provayder unumdorligi diagnostikasi",
   na: "yo'q",

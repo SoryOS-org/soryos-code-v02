@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Slå fejlfindingslinjen til eller fra",
-  "status.toggle": "Slå fejlfindingsværktøjer til/fra",
   ariaLabel: "Udviklingsydelsesdiagnostik",
   providerAriaLabel: "Diagnosticering af udbyderens ydeevne",
   na: "n/a",

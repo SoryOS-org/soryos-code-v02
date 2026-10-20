@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "डीबग बार टॉगल करें",
-  "status.toggle": "डीबग टूल टॉगल करें",
   ariaLabel: "विकास प्रदर्शन निदान",
   providerAriaLabel: "प्रोवाइडर के प्रदर्शन का निदान",
   na: "एन/ए",

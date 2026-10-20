@@ -19,10 +19,8 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     pendingMessage: string | undefined
     scroll: { overflow: boolean; jump: boolean }
     follow: { sessionKey: string; pinned: boolean }
-    /** The composer region's height; the timeline scrolls on underneath it. */
+    /** The composer region's height; the timeline scrolls on underneath it and fades out at its top. */
     inset: number
-    /** Distance from the composer region's bottom to the top of its opaque card, where the timeline fades out. */
-    edge: number
     refs: {
       scroller: HTMLDivElement | undefined
       content: HTMLDivElement | undefined
@@ -41,7 +39,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       pinned: true,
     },
     inset: 0,
-    edge: 0,
     refs: {
       scroller: undefined,
       content: undefined,
@@ -361,15 +358,9 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   )
   createResizeObserver(
     () => state.refs.dock,
-    (_rect, element, entry) => {
+    (_rect, _element, entry) => {
+      // The activity pill floats above the region out of flow, so only the docks, queue and composer count here.
       const next = Math.ceil(entry.borderBoxSize[0]?.blockSize ?? 0)
-      // Only the activity pill floats with gaps beside it; the docks, queue and composer below it form one opaque
-      // card. The pill changes the region's height as it comes and goes, so this observer sees every move of the edge.
-      const region = element.getBoundingClientRect()
-      const pill = element.querySelector('[data-component="session-activity-chips"]')?.getBoundingClientRect()
-      const edge = pill && pill.top - region.top < 1 ? Math.round(region.bottom - pill.bottom) : next
-
-      if (edge !== state.edge) setState("edge", edge)
 
       if (next === state.inset) return
       const delta = next - state.inset
@@ -404,7 +395,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       setActiveMessage,
     },
     inset: () => state.inset,
-    edge: () => state.edge,
     lastUserMessage: timeline.lastUserMessage,
     resource: timeline.resource,
     ready: timeline.ready,

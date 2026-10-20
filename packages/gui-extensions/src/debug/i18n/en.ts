@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Toggle debug bar",
-  "status.toggle": "Toggle debug tools",
   ariaLabel: "Development performance diagnostics",
   providerAriaLabel: "Provider performance diagnostics",
   na: "n/a",

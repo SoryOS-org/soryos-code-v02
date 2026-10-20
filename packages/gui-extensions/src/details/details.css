@@ -39,7 +39,7 @@
 .session-summary-row,
 .session-service-row,
 .session-service-config,
-[data-component="switch"].session-mcp-row {
+.session-mcp-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -142,7 +142,7 @@
 :is(.session-service-menu, .session-service-drawer) .session-summary-row,
 :is(.session-service-menu, .session-service-drawer) .session-service-row,
 :is(.session-service-menu, .session-service-drawer) .session-service-config,
-:is(.session-service-menu, .session-service-drawer) [data-component="switch"].session-mcp-row {
+:is(.session-service-menu, .session-service-drawer) .session-mcp-row {
   font-size: inherit;
   line-height: inherit;
 }
@@ -266,6 +266,29 @@
   font: inherit;
   letter-spacing: inherit;
 }
+/* Every row ends in the same 60px slot as the MCPs dialog, so switches and status links line up. */
+.session-mcp-trailing {
+  display: flex;
+  min-width: 60px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
+[data-component="switch"].session-mcp-row [data-slot="switch-control"] {
+  margin-inline-start: 36px;
+}
+
+div.session-mcp-row {
+  cursor: pointer;
+}
+
+.session-mcp-error-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
 .session-service-status {
   flex-shrink: 0;
   font-size: inherit;

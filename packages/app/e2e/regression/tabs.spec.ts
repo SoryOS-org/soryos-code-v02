@@ -366,6 +366,16 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   await expect(sidebar).toHaveCSS("width", "260px")
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
 
+  const actions = await Promise.all(
+    ["vertical-tabs-home", "vertical-tabs-search", "vertical-tabs-new-session"].map(async (action) => {
+      const box = await sidebar.locator(`[data-action="${action}"]`).boundingBox()
+      if (!box) throw new Error(`${action} is not rendered`)
+      return box
+    }),
+  )
+  const gaps = actions.slice(1).map((box, index) => box.y - (actions[index].y + actions[index].height))
+  expect(gaps).toEqual([4, 4])
+
   const handle = sidebar.locator('[data-component="resize-handle"]')
 
   for (const [offset, width] of [
@@ -432,34 +442,6 @@ for (const [screen, href] of [
       "aria-expanded",
       "true",
     )
-  })
-}
-
-// macOS 26 traffic lights end 74px from the window edge. The collapsed toggle starts 16px past them, as the horizontal
-// titlebar's first control does, and a fullscreen window has no traffic lights to clear.
-for (const [window, fullscreen, start] of [
-  ["windowed", false, 90],
-  ["fullscreen", true, 18],
-] as const) {
-  test(`collapsed sidebar toggle clears the macOS traffic lights (${window})`, async ({ page }) => {
-    await mockWorkspace(page, {
-      name: "Tabs",
-      sessions: [a],
-      seed: { settings: { appearance: { tabLayout: "vertical", sidebarOpen: false } }, tabs: [a.id] },
-    })
-    await page.goto(
-      `/e2e/utils/macos-window.html?${new URLSearchParams({ server: SERVER, route: sessionHref(a.id), fullscreen: String(fullscreen) })}`,
-    )
-    await expectSessionTitle(page, a.title)
-
-    const toggle = await page.locator("main").getByRole("button", { name: "Toggle sidebar", exact: true }).boundingBox()
-    const project = await page.locator('[data-session-title] [data-slot="session-project-trigger"]').boundingBox()
-
-    if (!toggle || !project) throw new Error("collapsed sidebar header has no bounding boxes")
-    expect(toggle.x).toBe(start)
-    // The header's contents follow the toggle on its center line.
-    expect(project.x).toBe(start + 32)
-    expect(project.y + project.height / 2).toBe(toggle.y + toggle.height / 2)
   })
 }
 

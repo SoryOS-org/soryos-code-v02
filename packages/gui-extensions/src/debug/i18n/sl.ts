@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Preklopi vrstico za razhroščevanje",
-  "status.toggle": "Preklop orodij za odpravljanje napak",
   ariaLabel: "Diagnostika uspešnosti razvoja",
   providerAriaLabel: "Diagnostika učinkovitosti ponudnika",
   na: "n/a",

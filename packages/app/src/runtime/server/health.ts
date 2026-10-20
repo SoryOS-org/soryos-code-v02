@@ -8,6 +8,10 @@ import { createStore, reconcile } from "solid-js/store"
 export type ServerHealth = {
   healthy: boolean
   version?: string
+  /** The server machine's name, when the server reports one. */
+  hostname?: string
+  /** The OS account the server runs as, when the server reports one. */
+  username?: string
   incompatible?: boolean
   checking?: boolean
   unauthorized?: boolean
@@ -122,7 +126,9 @@ export async function checkServerHealth(
       headers,
     })
       .server.info({ signal })
-      .then((status) => ({ data: { healthy: true as const, version: status.version } }))
+      .then((status) => ({
+        data: { healthy: true as const, version: status.version, hostname: status.hostname, username: status.username },
+      }))
       .catch((error) => ({ error }))
 
     if ("data" in current) return current.data

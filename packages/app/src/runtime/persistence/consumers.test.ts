@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { WorkspaceOnboardingSchema, ProviderTipSchema, WorkspaceTipSchema } from "@/new-session/view"
+import { WorkspaceOnboardingSchema, ProviderTipSchema } from "@/new-session/view"
 import { ModelSelectionSchema } from "@/providers/models/selection"
 import { Persistence } from "@/runtime/persistence/schema"
 import { FileViewsSchema } from "@/workspaces/files/view-cache"
 import { languageSchema } from "@/runtime/i18n/language"
-import { HomeServersSchema } from "@/home/projects/controller"
 import { ModelProvidersSchema } from "@/settings/models/models"
 import { ProjectState, VcsState } from "@/runtime/server/persistence"
 
@@ -42,8 +41,6 @@ describe("persisted consumer schemas", () => {
       [{ dismissedAt: Infinity }, { dismissedAt: 0 }],
       [{ dismissedAt: 123 }, { dismissedAt: 123 }],
     ]),
-    stored("workspace tip", WorkspaceTipSchema, { dismissedAt: 0 }, [[{ dismissedAt: 123 }, { dismissedAt: 123 }]]),
-    stored("home server collapse", HomeServersSchema, { collapsed: {} }, collapsed),
     stored("model provider collapse", ModelProvidersSchema, { collapsed: {} }, collapsed),
     stored("VCS cache", VcsState, { value: undefined }, [
       [{}, { value: undefined }],

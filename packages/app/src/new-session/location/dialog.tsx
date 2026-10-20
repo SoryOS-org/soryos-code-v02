@@ -414,6 +414,9 @@ function NewSessionLocationDialog(props: {
                               <Icon name={serverIcon(item().server)} class="command-palette-row-icon" />
                               <div class="command-palette-row-text">
                                 <span class="command-palette-title">{item().server.name}</span>
+                                <Show when={item().server.hint}>
+                                  {(hint) => <span class="command-palette-description">{hint()}</span>}
+                                </Show>
                               </div>
                             </div>
                           )}
@@ -521,7 +524,7 @@ function BackChip(props: { label: string; onBack: () => void; children: JSX.Elem
   )
 }
 
-/** The server a remote project lives on; local projects have none. */
+/** The server a project lives on; projects on the current server have none. */
 function ServerTag(props: { server?: PromptServer }) {
   return (
     <Show when={tagged(props.server)}>
@@ -564,11 +567,11 @@ function projectEntryID(project: PromptProject) {
 }
 
 function tagged(server?: PromptServer) {
-  return server?.kind === "local" ? undefined : server
+  return server?.kind === "current" ? undefined : server
 }
 
 function serverIcon(server: PromptServer) {
-  if (server.kind === "local") return "monitor"
+  if (server.kind === "current") return "monitor"
 
   return server.kind === "extension" ? "terminal" : "globe"
 }

@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "Rādīt vai paslēpt atkļūdošanas joslu",
-  "status.toggle": "Pārslēgt atkļūdošanas rīkus",
   ariaLabel: "Izstrādes veiktspējas diagnostika",
   providerAriaLabel: "Pakalpojumu sniedzēja veiktspējas diagnostika",
   na: "nav",

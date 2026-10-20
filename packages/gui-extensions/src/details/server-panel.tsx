@@ -1,6 +1,10 @@
 import { Popover } from "@kobalte/core/popover"
 import type { PluginInfo } from "@opencode/client"
+import { Button } from "@opencode/ui/button"
+import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
+import { ErrorDetails } from "@opencode/ui/error-details"
 import { Icon } from "@opencode/ui/icon"
+import { StatusLink } from "@opencode/ui/status-link"
 import { Switch } from "@opencode/ui/switch"
 import { showToast } from "@opencode/ui/toast"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -172,59 +176,9 @@ function LspMenu(props: ServiceMenuProps) {
 
 function McpMenu(props: ServiceMenuProps) {
   const ctx = useExtension()
-  const system = ctx.system
   const data = () => props.session.server.data
 
-  const toggle = useMutation(() => ({
-    mutationFn: async (input: { name: string; enabled: boolean }) => {
-      const client = props.session.server.client
-      const source = data()
-      const ref = { directory: props.directory }
-      const server = (await client.mcp.list({ location: ref })).data.find((item) => item.name === input.name)
-
-      if (!server) return
-
-      if (!input.enabled) {
-        await client.mcp.disconnect({ server: input.name, location: ref })
-      }
-
-      if (input.enabled && server.status.status !== "needs_auth") {
-        await client.mcp.connect({ server: input.name, location: ref })
-      }
-
-      source.location.mcp.server.invalidate(ref)
-      await source.location.mcp.server.sync(ref)
-      const current = source.location.mcp.server.list(ref)?.find((item) => item.name === input.name)
-
-      if (input.enabled && current?.status.status === "needs_auth" && current.integrationID) {
-        const integration = await client.integration.get({ integrationID: current.integrationID, location: ref })
-        const method = integration.data?.methods.find((item) => item.type === "oauth" && !item.form?.length)
-
-        if (!method || method.type !== "oauth") throw new Error(ctx.t("mcp.interactiveAuth", { name: input.name }))
-
-        const attempt = await client.integration.oauth.connect({
-          integrationID: current.integrationID,
-          methodID: method.id,
-          location: ref,
-        })
-
-        system.openExternal(attempt.data.url)
-      }
-
-      source.location.mcp.resource.invalidate(ref)
-      await source.location.mcp.resource.sync(ref)
-      // A successful HTTP response can still leave the MCP connection in a failed state.
-      const status = current?.status
-
-      if (status?.status === "failed") throw new Error(`${input.name}: ${status.error}`)
-    },
-    onError: (error) =>
-      showToast({
-        variant: "error",
-        title: ctx.t("common.requestFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      }),
-  }))
+  const toggle = useMcpToggle(props.session, () => props.directory)
 
   const [load, { refetch }] = createResource(
     () => props.shown && data(),
@@ -241,6 +195,11 @@ function McpMenu(props: ServiceMenuProps) {
       a.name.localeCompare(b.name),
     ),
   )
+
+  const showError = (name: string) =>
+    ctx.dialogs.open((dialog) => (
+      <McpErrorDialog session={props.session} directory={props.directory} name={name} onClose={dialog.close} />
+    ))
 
   return (
     <ServicePopover
@@ -262,6 +221,10 @@ function McpMenu(props: ServiceMenuProps) {
           {(server) => {
             const enabled = () => server().status.status !== "disabled"
             const pending = () => toggle.isPending || server().status.status === "pending"
+            // Like the MCPs dialog, a failed or auth-gated server shows its follow-up where the switch would be.
+            const failed = () => server().status.status === "failed"
+            const signIn = () => server().status.status === "needs_auth" && !!server().integrationID
+            const busy = () => toggle.isPending && toggle.variables?.name === server().name
 
             const error = () => {
               const status = server().status
@@ -271,8 +234,6 @@ function McpMenu(props: ServiceMenuProps) {
 
             const label = () => {
               const status = server().status.status
-
-              if (status === "failed") return ctx.t("failed")
 
               if (status === "pending") return ctx.t("connecting")
 
@@ -286,45 +247,92 @@ function McpMenu(props: ServiceMenuProps) {
               toggle.mutate({ name: server().name, enabled: value })
             }
 
+            const follow = () => {
+              if (failed()) return showError(server().name)
+              change(true)
+            }
+
             return (
-              <Switch
-                class="session-mcp-row [&_[data-slot=switch-description]]:sr-only"
-                description={label()}
-                checked={enabled()}
-                readOnly={pending()}
-                aria-disabled={pending()}
-                aria-busy={toggle.isPending}
-                onChange={change}
-                onClick={(event: MouseEvent) => {
-                  if (
-                    !(event.target instanceof Element) ||
-                    event.target.closest('[data-slot="switch-control"], [data-slot="switch-input"]')
-                  )
-                    return
+              <Show
+                when={failed() || signIn()}
+                fallback={
+                  <Switch
+                    class="session-mcp-row [&_[data-slot=switch-description]]:sr-only"
+                    description={label()}
+                    checked={enabled()}
+                    readOnly={pending()}
+                    aria-disabled={pending()}
+                    aria-busy={toggle.isPending}
+                    onChange={change}
+                    onClick={(event: MouseEvent) => {
+                      if (
+                        !(event.target instanceof Element) ||
+                        event.target.closest('[data-slot="switch-control"], [data-slot="switch-input"]')
+                      )
+                        return
 
-                  // Outside the switch itself, a row that requires sign-in starts sign-in instead of toggling.
-                  if (server().status.status === "needs_auth") {
-                    event.preventDefault()
+                      // Outside the switch itself, a row that requires sign-in starts sign-in instead of toggling.
+                      if (server().status.status === "needs_auth") {
+                        event.preventDefault()
 
-                    return change(true)
-                  }
+                        return change(true)
+                      }
 
-                  if (event.target === event.currentTarget) change(!enabled())
-                }}
-                title={error() ?? server().name}
-              >
-                <span class="session-service-dot" data-status={server().status.status} aria-hidden="true" />
-                <span dir="auto" class="session-summary-label">
-                  {server().name}
-                </span>
-                <Show when={label()}>
-                  {(status) => (
-                    <span class="session-service-status" aria-hidden="true">
-                      {status()}
+                      if (event.target === event.currentTarget) change(!enabled())
+                    }}
+                    title={error() ?? server().name}
+                  >
+                    <span class="session-service-dot" data-status={server().status.status} aria-hidden="true" />
+                    <span dir="auto" class="session-summary-label">
+                      {server().name}
                     </span>
-                  )}
-                </Show>
-              </Switch>
+                    <Show when={label()}>
+                      {(status) => (
+                        <span class="session-service-status" aria-hidden="true">
+                          {status()}
+                        </span>
+                      )}
+                    </Show>
+                  </Switch>
+                }
+              >
+                <div
+                  class="session-mcp-row"
+                  onClick={(event) => {
+                    if (event.target instanceof Element && event.target.closest('[data-component="status-link"]'))
+                      return
+                    follow()
+                  }}
+                >
+                  <span class="session-service-dot" data-status={server().status.status} aria-hidden="true" />
+                  <span dir="auto" class="session-summary-label">
+                    {server().name}
+                  </span>
+                  <span class="session-mcp-trailing">
+                    <Show
+                      when={failed()}
+                      fallback={
+                        <StatusLink
+                          tone="accent"
+                          busy={busy()}
+                          aria-label={ctx.t("mcp.signIn.open", { name: server().name })}
+                          onClick={follow}
+                        >
+                          {ctx.t("mcp.signIn")}
+                        </StatusLink>
+                      }
+                    >
+                      <StatusLink
+                        tone="danger"
+                        aria-label={ctx.t("mcp.error.open", { name: server().name })}
+                        onClick={follow}
+                      >
+                        {ctx.t("failed")}
+                      </StatusLink>
+                    </Show>
+                  </span>
+                </div>
+              </Show>
             )
           }}
         </Index>
@@ -454,6 +462,8 @@ function ServicePopover(props: ServiceMenuProps & ServiceBodyProps & { empty: bo
   const placement = createMemo(() =>
     props.mobile ? "top-end" : locale.direction() === "rtl" ? "right-start" : "left-start",
   )
+  // How the trigger last opened the menu: a keyboard open moves focus to the first row, a pointer open does not.
+  const opening = { pointer: false }
 
   // In a narrow-screen drawer the service list replaces the drawer's view instead of opening a popover over it.
   if (props.mobile && drawer) {
@@ -496,7 +506,13 @@ function ServicePopover(props: ServiceMenuProps & ServiceBodyProps & { empty: bo
       overflowPadding={16}
       modal={false}
     >
-      <Popover.Trigger as="button" type="button" class="session-summary-row">
+      <Popover.Trigger
+        as="button"
+        type="button"
+        class="session-summary-row"
+        onPointerDown={() => (opening.pointer = true)}
+        onKeyDown={() => (opening.pointer = false)}
+      >
         <Icon name={props.service.icon} class="shrink-0 text-v2-icon-icon-muted" />
         <span class="session-summary-label">{ctx.t(props.service.label)}</span>
         <Icon name="fill-triangle-down" class="session-summary-menu-indicator shrink-0 text-v2-icon-icon-muted" />
@@ -508,6 +524,17 @@ function ServicePopover(props: ServiceMenuProps & ServiceBodyProps & { empty: bo
           data-empty={(props.ready && !props.error && props.empty) || undefined}
           aria-busy={props.loading}
           aria-label={ctx.t(props.service.label)}
+          // A pointer open focuses the menu itself, as the browser site panel does, so its first row shows no ring.
+          onOpenAutoFocus={(event: Event) => {
+            if (!opening.pointer) return
+            event.preventDefault()
+
+            const content = event.currentTarget
+
+            // Deferred like Kobalte's own autofocus: focusing now, before this nested layer registers, reads as focus
+            // leaving the details panel and closes it.
+            if (content instanceof HTMLElement) setTimeout(() => content.focus({ preventScroll: true }))
+          }}
         >
           <ServiceBody {...props} />
         </Popover.Content>
@@ -657,4 +684,133 @@ function pluginLabel(plugin: PluginInfo) {
   if (plugin.source.type === "local") return plugin.source.path
 
   return plugin.source.type
+}
+
+// Connects, disconnects, or starts sign-in for one of the session server's MCPs, like the app's MCP toggle.
+function useMcpToggle(session: MountedSession, directory: () => string) {
+  const ctx = useExtension()
+  const system = ctx.system
+  const data = () => session.server.data
+
+  return useMutation(() => ({
+    mutationFn: async (input: { name: string; enabled: boolean }) => {
+      const client = session.server.client
+      const source = data()
+      const ref = { directory: directory() }
+      const server = (await client.mcp.list({ location: ref })).data.find((item) => item.name === input.name)
+
+      if (!server) return
+
+      if (!input.enabled) {
+        await client.mcp.disconnect({ server: input.name, location: ref })
+      }
+
+      if (input.enabled && server.status.status !== "needs_auth") {
+        await client.mcp.connect({ server: input.name, location: ref })
+      }
+
+      source.location.mcp.server.invalidate(ref)
+      await source.location.mcp.server.sync(ref)
+      const current = source.location.mcp.server.list(ref)?.find((item) => item.name === input.name)
+
+      if (input.enabled && current?.status.status === "needs_auth" && current.integrationID) {
+        const integration = await client.integration.get({ integrationID: current.integrationID, location: ref })
+        const method = integration.data?.methods.find((item) => item.type === "oauth" && !item.form?.length)
+
+        if (!method || method.type !== "oauth") throw new Error(ctx.t("mcp.interactiveAuth", { name: input.name }))
+
+        const attempt = await client.integration.oauth.connect({
+          integrationID: current.integrationID,
+          methodID: method.id,
+          location: ref,
+        })
+
+        system.openExternal(attempt.data.url)
+      }
+
+      source.location.mcp.resource.invalidate(ref)
+      await source.location.mcp.resource.sync(ref)
+      // A successful HTTP response can still leave the MCP connection in a failed state.
+      const status = current?.status
+
+      if (status?.status === "failed") throw new Error(`${input.name}: ${status.error}`)
+    },
+    onError: (error) =>
+      showToast({
+        variant: "error",
+        title: ctx.t("common.requestFailed"),
+        description: error instanceof Error ? error.message : String(error),
+      }),
+  }))
+}
+
+// The MCPs dialog's error view, for a server the popover lists. It reads the server's own data, so it outlives the
+// popover that opened it.
+function McpErrorDialog(props: { session: MountedSession; directory: string; name: string; onClose: () => void }) {
+  const ctx = useExtension()
+  const toggle = useMcpToggle(props.session, () => props.directory)
+  const [copied, setCopied] = createSignal(false)
+
+  const failure = () => {
+    const server = props.session.server.data.location.mcp.server
+      .list({ directory: props.directory })
+      ?.find((item) => item.name === props.name)
+
+    return server?.status.status === "failed" ? { name: server.name, error: server.status.error } : undefined
+  }
+
+  // A successful retry, disabling, or a removed server leaves nothing to show.
+  createKeyed(
+    () => !!failure(),
+    () => undefined,
+    { otherwise: props.onClose },
+  )
+
+  return (
+    <Show when={failure()}>
+      {(current) => (
+        <Dialog class="session-mcp-error">
+          <DialogHeader>
+            <DialogTitleGroup title={ctx.t("mcp.error.title", { name: current().name })} />
+          </DialogHeader>
+          <DialogBody class="session-mcp-error-body">
+            <ErrorDetails error={current().error}>
+              <Button
+                variant="ghost"
+                icon={copied() ? "check" : "copy"}
+                onClick={() =>
+                  void ctx.system
+                    .copy(ctx.t("mcp.error.details", { name: current().name, error: current().error }))
+                    .then(() => setCopied(true))
+                    .catch((error: unknown) =>
+                      showToast({
+                        variant: "error",
+                        title: ctx.t("mcp.error.copyFailed"),
+                        description: error instanceof Error ? error.message : String(error),
+                      }),
+                    )
+                }
+              >
+                {ctx.t(copied() ? "common.copied" : "mcp.error.copy")}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={toggle.isPending}
+                onClick={() => toggle.mutate({ name: props.name, enabled: false })}
+              >
+                {ctx.t("mcp.error.disable")}
+              </Button>
+              <Button
+                variant="neutral"
+                disabled={toggle.isPending}
+                onClick={() => toggle.mutate({ name: props.name, enabled: true })}
+              >
+                {ctx.t("common.retry")}
+              </Button>
+            </ErrorDetails>
+          </DialogBody>
+        </Dialog>
+      )}
+    </Show>
+  )
 }

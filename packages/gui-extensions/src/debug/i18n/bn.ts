@@ -1,6 +1,5 @@
 export default {
   "command.toggle": "ডিবাগ বার টগল করুন",
-  "status.toggle": "ডিবাগ টুল টগল করুন",
   ariaLabel: "উন্নয়ন কর্মক্ষমতা ডায়গনিস্টিক",
   providerAriaLabel: "প্রদানকারীর কর্মক্ষমতা নির্ণয়",
   na: "n/a",

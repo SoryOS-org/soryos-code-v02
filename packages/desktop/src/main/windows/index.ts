@@ -16,6 +16,7 @@ import {
   setDockIcon,
   setPinchZoomEnabled,
   setTitlebar,
+  setTrafficLightsPosition,
   setZoomFactor,
   updateTitlebar,
   windowAppearance,
@@ -60,6 +61,7 @@ export {
   setDockIcon,
   setPinchZoomEnabled,
   setTitlebar,
+  setTrafficLightsPosition,
   setZoomFactor,
   updateTitlebar,
 }

@@ -3,11 +3,13 @@ import { Icon } from "@opencode/ui/icon"
 import { useLanguage } from "@/runtime/i18n/language"
 import { pathKey } from "@/workspaces/path-key"
 
-/** A server listed in the location dialog; "local" servers get no tag. */
+/** A server listed in the location dialog; the current server gets no tag. */
 export type PromptServer = {
   key: string
   name: string
-  kind: "local" | "remote" | "extension"
+  /** "This computer" beside the current server's name in the server picker. */
+  hint?: string
+  kind: "current" | "remote" | "extension"
   /** The extension's short badge, e.g. "SSH". */
   label?: string
 }

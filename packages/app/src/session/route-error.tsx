@@ -3,7 +3,7 @@ import { createMemo, Show } from "solid-js"
 import { ErrorPage } from "@/shell/errors/error"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
-import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useTabs } from "@/shell/tabs/tabs"
 import { isLocalSessionNotFoundError, isSessionNotFoundError } from "@/runtime/server/errors"
 import { ServerUnavailablePanel } from "./server-unavailable-panel"
@@ -17,7 +17,7 @@ export function SessionErrorFallback(props: { error: unknown; sessionID?: string
   const displayServer = createMemo(() => {
     const conn = server.list.find((item) => ServerConnection.key(item) === props.serverKey)
 
-    return conn ? serverName(conn) : props.serverKey
+    return conn ? server.label(conn) : props.serverKey
   })
 
   const closeSession = () => {

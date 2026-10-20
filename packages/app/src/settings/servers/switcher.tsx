@@ -6,6 +6,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useGlobal } from "@/runtime/server/runtime"
 import type { ServerHealth } from "@/runtime/server/health"
 import { ServerHealthIndicator } from "@/servers/registry/row"
+import { ServerLabel } from "@/servers/registry/label"
 import { useSettingsSurface } from "@/settings/surface"
 import { settingsServerReachable, useSettingsServers, type SettingsServer } from "./inventory"
 
@@ -31,7 +32,11 @@ export function SettingsServerSwitcher() {
           >
             <ServerDot health={health(selected())} unreachable={unreachable(selected())} />
             <span class="settings-server-switcher-label">{language.t("settings.server.switcher.label")}</span>
-            <span class="settings-server-switcher-name">{selected().name}</span>
+            <ServerLabel
+              class="settings-server-switcher-name"
+              server={selected().connection}
+              name={selected().name}
+            />
             <Icon name="chevron-down" class="settings-server-switcher-chevron" />
           </Menu.Trigger>
           <Menu.Portal>
@@ -41,7 +46,7 @@ export function SettingsServerSwitcher() {
                   {(server) => (
                     <Menu.RadioItem value={server.key} closeOnSelect>
                       <ServerDot health={health(server)} unreachable={unreachable(server)} />
-                      <span class="settings-server-switcher-option">{server.name}</span>
+                      <ServerLabel class="settings-server-switcher-option" server={server.connection} name={server.name} hint />
                       <Show when={unreachable(server)}>
                         <span class="settings-server-switcher-status">
                           {language.t("settings.server.switcher.unreachable")}

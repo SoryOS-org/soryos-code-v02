@@ -38,13 +38,17 @@ describe("new session project selection", () => {
       worktree: "/remote",
       server: { key: "remote", name: "Remote", kind: "remote" as const },
     }
-    const local = { id: "shared", worktree: "/local", server: { key: "local", name: "Local", kind: "local" as const } }
+    const local = {
+      id: "shared",
+      worktree: "/local",
+      server: { key: "sidecar", name: "hailmary", kind: "current" as const },
+    }
 
     const controls: PromptProjectControls = {
       available: [remote, local],
       directory: "/local/feature",
       projectID: "shared",
-      server: "local",
+      server: "sidecar",
       select() {},
       add() {},
     }
@@ -57,7 +61,7 @@ describe("new session project selection", () => {
   })
 
   test("lists every server's projects in one list: used first, then the rest, each by recent activity", () => {
-    const local = { key: "local", name: "Local Server", kind: "local" as const }
+    const local = { key: "sidecar", name: "hailmary", kind: "current" as const }
     const apollo = { key: "http://apollo:4096", name: "apollo", kind: "remote" as const }
     const entry = (id: string, server: typeof local | typeof apollo, active: number, used: boolean) => ({
       id,
@@ -77,7 +81,7 @@ describe("new session project selection", () => {
         entry("opencode", apollo, 3, true),
       ],
       directory: "/elsewhere",
-      server: "local",
+      server: "sidecar",
       select() {},
       add() {},
     }
@@ -86,9 +90,9 @@ describe("new session project selection", () => {
       const controller = createPromptProjectController({ controls: () => controls })
       expect(controller.projects().map((project) => `${project.server?.name}:${project.id}`)).toEqual([
         "apollo:opencode",
-        "Local Server:local-used",
-        "Local Server:opencode",
-        "Local Server:local-unused",
+        "hailmary:local-used",
+        "hailmary:opencode",
+        "hailmary:local-unused",
         "apollo:apollo-unused",
       ])
       dispose()

@@ -87,6 +87,15 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
     })
 
     createEffect(() => {
+      for (const conn of server.list) {
+        const key = ServerConnection.key(conn)
+        const hostname = serverHealth.status[key]?.hostname
+
+        if (hostname) server.setHostname(key, hostname)
+      }
+    })
+
+    createEffect(() => {
       for (const [key] of serverCtxs) {
         if (serverHealth.status[key]?.unauthorized || !server.list.find((conn) => ServerConnection.key(conn) === key))
           disposeServerCtx(key)

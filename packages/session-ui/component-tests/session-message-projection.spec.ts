@@ -87,3 +87,17 @@ story("renders user image, file attachment, file reference, and agent reference"
   expect(bodyBox).not.toBeNull()
   expect(bodyBox!.y - (attachmentsBox!.y + attachmentsBox!.height)).toBe(8)
 })
+
+story("links URLs in user messages without swallowing punctuation or mentions", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--conversation", { args: { scenario: "links" } })
+  const links = timeline.locator('[data-slot="user-message-text"] a[data-slot="user-message-link"]')
+  await expect(links).toHaveCount(2)
+  await expect(links.nth(0)).toHaveText("https://github.com/Hona/mesh")
+  await expect(links.nth(0)).toHaveAttribute("href", "https://github.com/Hona/mesh")
+  await expect(links.nth(0)).toHaveAttribute("target", "_blank")
+  await expect(links.nth(1)).toHaveText("https://opencode.ai/docs")
+  await expect(timeline.getByText("@src/a.ts", { exact: true })).toBeVisible()
+  await expect(timeline.locator('[data-slot="user-message-text"]')).toHaveText(
+    "set it up on this pc https://github.com/Hona/mesh, then compare @src/a.ts with (https://opencode.ai/docs).",
+  )
+})

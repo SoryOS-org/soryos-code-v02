@@ -6,7 +6,7 @@ import { ServerHealthIndicator } from "@/servers/registry/row"
 import { ExtensionServerRow } from "@/servers/registry/extension-row"
 import { AddServerMenu } from "@/servers/registry/add-menu"
 import { useLanguage } from "@/runtime/i18n/language"
-import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { ServerConnection } from "@/runtime/server/registry"
 import { useServerCollectionController } from "@/servers/registry/controller"
 import { DialogServer } from "@/servers/connect/dialog"
 import { SettingsList } from "@/settings/list"
@@ -140,7 +140,7 @@ function ServerConnectionRow(props: { entry: SettingsServer; onServerChange?: (s
                 <ServerHealthIndicator health={health()} authenticationRequired={!!health()?.unauthorized} />
                 <div class="settings-servers-copy">
                   <bdi class="settings-servers-name" dir="auto">
-                    {serverName(server()) || props.entry.key}
+                    {props.entry.name}
                   </bdi>
                   <bdi class="settings-servers-meta" dir="ltr">
                     {server().http.url}

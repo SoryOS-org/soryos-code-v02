@@ -24,7 +24,8 @@ import { Workspace } from "@opencode/core/workspace"
 import { testEffect } from "./lib/effect"
 
 // Keep real execution ownership, location caching, forms, and eviction. The fixture
-// runner waits on a form instead of making a model request before asking a question.
+// runner waits on a form instead of making a model request before asking a question,
+// or sleeps silently to stand in for one long tool call.
 const locations = Layer.effect(
   LocationServiceMap.Service,
   Effect.gen(function* () {
@@ -48,17 +49,20 @@ const locations = Layer.effect(
               const forms = yield* Form.Service
               return SessionRunner.Service.of({
                 drain: ({ sessionID }) =>
-                  forms
-                    .ask({
-                      sessionID,
-                      title: "Questions",
-                      fields: [{ key: "runtime", type: "string" }],
-                    })
-                    .pipe(
-                      Effect.orDie,
-                      Effect.as(SessionRunner.DrainResult.Complete()),
-                      Effect.onInterrupt(() => Effect.sleep("5 minutes")),
-                    ),
+                  // A shell blocked on a build for three hours, silent until it exits.
+                  sessionID.startsWith("ses_shell")
+                    ? Effect.sleep("3 hours").pipe(Effect.as(SessionRunner.DrainResult.Complete()))
+                    : forms
+                        .ask({
+                          sessionID,
+                          title: "Questions",
+                          fields: [{ key: "runtime", type: "string" }],
+                        })
+                        .pipe(
+                          Effect.orDie,
+                          Effect.as(SessionRunner.DrainResult.Complete()),
+                          Effect.onInterrupt(() => Effect.sleep("5 minutes")),
+                        ),
               })
             }),
           ),
@@ -102,6 +106,148 @@ const it = testEffect(
 )
 
 describe("LocationActivity eviction", () => {
+  const setup = (sessionIDs: ReadonlyArray<Session.ID>) =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      const bus = yield* Bus.Service
+      const execution = yield* SessionExecution.Service
+      const ref = LocationServiceMap.canonical({ directory: AbsolutePath.make("/project") })
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: ref.directory, sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values(
+          sessionIDs.map((sessionID) => ({
+            id: sessionID,
+            project_id: Project.ID.global,
+            slug: "busy",
+            directory: ref.directory,
+            title: "Busy session",
+            version: "test",
+          })),
+        )
+        .run()
+        .pipe(Effect.orDie)
+      const interrupted: SessionEvent.Execution.Interrupted["data"][] = []
+      const unsubscribe = yield* bus.listen((event) =>
+        Effect.sync(() => {
+          if (event.type !== SessionEvent.Execution.Interrupted.type) return
+          interrupted.push(Schema.decodeUnknownSync(SessionEvent.Execution.Interrupted.data)(event.data))
+        }),
+      )
+      yield* Effect.addFinalizer(() => unsubscribe)
+      yield* Effect.addFinalizer(() =>
+        Effect.forEach(sessionIDs, (sessionID) => execution.interrupt(sessionID)).pipe(
+          Effect.andThen(TestClock.adjust("5 minutes")),
+        ),
+      )
+      return { ref, interrupted }
+    })
+
+  it.effect("retains a location while a session is blocked in one long tool call", () =>
+    Effect.gen(function* () {
+      const map = yield* LocationServiceMap.Service
+      const execution = yield* SessionExecution.Service
+      const sessionID = Session.ID.make("ses_shell_build")
+      const { ref, interrupted } = yield* setup([sessionID])
+      const idle = Location.Ref.make({ directory: ref.directory, workspaceID: Workspace.ID.make("wrk_idle") })
+
+      const running = yield* execution.resume(sessionID).pipe(Effect.exit, Effect.forkScoped)
+      yield* Effect.yieldNow
+      expect(Array.from(yield* execution.active)).toEqual([sessionID])
+      yield* Location.Service.pipe(Effect.provide(map.get(idle)), Effect.scoped)
+
+      // The tool call emits no durable session events while it runs.
+      yield* TestClock.adjust("1 minute")
+      yield* TestClock.adjust("62 minutes")
+      expect(Array.from(yield* execution.active)).toEqual([sessionID])
+      expect(interrupted).toEqual([])
+      // The idle workspace at the same directory still expires independently.
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+
+      // Two hours in: still retained, still running.
+      yield* TestClock.adjust("56 minutes")
+      expect(Array.from(yield* execution.active)).toEqual([sessionID])
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+
+      // The tool call finishes after three hours and the session settles normally.
+      yield* TestClock.adjust("61 minutes")
+      expect((yield* Fiber.join(running))._tag).toBe("Success")
+      expect(Array.from(yield* execution.active)).toEqual([])
+      expect(interrupted).toEqual([])
+
+      // Idle now, the location lives out its inactivity deadline, then is evicted.
+      yield* TestClock.adjust("55 minutes")
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+      yield* TestClock.adjust("7 minutes")
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([])
+    }),
+  )
+
+  for (const count of [1, 2]) {
+    it.effect(
+      `retains a location while ${count === 1 ? "a session waits" : `${count} sessions wait`} on unanswered questions`,
+      () =>
+        Effect.gen(function* () {
+          const bus = yield* Bus.Service
+          const map = yield* LocationServiceMap.Service
+          const execution = yield* SessionExecution.Service
+          const store = yield* SessionStore.Service
+          const sessionIDs = Array.from({ length: count }, (_, index) =>
+            Session.ID.make(`ses_waiting_question_${index}`),
+          )
+          const { ref, interrupted } = yield* setup(sessionIDs)
+
+          const created = yield* Deferred.make<void>()
+          const pending: Form.Info[] = []
+          const unsubscribe = yield* bus.listen((event) =>
+            Effect.gen(function* () {
+              if (event.type !== Form.Event.Created.type) return
+              pending.push(Schema.decodeUnknownSync(Form.Event.Created.data)(event.data).form)
+              if (pending.length === count) yield* Deferred.succeed(created, undefined)
+            }),
+          )
+          yield* Effect.addFinalizer(() => unsubscribe)
+          const running = yield* Effect.forEach(sessionIDs, (sessionID) =>
+            execution.resume(sessionID).pipe(Effect.exit, Effect.forkScoped),
+          )
+          yield* Deferred.await(created)
+          const context = yield* map.contextEffect(ref).pipe(Effect.scoped)
+          const forms = Context.get(context, Form.Service)
+          expect((yield* store.listSuspended()).toSorted()).toEqual(sessionIDs.toSorted())
+
+          // Human input produces no durable activity while the question is pending.
+          yield* TestClock.adjust("1 minute")
+          yield* TestClock.adjust("62 minutes")
+          yield* TestClock.adjust("2 hours")
+          expect(Array.from(yield* execution.active).toSorted()).toEqual(sessionIDs.toSorted())
+          expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+          expect(interrupted).toEqual([])
+          // The cached graph is still the one the waiting tools hold, so answers reach them.
+          const current = Context.get(yield* map.contextEffect(ref).pipe(Effect.scoped), Form.Service)
+          expect(current).toBe(forms)
+          expect((yield* forms.list()).toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
+            pending.toSorted((a, b) => a.id.localeCompare(b.id)),
+          )
+          yield* Effect.forEach(pending, (form) =>
+            forms.reply({ id: form.id, answer: { runtime: "bun" } }).pipe(Effect.orDie),
+          )
+
+          const results = yield* Effect.forEach(running, Fiber.join)
+          expect(results.every((exit) => exit._tag === "Success")).toBe(true)
+          expect(Array.from(yield* execution.active)).toEqual([])
+          expect(yield* store.listSuspended()).toEqual([])
+          expect(interrupted).toEqual([])
+
+          yield* TestClock.adjust("62 minutes")
+          expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([])
+        }),
+    )
+  }
+
   for (const [count, admission] of [
     [1, "none"],
     [2, "none"],
@@ -110,7 +256,7 @@ describe("LocationActivity eviction", () => {
   ] as const) {
     const newWork = admission !== "none"
     it.effect(
-      `interrupts ${count} waiting executions before eviction (${admission} session admitted during cleanup)`,
+      `interrupts ${count} executions silent for 24 hours before eviction (${admission} session admitted during cleanup)`,
       () =>
         Effect.gen(function* () {
           const db = (yield* Database.Service).db
@@ -176,7 +322,14 @@ describe("LocationActivity eviction", () => {
 
           // Human input produces no durable activity while the question is pending.
           yield* TestClock.adjust("1 minute")
-          yield* TestClock.adjust("62 minutes")
+          yield* TestClock.adjust("23 hours")
+          // Active executions hold the location well past its inactivity deadline.
+          expect(Array.from(yield* execution.active).toSorted()).toEqual(sessionIDs.toSorted())
+          expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+          expect(interrupted).toEqual([])
+          expect(yield* forms.list()).toHaveLength(count)
+          // Twenty-four hours without a durable event reaches the safety cap.
+          yield* TestClock.adjust("60 minutes")
           // Interruption has cancelled each question, but slow cleanup still owns the graph.
           expect(Array.from(yield* execution.active).toSorted()).toEqual(sessionIDs.toSorted())
           expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
@@ -223,6 +376,37 @@ describe("LocationActivity eviction", () => {
         }),
     )
   }
+
+  it.effect("a durable event resets the active hold cap", () =>
+    Effect.gen(function* () {
+      const bus = yield* Bus.Service
+      const map = yield* LocationServiceMap.Service
+      const execution = yield* SessionExecution.Service
+      const sessionID = Session.ID.make("ses_waiting_question_reset")
+      const { ref, interrupted } = yield* setup([sessionID])
+      const running = yield* execution.resume(sessionID).pipe(Effect.exit, Effect.forkScoped)
+
+      yield* TestClock.adjust("1 minute")
+      yield* TestClock.adjust("20 hours")
+      yield* bus.publish(SessionEvent.Execution.Started, { sessionID }, { location: Location.Ref.make(ref) })
+
+      // Past 24 hours since the session started, but only 4 since its last event.
+      yield* TestClock.adjust("4 hours")
+      expect(Array.from(yield* execution.active)).toEqual([sessionID])
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+      expect(interrupted).toEqual([])
+
+      yield* TestClock.adjust("19 hours")
+      expect(Array.from(yield* execution.active)).toEqual([sessionID])
+      expect(interrupted).toEqual([])
+
+      // Twenty-four silent hours after the event, the cap interrupts and evicts.
+      yield* TestClock.adjust("66 minutes")
+      expect((yield* Fiber.join(running))._tag).toBe("Failure")
+      expect(interrupted).toEqual([{ sessionID, reason: "inactivity" }])
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([])
+    }),
+  )
 
   it.effect("refreshes inactivity deadline for session events with non-canonical location refs", () =>
     Effect.gen(function* () {
