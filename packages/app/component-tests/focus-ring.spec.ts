@@ -66,3 +66,14 @@ story("keeps queue rings inside controls under the list fade", async ({ mount, p
   await expect(remove).toHaveCSS("outline-style", "solid")
   await expect(remove).toHaveCSS("outline-offset", "-2px")
 })
+
+story("leaves no ring on the review toggle after a pointer click", async ({ mount, page }) => {
+  await mount("app-session-header-actions--review-toggle")
+  const toggle = page.getByRole("button", { name: "Toggle review" })
+
+  await toggle.click()
+  // A later key press makes Chromium ring whatever still holds focus, so the click must not leave it there.
+  await page.keyboard.press("Shift")
+  expect(await toggle.evaluate((element) => element.matches(":focus-visible"))).toBe(false)
+  await expect(toggle).toHaveCSS("outline-style", "none")
+})

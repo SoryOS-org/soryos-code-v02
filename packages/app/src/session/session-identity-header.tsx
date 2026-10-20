@@ -175,7 +175,7 @@ export function SessionLocation(props: {
           <Show when={!props.compact && worktree()}>
             {(name) => (
               <>
-                <span class="shrink-0 ps-1 pe-0.5 text-[11px] font-medium text-v2-text-text-faint" aria-hidden="true">
+                <span class="shrink-0 px-1 text-[11px] font-medium text-v2-text-text-faint" aria-hidden="true">
                   /
                 </span>
                 <Icon name="outline-worktree" class="shrink-0 text-v2-icon-icon-muted" />
@@ -252,7 +252,7 @@ export function SessionLocation(props: {
       <Show when={props.trailing}>
         <span
           data-slot="session-title-separator"
-          class="shrink-0 ps-1 pe-0.5 text-[11px] font-medium text-v2-text-text-faint"
+          class="shrink-0 pe-1 text-[11px] font-medium text-v2-text-text-faint"
           aria-hidden="true"
         >
           /

@@ -59,12 +59,12 @@ export function SessionHeaderActions(props: { state: SessionHeaderActionsState }
               "--v2-overlay-simple-overlay-hover": "var(--v2-background-bg-layer-01)",
               "--v2-overlay-simple-overlay-pressed": "var(--v2-background-bg-layer-02)",
             }}
-            state={props.state.reviewOpened ? "pressed" : undefined}
+            onMouseDown={(event) => event.preventDefault()}
             onClick={props.state.onReviewToggle}
             aria-label={props.state.reviewLabel}
             aria-expanded={props.state.reviewOpened}
             aria-controls="review-panel"
-            icon={<Icon name="sidebar-right" />}
+            icon={<Icon name={props.state.reviewOpened ? "layout-right-full" : "layout-right"} />}
           />
         </Tooltip>
       </Show>

@@ -56,12 +56,12 @@ export function SidebarToggle() {
         variant="ghost-muted"
         size="large"
         class="shrink-0"
-        state={settings.appearance.sidebarOpen() ? "pressed" : undefined}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => settings.appearance.setSidebarOpen(!settings.appearance.sidebarOpen())}
         aria-label={language.t("command.sidebar.toggle")}
         aria-expanded={settings.appearance.sidebarOpen()}
         aria-controls="vertical-tabs-sidebar"
-        icon={<Icon name="layout-left" />}
+        icon={<Icon name={settings.appearance.sidebarOpen() ? "layout-left-full" : "layout-left"} />}
       />
     </Tooltip>
   )
@@ -100,6 +100,7 @@ export function CollapsedSidebarToggle() {
   return (
     <Show when={slot.visible()}>
       <div
+        data-slot="collapsed-sidebar-toggle"
         class={`absolute top-[calc(var(--shell-top-inset,8px)+10px)] start-[calc(var(--shell-inline-inset,8px)+10px)] z-40 ${slotClass}`}
         style={{ width: slot.open() ? "0px" : `${slot.width()}px` }}
         inert={slot.open()}

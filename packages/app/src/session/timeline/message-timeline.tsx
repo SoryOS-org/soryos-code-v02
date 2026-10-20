@@ -598,7 +598,7 @@ function MessageTimelineView(
                       icon={<Icon name="outline-dots" />}
                       variant="ghost-muted"
                       size="large"
-                      class="shrink-0"
+                      class="-ms-0.5 shrink-0"
                       aria-label={language.t("common.moreOptions")}
                       aria-expanded={title.menuOpen}
                     />
