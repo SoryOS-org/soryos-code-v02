@@ -47,8 +47,13 @@ export function summarizeActivity(
 export function busyLabel(part: Item["part"]) {
   if (part.type === "reasoning") return "Thinking…"
   const name = canonicalToolName(part.name)
-  const noun = name === "shell" ? "command" : name === "execute" ? "code" : name
-  return `${part.state.status === "streaming" ? "Preparing" : "Running"} ${noun}…`
+  if (name === "shell") return part.state.status === "streaming" ? "Preparing command…" : "Running command…"
+  if (name === "read") return "Reading file…"
+  if (name === "edit") return "Editing file…"
+  if (name === "write") return "Writing file…"
+  if (name === "patch") return "Applying patch…"
+  if (name === "execute") return part.state.status === "streaming" ? "Preparing code…" : "Running code…"
+  return `Running ${name}…`
 }
 
 /**
@@ -85,10 +90,17 @@ export function activitySummary(items: readonly Item[], instructions: number, cl
     else if (name === "edit" || name === "write" || name === "patch") counts.edit++
     else counts.tool++
   })
+  const n = (count: number, singular: string, plural = `${singular}s`) => `${count} ${count === 1 ? singular : plural}`
   return {
-    label: Object.entries(counts)
-      .filter(([, count]) => count > 0)
-      .map(([name, count]) => `${count} ${name}${count === 1 ? "" : "s"}`)
+    label: [
+      counts.command > 0 && `ran ${n(counts.command, "command")}`,
+      counts.edit > 0 && `modified ${n(counts.edit, "file")}`,
+      counts.read > 0 && `read ${n(counts.read, "file")}`,
+      counts.tool > 0 && `used ${n(counts.tool, "tool")}`,
+      counts.thought > 0 && `${n(counts.thought, "thought")}`,
+      counts.instruction > 0 && `loaded ${n(counts.instruction, "instruction")}`,
+    ]
+      .filter(Boolean)
       .join(", "),
     active: items.some((item) => isActive(item, closed)),
   }

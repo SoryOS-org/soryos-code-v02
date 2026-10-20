@@ -59,6 +59,7 @@ import { useInteractivity } from "../../context/interactivity"
 import { abbreviateHome } from "../../runtime"
 import { Slot } from "../../plugin/render"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
+import { Permission } from "@opencode/schema/permission"
 import {
   deduplicatePromptImages,
   preserveMentionlessPromptAttachments,
@@ -73,7 +74,10 @@ import { PromptMetadataRow } from "./metadata"
 import {
   Harness,
   executeHarness,
+  harnessAccess,
+  requestsWorkspaceWrite,
   routeTask,
+  routeTaskWithJev,
   withHarnessMemory,
   type HarnessTraceEvent,
   type RouteDecision,
@@ -1170,7 +1174,7 @@ export function Prompt(props: PromptProps) {
         ? routeTask(inputText)
         : selectedHarness === Harness.Ecode
           ? undefined
-          : { harness: selectedHarness }
+          : { harness: selectedHarness, access: harnessAccess(inputText) }
     const routedHarness = routeDecision?.harness ?? Harness.Ecode
     const usesLocalHarness = store.mode === "normal" && routedHarness !== Harness.Ecode
     const agent = local.agent.current()
@@ -1329,16 +1333,6 @@ export function Prompt(props: PromptProps) {
     if (usesLocalHarness) {
       const harnessPrompt = withHarnessMemory(inputText, data.session.message.list(target))
       move.startSubmit()
-      toast.show({
-        title: selectedHarness === Harness.Router ? "Router selected a coding harness" : "Coding harness selected",
-        message:
-          routedHarness === Harness.Codex
-            ? "Codex CLI"
-            : routedHarness === Harness.ClaudeCode
-              ? "Claude Code"
-              : "OpenCode CLI",
-        variant: "info",
-      })
       const send = async () => {
         await client.api.session.synthetic({
           sessionID: target,
@@ -1353,7 +1347,39 @@ export function Prompt(props: PromptProps) {
           currentLocation.current?.directory ??
           data.location.default().directory ??
           paths.cwd
-        let used = routeDecision!
+        let used = selectedHarness === Harness.Router ? await routeTaskWithJev(inputText) : routeDecision!
+        toast.show({
+          title: selectedHarness === Harness.Router ? "Router selected a coding harness" : "Coding harness selected",
+          message:
+            used.harness === Harness.Codex
+              ? used.model
+                ? `Codex CLI · ${used.model}`
+                : "Codex CLI"
+              : used.harness === Harness.ClaudeCode
+                ? "Claude Code"
+                : "OpenCode CLI",
+          variant: "info",
+        })
+
+        if (used.access === "write") {
+          const allowed = await requestHarnessWritePermission({
+            sessionID: target,
+            harness: used.harness,
+            directory,
+          })
+          if (!allowed) {
+            const output = "Coding harness write access was denied. No external harness was started."
+            await client.api.session.synthetic({
+              sessionID: target,
+              text: output,
+              description: output,
+              metadata: { source: "harness", harness: used.harness, state: "error" },
+              resume: false,
+            })
+            return
+          }
+        }
+
         const publishTrace = async (event: Exclude<HarnessTraceEvent, { type: "message" }>) => {
           await client.api.session.synthetic({
             sessionID: target,
@@ -1371,10 +1397,47 @@ export function Prompt(props: PromptProps) {
           })
         }
         let result = await executeHarness(used, harnessPrompt, directory, publishTrace)
-        if (selectedHarness === Harness.Router && result.exitCode !== 0 && used.harness !== Harness.Codex) {
-          used = { harness: Harness.Codex, model: "gpt-5.6-sol" }
-          await publishTrace({ type: "status", text: "Falling back to Codex CLI · gpt-5.6-sol" })
-          result = await executeHarness(used, harnessPrompt, directory, publishTrace)
+        let writeDenied = false
+        if (used.access === "read" && requestsWorkspaceWrite(result)) {
+          const allowed = await requestHarnessWritePermission({
+            sessionID: target,
+            harness: used.harness,
+            directory,
+          })
+          if (allowed) {
+            used = { ...used, access: "write" }
+            await publishTrace({ type: "status", text: "Write access approved · retrying the coding harness" })
+            result = await executeHarness(used, harnessPrompt, directory, publishTrace)
+          } else {
+            writeDenied = true
+            result = {
+              exitCode: 1,
+              stdout: "Coding harness write access was denied. The task was not retried.",
+              stderr: "",
+            }
+          }
+        }
+        if (
+          !writeDenied &&
+          selectedHarness === Harness.Router &&
+          result.exitCode !== 0 &&
+          used.harness !== Harness.Codex
+        ) {
+          const fallback: RouteDecision = { harness: Harness.Codex, model: "gpt-5.6-sol", access: used.access }
+          const allowed =
+            fallback.access === "read" ||
+            (await requestHarnessWritePermission({
+              sessionID: target,
+              harness: fallback.harness,
+              directory,
+            }))
+          if (allowed) {
+            used = fallback
+            await publishTrace({ type: "status", text: "Falling back to Codex CLI · gpt-5.6-sol" })
+            result = await executeHarness(used, harnessPrompt, directory, publishTrace)
+          } else {
+            await publishTrace({ type: "error", text: "Codex fallback write access was denied." })
+          }
         }
         const output = result.stdout || result.stderr || `Harness exited with code ${result.exitCode}`
         await client.api.session.synthetic({
@@ -1460,6 +1523,40 @@ export function Prompt(props: PromptProps) {
         })
         .catch((error) => (newSession ? newSession.recover(error) : fail("Failed to send prompt", error)))
       if (pendingEditorSelection) editor.markSelectionSent()
+    }
+
+    async function requestHarnessWritePermission(input: {
+      sessionID: string
+      harness: Exclude<Harness, "router" | "ecode">
+      directory: string
+    }) {
+      const id = Permission.ID.create()
+      const resource = `${input.harness}:${input.directory}`
+      let dispose = () => {}
+      const replied = new Promise<boolean>((resolve) => {
+        dispose = data.on("permission.replied", (event) => {
+          if (event.data.sessionID !== input.sessionID || event.data.requestID !== id) return
+          dispose()
+          resolve(event.data.reply !== "reject")
+        })
+      })
+
+      try {
+        const result = await client.api.permission.create({
+          id,
+          sessionID: input.sessionID,
+          action: "harness_write",
+          resources: [resource],
+          save: [resource],
+          metadata: { harness: input.harness, directory: input.directory },
+        })
+        if (result.effect === "ask") return replied
+        dispose()
+        return result.effect === "allow"
+      } catch (error) {
+        dispose()
+        throw error
+      }
     }
 
     // Optimistic admission puts the message in the store synchronously, so

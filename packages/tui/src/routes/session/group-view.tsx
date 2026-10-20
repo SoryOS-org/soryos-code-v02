@@ -280,18 +280,20 @@ function HarnessGroup(props: GroupProps) {
     }),
   )
   const label = createMemo(() => {
-    if (!props.completed) return "Working"
     const counts = traces().reduce<Record<string, number>>((result, message) => {
       const event = typeof message.metadata?.event === "string" ? message.metadata.event : "activity"
       result[event] = (result[event] ?? 0) + 1
       return result
     }, {})
+    const n = (count: number, singular: string, plural = `${singular}s`) =>
+      `${count} ${count === 1 ? singular : plural}`
     const items = [
-      counts.command && `${counts.command} ${counts.command === 1 ? "command" : "commands"}`,
-      counts.reasoning && `${counts.reasoning} ${counts.reasoning === 1 ? "thought" : "thoughts"}`,
-      counts.file && `${counts.file} file ${counts.file === 1 ? "change" : "changes"}`,
-      counts.tool && `${counts.tool} ${counts.tool === 1 ? "tool" : "tools"}`,
+      counts.command && `ran ${n(counts.command, "command")}`,
+      counts.file && `modified ${n(counts.file, "file")}`,
+      counts.reasoning && `${n(counts.reasoning, "thought")}`,
+      counts.tool && `used ${n(counts.tool, "tool")}`,
     ].filter(Boolean)
+    if (!props.completed) return items.length ? `Working · ${items.join(", ")}…` : "Working…"
     return items.length ? `Worked · ${items.join(", ")}` : "Worked"
   })
   return (
@@ -300,7 +302,7 @@ function HarnessGroup(props: GroupProps) {
         icon={disclosure.expanded() ? "−" : "+"}
         color={hover() ? theme.text.base : theme.text.muted}
         complete={props.completed}
-        pending="Working"
+        pending="Working…"
         spinner={!props.completed}
         onMouseOver={() => setHover(true)}
         onMouseOut={() => setHover(false)}
