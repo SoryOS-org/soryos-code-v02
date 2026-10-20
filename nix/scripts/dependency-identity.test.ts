@@ -25,7 +25,7 @@ test("OpenTUI consumers resolve one runtime entrypoint", async () => {
   )
   expect(new Set(paths).size).toBe(1)
 
-  for (const dependency of ["@opentui/solid", "opentui-spinner"]) {
+  for (const dependency of ["@opentui/solid", "@opentui/keymap"]) {
     const resolved = Bun.resolveSync(dependency, join(root, "packages/tui"))
     expect(await realpath(Bun.resolveSync("@opentui/core", dirname(resolved)))).toBe(paths[0])
   }
