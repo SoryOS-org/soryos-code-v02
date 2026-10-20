@@ -81,6 +81,7 @@ type Result = {
 
 type Failure = {
   readonly error: SessionError.Error
+  readonly outputLimit?: true
 }
 
 type Prepared = Effect.Success<ReturnType<SessionModelRequest.Interface["compaction"]>>
@@ -91,7 +92,7 @@ type Streamed = {
 }
 
 const NOTHING_TO_COMPACT: Failure = { error: { type: "compaction.unavailable", message: "Nothing to compact yet" } }
-/** After each "too long" rejection, the next attempt aims at this share of the first rejected request's size. */
+/** Input overflow and one length-limited summary share these targets relative to the first rejected request. */
 const SHRINK_STEPS = [0.7, 0.5, 0.35]
 // The least of the window kept free for the last reply before compaction and for the summary itself.
 const RESERVE_MIN = 16_000
@@ -401,8 +402,9 @@ export const layer = Layer.effect(
      * estimate ran low, so the next attempts aim at 70%, 50%, then 35% of the first rejected request's estimate, and a
      * rejection after those gives up. A "payload too large" rejection is about bytes, which inline media almost always
      * accounts for, so one on the unchanged request resends it as text, which carries no media, without counting; one
-     * on text counts as "too long". Other provider errors resend the same request under the session's retry policy. A
-     * `Failure` from `send` is a reply that cannot be used, and is never retried.
+     * on text counts as "too long". Other provider errors resend the same request under the session's retry policy.
+     * A summary cut off at its output limit gets one smaller request within that same shrink budget; its partial text
+     * is never accepted. Other `Failure` replies cannot be used and are not retried.
      */
     const deliver = Effect.fnUntraced(function* (
       trigger: Trigger,
@@ -424,6 +426,18 @@ export const layer = Layer.effect(
       let rejected: number | undefined
       let asText = false
       let fit = shrink.fit
+      let lengthFailure: Failure | undefined
+      const shrinkNext = (request: LLMRequest) => {
+        const step = SHRINK_STEPS[rejections]
+        if (step === undefined) return false
+        const size = estimateRequest(request)
+        rejected ??= size
+        // Whole-exchange boundaries can undershoot a target; never resend that rejected size.
+        target = Math.min(Math.floor(rejected * step), size - 1)
+        fit = target
+        rejections++
+        return true
+      }
 
       while (true) {
         const unchanged = asText
@@ -436,25 +450,33 @@ export const layer = Layer.effect(
         const request =
           unchanged ??
           flattenAndDropOldest(shrink.history, context, target) ??
-          (rejections > 0
+          (rejections > 0 || lengthFailure
             ? undefined
             : asText
               ? flattenAndDropOldest(shrink.history, context, Number.POSITIVE_INFINITY)
               : shrink.history)
         if (!request) {
-          return yield* Effect.fail<Failure>({
-            error: {
-              type: "compaction.failed",
-              message:
-                "The compaction request cannot be reduced further without losing the latest exchange or checkpoint",
+          return yield* Effect.fail<Failure>(
+            lengthFailure ?? {
+              error: {
+                type: "compaction.failed",
+                message:
+                  "The compaction request cannot be reduced further without losing the latest exchange or checkpoint",
+              },
             },
-          })
+          )
         }
 
         const attempt = yield* Effect.result(send(request))
         if (Result.isSuccess(attempt)) return attempt.success
         const cause = attempt.failure
-        if (!(cause instanceof AIError)) return yield* Effect.fail(cause)
+        if (!(cause instanceof AIError)) {
+          if (!cause.outputLimit || lengthFailure) return yield* Effect.fail(cause)
+          lengthFailure = cause
+          // The provider may have clamped output to the room left by an underestimated input.
+          if (!shrinkNext(request)) return yield* Effect.fail(cause)
+          continue
+        }
         const error = toSessionError(cause)
         const tooLarge = cause.reason._tag === "InvalidRequest" && cause.reason.classification === "payload-too-large"
 
@@ -464,12 +486,7 @@ export const layer = Layer.effect(
         }
 
         if (tooLarge || isContextOverflowFailure(cause)) {
-          const step = SHRINK_STEPS[rejections]
-          if (step === undefined) return yield* Effect.fail<Failure>({ error })
-          rejected ??= estimateRequest(request)
-          target = Math.floor(rejected * step)
-          fit = target
-          rejections++
+          if (!shrinkNext(request)) return yield* Effect.fail<Failure>({ error })
           continue
         }
 
@@ -582,9 +599,12 @@ export const layer = Layer.effect(
                   new AIError({ reason: new UnknownProviderError({ message: "Compaction generation failed" }) }),
                 )
               case "length":
-                return unusable({
-                  type: "compaction.failed",
-                  message: "Compaction summary reached the output token limit",
+                return Effect.fail<Failure>({
+                  error: {
+                    type: "compaction.failed",
+                    message: "Compaction summary reached the output token limit",
+                  },
+                  outputLimit: true,
                 })
               case "content-filter":
                 return unusable(contentFilterError("Compaction summary was blocked by the provider", event.reason))
