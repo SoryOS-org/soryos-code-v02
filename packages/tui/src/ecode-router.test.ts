@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { Harness, harnessCommand, harnessInvocation, routeHarness, routeTask } from "./ecode-router"
+import { Harness, harnessCommand, harnessInvocation, parseHarnessEvent, routeHarness, routeTask } from "./ecode-router"
 
 describe("ecode router", () => {
   test("routes simple questions to Codex with Sol", () => {
@@ -17,15 +17,18 @@ describe("ecode router", () => {
 
   test("quotes prompts passed to external harnesses", () => {
     expect(harnessCommand(Harness.Codex, "Fix user's test", "codex")).toBe(
-      `codex exec --color never 'Fix user'"'"'s test'`,
+      `codex exec --json --color never 'Fix user'"'"'s test'`,
     )
-    expect(harnessCommand(Harness.OpenCode, "Explain this repo", "opencode")).toBe(`opencode run 'Explain this repo'`)
+    expect(harnessCommand(Harness.OpenCode, "Explain this repo", "opencode")).toBe(
+      `opencode run --format json 'Explain this repo'`,
+    )
   })
 
   test("builds an argument array without a shell", () => {
     expect(harnessInvocation(Harness.Codex, "What does this project do?", "gpt-5.6-sol", "codex")).toEqual([
       "codex",
       "exec",
+      "--json",
       "--color",
       "never",
       "--model",
@@ -37,6 +40,41 @@ describe("ecode router", () => {
   test("quotes executable paths containing spaces", () => {
     expect(
       harnessCommand(Harness.Codex, "Explain this repo", "/Applications/Chat GPT.app/Contents/Resources/codex"),
-    ).toBe(`'/Applications/Chat GPT.app/Contents/Resources/codex' exec --color never 'Explain this repo'`)
+    ).toBe(`'/Applications/Chat GPT.app/Contents/Resources/codex' exec --json --color never 'Explain this repo'`)
+  })
+
+  test("normalizes Codex command and reasoning events", () => {
+    expect(
+      parseHarnessEvent(
+        Harness.Codex,
+        JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "command_execution",
+            command: "bun test",
+            aggregated_output: "2 pass\n",
+            exit_code: 0,
+          },
+        }),
+      ),
+    ).toEqual([{ type: "command", command: "bun test", output: "2 pass\n", exitCode: 0 }])
+    expect(
+      parseHarnessEvent(
+        Harness.Codex,
+        JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "Checking the failing test." } }),
+      ),
+    ).toEqual([{ type: "reasoning", text: "Checking the failing test." }])
+  })
+
+  test("normalizes OpenCode shell tool events", () => {
+    expect(
+      parseHarnessEvent(
+        Harness.OpenCode,
+        JSON.stringify({
+          type: "tool_use",
+          part: { name: "shell", state: { input: { command: "git status --short" }, output: " M app.ts" } },
+        }),
+      ),
+    ).toEqual([{ type: "command", command: "git status --short", output: " M app.ts", exitCode: undefined }])
   })
 })

@@ -70,7 +70,7 @@ import { directoryRecentValue } from "../../prompt/directory-completion"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
-import { Harness, executeHarness, routeTask, type RouteDecision } from "../../ecode-router"
+import { Harness, executeHarness, routeTask, type HarnessTraceEvent, type RouteDecision } from "../../ecode-router"
 
 export type PromptProps = {
   sessionID?: string
@@ -1346,10 +1346,27 @@ export function Prompt(props: PromptProps) {
           data.location.default().directory ??
           paths.cwd
         let used = routeDecision!
-        let result = await executeHarness(used, inputText, directory)
+        const publishTrace = async (event: Exclude<HarnessTraceEvent, { type: "message" }>) => {
+          await client.api.session.synthetic({
+            sessionID: target,
+            text: harnessTraceText(event),
+            description: harnessTraceText(event),
+            metadata: {
+              source: "harness-trace",
+              event: event.type,
+              harness: used.harness,
+              ...(event.type === "command" ? { command: event.command } : {}),
+              ...(event.type === "command" && event.output ? { output: event.output } : {}),
+              ...(event.type === "command" && event.exitCode !== undefined ? { exitCode: event.exitCode } : {}),
+            },
+            resume: false,
+          })
+        }
+        let result = await executeHarness(used, inputText, directory, publishTrace)
         if (selectedHarness === Harness.Router && result.exitCode !== 0 && used.harness !== Harness.Codex) {
           used = { harness: Harness.Codex, model: "gpt-5.6-sol" }
-          result = await executeHarness(used, inputText, directory)
+          await publishTrace({ type: "status", text: "Falling back to Codex CLI · gpt-5.6-sol" })
+          result = await executeHarness(used, inputText, directory, publishTrace)
         }
         const output = result.stdout || result.stderr || `Harness exited with code ${result.exitCode}`
         await client.api.session.synthetic({
@@ -1458,6 +1475,16 @@ export function Prompt(props: PromptProps) {
     }
     if (finishMoveProgress) move.finishSubmit()
     return true
+  }
+
+  function harnessTraceText(event: Exclude<HarnessTraceEvent, { type: "message" }>) {
+    if (event.type === "command") {
+      const output = event.output?.trim()
+      const exit = event.exitCode === undefined ? "" : `\nExited with code ${event.exitCode}`
+      return [`$ ${event.command}`, output, exit].filter(Boolean).join("\n")
+    }
+    if (event.type === "tool") return event.detail ? `${event.name}\n${event.detail}` : event.name
+    return event.text
   }
 
   function pasteText(text: string, virtualText: string) {

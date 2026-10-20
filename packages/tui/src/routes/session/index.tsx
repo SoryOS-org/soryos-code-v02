@@ -1968,6 +1968,10 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   const source = () => stringValue(metadata()?.source)
   const harness = () => stringValue(metadata()?.harness)
   const model = () => stringValue(metadata()?.model)
+  const harnessEvent = () => stringValue(metadata()?.event)
+  const harnessCommand = () => stringValue(metadata()?.command)
+  const harnessOutput = () => stringValue(metadata()?.output)
+  const harnessExitCode = () => finiteNumber(metadata()?.exitCode)
   const completion = () => source() === "subagent" || source() === "shell"
   const childID = () => (source() === "subagent" ? stringValue(metadata()?.childID) : undefined)
   const state = () => stringValue(metadata()?.state)
@@ -1993,7 +1997,7 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   }
   return (
     <Show
-      when={source() === "harness" || source() === "harness-user"}
+      when={source() === "harness" || source() === "harness-user" || source() === "harness-trace"}
       fallback={
         <Show
           when={completion()}
@@ -2024,23 +2028,69 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
       <Show
         when={source() === "harness-user"}
         fallback={
-          <box paddingTop={1} paddingLeft={3} flexDirection="column">
-            <text fg={state() === "error" ? theme.text.feedback.error.base : theme.text.muted}>
-              {harness() === "claude-code" ? "Claude Code" : harness() === "opencode" ? "OpenCode CLI" : "Codex CLI"}
-              {model() ? ` · ${model()}` : ""}
-            </text>
-            <markdown
-              syntaxStyle={syntax()}
-              renderNode={plugins.markdown()}
-              streaming={false}
-              internalBlockMode="top-level"
-              content={stripAnsi(text())}
-              tableOptions={{ style: "grid", cellPaddingX: 1 }}
-              conceal={ctx.markdownMode() === "rendered"}
-              fg={state() === "error" ? theme.text.feedback.error.base : theme.markdown.text}
-              bg={theme.background.base}
-            />
-          </box>
+          <Show
+            when={source() === "harness-trace"}
+            fallback={
+              <box paddingTop={1} paddingLeft={3} flexDirection="column">
+                <text fg={state() === "error" ? theme.text.feedback.error.base : theme.text.muted}>
+                  {harness() === "claude-code"
+                    ? "Claude Code"
+                    : harness() === "opencode"
+                      ? "OpenCode CLI"
+                      : "Codex CLI"}
+                  {model() ? ` · ${model()}` : ""}
+                </text>
+                <markdown
+                  syntaxStyle={syntax()}
+                  renderNode={plugins.markdown()}
+                  streaming={false}
+                  internalBlockMode="top-level"
+                  content={stripAnsi(text())}
+                  tableOptions={{ style: "grid", cellPaddingX: 1 }}
+                  conceal={ctx.markdownMode() === "rendered"}
+                  fg={state() === "error" ? theme.text.feedback.error.base : theme.markdown.text}
+                  bg={theme.background.base}
+                />
+              </box>
+            }
+          >
+            <Switch>
+              <Match when={harnessEvent() === "command"}>
+                <box paddingLeft={3}>
+                  <ShellDisplay
+                    command={harnessCommand()}
+                    status="completed"
+                    output={harnessOutput()}
+                    error={
+                      harnessExitCode() !== undefined && harnessExitCode() !== 0
+                        ? `Command exited with code ${harnessExitCode()}`
+                        : undefined
+                    }
+                  />
+                </box>
+              </Match>
+              <Match when={harnessEvent() === "reasoning"}>
+                <InlineToolRow icon="∴" color={theme.text.muted} pending="Thinking…" complete={true}>
+                  {text()}
+                </InlineToolRow>
+              </Match>
+              <Match when={harnessEvent() === "file"}>
+                <InlineToolRow icon="←" color={theme.text.muted} pending="Changing files…" complete={true}>
+                  {text()}
+                </InlineToolRow>
+              </Match>
+              <Match when={harnessEvent() === "error"}>
+                <InlineToolRow icon="!" color={theme.text.feedback.error.base} pending="Failed" complete={true}>
+                  {text()}
+                </InlineToolRow>
+              </Match>
+              <Match when={true}>
+                <InlineToolRow icon="·" color={theme.text.muted} pending="Working…" complete={true}>
+                  {text()}
+                </InlineToolRow>
+              </Match>
+            </Switch>
+          </Show>
         }
       >
         <box
