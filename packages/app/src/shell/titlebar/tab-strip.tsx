@@ -146,7 +146,9 @@ function SessionTabEntry(props: {
       const current = session()
       const currentCtx = props.serverCtx
 
-      if (current && currentCtx) currentCtx.data.session.remember({ ...current, title: value.title })
+      // A newer rename may have replaced this title while the save was in flight.
+      if (current && currentCtx && current.title === title)
+        currentCtx.data.session.remember({ ...current, title: value.title })
       showToast({
         title: language.t("common.requestFailed"),
         description: err instanceof Error ? err.message : undefined,

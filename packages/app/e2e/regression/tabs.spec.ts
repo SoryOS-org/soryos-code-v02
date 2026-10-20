@@ -124,31 +124,42 @@ test("inactive session attention dots share the close control without marking th
   await expectPath(page, sessionHref(a.id))
 })
 
-test("a tab does not reopen its title editor while a rename is saving", async ({ page }) => {
-  await mockWorkspace(page, { name: "Tabs", sessions: [a, b] })
-  await page.goto(sessionHref(a.id))
-  const title = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(b.id)}"]) [data-slot="tab-title"]`)
-  const editor = page.locator('[data-slot="tab-title"][contenteditable="true"]')
-  await expect(title).toHaveText(b.title)
-  const save = await holdRoute(page, (url) => url.pathname === `/api/session/${b.id}`, { method: "PATCH" })
+for (const tabLayout of ["horizontal", "vertical"] as const) {
+  test(`a ${tabLayout} tab can be renamed again while its previous rename is still saving`, async ({ page }) => {
+    await mockWorkspace(page, { name: "Tabs", sessions: [a, b], seed: { settings: { appearance: { tabLayout } } } })
+    await page.goto(sessionHref(a.id))
+    const title = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(a.id)}"]) [data-slot="tab-title"]`)
+    const editor = page.locator('[data-slot="tab-title"][contenteditable="true"]')
+    await expect(title).toHaveText(a.title)
+    const save = await holdRoute(page, (url) => url.pathname === `/api/session/${a.id}`, { method: "PATCH" })
 
-  await title.dblclick()
-  await expect(editor).toBeFocused()
-  await editor.fill("Renamed tab")
-  await editor.press("Enter")
-  expect((await save.arrived).postDataJSON()).toEqual({ title: "Renamed tab" })
-  await expect(editor).toHaveCount(0)
-  await title.dblclick()
-  await expect(editor).toHaveCount(0)
+    await title.dblclick()
+    await expect(editor).toBeFocused()
+    await editor.fill("First name")
+    await editor.press("Enter")
+    expect((await save.arrived).postDataJSON()).toEqual({ title: "First name" })
+    await expect(editor).toHaveCount(0)
 
-  // The context menu's Rename item is enabled again once the save settles.
-  save.release()
-  await title.click({ button: "right" })
-  await expect(page.getByRole("menuitem", { name: "Rename", exact: true })).toBeEnabled()
-  await page.keyboard.press("Escape")
-  await title.dblclick()
-  await expect(editor).toBeFocused()
-})
+    await title.dblclick()
+    await expect(editor).toBeFocused()
+    await editor.fill("Second name")
+    await editor.press("Enter")
+    await expect(title).toHaveText("Second name")
+
+    await title.click({ button: "right" })
+    await page.getByRole("menuitem", { name: "Rename", exact: true }).click()
+    await expect(editor).toBeFocused()
+    await editor.fill("Third name")
+    await editor.press("Enter")
+    await expect(title).toHaveText("Third name")
+
+    save.release()
+    await expect
+      .poll(() => save.requests.map((request) => request.postDataJSON()))
+      .toEqual([{ title: "First name" }, { title: "Second name" }, { title: "Third name" }])
+    await expect(title).toHaveText("Third name")
+  })
+}
 
 test("keyboard navigation follows the visible tab order and skips unresolved tabs", async ({ page }) => {
   await mockWorkspace(page, { name: "Tabs", sessions: [a, c], seed: { tabs: [a.id, "ses_tab_unresolved", c.id] } })

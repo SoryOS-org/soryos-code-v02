@@ -3,7 +3,6 @@ import { createStore } from "solid-js/store"
 import { Predicate } from "effect"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
-import { createMutation } from "@tanstack/solid-query"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
@@ -48,7 +47,6 @@ export function TabNavItem(props: {
   let tabRoot!: HTMLDivElement
   let titleEl!: HTMLSpanElement
   let measureFrame: number | undefined
-  const rename = createMutation(() => ({ mutationFn: props.onRename }))
 
   const closeTab = (event: MouseEvent) => {
     event.preventDefault()
@@ -162,7 +160,7 @@ export function TabNavItem(props: {
   }
 
   const closeRename = async (save: boolean) => {
-    if (rename.isPending || !editing()) return
+    if (!editing()) return
 
     const original = props.session?.title ?? ""
     const next = (titleEl.textContent ?? "").trim()
@@ -174,7 +172,7 @@ export function TabNavItem(props: {
       return
     }
 
-    await rename.mutateAsync(next)
+    await props.onRename(next)
   }
 
   createEffect(() => {
@@ -191,7 +189,7 @@ export function TabNavItem(props: {
     event?.preventDefault()
     event?.stopPropagation()
 
-    if (props.dragging || editing() || rename.isPending) return
+    if (props.dragging || editing()) return
     const session = props.session
 
     if (!session) return
@@ -433,7 +431,7 @@ export function TabNavItem(props: {
             openRename()
           }}
         >
-          <Menu.Item disabled={!props.session || rename.isPending} onSelect={() => setMenu("rename", true)}>
+          <Menu.Item disabled={!props.session} onSelect={() => setMenu("rename", true)}>
             {language.t("common.rename")}
           </Menu.Item>
           <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
