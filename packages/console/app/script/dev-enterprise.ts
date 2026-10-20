@@ -1,7 +1,6 @@
 import { handleEnterpriseRequest } from "../src/lib/enterprise"
 import { z } from "zod"
 import { SalesforceCliError, salesforceCliResponse } from "./salesforce-cli-response"
-import { handleConsoleSignup } from "../src/lib/console-signup"
 import { consoleAccountSchema } from "../src/lib/console-account"
 
 const org = process.env.SF_TARGET_ORG || "opencode"
@@ -9,11 +8,7 @@ const crmToken = process.env.CONSOLE_CRM_TOKEN
 if (!crmToken) throw new Error("Set CONSOLE_CRM_TOKEN to the shared local Console CRM token")
 const accountUrl = process.env.CONSOLE_CRM_LOOKUP_URL || "http://localhost:3100/console/api/internal/console-account"
 
-async function authenticatedRequest(
-  path: string,
-  payload?: Record<string, unknown>,
-  method: "GET" | "POST" | "PATCH" = payload ? "POST" : "GET",
-) {
+async function authenticatedRequest(path: string, payload?: Record<string, unknown>) {
   const child = Bun.spawn(
     [
       "sf",
@@ -25,7 +20,7 @@ async function authenticatedRequest(
       org,
       "--json",
       "--method",
-      method,
+      payload ? "POST" : "GET",
       ...(payload ? ["--body", "-", "--header", "Content-Type:application/json"] : []),
     ],
     {
@@ -51,11 +46,6 @@ const server = Bun.serve({
     const path = new URL(request.url).pathname
     if (path === "/health" && request.method === "GET") {
       return Response.json({ handler: "local-sst-enterprise", salesforceOrg: org })
-    }
-    if (path === "/api/console-signup" && request.method === "POST") {
-      return handleConsoleSignup(request, crmToken, (path, method, payload) =>
-        authenticatedRequest(path, payload, method),
-      )
     }
     if (path !== "/api/enterprise") return new Response("Not found", { status: 404 })
     if (request.method !== "POST") return new Response("Method not allowed", { status: 405 })
