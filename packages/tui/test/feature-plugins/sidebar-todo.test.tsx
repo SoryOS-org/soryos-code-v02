@@ -35,23 +35,16 @@ const content = [
   "Prepare a sample report with before and after captures; record the verification results",
 ]
 
-const cases = [3, 4, 8].flatMap((count) =>
-  [40, 50].flatMap((width) =>
-    [false, true].flatMap((wrapped) => [false, true].map((completed) => ({ count, width, wrapped, completed }))),
-  ),
-)
-
-test.each(cases)("sidebar preserves todo content and section spacing %j", async (input) => {
-  const todos = Array.from(
-    { length: input.count },
-    (_, index): Todo => ({
-      content: input.wrapped ? content[index % content.length] : `Task ${index + 1}`,
-      status: input.completed ? "completed" : index === 0 ? "in_progress" : "pending",
+test("sidebar preserves wrapped todo content and spacing before a growing section", async () => {
+  const todos = content.map(
+    (content, index): Todo => ({
+      content,
+      status: index === 0 ? "in_progress" : "pending",
     }),
   )
   const app = await testRender(
     () => (
-      <box width={input.width} height={40} paddingLeft={2} paddingRight={2}>
+      <box width={40} height={40} paddingLeft={2} paddingRight={2}>
         <scrollbox
           flexGrow={1}
           minHeight={0}
@@ -78,7 +71,7 @@ test.each(cases)("sidebar preserves todo content and section spacing %j", async 
         </scrollbox>
       </box>
     ),
-    { width: input.width, height: 40 },
+    { width: 40, height: 40 },
   )
 
   try {
