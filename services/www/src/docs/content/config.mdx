@@ -626,7 +626,7 @@ All experimental settings live under the `experimental` key:
     "todo": true,
     "subagent_depth": 2,
     "portable_shell_scanner": true,
-    "location_idle_timeout": 14400000,
+    "location_idle_timeout": "4 hours",
   },
 }
 ```
@@ -648,8 +648,8 @@ Defaults to `false`. See [Permissions](/permissions#scanner) for how it behaves.
 ### Location idle timeout
 
 `location_idle_timeout` controls how long a project location can go without session activity before OpenCode unloads
-its services. The value is in milliseconds and defaults to `3600000` (60 minutes). Running sessions and background jobs
-keep a location loaded. Set it to `false` to never unload idle locations. Project config can override the global
+its services. It takes a duration such as `"2 hours"` and defaults to `"60 minutes"`. Running sessions and background
+jobs keep a location loaded. Set it to `false` to never unload idle locations. Project config can override the global
 value.
 
 ### Deprecated policies

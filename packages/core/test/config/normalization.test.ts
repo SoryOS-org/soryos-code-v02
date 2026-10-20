@@ -526,7 +526,7 @@ describe("ConfigNormalize", () => {
           portable_shell_scanner: true,
           todo: true,
           subagent_depth: 0,
-          location_idle_timeout: 7_200_000,
+          location_idle_timeout: "2 hours",
           policies: [{ action: "provider.use", resource: "custom", effect: "allow" }],
         },
       }).encoded,
@@ -535,7 +535,7 @@ describe("ConfigNormalize", () => {
         portable_shell_scanner: true,
         todo: true,
         subagent_depth: 0,
-        location_idle_timeout: 7_200_000,
+        location_idle_timeout: "7200000 millis",
       },
       policies: [
         { action: "provider.use", resource: "*", effect: "deny" },

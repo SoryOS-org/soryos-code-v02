@@ -28,7 +28,7 @@ import { ConfigExperimental } from "@opencode/schema/config/experimental"
 import { testEffect } from "./lib/effect"
 
 // Per-workspace experimental.location_idle_timeout, read by each location's Config.
-const idleTimeouts = new Map<string, number | false>()
+const idleTimeouts = new Map<string, Duration.Duration | false>()
 
 // Keep real execution ownership, location caching, forms, and eviction. The fixture
 // runner waits on a form instead of making a model request before asking a question.
@@ -262,14 +262,14 @@ describe("LocationActivity eviction", () => {
     )
 
   for (const [timeout, after, evicted] of [
-    [600_000, "11 minutes", true],
+    ["10 minutes", "11 minutes", true],
     [false, "3 hours", false],
   ] as const)
     it.effect(`honors experimental.location_idle_timeout = ${JSON.stringify(timeout)}`, () =>
       Effect.gen(function* () {
         const map = yield* LocationServiceMap.Service
-        const workspaceID = Workspace.ID.make(`wrk_timeout_${timeout}`)
-        idleTimeouts.set(workspaceID, timeout)
+        const workspaceID = Workspace.ID.make(`wrk_timeout_${String(timeout).replace(" ", "_")}`)
+        idleTimeouts.set(workspaceID, timeout === false ? false : Duration.fromInputUnsafe(timeout))
         yield* Effect.addFinalizer(() => Effect.sync(() => idleTimeouts.delete(workspaceID)))
         const configured = Location.Ref.make({ directory: AbsolutePath.make("/project"), workspaceID })
         const fallback = Location.Ref.make({ directory: AbsolutePath.make("/project") })

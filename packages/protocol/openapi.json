@@ -14327,8 +14327,7 @@
               "location_idle_timeout": {
                 "anyOf": [
                   {
-                    "type": "integer",
-                    "exclusiveMinimum": 0
+                    "type": "string"
                   },
                   {
                     "type": "boolean",
