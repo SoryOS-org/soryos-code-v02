@@ -15,8 +15,7 @@ import { fetchSessionExport, saveSessionExport, sessionExportFilename } from "@/
 import { usePlatform } from "@/runtime/platform/platform"
 import type { SessionModel } from "@/session/model"
 import type { SessionRevert } from "@/session/revert"
-import { Command } from "@opencode/gui-extensions/sdk"
-import { useExtensionHost } from "@/runtime/extension/host"
+import { useExtensionScoped } from "@/runtime/extension/commands"
 import type { Region } from "@/runtime/extension/panels"
 import { createSideFocus } from "@/runtime/extension/closed-tabs"
 
@@ -60,7 +59,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const settings = useSettings()
   const platform = usePlatform()
   const layout = useLayout()
-  const host = useExtensionHost()
+  const extensionScoped = useExtensionScoped()
 
   const openDialog = async <T,>(load: () => Promise<T>, show: (value: T) => void) => {
     const owner = actions.session.ownership.capture()
@@ -84,11 +83,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
   const inSide = createSideFocus()
   const cycleSideTabs = () => actions.session.layout.view().side.opened() && actions.region.keys().length > 1
-
-  // Focus inside an extension command's scope belongs to that extension, which binds its own shortcuts there.
-  const extensionScoped = (target: EventTarget | null) =>
-    target instanceof Element &&
-    host.items(Command).some((item) => !!item.value.scope && !!target.closest(item.value.scope))
 
   const sideFocused = (target: EventTarget | null) => {
     const element =

@@ -80,6 +80,15 @@ test("commandKeymap puts a user's binding before a default on the same keys", ()
   expect(commandKeymap([{ ...rename, disabled: true }], () => false).size).toBe(0)
 })
 
+test.each([true, false])("resolveKeybindOption leaves the key to a skipping command's target: %p", (inside) => {
+  const rename = { id: "session.rename", title: "Rename session", skip: () => inside }
+  const focus = { id: "input.focus", title: "Focus input" }
+  const event = new KeyboardEvent("keydown")
+
+  expect(resolveKeybindOption([rename], event)).toBe(inside ? undefined : rename)
+  expect(resolveKeybindOption([rename, focus], event)).toBe(inside ? focus : rename)
+})
+
 describe("command keybinds", () => {
   test("parseKeybind handles aliases, multiple combos, and disabled bindings", () => {
     const keybinds = parseKeybind("control+option+k, mod+shift+comma")

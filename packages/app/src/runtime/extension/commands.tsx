@@ -1,6 +1,6 @@
 import { createMemo } from "solid-js"
 import { Command } from "@opencode/gui-extensions/sdk"
-import { useCommand } from "@/shell/commands/command"
+import { useCommand, type CommandSource } from "@/shell/commands/command"
 import { useSettings } from "@/settings/model"
 import { migrateKeybinds } from "@/settings/keybinds/migration"
 import { useExtensionHost } from "./host"
@@ -33,13 +33,22 @@ export function ExtensionCommands() {
         disabled: item.value.enabled === false,
         hidden: item.value.hidden,
         editable: item.value.editable,
-        when: item.value.scope
-          ? (event: KeyboardEvent) =>
-              event.target instanceof Element && !!event.target.closest(item.value.scope as string)
-          : undefined,
-        onSelect: (_source: unknown, input?: string) => item.value.run(input),
+        when: item.value.scope ? scopedTo(item.value.scope) : undefined,
+        onSelect: (_source?: CommandSource, input?: string) => item.value.run(input),
       })),
   )
 
   return null
+}
+
+const scopedTo = (scope: string) => (event: KeyboardEvent) =>
+  event.target instanceof Element && !!event.target.closest(scope)
+
+/** Focus inside an extension command's scope belongs to that extension, which binds its own shortcuts there. */
+export function useExtensionScoped() {
+  const host = useExtensionHost()
+
+  return (target: EventTarget | null) =>
+    target instanceof Element &&
+    host.items(Command).some((item) => !!item.value.scope && !!target.closest(item.value.scope))
 }

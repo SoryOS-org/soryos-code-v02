@@ -112,6 +112,8 @@ export interface CommandOption {
   /** The keybind also fires while a text field has focus. */
   editable?: boolean
   when?: (event: KeyboardEvent) => boolean
+  /** The keybind leaves this event to its target, as if the command had no keybind. */
+  skip?: (event: KeyboardEvent) => boolean
   onSelect?: (source?: "palette" | "keybind" | "slash", input?: string) => void | Promise<void>
   onHighlight?: () => (() => void) | void
 }
@@ -149,10 +151,12 @@ export function commandKeymap(options: CommandOption[], custom: (id: string) => 
 }
 
 export function resolveKeybindOption(candidates: CommandOption[] | undefined, event: KeyboardEvent) {
-  return candidates?.find((option) => option.when?.(event)) ?? candidates?.find((option) => !option.when)
+  const live = candidates?.filter((option) => !option.skip?.(event))
+
+  return live?.find((option) => option.when?.(event)) ?? live?.find((option) => !option.when)
 }
 
-type CommandSource = "palette" | "keybind" | "slash"
+export type CommandSource = "palette" | "keybind" | "slash"
 
 export const CommandCatalogItem = Persistence.struct({
   title: Schema.String,
