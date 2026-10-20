@@ -200,6 +200,7 @@
       text-decoration: underline;
       text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
       text-underline-offset: 2px;
+      cursor: pointer;
 
       &:hover {
         text-decoration-color: currentColor;

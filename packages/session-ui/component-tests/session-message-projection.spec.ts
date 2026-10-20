@@ -95,6 +95,7 @@ story("links URLs in user messages without swallowing punctuation or mentions", 
   await expect(links.nth(0)).toHaveText("https://github.com/Hona/mesh")
   await expect(links.nth(0)).toHaveAttribute("href", "https://github.com/Hona/mesh")
   await expect(links.nth(0)).toHaveAttribute("target", "_blank")
+  await expect(links.nth(0)).toHaveCSS("cursor", "pointer")
   await expect(links.nth(1)).toHaveText("https://opencode.ai/docs")
   await expect(timeline.getByText("@src/a.ts", { exact: true })).toBeVisible()
   await expect(timeline.locator('[data-slot="user-message-text"]')).toHaveText(
