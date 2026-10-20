@@ -50,6 +50,8 @@ const setup = Effect.fnUntraced(function* (
     hang?: boolean
     sequence?: readonly ("overflow" | "length" | "stop")[]
     messages?: readonly string[]
+    usage?: "window" | "cap" | "cap-window" | "missing" | "below-window" | "input-only"
+    context?: number
   } = {},
 ) {
   const db = (yield* Database.Service).db
@@ -90,6 +92,31 @@ const setup = Effect.fnUntraced(function* (
               { status: 400 },
             )
           }
+          const cap = Schema.decodeUnknownSync(Schema.Number)(
+            bodies.at(-1)?.max_completion_tokens ?? bodies.at(-1)?.max_tokens,
+          )
+          const usage =
+            reason !== "length"
+              ? { prompt_tokens: 10, completion_tokens: 6 }
+              : options.usage === "cap-window"
+                ? { prompt_tokens: 200_000 - cap, completion_tokens: cap }
+                : options.usage === "cap"
+                  ? { prompt_tokens: 10_000, completion_tokens: cap }
+                  : options.usage === "below-window"
+                    ? {
+                        prompt_tokens: 130_000,
+                        completion_tokens: 20_000,
+                        prompt_tokens_details: { cached_tokens: 80_000 },
+                        completion_tokens_details: { reasoning_tokens: 15_000 },
+                      }
+                    : options.usage === "input-only"
+                      ? { prompt_tokens: 190_000 }
+                      : {
+                          prompt_tokens: 190_000,
+                          completion_tokens: 10_000,
+                          prompt_tokens_details: { cached_tokens: 100_000 },
+                          completion_tokens_details: { reasoning_tokens: 9_000 },
+                        }
           const chunks = [
             {
               delta: { content: reason === "stop" ? "## Objective\n- Complete summary" : "TRUNCATED" },
@@ -99,7 +126,14 @@ const setup = Effect.fnUntraced(function* (
           ]
           return new Response(
             chunks
-              .map((choice) => `data: ${JSON.stringify({ id: "summary", choices: [{ index: 0, ...choice }] })}\n\n`)
+              .map(
+                (choice, index) =>
+                  `data: ${JSON.stringify({
+                    id: "summary",
+                    choices: [{ index: 0, ...choice }],
+                    usage: index === 1 && options.usage !== "missing" ? usage : undefined,
+                  })}\n\n`,
+              )
               .join("") + "data: [DONE]\n\n",
             { headers: { "content-type": "text/event-stream" } },
           )
@@ -117,7 +151,7 @@ const setup = Effect.fnUntraced(function* (
     {
       capabilities: { tools: true, input: ["text"], output: ["text"] },
       cost: [],
-      limit: { context: 200_000, output: 32_000 },
+      limit: { context: options.context ?? 200_000, output: 32_000 },
     },
   )
   const sessionID = SessionSchema.ID.create()
@@ -168,6 +202,8 @@ it.live("a truncated summary retries once with less history and persists only th
     const fixture = yield* setup("stop")
     expect(yield* fixture.compact).toEqual({ status: "completed" })
     expect(fixture.bodies).toHaveLength(2)
+    // The provider's usage proves window exhaustion even though the requested cap did not change.
+    expect(fixture.bodies.map((body) => body.max_completion_tokens ?? body.max_tokens)).toEqual([30_000, 30_000])
     expect(JSON.stringify(fixture.bodies[1]).length).toBeLessThan(JSON.stringify(fixture.bodies[0]).length)
     const history = yield* fixture.store.context(fixture.sessionID)
     expect(history).toMatchObject([
@@ -275,6 +311,47 @@ it.live("length recovery shares the existing three-reduction budget with input o
     }
     const history = yield* fixture.store.context(fixture.sessionID)
     expect(history.filter((message) => message.type === "user")).toEqual(
+      fixture.messages.filter((message) => message.type === "user"),
+    )
+  }),
+)
+
+for (const usage of ["cap", "cap-window", "missing", "below-window", "input-only"] as const) {
+  it.live(`length with ${usage} usage fails without discarding history or retrying`, () =>
+    Effect.gen(function* () {
+      const fixture = yield* setup("stop", { usage })
+      expect(yield* fixture.compact).toMatchObject({
+        status: "failed",
+        error: { message: "Compaction summary reached the output token limit" },
+      })
+      expect(fixture.bodies).toHaveLength(1)
+      const history = yield* fixture.store.context(fixture.sessionID)
+      expect(history.filter((message) => message.type === "user")).toEqual(
+        fixture.messages.filter((message) => message.type === "user"),
+      )
+      expect(history.some((message) => message.type === "compaction" && message.status === "completed")).toBe(false)
+    }),
+  )
+}
+
+it.live("reported usage does not infer a context limit when the model window is unknown", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("stop", { context: 0 })
+    expect(yield* fixture.compact).toMatchObject({ status: "failed" })
+    expect(fixture.bodies).toHaveLength(1)
+    expect((yield* fixture.store.context(fixture.sessionID)).filter((message) => message.type === "user")).toEqual(
+      fixture.messages.filter((message) => message.type === "user"),
+    )
+  }),
+)
+
+it.live("a client-clamped request with no reducible exchange still fails without losing history", () =>
+  Effect.gen(function* () {
+    const fixture = yield* setup("stop", { messages: ["latest " + "x".repeat(1_000_000)], usage: "missing" })
+    expect(yield* fixture.compact).toMatchObject({ status: "failed" })
+    expect(fixture.bodies).toHaveLength(1)
+    expect(fixture.bodies[0]?.max_completion_tokens ?? fixture.bodies[0]?.max_tokens).toBe(1_024)
+    expect((yield* fixture.store.context(fixture.sessionID)).filter((message) => message.type === "user")).toEqual(
       fixture.messages.filter((message) => message.type === "user"),
     )
   }),

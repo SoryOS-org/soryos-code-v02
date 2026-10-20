@@ -89,6 +89,7 @@ type Prepared = Effect.Success<ReturnType<SessionModelRequest.Interface["compact
 type Streamed = {
   readonly text: string
   readonly providerState?: SessionMessage.ProviderState
+  readonly usage?: Usage
 }
 
 const NOTHING_TO_COMPACT: Failure = { error: { type: "compaction.unavailable", message: "Nothing to compact yet" } }
@@ -300,14 +301,14 @@ export const layer = Layer.effect(
             LLMRequest.update(request, { messages: [...request.messages, Message.user(prompt)] }),
             context.model.limit,
           )
-          const reply = yield* stream(context, prompted, prepared.options)
+          const reply = yield* stream(context, prompted, prepared.options, request.generation?.maxTokens)
           if (filled(reply.text)) return { ...reply, recent: recent.text }
 
           const nudged = fitOutput(
             LLMRequest.update(prompted, { messages: [...prompted.messages, Message.user(NUDGE)] }),
             context.model.limit,
           )
-          const retry = yield* stream(context, nudged, prepared.options)
+          const retry = yield* stream(context, nudged, prepared.options, request.generation?.maxTokens)
           if (filled(retry.text)) return { ...retry, recent: recent.text }
           return yield* Effect.fail<Failure>({
             error: {
@@ -403,8 +404,8 @@ export const layer = Layer.effect(
      * rejection after those gives up. A "payload too large" rejection is about bytes, which inline media almost always
      * accounts for, so one on the unchanged request resends it as text, which carries no media, without counting; one
      * on text counts as "too long". Other provider errors resend the same request under the session's retry policy.
-     * A summary cut off at its output limit gets one smaller request within that same shrink budget; its partial text
-     * is never accepted. Other `Failure` replies cannot be used and are not retried.
+     * A length-limited summary gets one smaller request within that same shrink budget only when the context window
+     * constrained its output. Partial summaries and other `Failure` replies are never accepted.
      */
     const deliver = Effect.fnUntraced(function* (
       trigger: Trigger,
@@ -552,7 +553,12 @@ export const layer = Layer.effect(
       })
     }
 
-    const stream = (context: SessionContext.Loaded, request: LLMRequest, options: StreamOptions) => {
+    const stream = (
+      context: SessionContext.Loaded,
+      request: LLMRequest,
+      options: StreamOptions,
+      requestedOutput: number | undefined,
+    ) => {
       const sessionID = context.session.id
       const metadataKey = context.model.model.route.providerMetadataKey ?? context.model.model.provider
       const unusable = (error: SessionError.Error) => Effect.fail<Failure>({ error })
@@ -579,7 +585,7 @@ export const layer = Layer.effect(
 
             if (LLMEvent.is.stepFinish(event)) {
               return spend(sessionID, SessionUsage.record(event.usage, context.model.cost)).pipe(
-                Effect.as({ ...streamed, providerState: event.providerMetadata?.[metadataKey] }),
+                Effect.as({ ...streamed, usage: event.usage, providerState: event.providerMetadata?.[metadataKey] }),
               )
             }
 
@@ -598,14 +604,28 @@ export const layer = Layer.effect(
                 return Effect.fail(
                   new AIError({ reason: new UnknownProviderError({ message: "Compaction generation failed" }) }),
                 )
-              case "length":
+              case "length": {
+                const cap = request.generation?.maxTokens
+                const usage = streamed.usage
+                // Shrinking helps only when the context window, not the requested output cap, ran out.
+                const roomLimited =
+                  cap !== undefined &&
+                  ((requestedOutput !== undefined &&
+                    cap < requestedOutput &&
+                    cap < SessionModelRequest.outputLimit(context.model.limit, "compaction")) ||
+                    (context.model.limit.context > 0 &&
+                      usage?.inputTokens !== undefined &&
+                      usage.outputTokens !== undefined &&
+                      usage.outputTokens < cap &&
+                      usage.inputTokens + usage.outputTokens >= context.model.limit.context))
                 return Effect.fail<Failure>({
                   error: {
                     type: "compaction.failed",
                     message: "Compaction summary reached the output token limit",
                   },
-                  outputLimit: true,
+                  outputLimit: roomLimited ? true : undefined,
                 })
+              }
               case "content-filter":
                 return unusable(contentFilterError("Compaction summary was blocked by the provider", event.reason))
               default:
