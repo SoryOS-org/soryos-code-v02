@@ -283,17 +283,24 @@ test.describe("session ID links", () => {
   test("opens a verified session from agent prose or inline code with the keyboard", async ({ page }) => {
     await setupTimeline(page, {
       sessions: [session(), session({ id: target, title: "Linked session" })],
+      tabs: [sessionID, target],
       messages: [
         userMessage(),
-        assistantMessage([textPart("prt_session_links", `Visit ${target} or \`${target}\` to see the result.`)]),
+        assistantMessage([textPart("prt_session_links", `Visit ${target}.\n\nOr \`${target}\` to see the result.`)]),
       ],
     })
-    const markdown = page.locator('[data-component="markdown"]').filter({ hasText: `Visit ${target}` })
+    // Visit the target so it is known to the shared session cache before checking its references.
+    await page.locator(`[data-titlebar-tab-link][href$="/session/${target}"]`).click()
+    await expectSessionTitle(page, "Linked session")
+    await page.locator(`[data-titlebar-tab-link][href$="/session/${sessionID}"]`).click()
+    await expectSessionTitle(page, "Timeline visual stability")
+    const markdown = page.locator('[data-component="markdown"]').filter({ hasText: "Visit" })
     await expect(markdown).toHaveAttribute("data-markdown-ready", "")
-    await expect(markdown.getByRole("button", { name: target })).toHaveCount(2)
+    await expect(markdown.getByRole("button", { name: "Linked session", exact: true })).toHaveCount(2)
     await markdown
-      .getByRole("button", { name: target })
-      .filter({ has: page.locator("code") })
+      .locator("p")
+      .filter({ hasText: "Or" })
+      .getByRole("button", { name: "Linked session", exact: true })
       .press("Enter")
     await expectPath(page, sessionHref(target))
     await expect(page.locator(`[data-titlebar-tab-link][href$="/session/${target}"]`)).toContainText("Linked session")
@@ -305,8 +312,8 @@ test.describe("session ID links", () => {
     })
     const markdown = page.locator('[data-component="markdown"]').filter({ hasText: `See ${missing}.` })
     await expect(markdown).toHaveAttribute("data-markdown-ready", "")
-    await markdown.getByRole("button", { name: missing }).click()
-    await expect(page.getByText("This session cannot be found")).toBeVisible()
+    await expect(markdown.getByRole("button")).toHaveCount(0)
+    await expect(markdown.locator("code")).toHaveText(missing)
     await expectPath(page, sessionHref(sessionID))
   })
 })
