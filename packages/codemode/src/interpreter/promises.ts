@@ -167,17 +167,12 @@ export class Turn {
     })
   }
 
+  // Resume a parked caller in the scheduler: resumed inline, it would run to its next await and queue before the callee
+  // that just suspended has queued its own continuation.
   private handBack(back: Handback): void {
     back.returned = true
     const resume = back.resume
-    if (resume === undefined) return
-    if (this.nesting >= MAX_NESTING) return back.fiber.currentDispatcher.scheduleTask(() => resume(Effect.void), 0)
-    this.nesting++
-    try {
-      resume(Effect.void)
-    } finally {
-      this.nesting--
-    }
+    if (resume !== undefined) back.fiber.currentDispatcher.scheduleTask(() => resume(Effect.void), 0)
   }
 
   // Run `effect`, which can run another program fiber inside the current step, counting the nesting.
