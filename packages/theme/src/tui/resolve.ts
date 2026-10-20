@@ -36,10 +36,26 @@ function decodeThemeDefinition(input: unknown) {
   }
 }
 
+function schemaFailure(message: string) {
+  const [first = message] = message.split(/\n(?=\S)/)
+  const value = /got ("[^"]*"|\S+)/.exec(first)?.[1]
+  const path = /at ((?:\["[^"]*"\])+)/.exec(first)?.[1]
+  const token = path
+    ? [...path.matchAll(/"([^"]*)"/g)].map((match) => match[1]).join(".")
+    : undefined
+  const detail = value ? `got ${value}` : (first.split("\n")[0] ?? first)
+  return token ? `${token}: ${detail}` : detail
+}
+
 export function themeDecodeError(error: unknown, name: string) {
-  const message = Schema.isSchemaError(error) ? error.message : String(error)
-  const value = /got ("[^"]*"|\S+)/.exec(message)?.[1] ?? "value"
-  return new Error(`Invalid theme: ${name} ${value} is an invalid value`, { cause: error })
+  // Resolution errors already say what is wrong (a missing or circular
+  // reference, an invalid color), so keep their text instead of replacing it.
+  const detail = Schema.isSchemaError(error)
+    ? schemaFailure(error.message)
+    : error instanceof Error
+      ? error.message
+      : String(error)
+  return new Error(`Invalid theme: ${name}: ${detail}`, { cause: error })
 }
 
 export function parseThemeDocument(input: unknown, name = "theme") {
