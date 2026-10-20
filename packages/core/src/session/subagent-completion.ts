@@ -4,6 +4,7 @@ import { Effect } from "effect"
 import type { Job } from "../job.js"
 import type { Session } from "../session.js"
 import type { SessionMessage } from "./message.js"
+import type { SessionSchema } from "./schema.js"
 
 export const NO_TEXT = "Subagent completed without a text response."
 
@@ -17,6 +18,33 @@ export function text(message: SessionMessage.Info | undefined) {
       .join("\n\n") || NO_TEXT
   )
 }
+
+/**
+ * Runs the child until it is idle with no background work of its own left. Each background job
+ * reports back through a synthetic message that wakes the child, so a job only stops counting once
+ * its pending marker is cleared after admission; the next resume then drains that notice.
+ */
+export const settle = <E>(
+  jobs: Pick<Job.Interface, "pendingBackground" | "get" | "wait">,
+  sessionID: SessionSchema.ID,
+  resume: Effect.Effect<void, E>,
+): Effect.Effect<void, E> =>
+  Effect.gen(function* () {
+    yield* resume
+    const pending = (yield* jobs.pendingBackground).filter(
+      (background) =>
+        (background.recovery.kind === "shell" ? background.recovery.sessionID : background.recovery.parentSessionID) ===
+        sessionID,
+    )
+    if (pending.length === 0) return
+    const running = yield* Effect.filter(pending, (background) =>
+      jobs.get(background.id).pipe(Effect.map((info) => info?.status === "running")),
+    )
+    // Finished jobs keep their marker until their notice is admitted, which happens shortly after.
+    if (running.length === 0) yield* Effect.sleep("50 millis")
+    yield* Effect.forEach(running, (background) => jobs.wait({ id: background.id }), { discard: true })
+    return yield* settle(jobs, sessionID, resume)
+  })
 
 export const deliver = Effect.fnUntraced(function* (
   sessions: Pick<Session.Interface, "synthetic">,

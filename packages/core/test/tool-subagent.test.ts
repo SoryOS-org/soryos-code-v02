@@ -824,4 +824,65 @@ describe("SubagentTool", () => {
       ),
     ),
   )
+
+  it.live("waits for the child's background jobs before reporting completion", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((dir) =>
+        Effect.gen(function* () {
+          const location = Location.Ref.make({ directory: AbsolutePath.make(dir.path) })
+          const sessions = yield* Session.Service
+          const parent = yield* sessions.create({ location })
+          yield* withSubagent(parent.location)
+          const child = yield* sessions.create({ parentID: parent.id, agent: Agent.ID.make("reviewer") })
+          const locations = yield* LocationServiceMap.Service
+          const registry = yield* Tool.Service.pipe(Effect.provide(locations.get(parent.location)))
+          const jobs = yield* Job.Service
+          const bus = yield* Bus.Service
+          const release = yield* Deferred.make<void>()
+          yield* jobs.start({
+            id: "child-background-shell",
+            type: "shell",
+            recovery: { kind: "shell", sessionID: child.id, shellID: "child-shell", command: "sleep" },
+            run: Deferred.await(release).pipe(Effect.as("done")),
+          })
+          const background = yield* jobs.background("child-background-shell")
+          const admitted = yield* bus.subscribe(SessionEvent.InboxEnqueued).pipe(
+            Stream.filter((event) => event.data.sessionID === parent.id && event.data.item.type === "synthetic"),
+            Stream.take(1),
+            Stream.runCollect,
+            Effect.forkScoped({ startImmediately: true }),
+          )
+
+          yield* executeTool(registry, {
+            sessionID: parent.id,
+            ...toolIdentity,
+            call: {
+              type: "tool-call",
+              id: "call-background-child-jobs",
+              name: SubagentTool.name,
+              input: {
+                agent: "reviewer",
+                description: "background review",
+                prompt: "review",
+                sessionID: child.id,
+                background: true,
+              },
+            },
+          })
+          yield* Effect.sleep("200 millis")
+          expect(admitted.pollUnsafe()).toBeUndefined()
+
+          yield* Deferred.succeed(release, undefined)
+          yield* jobs.wait({ id: "child-background-shell" })
+          if (background?.notificationID) yield* jobs.completeBackground(background.notificationID)
+          const admission = Array.from(yield* Fiber.join(admitted))[0]
+          if (admission?.data.item.type !== "synthetic") return yield* Effect.die("Expected synthetic inbox item")
+          expect(admission.data.item.payload.text).toContain(`<subagent sessionID="${child.id}" state="completed"`)
+        }),
+      ),
+    ),
+  )
 })

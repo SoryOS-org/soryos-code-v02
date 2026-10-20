@@ -51,7 +51,7 @@ const make: Effect.Effect<Interface, never, Session.Service | Job.Service | Scop
           metadata: {},
           recovery,
           run: Effect.gen(function* () {
-            yield* sessions.resume(recovery.childSessionID)
+            yield* SubagentCompletion.settle(jobs, recovery.childSessionID, sessions.resume(recovery.childSessionID))
             const messages = yield* sessions.messages({ sessionID: recovery.childSessionID, order: "desc", limit: 20 })
             const assistant = messages.find(
               (message) =>

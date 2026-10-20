@@ -171,7 +171,7 @@ export const layer = (options?: Options) =>
           title: recovery.description,
           notificationID: background.notificationID,
           recovery,
-          run: execution.resume(recovery.childSessionID).pipe(
+          run: SubagentCompletion.settle(jobs, recovery.childSessionID, execution.resume(recovery.childSessionID)).pipe(
             Effect.andThen(store.context(recovery.childSessionID)),
             Effect.map((messages) => {
               const assistant = messages.findLast(
