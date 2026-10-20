@@ -8,6 +8,7 @@ import { Global } from "@opencode/util/global"
 import { Bus } from "@opencode/core/bus"
 import { Database } from "@opencode/core/database/database"
 import { Location } from "@opencode/core/location"
+import { Job } from "@opencode/core/job"
 import { LocationActivity } from "@opencode/core/location-activity"
 import { LocationServiceMap } from "@opencode/core/location-services"
 import { Plugin } from "@opencode/core/plugin"
@@ -31,7 +32,7 @@ const it = testEffect(
         makeGlobalNode({
           service: LocationActivity.Service,
           layer: LocationActivity.layer({ timeToLive: "2 seconds", sweepInterval: "100 millis" }),
-          deps: [Bus.node, LocationServiceMap.node, SessionExecution.node, SessionStore.node],
+          deps: [Bus.node, Job.node, LocationServiceMap.node, SessionExecution.node, SessionStore.node],
         }),
       ),
     ],

@@ -8,6 +8,7 @@ import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Bus } from "@opencode/core/bus"
 import { Database } from "@opencode/core/database/database"
 import { Form } from "@opencode/core/form"
+import { Job } from "@opencode/core/job"
 import { Location } from "@opencode/core/location"
 import { LocationActivity } from "@opencode/core/location-activity"
 import { LocationServiceMap, type LocationServices } from "@opencode/core/location-services"
@@ -84,6 +85,7 @@ const it = testEffect(
     LayerNode.group([
       Database.node,
       Bus.node,
+      Job.node,
       SessionStore.node,
       LocationServiceMap.node,
       SessionExecution.node,
@@ -219,4 +221,59 @@ describe("LocationActivity eviction", () => {
         }),
     )
   }
+
+  it.effect("keeps a location with a running background job until the job finishes", () =>
+    Effect.gen(function* () {
+      const db = (yield* Database.Service).db
+      const bus = yield* Bus.Service
+      const map = yield* LocationServiceMap.Service
+      const jobs = yield* Job.Service
+      const sessionID = Session.ID.make("ses_background_job")
+      const ref = LocationServiceMap.canonical({ directory: AbsolutePath.make("/project") })
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: ref.directory, sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "background",
+          directory: ref.directory,
+          title: "Background job",
+          version: "test",
+        })
+        .run()
+        .pipe(Effect.orDie)
+      const interrupted: unknown[] = []
+      const unsubscribe = yield* bus.listen((event) =>
+        Effect.sync(() => {
+          if (event.type === SessionEvent.Execution.Interrupted.type) interrupted.push(event.data)
+        }),
+      )
+      yield* Effect.addFinalizer(() => unsubscribe)
+      yield* Location.Service.pipe(Effect.provide(map.get(ref)), Effect.scoped)
+      const finish = yield* Deferred.make<string>()
+      const job = yield* jobs.start({
+        id: "shell_background",
+        type: "shell",
+        recovery: { kind: "shell", sessionID, shellID: "shell_background", command: "sleep 9999" },
+        run: Deferred.await(finish),
+      })
+      yield* jobs.background(job.id)
+
+      yield* TestClock.adjust("1 minute")
+      yield* TestClock.adjust("62 minutes")
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([ref])
+      expect(interrupted).toEqual([])
+      expect((yield* jobs.get(job.id))?.status).toBe("running")
+
+      yield* Deferred.succeed(finish, "done")
+      yield* jobs.wait({ id: job.id })
+      yield* TestClock.adjust("62 minutes")
+      expect(Array.from(yield* RcMap.keys(map.rcMap))).toEqual([])
+    }),
+  )
 })

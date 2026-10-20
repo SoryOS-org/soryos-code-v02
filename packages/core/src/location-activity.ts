@@ -2,6 +2,7 @@ export * as LocationActivity from "./location-activity.js"
 
 import { Clock, Context, Duration, Effect, Layer, RcMap, Schema } from "effect"
 import { Bus } from "./bus.js"
+import { Job } from "./job.js"
 import { Location } from "./location.js"
 import { LocationServiceMap } from "./location-service-map.js"
 import { SessionEvent } from "./session/event.js"
@@ -21,6 +22,7 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
       const bus = yield* Bus.Service
       const locations = yield* LocationServiceMap.Service
       const execution = yield* SessionExecution.Service
+      const jobs = yield* Job.Service
       const sessions = yield* SessionStore.Service
       const timeToLive = Duration.toMillis(options.timeToLive ?? "60 minutes")
       const entries = new Map<string, { readonly ref: Location.Ref; expiresAt: number }>()
@@ -51,10 +53,18 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
         const expired = Array.from(entries.values()).filter((entry) => entry.expiresAt <= now)
         if (expired.length === 0) return
         const active = yield* Effect.forEach(yield* execution.active, (sessionID) => sessions.get(sessionID))
+        const background = yield* Effect.forEach(yield* jobs.runningBackground, (recovery) =>
+          sessions.get(recovery.kind === "shell" ? recovery.sessionID : recovery.parentSessionID),
+        )
         yield* Effect.forEach(
           expired,
           (entry) =>
             Effect.gen(function* () {
+              // Background jobs report no durable activity while they run; keep their graph until they finish.
+              if (background.some((session) => session && key(session.location) === key(entry.ref))) {
+                yield* touch(entry.ref)
+                return
+              }
               const owners = active.flatMap((session) =>
                 session && key(session.location) === key(entry.ref) ? [session] : [],
               )
@@ -92,5 +102,5 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
 export const node = makeGlobalNode({
   service: Service,
   layer: layer(),
-  deps: [Bus.node, LocationServiceMap.node, SessionExecution.node, SessionStore.node],
+  deps: [Bus.node, Job.node, LocationServiceMap.node, SessionExecution.node, SessionStore.node],
 })
