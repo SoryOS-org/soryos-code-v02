@@ -384,6 +384,13 @@ export function CurrentUserMessageDisplay(props: {
       data-pending={waiting() ? "true" : undefined}
       data-timeline-part-id={props.text ? `${props.message.id}:text:0` : undefined}
     >
+      <Show when={waiting()}>
+        <div data-slot="user-message-pending" role="img" aria-label={i18n.t("ui.message.pending")}>
+          <Tooltip appearance="compact" value={i18n.t("ui.message.pending")} placement="top" gutter={4}>
+            <Icon name="outline-steer" size="small" />
+          </Tooltip>
+        </div>
+      </Show>
       {renderAttachments()}
       <Show
         when={props.text}
@@ -397,7 +404,7 @@ export function CurrentUserMessageDisplay(props: {
           <Show when={props.voice}>
             <div data-slot="user-message-voice" role="img" aria-label={i18n.t("ui.message.voice")}>
               <Tooltip appearance="compact" value={i18n.t("ui.message.voice")} placement="top" gutter={4}>
-                <Icon name="waveform" size="small" />
+                <Icon name="outline-wave-audio" size="small" />
               </Tooltip>
             </div>
           </Show>

@@ -1,5 +1,68 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("badges pending steers without marking delivered, starting, or queued prompts", async ({ mount }) => {
+  const timeline = await mount("current-prompt-message--pending")
+  const badge = timeline.getByRole("img", { name: "Pending", exact: true })
+  const text = timeline.locator('[data-slot="user-message-text"]')
+
+  for (const status of ["steering", "stranded", "starting", "queued", "delivered"]) {
+    await timeline.getByLabel("Delivery state").selectOption(status)
+    const pending = status === "steering" || status === "stranded"
+    await expect(badge).toHaveCount(pending ? 1 : 0)
+
+    const colors = await timeline.evaluate((element, pending) => {
+      const probe = document.createElement("span")
+      probe.style.color = `var(--v2-text-text-${pending ? "muted" : "base"})`
+      probe.style.backgroundColor = `var(--v2-background-bg-layer-${pending ? "01" : "02"})`
+      element.append(probe)
+      const result = { color: getComputedStyle(probe).color, background: getComputedStyle(probe).backgroundColor }
+      probe.remove()
+
+      return result
+    }, pending)
+
+    await expect(text).toHaveCSS("color", colors.color)
+    await expect(text).toHaveCSS("background-color", colors.background)
+  }
+
+  await timeline.getByLabel("Delivery state").selectOption("steering")
+  await timeline.getByLabel("Voice message", { exact: true }).check()
+  const voice = timeline.getByRole("img", { name: "Voice", exact: true })
+  await expect(voice).toBeVisible()
+  await expect(badge).toBeVisible()
+
+  await expect(voice.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-wave-audio")
+  await expect(badge.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
+
+  for (const marker of [voice, badge]) {
+    await expect(marker).toHaveCSS("width", "20px")
+    await expect(marker).toHaveCSS("height", "20px")
+    await expect(marker.locator('[data-slot="icon-svg"]')).toHaveCSS("width", "14px")
+    await expect(marker.locator('[data-slot="icon-svg"]')).toHaveCSS("height", "14px")
+  }
+
+  const badgeColors = await badge.evaluate((element) => {
+    const probe = document.createElement("span")
+    probe.style.color = "var(--v2-icon-icon-muted)"
+    probe.style.backgroundColor = "var(--v2-background-bg-layer-02)"
+    element.append(probe)
+    const colors = { color: getComputedStyle(probe).color, background: getComputedStyle(probe).backgroundColor }
+    probe.remove()
+
+    return colors
+  })
+
+  await expect(badge).toHaveCSS("color", badgeColors.color)
+  await expect(badge).toHaveCSS("background-color", badgeColors.background)
+  const boxes = await Promise.all([voice.boundingBox(), badge.boundingBox()])
+  expect(boxes[0]!.x + boxes[0]!.width).toBeLessThanOrEqual(boxes[1]!.x)
+  await timeline.getByLabel("Prompt text", { exact: true }).uncheck()
+  await expect(timeline.getByText("notes.json", { exact: true })).toBeVisible()
+  await expect(badge).toBeVisible()
+  await timeline.getByRole("button", { name: "Move to queue", exact: true }).click()
+  await expect(badge).toHaveCount(0)
+})
+
 // Moved from packages/app/e2e/regression/session-timeline-collapse-state.spec.ts
 story("keeps a manually collapsed tool collapsed when later assistant content streams", async ({ mount }) => {
   const timeline = await mount("current-session-file-changes--changing-files", { args: { scenario: "streaming" } })
@@ -79,6 +142,25 @@ story("renders user image, file attachment, file reference, and agent reference"
   await expect(timeline.getByText("tsconfig.json")).toBeVisible()
   await expect(timeline.getByText("@src/a.ts", { exact: true })).toBeVisible()
   await expect(timeline.getByText("@explore", { exact: true })).toBeVisible()
+
+  const accent = await timeline.evaluate((element) => {
+    const probe = document.createElement("span")
+    probe.style.color = "var(--v2-text-text-accent)"
+    element.append(probe)
+    const color = getComputedStyle(probe).color
+    probe.remove()
+
+    return color
+  })
+
+  for (const mention of await timeline.locator("[data-highlight]").all()) {
+    await expect(mention).toHaveCSS("color", accent)
+    await expect(mention).toHaveCSS("font-weight", "440")
+  }
+
+  for (const prefix of await timeline.locator('[data-slot="user-message-mention-prefix"]').all()) {
+    await expect(prefix).toHaveCSS("color", accent)
+  }
 
   const attachments = timeline.locator('[data-slot="user-message-attachments"]')
   const body = timeline.locator('[data-slot="user-message-body"]')

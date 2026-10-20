@@ -139,7 +139,8 @@
     margin-top: 8px;
   }
 
-  [data-slot="user-message-voice"] {
+  [data-slot="user-message-voice"],
+  [data-slot="user-message-pending"] {
     position: absolute;
     top: -8px;
     inset-inline-start: -8px;
@@ -149,7 +150,6 @@
     border-radius: 9999px;
     background: var(--v2-background-bg-layer-03);
     box-shadow: 0 0 0 2px var(--v2-background-bg-base);
-    color: var(--v2-icon-icon-muted);
 
     [data-component="tooltip-v2-trigger"] {
       width: 100%;
@@ -160,8 +160,27 @@
     }
 
     [data-slot="icon-svg"] {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  [data-slot="user-message-voice"] {
+    color: var(--v2-icon-icon-muted);
+  }
+
+  [data-slot="user-message-pending"] {
+    color: var(--v2-icon-icon-muted);
+    background: var(--v2-background-bg-layer-02);
+  }
+
+  &[data-pending] {
+    position: relative;
+    margin-block-start: 8px;
+
+    [data-slot="user-message-pending"] {
+      inset-inline-start: auto;
+      inset-inline-end: -8px;
     }
   }
 
@@ -185,14 +204,14 @@
 
     [data-highlight="file"],
     [data-highlight="agent"] {
-      color: inherit;
-      font-weight: 600;
+      color: var(--v2-text-text-accent);
+      font-weight: 440;
       direction: ltr;
       unicode-bidi: isolate;
     }
 
     [data-slot="user-message-mention-prefix"] {
-      color: var(--v2-blue-500);
+      color: var(--v2-text-text-accent);
     }
 
     [data-slot="user-message-link"] {
@@ -1477,8 +1496,8 @@
   font-weight: 440;
 
   [data-slot="user-message-text"] {
-    background: var(--v2-blue-1200);
-    color: var(--v2-blue-300);
+    background: var(--v2-background-bg-layer-02);
+    color: var(--v2-text-text-base);
   }
 
   [data-slot="user-message-comments"] {
@@ -1519,19 +1538,10 @@
   }
 }
 
-:root[data-color-scheme="light"] body [data-component="user-message"] [data-slot="user-message-text"] {
-  background: var(--v2-blue-100);
-  color: var(--v2-blue-700);
-}
-
 /* Only delivery animates. A steer can render once before its admission marks it pending, and must not fade from the
    delivered color. */
 :root body [data-component="user-message"][data-pending] [data-slot="user-message-text"] {
-  background: var(--v2-background-bg-layer-02);
-  color: var(--v2-text-text-base);
+  background: var(--v2-background-bg-layer-01);
+  color: var(--v2-text-text-muted);
   transition: none;
-
-  [data-slot="user-message-mention-prefix"] {
-    color: currentColor;
-  }
 }
