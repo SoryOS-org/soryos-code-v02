@@ -170,7 +170,7 @@ test("focuses the terminal opened from the command palette", async ({ page }) =>
   await editor.click()
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const palette = page.getByRole("dialog")
-  const search = palette.getByRole("textbox")
+  const search = palette.getByRole("combobox")
   await expect(search).toBeFocused()
   await search.fill("Toggle terminal")
   await expect(palette.getByRole("option", { name: /^Toggle terminal/ })).toHaveAttribute("aria-selected", "true")

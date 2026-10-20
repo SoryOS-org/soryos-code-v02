@@ -29,7 +29,7 @@ export async function openCommandPalette(page: Page, home = false) {
   const mock = await openPaletteWorkspace(page, home)
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")
-  const input = dialog.getByRole("textbox")
+  const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
   await expect(dialog.getByRole("option")).not.toHaveCount(0)
 

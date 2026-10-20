@@ -11,6 +11,7 @@ import {
 } from "@opencode/ui/project-avatar"
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { TextInput } from "@opencode/ui/text-input"
+import { createTypeahead } from "@opencode/ui/typeahead"
 import { getFilename } from "@opencode/util/path"
 import { createEffect, createMemo, createResource, For, type JSX, Match, onCleanup, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -70,7 +71,6 @@ function NewSessionLocationDialog(props: {
     /** Picking the server to add a project to. */
     picking?: boolean
     query: string
-    active?: string
     /** The projects view to restore when stepping back out of a project or the server step. */
     back?: { query: string; active: string }
   }>({ query: "" })
@@ -177,8 +177,14 @@ function NewSessionLocationDialog(props: {
 
   const choosesServer = () => props.project.servers().length > 1
 
-  // Every step opens on its first row; the user's choice wins until the results change.
-  const activeEntry = createMemo(() => entries().find((entry) => entry.id === store.active) ?? entries()[0])
+  // Every step opens on its first row; the user's choice holds while it stays in the results.
+  const typeahead = createTypeahead<LocationEntry>({
+    items: entries,
+    key: (entry) => entry.id,
+    onSelect: choose,
+  })
+
+  const activeEntry = typeahead.activeItem
 
   let resultsRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
@@ -200,28 +206,19 @@ function NewSessionLocationDialog(props: {
   }
 
   function drill(project: PromptProject) {
-    setStore({
-      drilled: project,
-      query: "",
-      active: undefined,
-      back: { query: store.query, active: projectEntryID(project) },
-    })
+    setStore({ drilled: project, query: "", back: { query: store.query, active: projectEntryID(project) } })
     inputRef?.focus()
   }
 
   function pick() {
-    setStore({ picking: true, query: "", active: undefined, back: { query: store.query, active: "add" } })
+    setStore({ picking: true, query: "", back: { query: store.query, active: "add" } })
     inputRef?.focus()
   }
 
   function back() {
-    setStore({
-      drilled: undefined,
-      picking: undefined,
-      query: store.back?.query ?? "",
-      active: store.back?.active,
-      back: undefined,
-    })
+    const active = store.back?.active
+    setStore({ drilled: undefined, picking: undefined, query: store.back?.query ?? "", back: undefined })
+    typeahead.setActive(active)
     inputRef?.focus()
   }
 
@@ -266,33 +263,11 @@ function NewSessionLocationDialog(props: {
     dialog.close()
   }
 
-  const move = (delta: -1 | 1) => {
-    const list = entries()
-
-    if (list.length === 0) return
-    const index = list.findIndex((entry) => entry.id === activeEntry()?.id)
-    setStore("active", list[(index + delta + list.length) % list.length].id)
-  }
-
   const handleKeyDown = (event: KeyboardEvent) => {
     const target = event.currentTarget as HTMLInputElement
     const atEnd = target.selectionStart === target.value.length && target.selectionEnd === target.value.length
     const atStart = target.selectionStart === 0 && target.selectionEnd === 0
     const active = activeEntry()
-
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault()
-      move(event.key === "ArrowDown" ? 1 : -1)
-
-      return
-    }
-
-    if (event.key === "Enter" && !event.isComposing) {
-      event.preventDefault()
-      choose(active)
-
-      return
-    }
 
     if (event.key === "ArrowRight" && atEnd && active?.type === "project" && drillable(active.project)) {
       event.preventDefault()
@@ -314,7 +289,11 @@ function NewSessionLocationDialog(props: {
     ) {
       event.preventDefault()
       back()
+
+      return
     }
+
+    typeahead.onKeyDown(event)
   }
 
   return (
@@ -354,17 +333,22 @@ function NewSessionLocationDialog(props: {
                 </Match>
               </Switch>
             }
-            onInput={(event) => setStore({ query: event.currentTarget.value, active: undefined })}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={typeahead.listID}
+            aria-activedescendant={typeahead.activeID()}
+            onInput={(event) => setStore("query", event.currentTarget.value)}
             onKeyDown={handleKeyDown}
           />
         </div>
         <ScrollView class="command-palette-scroll" viewportRef={(el) => (resultsRef = el)}>
-          <div class="command-palette-results" role="listbox">
+          <div id={typeahead.listID} class="command-palette-results" role="listbox">
             <Show
               when={entries().length > 0}
               fallback={
-                <div class="command-palette-state">
-                  {store.drilled && listed.loading ? language.t("common.loading") : language.t("palette.empty")}
+                // The worktree list may still be loading; hold the row's height without flashing a label.
+                <div class="command-palette-state" classList={{ invisible: !!store.drilled && listed.loading }}>
+                  {language.t("palette.empty")}
                 </div>
               }
             >
@@ -374,6 +358,7 @@ function NewSessionLocationDialog(props: {
                   {(entry) => (
                     <button
                       type="button"
+                      id={typeahead.optionID(entry)}
                       class="command-palette-row"
                       role="option"
                       aria-selected={activeEntry()?.id === entry.id}
@@ -381,7 +366,7 @@ function NewSessionLocationDialog(props: {
                       onMouseMove={(event) => {
                         // Ignore hover from a static cursor when keyboard scrolling moves rows underneath it.
                         if (event.movementX === 0 && event.movementY === 0) return
-                        setStore("active", entry.id)
+                        typeahead.setActive(entry.id)
                       }}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => choose(entry)}

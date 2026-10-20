@@ -57,7 +57,7 @@ test("titlebar search lists recent sessions and opens the typed match", async ({
   await openPaletteWorkspace(page, true)
   await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
   const dialog = page.getByRole("dialog")
-  const input = dialog.getByRole("textbox")
+  const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
   await expect(input).toHaveAttribute("placeholder", "Search sessions")
   await expect(dialog.getByText("Recent sessions", { exact: true })).toBeVisible()
@@ -78,7 +78,7 @@ test("reopens from its shortcut as soon as it closes", async ({ page }) => {
   await expect(dialog).toHaveCount(0)
   // A closed dialog stops blocking shortcuts when it leaves the screen, not when it is disposed afterwards.
   await page.keyboard.press("ControlOrMeta+Shift+P")
-  await expect(dialog.getByRole("textbox")).toBeFocused()
+  await expect(dialog.getByRole("combobox")).toBeFocused()
 })
 
 test("appends search results without resetting the selected command", async ({ page }) => {
@@ -224,11 +224,11 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await expect(editor).toBeFocused()
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")
-  await expect(dialog.getByRole("textbox")).toBeFocused()
-  await expect(dialog.getByRole("textbox")).toHaveAttribute("placeholder", "Search files, commands, and sessions")
-  await dialog.getByRole("textbox").fill("copy session")
+  await expect(dialog.getByRole("combobox")).toBeFocused()
+  await expect(dialog.getByRole("combobox")).toHaveAttribute("placeholder", "Search files, commands, and sessions")
+  await dialog.getByRole("combobox").fill("copy session")
   await expect(dialog.getByRole("option", { name: "Copy Session ID", exact: true })).toHaveCount(0)
-  await dialog.getByRole("textbox").press("Escape")
+  await dialog.getByRole("combobox").press("Escape")
   await expect(dialog).toHaveCount(0)
   const tabs = page.locator("[data-titlebar-tab-link]")
   await tabs.filter({ hasText: paletteSession.title }).click()
@@ -255,8 +255,8 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await tabs.filter({ hasText: paletteSession.title }).click()
   await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
   await page.keyboard.press("ControlOrMeta+Shift+P")
-  await expect(dialog.getByRole("textbox")).toBeFocused()
-  await dialog.getByRole("textbox").fill("copy session")
+  await expect(dialog.getByRole("combobox")).toBeFocused()
+  await dialog.getByRole("combobox").fill("copy session")
   await expect(dialog.getByRole("option", { name: "Copy Session ID", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -271,7 +271,7 @@ test("keeps matching session and file results steady across keystrokes while sea
   const mac = await page.evaluate(() => /(Mac|iPod|iPhone|iPad)/.test(navigator.platform))
   await page.keyboard.press(mac ? "Meta+Shift+P" : "Control+Shift+P")
   const dialog = page.getByRole("dialog")
-  const input = dialog.getByRole("textbox")
+  const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
   const sessionOption = dialog.getByRole("option", { name: /Palette fixture session/ })
   const matchingFile = dialog.getByRole("option", { name: "packages/desktop/ palette.ts", exact: true })

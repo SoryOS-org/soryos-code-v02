@@ -307,7 +307,7 @@ test("a narrow-screen palette pick keeps the view, and the side region shows the
   await expect(terminal.locator("textarea")).toBeEditable()
   await page.keyboard.press("ControlOrMeta+p")
   const dialog = page.getByRole("dialog")
-  await dialog.getByRole("textbox").fill("README")
+  await dialog.getByRole("combobox").fill("README")
   await dialog.getByRole("option", { name: "/ README.md", exact: true }).click()
   await expect(dialog).toHaveCount(0)
   await expect(tabs.getByRole("tab", { selected: true })).toHaveText("More...")

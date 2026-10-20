@@ -5,6 +5,7 @@ import { Dialog, DialogBody } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
 import { TextInput } from "@opencode/ui/text-input"
+import { createTypeahead } from "@opencode/ui/typeahead"
 import { createEffect, createMemo, For, Match, onCleanup, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 import { formatKeybindParts } from "@/shell/commands/command"
@@ -65,7 +66,7 @@ export function CommandPaletteView(props: {
 }) {
   const language = useLanguage()
   const tabs = useTabs()
-  const [store, setStore] = createStore<{ query: string; active?: string }>({ query: "" })
+  const [store, setStore] = createStore({ query: "" })
 
   const search = createCommandPaletteSearch({ query: () => store.query, items: props.items, sources: props.sources })
   const visibleEntries = search.items
@@ -78,9 +79,14 @@ export function CommandPaletteView(props: {
   })
 
   // Follow the first result until the user explicitly chooses a row.
-  const activeEntry = createMemo(
-    () => visibleEntries().find((entry) => entry.id === store.active) ?? visibleEntries()[0],
-  )
+  const typeahead = createTypeahead<CommandPaletteEntry>({
+    items: visibleEntries,
+    key: (entry) => entry.id,
+    onSelect: props.select,
+    onClose: props.close,
+  })
+
+  const activeEntry = typeahead.activeItem
 
   const openSessions = createMemo(
     () => new Set(tabs.store.flatMap((tab) => (tab.type === "session" ? [`${tab.server}\0${tab.sessionId}`] : []))),
@@ -105,42 +111,6 @@ export function CommandPaletteView(props: {
     onCleanup(() => cancelAnimationFrame(frame))
   })
 
-  const move = (delta: -1 | 1) => {
-    const count = visibleEntries().length
-
-    if (count === 0) return
-    const index = visibleEntries().findIndex((entry) => entry.id === activeEntry()?.id)
-    setStore("active", visibleEntries()[(index + delta + count) % count].id)
-  }
-
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault()
-      move(1)
-
-      return
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault()
-      move(-1)
-
-      return
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault()
-      props.select(activeEntry())
-
-      return
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault()
-      props.close()
-    }
-  }
-
   return (
     <Dialog class="command-palette" size="large">
       <DialogBody class="command-palette-body">
@@ -153,19 +123,16 @@ export function CommandPaletteView(props: {
             appearance="large"
             placeholder={props.placeholder}
             leadingIcon={<Icon name="magnifying-glass" />}
-            onInput={(event) => {
-              const query = event.currentTarget.value
-              const active = store.active ? entryById().get(store.active) : undefined
-              setStore({
-                query,
-                active: active && matchesCommandPaletteEntry(active, query) ? store.active : undefined,
-              })
-            }}
-            onKeyDown={handleKeyDown}
+            role="combobox"
+            aria-expanded="true"
+            aria-controls={typeahead.listID}
+            aria-activedescendant={typeahead.activeID()}
+            onInput={(event) => setStore("query", event.currentTarget.value)}
+            onKeyDown={typeahead.onKeyDown}
           />
         </div>
         <ScrollView class="command-palette-scroll" viewportRef={(el) => (resultsRef = el)}>
-          <div class="command-palette-results" role="listbox">
+          <div id={typeahead.listID} class="command-palette-results" role="listbox">
             <Show
               when={visibleEntries().length > 0}
               fallback={
@@ -202,6 +169,7 @@ export function CommandPaletteView(props: {
 
                           return (
                             <PaletteRow
+                              id={typeahead.optionID(item())}
                               item={item()}
                               active={activeEntry()?.id === id}
                               language={language}
@@ -210,7 +178,7 @@ export function CommandPaletteView(props: {
                                   ? openSessions().has(`${item().server}\0${item().sessionID}`)
                                   : false
                               }
-                              onActive={() => setStore("active", id)}
+                              onActive={() => typeahead.setActive(id)}
                               onSelect={() => props.select(item())}
                             />
                           )
@@ -229,6 +197,7 @@ export function CommandPaletteView(props: {
 }
 
 function PaletteRow(props: {
+  id: string
   item: CommandPaletteEntry
   active: boolean
   language: ReturnType<typeof useLanguage>
@@ -243,6 +212,7 @@ function PaletteRow(props: {
 
   return (
     <button
+      id={props.id}
       type="button"
       class="command-palette-row group"
       role="option"
