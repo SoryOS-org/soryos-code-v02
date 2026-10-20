@@ -85,7 +85,7 @@ Each key has a permission level, chosen under **Permissions** when you create it
 | **Read only**  | Read access to every resource. The key can list models but not call them.            |
 
 A key never does more than whoever it acts as. A personal key is capped by the member's current role, and a service
-account key by what [service accounts can do](#what-keys-cant-do).
+account key by what [service accounts can do](#limitations).
 
 ### Restricted keys
 
@@ -123,24 +123,21 @@ Keys created as **Inference only** before scoped permissions show as **Restricte
   match.
 - **Service account keys** default to **All**. Owners and admins choose their permissions.
 
-### Keys that create keys
+### Limitations
 
-- **This account's API keys** is only available on service account keys, and **All** doesn't include it.
-- A key with it can create and revoke keys for its own service account only. New keys must be **Restricted**, stay
-  within the creating key's permissions, and can't include **This account's API keys**.
-- Personal keys can never get this permission, and no API key can create or revoke personal API keys.
-
-### What keys can't do
-
-Some actions always need a person signed in to the Console.
+Some actions always need a person signed in to the Console, and creating keys with a key is tightly limited.
 
 - No API key can change SSO settings or delete the workspace.
 - Service account keys can't invite members, change roles, remove members, manage billing, change workspace settings,
   manage models, or create or remove service accounts, even with **All**.
+- **This account's API keys** is only available on service account keys, and **All** doesn't include it. A key with it
+  can create and revoke keys for its own service account only. New keys must be **Restricted**, stay within the
+  creating key's permissions, and can't include **This account's API keys**.
+- Personal keys can never get **This account's API keys**, and no API key can create or revoke personal API keys.
 
 Requests outside a key's permissions return HTTP `403`.
 
-## Revoke keys
+## Revocation
 
 | Key                 | Who can revoke it      | Where                                                                             |
 | ------------------- | ---------------------- | --------------------------------------------------------------------------------- |
