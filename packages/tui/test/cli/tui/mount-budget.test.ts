@@ -15,7 +15,7 @@ function group(size: number, path: readonly GroupKind[] = ["exploration"]): Sess
     () => path,
   )
   if (node.type !== "group") throw new Error("Expected group")
-  return node.kind === "reasoning" || node.kind === "instructions"
+  return node.kind === "reasoning" || node.kind === "instructions" || node.kind === "harness"
     ? { ...node, kind: node.kind, completed: true }
     : { ...node, kind: node.kind, pending: [], completed: true }
 }

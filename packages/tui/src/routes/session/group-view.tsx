@@ -54,6 +54,9 @@ function Group(props: GroupProps) {
           <Match when={kind === "instructions"}>
             <InstructionsGroup {...props} />
           </Match>
+          <Match when={kind === "harness"}>
+            <HarnessGroup {...props} />
+          </Match>
         </Switch>
       )}
     </Show>
@@ -259,6 +262,56 @@ function InstructionsGroup(props: GroupProps) {
       </InlineToolRow>
       <Show when={disclosure.expanded()}>
         <Children {...props} nodes={props.node.children} mode="normal" />
+      </Show>
+    </GroupAnchor>
+  )
+}
+
+/** A routed CLI run: one compact Working row with commands, thoughts, and files beneath it. */
+function HarnessGroup(props: GroupProps) {
+  const theme = useTheme()
+  const disclosure = useDisclosure(props)
+  const [hover, setHover] = createSignal(false)
+  const traces = createMemo(() =>
+    descendants(props.node).flatMap((entry) => {
+      if (entry.type !== "message") return []
+      const message = props.message(entry.messageID)
+      return message?.type === "synthetic" && message.metadata?.source === "harness-trace" ? [message] : []
+    }),
+  )
+  const label = createMemo(() => {
+    if (!props.completed) return "Working"
+    const counts = traces().reduce<Record<string, number>>((result, message) => {
+      const event = typeof message.metadata?.event === "string" ? message.metadata.event : "activity"
+      result[event] = (result[event] ?? 0) + 1
+      return result
+    }, {})
+    const items = [
+      counts.command && `${counts.command} ${counts.command === 1 ? "command" : "commands"}`,
+      counts.reasoning && `${counts.reasoning} ${counts.reasoning === 1 ? "thought" : "thoughts"}`,
+      counts.file && `${counts.file} file ${counts.file === 1 ? "change" : "changes"}`,
+      counts.tool && `${counts.tool} ${counts.tool === 1 ? "tool" : "tools"}`,
+    ].filter(Boolean)
+    return items.length ? `Worked · ${items.join(", ")}` : "Worked"
+  })
+  return (
+    <GroupAnchor groupID={disclosure.id()} active={traces().length > 0}>
+      <InlineToolRow
+        icon={disclosure.expanded() ? "−" : "+"}
+        color={hover() ? theme.text.base : theme.text.muted}
+        complete={props.completed}
+        pending="Working"
+        spinner={!props.completed}
+        onMouseOver={() => setHover(true)}
+        onMouseOut={() => setHover(false)}
+        onMouseUp={(event) => disclosure.toggle(event.currentTarget)}
+      >
+        {label()}
+      </InlineToolRow>
+      <Show when={disclosure.expanded()}>
+        <box flexDirection="column" gap={1} marginTop={1}>
+          <Children {...props} nodes={props.node.children} mode="normal" />
+        </box>
       </Show>
     </GroupAnchor>
   )

@@ -39,6 +39,7 @@ npx --yes bun@1.4.2 run packages/cli/script/build.ts \
 
 cp packages/cli/dist-ecode/cli-darwin-arm64/bin/opencode ~/.local/bin/ecode
 chmod 755 ~/.local/bin/ecode
+codesign --force --sign - --timestamp=none ~/.local/bin/ecode
 ```
 
 The source-level runner is also available from the repository root with `npx --yes bun@1.4.2 run ecode`.

@@ -18,14 +18,14 @@ export type SessionEntry =
   | { type: "assistant-footer"; messageID: string }
   | { type: "turn-usage"; messageIDs: string[]; previousCache?: CacheUsage }
 
-export type GroupKind = "activity" | "reasoning" | "exploration" | "instructions"
+export type GroupKind = "activity" | "reasoning" | "exploration" | "instructions" | "harness"
 export type SessionNode = GroupNode<SessionEntry, GroupKind>
 export type SessionGroup = {
   type: "group"
   children: readonly GroupNode<SessionEntry, GroupKind>[]
   size: number
   completed: boolean
-} & ({ kind: "reasoning" | "instructions" } | { kind: "exploration" | "activity"; pending: PartRef[] })
+} & ({ kind: "reasoning" | "instructions" | "harness" } | { kind: "exploration" | "activity"; pending: PartRef[] })
 
 /** Experimental transcript detail; undefined selects the default production rules. */
 export type Verbosity = "low" | "medium" | "high"
@@ -92,6 +92,7 @@ export function partPath(part: AppendPart, verbosity: Verbosity): readonly Group
 
 /** Instruction loads group; other messages stand alone. */
 export function messagePath(message: SessionMessageInfo, verbosity: Verbosity): readonly GroupKind[] {
+  if (message.type === "synthetic" && message.metadata?.source === "harness-trace") return ["harness"]
   if (instructionPaths(message).length === 0) return []
   return verbosity === "low" ? ["activity", "instructions"] : ["instructions"]
 }

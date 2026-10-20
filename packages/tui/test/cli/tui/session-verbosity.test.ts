@@ -49,6 +49,14 @@ const instruction = (id: string, paths: string[]): SessionMessageInfo => ({
   metadata: { instruction: { paths } },
   time: { created: 1 },
 })
+const harnessTrace = (id: string, event: string): SessionMessageInfo => ({
+  type: "synthetic",
+  id,
+  text: event,
+  description: event,
+  metadata: { source: "harness-trace", event },
+  time: { created: 1 },
+})
 
 test("reasoning and exploration group at every level; other tools stand alone", () => {
   for (const verbosity of ["medium", "high"] as const) {
@@ -132,6 +140,26 @@ test("medium hydration keeps production shape plus instruction groups", () => {
     "instructions:2",
     "part",
   ])
+})
+
+test("consecutive harness traces collapse beneath one Working group", () => {
+  const messages: SessionMessageInfo[] = [
+    { type: "synthetic", id: "prompt", text: "Fix it", description: "Fix it", metadata: { source: "harness-user" }, time: { created: 0 } },
+    harnessTrace("status", "status"),
+    harnessTrace("thought", "reasoning"),
+    harnessTrace("command", "command"),
+    { type: "synthetic", id: "result", text: "Done", description: "Done", metadata: { source: "harness" }, time: { created: 2 } },
+  ]
+  const rows = reduceSessionRows(messages)
+  expect(rows.map((row) => (row.type === "group" ? `${row.kind}:${row.size}` : row.type))).toEqual([
+    "message",
+    "harness:3",
+    "message",
+  ])
+  const group = rows[1]
+  if (group.type !== "group") throw new Error("Expected harness group")
+  expect(group.kind).toBe("harness")
+  expect(group.completed).toBe(true)
 })
 
 test("live appends under low merge into the open activity group", () => {

@@ -299,6 +299,25 @@ export function Session(props: {
     harnessTraceView.overrides[messageID] ?? harnessTraceView.all
   const setHarnessTracesExpanded = (expanded: boolean) =>
     setHarnessTraceView({ all: expanded, overrides: {} })
+  const harnessGroups = createMemo(() =>
+    rows.flatMap((row) => (row.type === "group" && row.kind === "harness" ? [row] : [])),
+  )
+  const harnessGroupsExpanded = createMemo(() => {
+    const groups = harnessGroups()
+    return (
+      groups.length > 0 &&
+      groups.every((group) => {
+        const id = groupID(group, 0)
+        return id ? groupExpanded(id, "harness") : false
+      })
+    )
+  })
+  const setHarnessGroupsExpanded = (expanded: boolean) => {
+    harnessGroups().forEach((group) => {
+      const id = groupID(group, 0)
+      if (id) sessionTabs.setGroupExpanded(sessionID, id, expanded)
+    })
+  }
   const [awayFromBottom, setAwayFromBottom] = createSignal(false)
   const [latestHovered, setLatestHovered] = createSignal(false)
   let ensureAllRowsPending: (() => void)[] | undefined
@@ -1078,12 +1097,12 @@ export function Session(props: {
       },
     },
     {
-      title: harnessTraceView.all ? "Collapse coding harness traces" : "Expand coding harness traces",
+      title: harnessGroupsExpanded() ? "Collapse coding harness traces" : "Expand coding harness traces",
       id: "session.toggle.harness_traces",
       group: "Session",
       run: () => {
-        const expanded = !harnessTraceView.all
-        setHarnessTracesExpanded(expanded)
+        const expanded = !harnessGroupsExpanded()
+        setHarnessGroupsExpanded(expanded)
         toast.show({
           message: expanded ? "Coding harness traces expanded" : "Coding harness traces collapsed",
           variant: "info",
