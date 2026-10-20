@@ -210,10 +210,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   const palette = await openCommandPalette(page, true)
   await palette.input.press("Escape")
   await expect(palette.dialog).toHaveCount(0)
-  await page
-    .getByRole("region", { name: "Recent sessions" })
-    .getByRole("button", { name: /Palette fixture session/ })
-    .click()
+  await page.locator('[data-slot="start-row"]').filter({ hasText: paletteSession.title }).click()
   const editor = page.locator('[data-component="composer-editor"]')
   await expect(editor).toBeEditable()
   await page.keyboard.press("ControlOrMeta+t")

@@ -150,7 +150,7 @@ test.describe("rename", () => {
     })
     await mockStressTimeline(page)
     await page.goto("/")
-    await page.locator('[data-component="home-session-row"]').filter({ hasText: fixture.expected.targetTitle }).click()
+    await page.locator('[data-slot="start-row"]').filter({ hasText: fixture.expected.targetTitle }).click()
     await expect(heading(page, fixture.expected.targetTitle)).toBeVisible()
   })
 
@@ -228,14 +228,12 @@ test.describe("rename", () => {
     await page.getByRole("menuitem", { name: "Close tab", exact: true }).click()
     await expect(renamed).toBeHidden()
     await page.getByRole("button", { name: "Home", exact: true }).click()
-    await expect(
-      page.locator('[data-component="home-session-row"]').filter({ hasText: "Renamed from tab" }),
-    ).toBeVisible()
+    await expect(page.locator('[data-slot="start-row"]').filter({ hasText: "Renamed from tab" })).toBeVisible()
   })
 
   test("renames an inactive tab without switching sessions", async ({ page }) => {
     await page.getByRole("button", { name: "Home", exact: true }).click()
-    await page.locator('[data-component="home-session-row"]').filter({ hasText: fixture.expected.sourceTitle }).click()
+    await page.locator('[data-slot="start-row"]').filter({ hasText: fixture.expected.sourceTitle }).click()
     await expect(heading(page, fixture.expected.sourceTitle)).toBeVisible()
     await tabs(page).filter({ hasText: fixture.expected.targetTitle }).click({ button: "right" })
     await page.getByRole("menuitem", { name: "Rename", exact: true }).click()

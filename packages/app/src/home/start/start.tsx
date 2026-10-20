@@ -2,16 +2,24 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
-import { displayName, getProjectAvatarSource, getProjectAvatarVariant, ProjectAvatar } from "@opencode/ui/project-avatar"
+import {
+  displayName,
+  getProjectAvatarSource,
+  getProjectAvatarVariant,
+  ProjectAvatar,
+} from "@opencode/ui/project-avatar"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { createEffect, createMemo, For, Match, Show, Switch, type JSX } from "solid-js"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { createEffect, createMemo, For, Match, Show, startTransition, Switch, type JSX } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
+import { useSettingsCommand } from "@/settings/command"
 import { useSettingsSurface } from "@/settings/surface"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCommand } from "@/shell/commands/command"
+import { useTabs } from "@/shell/tabs/tabs"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
 import { sessionTabTitle } from "@/shell/titlebar/tab-title"
 import type { InboxEntry } from "@/shell/titlebar/inbox-model"
@@ -22,6 +30,7 @@ type Language = ReturnType<typeof useLanguage>
 /** Home: a greeting, every session sorted by what it needs from you, and recent projects beside them. */
 export function StartHome() {
   const model = createStartModel()
+  useStartCommands()
 
   return (
     <div
@@ -46,12 +55,49 @@ export function StartHome() {
   )
 }
 
+/** Home's own palette lists commands and this computer's sessions; Settings opens from Home like from a session. */
+function useStartCommands() {
+  const command = useCommand()
+  const dialog = useDialog()
+  const global = useGlobal()
+  const language = useLanguage()
+  const servers = useServers()
+  const tabs = useTabs()
+
+  useSettingsCommand()
+  command.register("home.palette", () => [
+    {
+      id: "command.palette",
+      title: language.t("command.palette"),
+      hidden: true,
+      onSelect: async () => {
+        const conn = servers.visible.find((item) => servers.current(item)) ?? servers.visible[0]
+
+        if (!conn) return
+        const { HomeCommandPalette } = await import("./command-palette")
+        void dialog.show(() => (
+          <HomeCommandPalette
+            server={conn}
+            onSelectSession={(entry) => {
+              if (!entry.sessionID || !entry.directory || !entry.server) return
+              const sessionID = entry.sessionID
+              const server = entry.server
+              global.ensureServerCtx(conn).projects.touch(entry.project?.worktree ?? entry.directory)
+              void startTransition(() => {
+                tabs.select(tabs.addSessionTab({ server, sessionId: sessionID }))
+              })
+            }}
+          />
+        ))
+      },
+    },
+  ])
+}
+
 function StartGreeting(props: { model: StartModel }) {
   const language = useLanguage()
   const command = useCommand()
   const platform = usePlatform()
-  // `settings.open` is registered only by the session and new-session routes, so Home opens the surface directly.
-  const settings = useSettingsSurface()
   const groups = props.model.groups
   const hour = () => new Date(props.model.inbox.now()).getHours()
   const period = () => (hour() < 12 ? "morning" : hour() < 18 ? "afternoon" : "evening")
@@ -73,11 +119,19 @@ function StartGreeting(props: { model: StartModel }) {
 
   return (
     <div class="flex items-end justify-between gap-4 px-2">
+      {/* Both lines keep their height while they wait, so nothing below moves when they fill in. */}
       <div class="min-w-0">
-        <h1 class="truncate text-[20px] font-medium leading-7 text-v2-text-text-base">{greeting()}</h1>
-        <p class="truncate text-[13px] leading-5 text-v2-text-text-muted">
-          <Show when={summary().length > 0} fallback={language.t("start.caughtUp")}>
-            {summary().join(" · ")}
+        <h1
+          class="truncate text-[20px] font-medium leading-7 text-v2-text-text-base transition-opacity duration-200"
+          classList={{ "opacity-0": !props.model.greeted() }}
+        >
+          {greeting()}
+        </h1>
+        <p class="flex h-5 items-center truncate text-[13px] leading-5 text-v2-text-text-muted">
+          <Show when={!props.model.loading()} fallback={<Bar class="w-44" />}>
+            <Show when={summary().length > 0} fallback={language.t("start.caughtUp")}>
+              {summary().join(" · ")}
+            </Show>
           </Show>
         </p>
       </div>
@@ -107,7 +161,7 @@ function StartGreeting(props: { model: StartModel }) {
             size="large"
             aria-label={language.t("sidebar.settings")}
             icon={<Icon name="settings-gear" />}
-            onClick={() => settings.open()}
+            onClick={() => command.trigger("settings.open")}
           />
         </Tooltip>
         <Tooltip
@@ -154,7 +208,11 @@ function StartUnreachable(props: { model: StartModel }) {
                   { server: servers.label(conn) },
                 )}
               </span>
-              <Button size="small" variant="ghost-muted" onClick={() => settings.openServers(ServerConnection.key(conn))}>
+              <Button
+                size="small"
+                variant="ghost-muted"
+                onClick={() => settings.openServers(ServerConnection.key(conn))}
+              >
                 {language.t("start.server.manage")}
               </Button>
             </div>
@@ -175,37 +233,71 @@ function StartSections(props: { model: StartModel }) {
   )
 
   return (
-    <div class="flex flex-col gap-6">
-      <Show when={groups().needs.length > 0} fallback={<InboxZero />}>
-        <Section title={language.t("start.section.needsYou")} count={groups().needs.length} icon="warning">
-          <For each={groups().needs}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
-        </Section>
-      </Show>
-      <Show when={groups().done.length > 0}>
-        <Section
-          title={language.t("start.section.done")}
-          count={groups().done.length}
-          icon="circle-check"
-          action={
-            <Button size="small" variant="ghost-muted" onClick={props.model.markAllViewed}>
-              {language.t("start.markAllRead")}
-            </Button>
-          }
-        >
-          <For each={groups().done}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
-        </Section>
-      </Show>
-      <Show when={groups().working.length > 0}>
-        <Section title={language.t("start.section.running")} count={groups().working.length} icon="status-active">
-          <For each={groups().working}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
-        </Section>
-      </Show>
-      <Show when={groups().earlier.length > 0}>
-        <Section title={language.t("start.section.earlier")} icon="reset">
-          <For each={groups().earlier}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
-        </Section>
-      </Show>
+    <Show when={!props.model.loading()} fallback={<Skeleton />}>
+      <div class="flex flex-col gap-6">
+        <Show when={groups().needs.length > 0} fallback={<InboxZero />}>
+          <Section title={language.t("start.section.needsYou")} count={groups().needs.length} icon="warning">
+            <For each={groups().needs}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
+          </Section>
+        </Show>
+        <Show when={groups().done.length > 0}>
+          <Section
+            title={language.t("start.section.done")}
+            count={groups().done.length}
+            icon="circle-check"
+            action={
+              <Button size="small" variant="ghost-muted" onClick={props.model.markAllViewed}>
+                {language.t("start.markAllRead")}
+              </Button>
+            }
+          >
+            <For each={groups().done}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
+          </Section>
+        </Show>
+        <Show when={groups().working.length > 0}>
+          <Section title={language.t("start.section.running")} count={groups().working.length} icon="status-active">
+            <For each={groups().working}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
+          </Section>
+        </Show>
+        <Show when={groups().earlier.length > 0}>
+          <Section title={language.t("start.section.earlier")} icon="reset">
+            <For each={groups().earlier}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
+          </Section>
+        </Show>
+      </div>
+    </Show>
+  )
+}
+
+/** Row-shaped placeholders while the first load settles; claiming inbox zero before then would be wrong. */
+function Skeleton() {
+  return (
+    <div class="flex flex-col gap-1" aria-hidden="true">
+      <div class="flex h-7 items-center gap-3 px-2">
+        <span class="size-4 shrink-0" />
+        <Bar class="w-20" />
+      </div>
+      <For each={[56, 44, 64, 38]}>
+        {(width) => (
+          <div class="flex h-12 items-center gap-3 px-2">
+            <span class="size-4 shrink-0 animate-pulse rounded-[4px] bg-v2-background-bg-layer-03" />
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Bar style={{ width: `${width}%` }} />
+              <Bar class="w-28" />
+            </div>
+          </div>
+        )}
+      </For>
     </div>
+  )
+}
+
+function Bar(props: { class?: string; style?: JSX.CSSProperties }) {
+  return (
+    <span
+      class={`block h-2.5 max-w-full animate-pulse rounded-full bg-v2-background-bg-layer-03 ${props.class ?? ""}`}
+      style={props.style}
+    />
   )
 }
 
@@ -222,7 +314,11 @@ function StartProjects(props: { model: StartModel }) {
           <div class="flex flex-col gap-1">
             <div class="flex h-7 items-center gap-1.5 px-2 text-[12px] leading-4 font-medium text-v2-text-text-muted">
               <Show when={several()} fallback={language.t("start.projects")}>
-                <Icon name={servers.current(server.conn) ? "monitor" : "server"} size="small" class="shrink-0 text-v2-icon-icon-faint" />
+                <Icon
+                  name={servers.current(server.conn) ? "monitor" : "server"}
+                  size="small"
+                  class="shrink-0 text-v2-icon-icon-faint"
+                />
                 <span class="min-w-0 truncate">{servers.label(server.conn)}</span>
               </Show>
               <Show when={!several() && index() === 0 && servers.tag(server.conn)}>
@@ -245,7 +341,11 @@ function ProjectList(props: { model: StartModel; server: StartServer }) {
 
     return new Set(names.filter((name, index) => names.indexOf(name) !== index))
   })
-  const parent = (worktree: string) => worktree.replace(/[/\\]+$/, "").split(/[/\\]/).at(-2)
+  const parent = (worktree: string) =>
+    worktree
+      .replace(/[/\\]+$/, "")
+      .split(/[/\\]/)
+      .at(-2)
 
   return (
     <For each={props.server.projects}>

@@ -318,16 +318,12 @@ function bunTranspilerCache() {
 async function waitForHome(page: Page, mark: (name: Milestone) => void) {
   await expect.poll(() => page.evaluate(() => document.visibilityState), { timeout: 120_000 }).toBe("visible")
 
-  const projects = page.getByRole("complementary", { name: "Projects", exact: true })
-  const sessions = page.getByRole("region", { name: "Recent sessions", exact: true })
-  const search = page.getByRole("textbox", { name: "Search sessions", exact: true })
-  const addProject = projects.locator('button[data-action="home-add-project-row"]')
-  await expect(projects).toBeVisible({ timeout: 120_000 })
-  await expect(sessions).toBeVisible()
-  await expect(search).toBeEditable()
-  await expect(sessions.getByText("Nothing here yet", { exact: true })).toBeVisible()
-  await expect(addProject).toHaveCount(1)
-  await addProject.click({ trial: true })
+  const home = page.locator('[data-slot="home-panel"]')
+  const newSession = home.getByRole("button", { name: "New session", exact: true })
+  await expect(home).toBeVisible({ timeout: 120_000 })
+  await expect(home.locator("section").getByText("Nothing needs you", { exact: true })).toBeVisible()
+  await expect(newSession).toHaveCount(1)
+  await newSession.click({ trial: true })
   mark("homeReady")
 }
 

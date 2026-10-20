@@ -269,8 +269,9 @@ for (const scenario of ["visible-output", "hidden-output", "full-scrollback-tear
         const start = await page.evaluate(() => performance.now())
         await close.click()
         await expect(page).toHaveURL("/")
-        await expect(page.locator('[data-component="home-session-search"]')).toBeVisible()
-        await expect(page.locator('[data-component="home-session-search"] input')).toBeEditable()
+        await expect(
+          page.locator('[data-slot="home-panel"]').getByRole("button", { name: "New session", exact: true }),
+        ).toBeEnabled()
         await expect.poll(() => page.evaluate(() => window.terminalProbe.serialized.length)).toBe(1)
         interaction = await page.evaluate(
           (start) => ({

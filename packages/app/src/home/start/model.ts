@@ -103,9 +103,14 @@ export function createStartModel() {
   )
 
   // The account this computer's server runs as is the best name the app has for the person.
-  const name = createMemo(() => {
+  const health = () => {
     const conn = ordered()[0]
-    const account = conn ? global.servers.health[ServerConnection.key(conn)]?.username : undefined
+
+    return conn ? global.servers.health[ServerConnection.key(conn)] : undefined
+  }
+
+  const name = createMemo(() => {
+    const account = health()?.username
 
     return account ? account.charAt(0).toUpperCase() + account.slice(1) : undefined
   })
@@ -124,6 +129,9 @@ export function createStartModel() {
     projectServers,
     unreachable,
     name,
+    /** The greeting waits for the first health check, so the name never pops in after it. */
+    greeted: () => !!health() && !health()?.checking,
+    loading: inbox.loading,
     newSession: () => command.trigger("tab.new"),
     openProject: (server: StartServer, item: StartProject) => {
       global.ensureServerCtx(server.conn).projects.touch(item.project.worktree)

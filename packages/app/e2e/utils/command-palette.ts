@@ -49,9 +49,9 @@ export async function openPaletteWorkspace(page: Page, home = false) {
   await page.goto(home ? "/" : sessionHref(paletteSession.id))
 
   if (home) {
-    await expect(
-      page.getByRole("region", { name: "Recent sessions" }).getByRole("button", { name: /Palette fixture session/ }),
-    ).toBeEnabled({ timeout: APP_READY_TIMEOUT })
+    await expect(page.locator('[data-slot="start-row"]').filter({ hasText: paletteSession.title })).toBeVisible({
+      timeout: APP_READY_TIMEOUT,
+    })
   }
 
   if (!home) {

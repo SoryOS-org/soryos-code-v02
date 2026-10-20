@@ -10,10 +10,8 @@ import { useLayout } from "@/shell/state/layout"
 import { useTabs } from "@/shell/tabs/tabs"
 import { sessionBusy, sessionRequests } from "@/shell/layout/project-avatar-state"
 import { pathKey } from "@/workspaces/path-key"
-import { notifySessionTabsRemoved } from "./session-events"
-import { loadHomeSessionIndex } from "@/home/sessions/index"
-import { archiveHomeSession } from "@/home/sessions/archive"
-import { sessionFormRequest, sessionPermissionRequest, sessionTreeIDs } from "@/session/requests/session-request-tree"
+import { parseHomeSessionIndex } from "@/home/sessions/index"
+import { sessionFormRequest, sessionPermissionRequest } from "@/session/requests/session-request-tree"
 import { errorMessage } from "@/shell/layout/helpers"
 import { showToast } from "@/shell/notifications/toast"
 
@@ -23,8 +21,8 @@ const selectSessions = (sessions: SessionInfo[]) => () => sessions
 // Branch lookups each run git on the server, so load them a few at a time.
 const BRANCH_BATCH = 4
 
-// The Home index excludes archived sessions, so the inbox loads the newest archived ones separately.
-const ARCHIVED_LIMIT = 50
+// Root sessions fetched per server.
+const INDEX_LIMIT = 200
 
 export type InboxStatus = "approval" | "input" | "working" | "failed" | "done" | "ready"
 
@@ -39,9 +37,9 @@ export type InboxEntry = {
 
 /**
  * Root sessions across every visible server with the state a person acts on: waiting for an answer, working,
- * finished and unread, or read. Shared by the sidebar inbox and the new session start screen.
+ * finished and unread, or read. Home lists them.
  */
-export function createSessionInbox(input: { archived?: boolean } = {}) {
+export function createSessionInbox() {
   const global = useGlobal()
   const servers = useServers()
   const settings = useSettings()
@@ -61,9 +59,6 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
     queryClient.setQueryData<SessionInfo[]>(["home-sessions", conn], (current) =>
       current?.filter((session) => session.id !== sessionID),
     )
-    queryClient.setQueryData<SessionInfo[]>(["inbox-archived-sessions", conn], (current) =>
-      current?.filter((session) => session.id !== sessionID),
-    )
   }
 
   createEffect(() => {
@@ -72,29 +67,16 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
     })
   })
 
-  // Shares the Home query cache so renames and deletions there refresh the inbox too.
+  // One page of the newest root sessions: what needs a person is recent, and paging the whole history first made the
+  // first paint wait on every session the server has.
   const queries = useQueries(() => ({
     queries: connections().map((item) => ({
       queryKey: ["home-sessions", item.conn] as const,
       enabled: item.ctx.sdk.connection.status() === "connected",
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        loadHomeSessionIndex((list, options) => item.ctx.sdk.api.session.list(list, options), signal),
-      retry: false,
-      staleTime: 30_000,
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      select: selectSessions,
-    })),
-  }))
-
-  const archivedQueries = useQueries(() => ({
-    queries: connections().map((item) => ({
-      queryKey: ["inbox-archived-sessions", item.conn] as const,
-      enabled: !!input.archived && item.ctx.sdk.connection.status() === "connected",
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
         item.ctx.sdk.api.session
-          .list({ limit: ARCHIVED_LIMIT, order: "desc", parentID: null, archived: true }, { signal })
-          .then((response) => response.data),
+          .list({ limit: INDEX_LIMIT, order: "desc", parentID: null }, { signal })
+          .then((response) => parseHomeSessionIndex(response.data)),
       retry: false,
       staleTime: 30_000,
       refetchOnMount: true,
@@ -134,11 +116,9 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
 
         // Locally known sessions come last so live archive and unarchive events win over cached indexes.
         const sessions = new Map(
-          [
-            ...(queries[index]?.data?.() ?? []),
-            ...(input.archived ? (archivedQueries[index]?.data?.() ?? []) : []),
-            ...data.session.list(),
-          ].map((session) => [session.id, session] as const),
+          [...(queries[index]?.data?.() ?? []), ...data.session.list()].map(
+            (session) => [session.id, session] as const,
+          ),
         )
 
         return data.session.apply([...sessions.values()].filter((session) => !session.parentID)).map(
@@ -156,14 +136,36 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
   )
 
   // Pending permissions and questions only load for sessions the client has opened. A running session may be waiting
-  // on one, so load them for every working root; events keep them current from then on.
+  // on one, so load them for every working root; events keep them current from then on. `checked` marks the roots
+  // whose first load ended, so the first paint can wait for them instead of moving rows a moment later.
+  const [requests, setRequests] = createStore({ checked: {} as Record<string, true> })
+
   createEffect(() => {
     entries().forEach((entry) => {
-      if (entry.status !== "working") return
-      void entry.ctx.data.session.permission.sync(entry.session.id).catch(() => undefined)
-      void entry.ctx.data.session.form.sync(entry.session.id).catch(() => undefined)
+      if (entry.status !== "working" || requests.checked[entry.key]) return
+      void Promise.allSettled([
+        entry.ctx.data.session.permission.sync(entry.session.id),
+        entry.ctx.data.session.form.sync(entry.session.id),
+      ]).then(() => setRequests("checked", entry.key, true))
     })
   })
+
+  // Settled once every reachable server answered the index and every working root's requests loaded. A server that
+  // never connects or fails its health check does not hold the screen.
+  // Once settled it stays settled, so a session starting later never blanks the screen again.
+  const settled = createMemo(
+    (previous: boolean) =>
+      previous ||
+      (connections().every((item, index) => {
+        const health = global.servers.health[ServerConnection.key(item.conn)]
+
+        if (health && !health.checking && !health.healthy) return true
+
+        return !!queries[index]?.isSuccess || !!queries[index]?.isError
+      }) &&
+        entries().every((entry) => entry.status !== "working" || !!requests.checked[entry.key])),
+    false,
+  )
 
   // Rows are keyed by stable strings so live session updates do not remount them.
   const byKey = createMemo(() => new Map(entries().map((entry) => [entry.key, entry])))
@@ -224,17 +226,6 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
     })
   }
 
-  // Move the session between the cached indexes so it changes section before either refetches.
-  const move = (entry: InboxEntry, archivedAt: number | undefined) => {
-    const session = { ...entry.session, time: { ...entry.session.time, archived: archivedAt } }
-
-    forget(entry.conn, entry.session.id)
-    queryClient.setQueryData<SessionInfo[]>(
-      [archivedAt === undefined ? "home-sessions" : "inbox-archived-sessions", entry.conn],
-      (current) => current && [session, ...current],
-    )
-  }
-
   const requestFailed = (cause: unknown) =>
     showToast({
       title: language.t("common.requestFailed"),
@@ -252,8 +243,8 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
   return {
     now,
     entries,
-    /** The first index load is still running on some connected server. */
-    loading: () => queries.some((query) => query.isPending && query.fetchStatus !== "idle"),
+    /** The first load has not settled: lists would still move or claim nothing needs you. */
+    loading: () => !settled(),
     byKey,
     selected,
     open,
@@ -270,40 +261,12 @@ export function createSessionInbox(input: { archived?: boolean } = {}) {
       const request = sessionPermissionRequest(family(entry), entry.ctx.data.session.permission.list, entry.session.id)
 
       if (!request) return
-      void entry.ctx.sdk.api.permission
+      // The data store's reply drops the request at once, so the row leaves Needs you without waiting for an event.
+      void entry.ctx.data.session.permission
         .reply({ sessionID: request.sessionID, requestID: request.id, decision })
         .catch(requestFailed)
     },
     markViewed: (entry: InboxEntry) => entry.ctx.notification.session.markViewed(entry.session.id),
-    archive: (entry: InboxEntry) =>
-      archiveHomeSession({
-        server: entry.server,
-        session: entry.session,
-        archive: (sessionID) => entry.ctx.sdk.api.session.update({ sessionID, archived: true }),
-        remove: () => move(entry, Date.now()),
-        onError: requestFailed,
-      }),
-    unarchive: (entry: InboxEntry) =>
-      entry.ctx.sdk.api.session
-        .update({ sessionID: entry.session.id, archived: false })
-        .then(() => move(entry, undefined))
-        .catch(requestFailed),
-    remove: (entry: InboxEntry) => {
-      const ids = sessionTreeIDs(entry.ctx.data.session.list(), entry.session.id)
-
-      return entry.ctx.data.session
-        .remove(entry.session.id)
-        .then(() => {
-          forget(entry.conn, entry.session.id)
-          notifySessionTabsRemoved({ server: entry.server, directory: entry.session.location.directory, sessionIDs: ids })
-        })
-        .catch((cause) =>
-          showToast({
-            title: language.t("session.delete.failed.title"),
-            description: errorMessage(cause, language.t("session.delete.failed.title")),
-          }),
-        )
-    },
   }
 }
 
