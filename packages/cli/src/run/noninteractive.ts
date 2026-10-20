@@ -54,7 +54,7 @@ type ToolState = StartedPart & {
   input: Record<string, JsonValue>
   raw?: string
   provider?: unknown
-  providerState?: SessionMessageAssistantTool["providerState"]
+  native?: SessionMessageAssistantTool["native"]
   metadata: Record<string, JsonValue>
   content: ToolContent[]
 }
@@ -334,7 +334,7 @@ export async function runNonInteractivePrompt(input: Input) {
           messageID: event.data.assistantMessageID,
           type: "reasoning",
           text: event.data.text,
-          metadata: event.data.state,
+          metadata: event.data.native,
           time: { start: started?.timestamp ?? time, end: time },
         }
         renderedReasoning.set(key, event.data.text)
@@ -376,8 +376,8 @@ export async function runNonInteractivePrompt(input: Input) {
           tool: current?.tool ?? "tool",
           input: event.data.input,
           raw: current?.raw,
-          provider: { executed: event.data.executed, state: event.data.state },
-          providerState: event.data.state,
+          provider: { executed: event.data.executed, state: event.data.native },
+          native: event.data.native,
           metadata: {},
           content: [],
         })
@@ -398,8 +398,7 @@ export async function runNonInteractivePrompt(input: Input) {
           id: event.data.id,
           name: current.tool,
           executed: event.data.executed,
-          providerState: current.providerState,
-          providerResultState: event.data.resultState,
+          native: event.data.native ? { ...current.native, ...event.data.native } : current.native,
           state: {
             status: "completed",
             input: current.input,
@@ -424,7 +423,7 @@ export async function runNonInteractivePrompt(input: Input) {
               metadata: event.data.metadata,
               content: event.data.content,
               providerCall: current.provider,
-              providerResult: { executed: event.data.executed, state: event.data.resultState },
+              providerResult: { executed: event.data.executed, state: event.data.native },
               rawInput: current.raw,
             },
             time: { start: current.timestamp, end: time },
@@ -446,8 +445,7 @@ export async function runNonInteractivePrompt(input: Input) {
           id: event.data.id,
           name: current.tool,
           executed: event.data.executed,
-          providerState: current.providerState,
-          providerResultState: event.data.resultState,
+          native: event.data.native ? { ...current.native, ...event.data.native } : current.native,
           state: {
             status: "error",
             input: current.input,
@@ -470,7 +468,7 @@ export async function runNonInteractivePrompt(input: Input) {
             error,
             metadata: {
               providerCall: current.provider,
-              providerResult: { executed: event.data.executed, state: event.data.resultState },
+              providerResult: { executed: event.data.executed, state: event.data.native },
               rawInput: current.raw,
             },
             time: { start: current.timestamp, end: time },
@@ -621,7 +619,7 @@ export async function runNonInteractivePrompt(input: Input) {
             messageID: message.id,
             type: "reasoning",
             text,
-            metadata: item.state,
+            metadata: item.native,
             time: { start: message.time.created, end: timestamp },
           }
           renderedReasoning.set(key, item.text)
