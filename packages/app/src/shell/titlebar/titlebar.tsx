@@ -426,7 +426,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   data-titlebar-tab-action
                   data-action="vertical-tabs-home"
                   data-state={layout.route().type === "home" ? "pressed" : undefined}
-                  class="group mb-1 flex h-7 w-full shrink-0 items-center gap-1.5 rounded-[6px] ps-1.5 pe-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base data-[state=pressed]:text-v2-text-text-base"
+                  class="group flex h-7 w-full shrink-0 items-center gap-1.5 rounded-[6px] ps-1.5 pe-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base data-[state=pressed]:text-v2-text-text-base"
                   onClick={toggleHome}
                   aria-label={language.t("home.title")}
                   aria-pressed={layout.route().type === "home"}
@@ -776,7 +776,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                               <div
                                 class="flex w-full shrink-0 gap-2"
                                 classList={{
-                                  "items-start pt-2.5": homeInSidebarHeader(),
+                                  "items-start pt-2.5 pb-1": homeInSidebarHeader(),
                                   "mb-2 h-12 items-center": !homeInSidebarHeader(),
                                 }}
                                 style={{
@@ -800,13 +800,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 <SidebarToggle />
                               </div>
                             </Show>
-                            <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
-                            {searchButton(true)}
-                            <RecentlyClosedTabsMenu
-                              vertical
-                              onNewTab={openNewTab}
-                              keybind={command.keybind("tab.new")}
-                            />
+                            <div class="flex w-full shrink-0 flex-col gap-1">
+                              <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
+                              {searchButton(true)}
+                              <RecentlyClosedTabsMenu
+                                vertical
+                                onNewTab={openNewTab}
+                                keybind={command.keybind("tab.new")}
+                              />
+                            </div>
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Show
