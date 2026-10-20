@@ -1433,12 +1433,9 @@ export function Prompt(props: PromptProps) {
     const extmark = input.extmarks.get(extmarkId)
     const ref = store.extmarkToPart.get(extmarkId)
     if (!extmark || !ref) return false
-    const text =
-      ref.type === "pasted"
-        ? store.prompt.pasted[ref.index]?.text
-        : ref.type === "file"
-          ? store.prompt.files?.[ref.index]?.pastedPath
-          : undefined
+    let text: string | undefined
+    if (ref.type === "pasted") text = store.prompt.pasted[ref.index]?.text
+    if (ref.type === "file") text = store.prompt.files?.[ref.index]?.pastedPath
     if (text === undefined) return false
 
     input.extmarks.delete(extmarkId)

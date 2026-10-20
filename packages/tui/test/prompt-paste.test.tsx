@@ -3,6 +3,7 @@ import path from "node:path"
 import { takeDraft } from "../src/component/prompt/draft-stash"
 import { createAppFixture } from "./fixture/app"
 import { tmpdir } from "./fixture/fixture"
+import { agent, model, session } from "./fixture/local"
 import { directory, json } from "./fixture/tui-client"
 
 test("the prompt keeps pasted control characters and drops escape sequences", async () => {
@@ -31,26 +32,14 @@ test("clicking a pasted image expands its path without submitting the attachment
     args: { sessionID },
     fetch: async (url, request) => {
       if (url.pathname === `/api/session/${sessionID}`)
-        return json({
-          data: {
-            id: sessionID,
-            projectID: "project",
-            title: "Image path fixture",
-            agent: "build",
-            model: { providerID: "demo", id: "model" },
-            location: { directory },
-            cost: 0,
-            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-            time: { created: 0, updated: 0 },
-          },
-        })
+        return json({ data: session(sessionID, { providerID: "provider", id: "model" }) })
       if (url.pathname === `/api/session/${sessionID}/message` || url.pathname === `/api/session/${sessionID}/inbox`)
         return json({ data: [], cursor: {} })
       if (url.pathname === "/api/agent")
-        return json({ location, data: [{ id: "build", mode: "primary", hidden: false, permissions: [] }] })
-      if (url.pathname === "/api/provider") return json({ location, data: [{ id: "demo", name: "Demo" }] })
+        return json({ location, data: [agent("build")] })
+      if (url.pathname === "/api/provider") return json({ location, data: [{ id: "provider", name: "Provider" }] })
       if (url.pathname === "/api/model")
-        return json({ location, data: [{ id: "model", providerID: "demo", name: "Demo Model", variants: [] }] })
+        return json({ location, data: [{ ...model("model"), name: "Demo Model" }] })
       if (url.pathname === `/api/session/${sessionID}/prompt`) {
         submitted.resolve(await request.json())
         return json({ data: {} })
