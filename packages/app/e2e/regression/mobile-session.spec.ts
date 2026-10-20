@@ -124,7 +124,7 @@ for (const position of ["top", "bottom"] as const) {
     await expect(details.locator('[data-slot="mobile-panel-header"]')).toHaveCount(0)
     await expect(details.getByRole("button", { name: "Close", exact: true })).toHaveCount(0)
     await expect(details.getByRole("heading", { name: "Session details", exact: true })).toHaveCSS("width", "1px")
-    await expect(details.getByText(fixture.project.name, { exact: true })).toBeVisible()
+    await expect(details.getByRole("button", { name: "Local repository", exact: true })).toBeVisible()
     await expect(details.getByRole("button", { name: "No changes", exact: true })).toBeVisible()
     await expect(details.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
     await page.locator('[data-slot="mobile-drawer-overlay"]').click({ position: { x: 10, y: 10 } })

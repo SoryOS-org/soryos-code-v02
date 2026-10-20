@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import { SERVER, holdRoute, seed, sessionHref } from "../utils/app"
 import { openWithDirection } from "../utils/direction"
 import { mockOpenCodeServer } from "../utils/mock-server"
@@ -89,10 +89,12 @@ test("a session in a worktree subfolder names its worktree and lists cached work
   const list = await holdRoute(page, (url) => url.pathname === "/api/worktree", { method: "GET" })
   await trigger.click()
   await location.click()
+  await enter(page, location, page.getByRole("menu").filter({ hasText: "Move session to" }))
   await list.arrived
   await page.getByRole("menuitem", { name: "Worktree", exact: true }).click()
-  await expect(page.getByRole("menuitem", { name: "other", exact: true })).toBeVisible()
-  await expect(page.getByRole("menuitem", { name: "feature", exact: true })).toHaveCount(0)
+  const existing = page.getByRole("menu").filter({ has: page.getByRole("menuitem", { name: "other", exact: true }) })
+  await expect(existing.getByRole("menuitem", { name: "other", exact: true })).toBeVisible()
+  await expect(existing.getByRole("menuitem", { name: "feature", exact: true })).toHaveCount(0)
   list.release()
 })
 
@@ -312,7 +314,12 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   await page.getByRole("button", { name: "Session details", exact: true }).click()
   const summary = page.getByRole("menu", { name: "Session details", exact: true })
   const menu = (name: string) => page.getByRole("menu", { name, exact: true })
-  const open = (name: string) => summary.getByRole("menuitem", { name, exact: true }).click()
+
+  const open = async (name: string) => {
+    const item = summary.getByRole("menuitem", { name, exact: true })
+    await item.click()
+    await enter(page, item, menu(name))
+  }
 
   await prefetch.arrived
   await expect(summary.getByRole("menuitem", { name: "Local repository", exact: true })).toBeVisible()
@@ -393,8 +400,10 @@ test("MCP rows show each server's state and the menu opens the MCP servers dialo
   })
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await page.getByRole("menuitem", { name: "MCP", exact: true }).click()
+  const item = page.getByRole("menuitem", { name: "MCP", exact: true })
+  await item.click()
   const submenu = page.getByRole("menu", { name: "MCP", exact: true })
+  await enter(page, item, submenu)
 
   const row = (name: string) =>
     submenu.locator(".session-mcp-row").filter({ has: page.getByText(name, { exact: true }) })
@@ -443,8 +452,10 @@ test("MCP authentication starts before a slow resource catalog finishes", async 
 
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await page.getByRole("menuitem", { name: "MCP", exact: true }).click()
+  const item = page.getByRole("menuitem", { name: "MCP", exact: true })
+  await item.click()
   const submenu = page.getByRole("menu", { name: "MCP", exact: true })
+  await enter(page, item, submenu)
   const signIn = submenu.getByRole("button", { name: "Sign in to linear", exact: true })
   await expect(signIn).toBeEnabled()
 
@@ -523,8 +534,10 @@ test.describe("remote configuration", () => {
       { name: "LSP", path: `${home}/lsp.json` },
     ].entries()) {
       await trigger.click()
-      await summary.getByRole("menuitem", { name: service.name, exact: true }).click()
+      const item = summary.getByRole("menuitem", { name: service.name, exact: true })
+      await item.click()
       const menu = page.getByRole("menu", { name: service.name, exact: true })
+      await enter(page, item, menu)
       const copy = menu.getByRole("button", { name: "Copy configuration file path", exact: true })
       await expect(tooltip).toHaveCount(0)
       await copy.hover()
@@ -552,7 +565,9 @@ test.describe("remote configuration", () => {
     entries.length = 0
     await page.evaluate(() => navigator.clipboard.writeText("original clipboard"))
     await trigger.click()
-    await summary.getByRole("menuitem", { name: "Skills", exact: true }).click()
+    const skills = summary.getByRole("menuitem", { name: "Skills", exact: true })
+    await skills.click()
+    await enter(page, skills, page.getByRole("menu", { name: "Skills", exact: true }))
 
     const copy = page
       .getByRole("menu", { name: "Skills", exact: true })
@@ -591,6 +606,14 @@ test("long MCP lists stay in the viewport in a real RTL locale", async ({ page }
   await page.keyboard.press("Escape")
   await expect(menu).toBeHidden()
 })
+
+// Moves the pointer straight across from a submenu's trigger into the open submenu, so it never crosses sibling items.
+async function enter(page: Page, trigger: Locator, menu: Locator) {
+  await expect(menu).toBeVisible()
+  const from = (await trigger.boundingBox())!
+  const to = (await menu.boundingBox())!
+  await page.mouse.move(to.x + to.width / 2, from.y + from.height / 2, { steps: 5 })
+}
 
 // Solid reports reactive work created without an owner; the warning appears in dev builds only.
 function ownerWarnings(page: Page) {

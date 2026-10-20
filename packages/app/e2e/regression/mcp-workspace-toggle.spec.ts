@@ -16,7 +16,8 @@ type Surface = "popover" | "dialog"
 
 // A session in a worktree of the project. The harness answers the MCP list for each location directory and stores
 // connect/disconnect results per directory; `requests` records every MCP request and the directory it targeted.
-// The popover belongs to the summary extension; the dialog (Ctrl+;) is the app's own MCP toggle.
+// The popover is the session details menu's MCP submenu, which shows state but does not toggle; the dialog (Ctrl+;) is
+// the app's own MCP toggle.
 async function open(
   page: Page,
   input: { surface: Surface } & Pick<MockServerConfig, "mcp" | "onMcpAction" | "integrations" | "onIntegrationOAuth">,
@@ -45,12 +46,22 @@ async function open(
   await page.goto(sessionHref(sessionID))
   await expectSessionTitle(page, title)
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeEditable()
-  const panel = page.getByRole("dialog", { name: input.surface === "popover" ? "MCP" : "MCPs", exact: true })
+
+  const panel =
+    input.surface === "popover"
+      ? page.getByRole("menu", { name: "MCP", exact: true })
+      : page.getByRole("dialog", { name: "MCPs", exact: true })
 
   const show = async () => {
     if (input.surface === "dialog") return page.keyboard.press("Control+;")
     await page.getByRole("button", { name: "Session details", exact: true }).click()
-    await page.getByRole("button", { name: "MCP", exact: true }).click()
+    const item = page.getByRole("menuitem", { name: "MCP", exact: true })
+    await item.click()
+    await expect(panel).toBeVisible()
+    // Straight across into the submenu, so the pointer never crosses the items below MCP.
+    const from = (await item.boundingBox())!
+    const to = (await panel.boundingBox())!
+    await page.mouse.move(to.x + to.width / 2, from.y + from.height / 2, { steps: 5 })
   }
 
   await show()
@@ -66,7 +77,7 @@ for (const shared of [true, false]) {
     const actions: Parameters<NonNullable<MockServerConfig["onMcpAction"]>>[0][] = []
 
     const view = await open(page, {
-      surface: "popover",
+      surface: "dialog",
       mcp: (target) =>
         !shared && target !== workspace ? [] : [{ name: "figma-desktop", status: { status: "disabled" } }],
       onMcpAction: (action) => void actions.push(action),
@@ -85,7 +96,7 @@ for (const shared of [true, false]) {
     expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
 
     view.requests.length = 0
-    await view.panel.locator('[data-slot="truncated-text-label"]').filter({ hasText: "figma-desktop" }).click()
+    await view.panel.locator('[data-slot="switch-control"]').click()
     await expect(view.toggle).not.toBeChecked()
     await expect(view.toggle).toBeEnabled()
     expect(actions).toEqual([
@@ -100,7 +111,37 @@ for (const shared of [true, false]) {
   })
 }
 
-for (const surface of ["popover", "dialog"] as const) {
+test("the MCP popover shows a failed server and reconnects it from its details", async ({ page }) => {
+  const error = "Streamable HTTP error: Error POSTing to endpoint: 404 Not Found"
+
+  const view = await open(page, {
+    surface: "popover",
+    mcp: (target) => [
+      { name: "figma-desktop", status: target !== workspace ? { status: "connected" } : { status: "failed", error } },
+    ],
+  })
+
+  const row = view.panel.locator(".session-mcp-row").filter({ hasText: "figma-desktop" })
+  await expect(view.toggle).toHaveCount(0)
+  await expect(row.getByText("Failed", { exact: true })).toBeVisible()
+  const failed = view.panel.getByRole("button", { name: "Details for figma-desktop", exact: true })
+  await expect(failed).toHaveText("Details")
+  view.requests.length = 0
+  await failed.click()
+  const details = page.getByRole("dialog", { name: "figma-desktop", exact: true })
+  await expect(details).toHaveAccessibleDescription("Connection failed")
+  await expect(details.getByText(error, { exact: true })).toBeVisible()
+  await details.getByRole("button", { name: "Try again", exact: true }).click()
+  await expect(details).toBeHidden()
+  expect(view.requests.filter((request) => request.path.endsWith("/connect"))).toEqual([
+    { path: "/api/experimental/mcp/figma-desktop/connect", directory: workspace },
+  ])
+
+  if (!(await view.panel.isVisible())) await view.show()
+  await expect(row.getByText("Connected", { exact: true })).toBeVisible()
+})
+
+for (const surface of ["dialog"] as const) {
   test(`shows connection failures from the MCP ${surface} and allows reconnecting`, async ({ page }) => {
     const error = "Streamable HTTP error: Error POSTing to endpoint: 404 Not Found"
     const state = { fail: true }
@@ -175,13 +216,6 @@ for (const surface of ["popover", "dialog"] as const) {
 
     state.fail = false
     await details.getByRole("button", { name: "Try again", exact: true }).click()
-
-    if (surface === "popover") {
-      await expect(details).toBeHidden()
-
-      if (!(await view.panel.isVisible())) await view.show()
-    }
-
     await expect(view.toggle).toBeChecked()
     await expect(view.toggle).toBeEnabled()
   })
@@ -243,7 +277,15 @@ for (const surface of ["popover", "dialog"] as const) {
     ])
 
     if (!(await view.panel.isVisible())) await view.show()
-    await expect(view.toggle).toBeChecked()
+
+    if (surface === "dialog") await expect(view.toggle).toBeChecked()
+    else
+      await expect(
+        view.panel
+          .locator(".session-mcp-row")
+          .filter({ hasText: "figma-desktop" })
+          .getByText("Connected", { exact: true }),
+      ).toBeVisible()
     await expect(view.panel.getByRole("button", { name: "Sign in to figma-desktop", exact: true })).toHaveCount(0)
   })
 }

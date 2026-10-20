@@ -70,7 +70,7 @@ for (const scheme of ["light", "dark"] as const) {
   }
 }
 
-test("mobile extension drawers keep configured lists, retry, refresh, and MCP toggles working", async ({ page }) => {
+test("mobile extension drawers keep configured lists, retry, refresh, and MCP status working", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await mockStressTimeline(page)
   const state = { fail: true, extra: false, enabled: true }
@@ -182,7 +182,8 @@ test("mobile extension drawers keep configured lists, retry, refresh, and MCP to
 
   await details.getByRole("button", { name: "MCP", exact: true }).click()
   const mcp = page.getByRole("dialog", { name: "MCP", exact: true })
-  await expect(mcp.getByRole("switch")).toHaveCount(30)
+  await expect(mcp.locator(".session-mcp-row")).toHaveCount(30)
+  await expect(mcp.getByRole("switch")).toHaveCount(0)
   await expect
     .poll(() =>
       mcp
@@ -191,18 +192,9 @@ test("mobile extension drawers keep configured lists, retry, refresh, and MCP to
     )
     .toBe(true)
   await expect(mcp).toBeInViewport({ ratio: 1 })
-  const disconnect = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/disconnect"))
-  await mcp.getByRole("switch", { name: "mcp-00", exact: true }).focus()
-  await mcp.getByRole("switch", { name: "mcp-00", exact: true }).press("Space")
-  await disconnect
-  await expect(mcp.getByRole("switch", { name: "mcp-00", exact: true })).not.toBeChecked()
 
-  const last = mcp
-    .locator(".session-mcp-row")
-    .filter({ has: page.getByRole("switch", { name: "mcp-29", exact: true }) })
-
+  const last = mcp.locator(".session-mcp-row").filter({ hasText: "mcp-29" })
   await last.scrollIntoViewIfNeeded()
   await expect(last).toBeInViewport()
-  await mcp.getByRole("switch", { name: "mcp-29", exact: true }).focus()
-  await expect(mcp.getByRole("switch", { name: "mcp-29", exact: true })).toBeFocused()
+  await expect(mcp.getByRole("button", { name: "Manage MCP servers", exact: true })).toBeVisible()
 })
