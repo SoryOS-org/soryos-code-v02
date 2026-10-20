@@ -380,6 +380,23 @@ story("reloads the browser tab with ⌘R inside the pane and leaves it to the wi
   await expect(reloads).toHaveText("1")
 })
 
+story("adds a second new tab with ⌘T on a new tab page", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
+  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  await root.getByRole("button", { name: "Beta", exact: true }).click()
+  await expect(root.getByText("Registrations: 2", { exact: true })).toBeVisible()
+  await root.getByRole("button", { name: "Blank page", exact: true }).click()
+  await expect(root.getByRole("tab", { name: "New tab", exact: true })).toHaveAttribute("aria-selected", "true")
+
+  await address.press(`${mac ? "Meta" : "Control"}+t`)
+  const tabs = root.getByRole("tab", { name: "New tab", exact: true })
+  await expect(tabs).toHaveCount(2)
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true")
+  await expect(root.getByTestId("browser-closes")).toHaveText("[]")
+})
+
 story("reopens a closed browser tab with ⌘⇧T after the side panel and a session tab elsewhere", async ({ page }) => {
   const root = page.getByTestId("browser-region-fixture")
   const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
