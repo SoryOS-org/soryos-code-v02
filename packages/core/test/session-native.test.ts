@@ -17,7 +17,6 @@ import { InstructionState } from "@opencode/core/session/instruction-state"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionNative } from "@opencode/core/session/native"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { toLLMMessages } from "@opencode/core/session/runner/to-llm-message"
 import { SessionSchema } from "@opencode/core/session/schema"
@@ -30,6 +29,11 @@ import { asc, eq, sql } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 import { testEffect } from "./lib/effect"
 import legacyMedia from "./fixture/native/2.0.14-media.json"
+
+// A window as compaction stores it, and as history and replay read it back.
+const stored = (messages: ReadonlyArray<Message>) => ({ messages: JSON.parse(JSON.stringify(messages)) })
+const decode = (checkpoint: { readonly native: { readonly messages: unknown } }) =>
+  Schema.decodeUnknownSync(SessionHistory.NativeWindow)(checkpoint.native.messages)
 
 const model = SessionRunnerModel.resolved(
   LanguageModel.make({ id: "deployment", provider: "openai", route: OpenAIResponses.route }),
@@ -46,22 +50,21 @@ const replacement = [
     CompactionPart.make({ provider: model.model.provider, encrypted: "opaque-checkpoint", id: "cp_1" }),
   ),
 ]
-const native = SessionNative.encode(replacement)
+const native = stored(replacement)
 const sessionID = SessionSchema.ID.make("ses_native")
 
 // A window as releases before v2.1 stored it, read the way history reads stored rows.
 const legacy = (messages: unknown) =>
-  SessionLegacy.message("compaction", { providerContext: { version: 1, messages } }) as Pick<
-    SessionNative.Checkpoint,
-    "native"
-  >
+  SessionLegacy.message("compaction", { providerContext: { version: 1, messages } }) as {
+    readonly native: { readonly messages: unknown }
+  }
 // Frozen serialized data, deliberately not constructed using today's Message API.
 const legacyCheckpoint = legacy(legacyMedia)
 
 test("reads pre-2.0.15 checkpoint media without rewriting the stored payload", async () => {
   const before = JSON.stringify(legacyMedia)
-  const decoded = SessionNative.decode(legacyCheckpoint)
-  expect(await Effect.runPromise(SessionNative.validate(legacyCheckpoint))).toEqual(decoded)
+  const decoded = decode(legacyCheckpoint)
+  expect(await Effect.runPromise(validate(legacyCheckpoint))).toEqual(decoded)
   expect(decoded[0]?.content).toMatchObject([
     { type: "text", text: "retained attachments" },
     {
@@ -86,13 +89,16 @@ test("reads mixed legacy and current media without overriding an existing asset"
     data: "AQID",
   }
   const checkpoint = legacy([{ role: "user", content: [...(legacyMedia[0]?.content ?? []), current] }])
-  const decoded = SessionNative.decode(checkpoint)
-  expect(await Effect.runPromise(SessionNative.validate(checkpoint))).toEqual(decoded)
+  const decoded = decode(checkpoint)
+  expect(await Effect.runPromise(validate(checkpoint))).toEqual(decoded)
   expect(decoded[0]?.content.at(-1)).toMatchObject({ media: current.media })
   const invalid = legacy([{ role: "user", content: [{ ...current, media: null }] }])
-  expect(() => SessionNative.decode(invalid)).toThrow()
-  expect(await Effect.runPromise(Effect.isFailure(SessionNative.validate(invalid)))).toBe(true)
+  expect(() => decode(invalid)).toThrow()
+  expect(await Effect.runPromise(Effect.isFailure(validate(invalid)))).toBe(true)
 })
+
+const validate = (checkpoint: { readonly native: { readonly messages: unknown } }) =>
+  Schema.decodeUnknownEffect(SessionHistory.NativeWindow)(checkpoint.native.messages)
 
 const it = testEffect(
   AppNodeBuilder.build(
@@ -178,10 +184,10 @@ it.effect("loads and replays a pre-v2.1 providerContext checkpoint with pre-2.0.
     ).not.toHaveProperty("native")
     yield* s.prompt("continue")
     const history = yield* SessionHistory.load(s.db, sessionID, target)
-    expect(toLLMMessages(history, model.ref).slice(0, 2)).toEqual([...SessionNative.decode(legacyCheckpoint)])
-    expect(history.some(SessionNative.isCheckpoint)).toBe(true)
+    expect(toLLMMessages(history, model.ref).slice(0, 2)).toEqual([...decode(legacyCheckpoint)])
+    expect(history.some(SessionHistory.isNativeCompaction)).toBe(true)
     const local = yield* SessionHistory.load(s.db, sessionID, "local")
-    expect(local.some(SessionNative.isCheckpoint)).toBe(false)
+    expect(local.some(SessionHistory.isNativeCompaction)).toBe(false)
     expect(toLLMMessages(local, model.ref).map((message) => message.content)).toEqual([
       [Message.text("original request")],
       [Message.text("continue")],
@@ -196,9 +202,8 @@ test("a native window round-trips tools, opaque checkpoints and binary media thr
     Message.tool({ id: "call_1", name: "read", result: { text: "result" } }),
     Message.user({ type: "media", media: Media.bytes(new Uint8Array([1, 2, 3]), "image/png") }),
   ]
-  const stored = JSON.parse(JSON.stringify(SessionNative.encode(messages)))
-  expect(SessionNative.decode({ native: stored })).toEqual(messages)
-  const optionalMetadata = SessionNative.encode([
+  expect(decode({ native: stored(messages) })).toEqual(messages)
+  const optionalMetadata = stored([
     Message.make({
       role: "user",
       content: [
@@ -207,12 +212,12 @@ test("a native window round-trips tools, opaque checkpoints and binary media thr
       providerMetadata: { openai: { itemId: undefined, type: "message", status: undefined, phase: undefined } },
     }),
   ])
-  expect(SessionNative.decode({ native: optionalMetadata })[0]).toMatchObject({
+  expect(decode({ native: optionalMetadata })[0]).toMatchObject({
     providerMetadata: { openai: { type: "message" } },
     content: [{ metadata: { attachment: { source: { type: "inline" } } } }],
   })
   expect(() =>
-    SessionNative.decode({
+    decode({
       native: { messages: [{ role: "assistant", content: [{ type: "compaction", provider: "openai" }] }] },
     }),
   ).toThrow()

@@ -31,7 +31,6 @@ import { SessionEvent } from "./event.js"
 import { SessionHistory } from "./history.js"
 import type { SessionMessage } from "./message.js"
 import { SessionModelRequest } from "./model-request.js"
-import { SessionNative } from "./native.js"
 import { SessionRunnerModel } from "./runner/model.js"
 import { SessionRunnerRetry } from "./runner/retry.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
@@ -250,7 +249,7 @@ export const layer = Layer.effect(
       if (last?.type === "compaction" && last.status === "completed") return false
       // An encrypted native window estimates as nothing, so wait for a response to measure it.
       const measured = messages.findLastIndex((message) => hasMeasuredPrompt(message, context.model.ref))
-      if (measured < messages.findLastIndex(SessionNative.isCheckpoint)) return false
+      if (measured < messages.findLastIndex(SessionHistory.isNativeCompaction)) return false
       return estimateContext(context) >= ceiling
     }
 
@@ -359,7 +358,8 @@ export const layer = Layer.effect(
         spend(context.session.id, usage && SessionUsage.record(usage, context.model.cost)).pipe(
           Effect.as<Result>({
             text: "",
-            native: SessionNative.encode(window),
+            // Plain JSON, not the schema encoder: provider metadata can hold undefined entries, which it rejects.
+            native: { messages: JSON.parse(JSON.stringify(window)) },
           }),
         )
 
@@ -491,7 +491,7 @@ export const layer = Layer.effect(
             (previous !== undefined && message.id === previous.id) ||
             message.content.some((part) => part.type === "compaction"),
         ) + 1
-      const summary = previous !== undefined && !SessionNative.isCheckpoint(previous) ? previous : undefined
+      const summary = previous !== undefined && !SessionHistory.isNativeCompaction(previous) ? previous : undefined
       // TODO: Read the previous summary from the hooked request once it no longer merges summary and recent into one
       // message. Until then it is rebuilt from storage, which drops a compaction hook's edits to that message.
       const lead = summary

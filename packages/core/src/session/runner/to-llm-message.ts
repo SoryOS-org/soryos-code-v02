@@ -11,7 +11,7 @@ import type { Model } from "@opencode/schema/model"
 import { Option, Schema } from "effect"
 import { fileURLToPath } from "url"
 import { SessionMessage } from "../message.js"
-import { SessionNative } from "../native.js"
+import { SessionHistory } from "../history.js"
 import { SessionRecentText } from "../recent-text.js"
 import type { FileAttachment } from "@opencode/schema/prompt"
 
@@ -154,7 +154,7 @@ const toolResult = (tool: SessionMessage.AssistantTool, providerMetadataKey: str
 
 const assistant = (message: SessionMessage.Assistant, model: Model.Ref, providerMetadataKey: string) => {
   const sameProvider = String(message.model.providerID) === String(model.providerID)
-  const sameModel = SessionNative.reusable(message.model, model)
+  const sameModel = sameProvider && String(message.model.id) === String(model.id)
   const reuseProviderMetadata = sameModel && message.error === undefined
   const reasoningInterrupted = message.content.some(
     (item) => item.type === "reasoning" && item.time !== undefined && item.time.completed === undefined,
@@ -291,7 +291,8 @@ function toLLMMessage(message: SessionMessage.Info, model: Model.Ref, providerMe
     case "compaction": {
       if (message.status !== "completed") return []
       // History selection only keeps native windows the target model can replay.
-      if (SessionNative.isCheckpoint(message)) return [...SessionNative.decode(message)]
+      if (message.native?.messages !== undefined)
+        return [...Schema.decodeUnknownSync(SessionHistory.NativeWindow)(message.native.messages)]
       const kept = SessionRecentText.kept(message)
       return [
         Message.make({

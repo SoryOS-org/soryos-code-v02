@@ -42,7 +42,6 @@ import { SessionCompaction } from "@opencode/core/session/compaction"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionModelTransport } from "@opencode/core/session/model-transport"
-import { SessionNative } from "@opencode/core/session/native"
 import { Money } from "@opencode/schema/money"
 import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionExecution } from "@opencode/core/session/execution"
@@ -1517,7 +1516,7 @@ describe("SessionRunnerLLM", () => {
       const replacement = [
         Message.assistant(CompactionPart.make({ provider: s.currentModel.provider, encrypted: "checkpoint" })),
       ]
-      const native = SessionNative.encode(replacement)
+      const native = { messages: JSON.parse(JSON.stringify(replacement)) }
       yield* s.bus.publish(SessionEvent.Compaction.Ended, {
         sessionID,
         reason: "manual",

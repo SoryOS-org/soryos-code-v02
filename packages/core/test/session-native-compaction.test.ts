@@ -20,13 +20,15 @@ import { InstructionState } from "@opencode/core/session/instruction-state"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionModelRequest } from "@opencode/core/session/model-request"
 import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionNative } from "@opencode/core/session/native"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { SessionSchema } from "@opencode/core/session/schema"
 import { SessionStore } from "@opencode/core/session/store"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { DateTime, Deferred, Effect, Fiber, Schema } from "effect"
 import { testEffect } from "./lib/effect"
+
+const decode = (checkpoint: { readonly native: { readonly messages: unknown } }) =>
+  Schema.decodeUnknownSync(SessionHistory.NativeWindow)(checkpoint.native.messages)
 
 const it = testEffect(
   AppNodeBuilder.build(
@@ -214,7 +216,7 @@ const setup = Effect.fnUntraced(function* (options: { endpoint?: boolean } = {})
   const checkpoint = Effect.gen(function* () {
     const messages = (yield* load).messages
     const last = messages.findLast((message) => message.type === "compaction" && message.status === "completed")
-    if (!last || !SessionNative.isCheckpoint(last)) return yield* Effect.die("Missing native checkpoint")
+    if (!last || !SessionHistory.isNativeCompaction(last)) return yield* Effect.die("Missing native checkpoint")
     expect(last.summary).toBe("")
     expect(last.metadata?.recent).toBeUndefined()
     // Provider compaction has no summary, so the request usage is the only visible cost of the operation.
@@ -252,7 +254,7 @@ it.live(
       yield* fixture.prompt("Synthetic context, not a user request", true)
       expect(yield* fixture.compact).toEqual({ status: "completed" })
       const first = yield* fixture.checkpoint
-      expect(SessionNative.decode(first).map((message) => message.role)).toEqual(["user", "assistant"])
+      expect(decode(first).map((message) => message.role)).toEqual(["user", "assistant"])
       expect(JSON.stringify(first.native.messages)).not.toContain("Synthetic context")
       expect(fixture.bodies[0]).toMatchObject({
         input: expect.arrayContaining([{ type: "compaction_trigger" }]),
@@ -278,7 +280,7 @@ it.live(
       expect(yield* fixture.compact).toEqual({ status: "completed" })
       const second = yield* fixture.checkpoint
       expect(
-        SessionNative.decode(second)
+        decode(second)
           .filter((message) => message.role === "user")
           .map((message) => message.content),
       ).toEqual([[Message.text("First real user request")], [Message.text("Second real user request")]])
@@ -318,9 +320,7 @@ it.live(
           decision: { retry: true, delay: 0 },
         },
       ])
-      expect(SessionNative.decode(yield* fixture.checkpoint).filter((message) => message.role === "user")).toHaveLength(
-        3,
-      )
+      expect(decode(yield* fixture.checkpoint).filter((message) => message.role === "user")).toHaveLength(3)
     }),
   15000,
 )
@@ -332,7 +332,7 @@ it.live("manual and automatic endpoint compaction keep the provider replacement 
     expect(yield* fixture.compact).toEqual({ status: "completed" })
     yield* fixture.prompt("Later user")
     expect(yield* fixture.overflow).toEqual({ status: "completed" })
-    const replacement = SessionNative.decode(yield* fixture.checkpoint)
+    const replacement = decode(yield* fixture.checkpoint)
     expect(replacement[0]?.content).toEqual([Message.text("endpoint retained")])
     expect(JSON.stringify(replacement)).not.toContain("Original user")
     expect(fixture.state.calls).toBe(2)
