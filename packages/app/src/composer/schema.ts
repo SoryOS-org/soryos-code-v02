@@ -2,6 +2,7 @@ import { Schema, SchemaGetter, Struct } from "effect"
 import { checksum } from "@opencode/util/encode"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Skill } from "@opencode/schema/skill"
+import { Session } from "@opencode/schema/session"
 import { Persistence } from "@/runtime/persistence/schema"
 import { FileSelection, SelectedLineRange } from "@/workspaces/files/types"
 
@@ -58,6 +59,14 @@ export const SkillPart = Persistence.struct({
 })
 
 export type SkillPart = typeof SkillPart.Type
+
+export const SessionPart = Persistence.struct({
+  type: Schema.Literal("session"),
+  ...PartBase,
+  id: Session.ID,
+})
+
+export type SessionPart = typeof SessionPart.Type
 
 const ImageFields = {
   type: Schema.Literal("image"),
@@ -121,6 +130,7 @@ export const ContentPart = Schema.Union([
   FileAttachmentPart,
   AgentPart,
   SkillPart,
+  SessionPart,
   ImageAttachmentPart,
   PathAttachmentPart,
 ])

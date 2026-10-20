@@ -36,6 +36,7 @@ export function createSessionRevert(input: {
     const restored = extractPromptFromMessage(message, {
       directory: location().directory,
       attachmentName: language.t("common.attachment"),
+      sessionTitle: (id) => data.session.get(id)?.title,
     })
 
     const context = extractPromptContext(message, { directory: location().directory })

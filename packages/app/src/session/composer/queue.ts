@@ -241,6 +241,7 @@ export function createSessionQueue(input: {
       prompt: extractPromptFromMessage(source, {
         directory: location().directory,
         attachmentName: language.t("common.attachment"),
+        sessionTitle: (id) => data.session.get(id)?.title,
       }),
       context: [...context.comments, ...context.files],
     })

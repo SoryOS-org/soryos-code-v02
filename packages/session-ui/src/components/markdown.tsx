@@ -795,7 +795,7 @@ export function Markdown(
     })
     activeCodeKeys.clear()
     nextCodeKeys.forEach((key) => activeCodeKeys.add(key))
-    const sessionLinks = !!markdown?.openSession
+    const sessionLinks = markdown?.sessionTitle
     const localFileExists = markdown?.localFileExists
 
     content.forEach((block, index) => {
@@ -803,6 +803,8 @@ export function Markdown(
       updateBlock(container, index, block, labels, sessionLinks, localFileExists)
     })
     renderedBlocks = content
+
+    if (sessionLinks) markSessionLinks(container, sessionLinks)
 
     while (container.children.length > content.length) {
       const child = container.lastElementChild
@@ -923,7 +925,7 @@ function updateBlock(
   index: number,
   block: RenderedBlock,
   labels: CopyLabels,
-  sessionLinks: boolean,
+  sessionLinks: ((id: string) => string | undefined) | undefined,
   localFileExists?: MarkdownLocalFileExists,
 ) {
   const current = container.children[index]
@@ -965,7 +967,7 @@ function updateBlock(
   markCodeLinks(source)
   wrapTables(source)
 
-  if (sessionLinks) markSessionLinks(source)
+  if (sessionLinks) markSessionLinks(source, sessionLinks)
   markExternalLinkFavicons(source)
 
   if (rendered) {

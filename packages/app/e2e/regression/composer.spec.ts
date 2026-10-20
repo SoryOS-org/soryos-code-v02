@@ -1,8 +1,42 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { NO_PROVIDER, SERVER, T0, holdRoute, provider, sessionHref } from "../utils/app"
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
+import type { MockServerConfig } from "../utils/mock-server"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
+
+test("mention a session by title, send its stable token, and open its own tab", async ({ page }) => {
+  const target = "ses_0123456789abcdefghijklmnop"
+  const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []
+
+  const view = await openSession(page, {
+    name: "SessionMentions",
+    findFiles: () => [],
+    sessions: [
+      { id: "ses_mentions_source", title: "Review the plan" },
+      { id: target, title: "Auth middleware" },
+    ],
+    seed: { tabs: ["ses_mentions_source"] },
+    onPrompt: (input) => void prompts.push(input.body),
+  })
+
+  await view.editor.fill("Compare with @Auth")
+  await page
+    .locator('[data-component="composer-suggestions"]')
+    .getByRole("button", { name: /Auth middleware/ })
+    .click()
+  await expect(view.editor.locator('[data-mention="session"]')).toHaveText("@Auth middleware")
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts.length).toBe(1)
+  expect(prompts[0]?.text).toBe(`Compare with @session:${target} `)
+  const message = page.locator('[data-timeline-row="UserMessage"]')
+  const chip = message.getByRole("button", { name: "Auth middleware", exact: true })
+  await expect(chip).toBeVisible()
+  await chip.click()
+  await expect(page).toHaveURL(new RegExp(`${target}$`))
+  await expect(page.locator("[data-titlebar-tab-link]").filter({ hasText: "Review the plan" })).toHaveCount(1)
+  await expect(page.locator('[data-titlebar-tab-slot][data-active="true"]')).toContainText("Auth middleware")
+})
 
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
   const alpha = { id: "alpha", name: "Alpha", variants: { high: {} } }

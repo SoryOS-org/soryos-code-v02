@@ -1,3 +1,31 @@
+.markdown-session-link {
+  display: inline;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--v2-background-bg-layer-02);
+  box-shadow: inset 0 0 0 1px var(--v2-border-border-base);
+  color: var(--text-interactive-base);
+  font: inherit;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.markdown-session-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-session-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.markdown-session-id {
+  font-family: var(--font-family-mono);
+}
+
 [data-component="markdown"] {
   --markdown-inline-code-path-color: var(--v2-text-text-code-path);
   --markdown-inline-code-color: var(--v2-text-text-code-accent);
@@ -155,26 +183,6 @@
 
   a[data-local-link] {
     cursor: pointer;
-  }
-
-  .markdown-session-link {
-    display: inline;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text-interactive-base);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .markdown-session-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .markdown-session-link:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
   }
 
   &[data-local-links] :not(pre) > code[data-inline-code-kind="path"]:not(a > code) {

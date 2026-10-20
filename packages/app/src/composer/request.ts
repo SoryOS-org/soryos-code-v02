@@ -1,4 +1,6 @@
 import { encodeFilePath, getFilename } from "@opencode/util/path"
+import { parseSessionMention } from "@opencode/util/session-mention"
+import { serializePrompt } from "./prompt-parts"
 import type { FileSelection } from "@/workspaces/files/model"
 import type {
   AgentPart,
@@ -66,7 +68,7 @@ const parseCommentMentions = (comment: string) => {
   return Array.from(comment.matchAll(mention)).flatMap((match) => {
     const path = (match[2] ?? "").replace(/[.,!?;:)}\]"']+$/, "")
 
-    if (!path) return []
+    if (!path || parseSessionMention(`@${path}`)) return []
 
     return [path]
   })
@@ -109,13 +111,19 @@ export function quoteComment(item: QuoteContextItem) {
 }
 
 export function buildPromptRequest(input: BuildPromptRequestInput): PromptRequest {
-  const skills = input.prompt.filter(isSkillAttachment).map((attachment) => ({
+  const prompt = serializePrompt(input.prompt)
+
+  const text = input.prompt.some((part) => part.type === "session")
+    ? prompt.map((part) => ("content" in part ? part.content : "")).join("")
+    : input.text
+
+  const skills = prompt.filter(isSkillAttachment).map((attachment) => ({
     id: attachment.id,
     name: attachment.name,
     mention: { start: attachment.start, end: attachment.end, text: attachment.content },
   }))
 
-  const files = input.prompt.filter(isFileAttachment).map((attachment) => {
+  const files = prompt.filter(isFileAttachment).map((attachment) => {
     const path = absolute(input.sessionDirectory, attachment.path)
 
     return {
@@ -127,7 +135,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     }
   })
 
-  const agents = input.prompt.filter(isAgentAttachment).map((attachment) => ({
+  const agents = prompt.filter(isAgentAttachment).map((attachment) => ({
     name: attachment.name,
     mention: { start: attachment.start, end: attachment.end, text: attachment.content },
   }))
@@ -197,7 +205,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
 
   return {
     text: [
-      ...(input.text.trim() ? [input.text] : []),
+      ...(text.trim() ? [text] : []),
       ...attachments.map(formatAttachmentReference),
       ...comments.map((comment) => {
         if (comment.type === "note") return formatNoteComment(comment)
@@ -207,7 +215,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
         return formatCommentNote(comment)
       }),
     ].join("\n"),
-    displayText: input.text,
+    displayText: text,
     files: [...files, ...context, ...inline],
     agents,
     skills,

@@ -16,6 +16,8 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Markdown } from "../components/markdown"
 import { linkSegments } from "../components/link-segments"
+import { sessionReferenceText, setupSessionLinks } from "../components/markdown-session-links"
+import { useMarkdown } from "../context/markdown"
 import { ImagePreview } from "@opencode/ui/image-preview"
 import { getFilename } from "@opencode/util/path"
 import { AttachmentCard } from "./attachment-card"
@@ -541,13 +543,16 @@ function CurrentHighlightedText(props: {
     ].sort((a, b) => a.start - b.start)
 
     const result: HighlightSegment[] = []
+
     // Plain text between references may contain URLs, which become links.
     const pushText = (text: string) =>
       result.push(
-        ...linkSegments(text).map((segment): HighlightSegment => ({
-          text: segment.text,
-          type: segment.href ? "link" : undefined,
-        })),
+        ...linkSegments(text).map(
+          (segment): HighlightSegment => ({
+            text: segment.text,
+            type: segment.href ? "link" : undefined,
+          }),
+        ),
       )
 
     let last = 0
@@ -571,7 +576,10 @@ function CurrentHighlightedText(props: {
           when={segment.type === "link"}
           fallback={
             <span data-highlight={segment.type}>
-              <Show when={segment.type && segment.text.startsWith("@")} fallback={segment.text}>
+              <Show
+                when={segment.type && segment.text.startsWith("@")}
+                fallback={<SessionReferenceText text={segment.text} />}
+              >
                 <span data-slot="user-message-mention-prefix">@</span>
                 {segment.text.slice(1)}
               </Show>
@@ -588,6 +596,15 @@ function CurrentHighlightedText(props: {
 }
 
 type HighlightSegment = { text: string; type?: "file" | "agent" | "link" }
+
+function SessionReferenceText(props: { text: string }) {
+  const markdown = useMarkdown()
+  const root = document.createElement("span")
+  createEffect(() => root.replaceChildren(sessionReferenceText(props.text, (id) => markdown?.sessionTitle?.(id))))
+  onCleanup(setupSessionLinks(root, () => markdown?.openSession))
+
+  return root
+}
 
 /** A compaction the server admitted but has not started, drawn as the divider a started one opens with. */
 export function SessionCompactionQueued() {

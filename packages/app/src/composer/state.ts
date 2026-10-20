@@ -31,6 +31,7 @@ export type {
   QuoteComment,
   QuoteContextItem,
   SkillPart,
+  SessionPart,
   TextPart,
 } from "./schema"
 

@@ -21,6 +21,9 @@ import { readLocalImage } from "@/runtime/server/image"
 import { showToast } from "@/shell/notifications/toast"
 import { formatServerError } from "@/runtime/server/errors"
 import { Skill } from "@opencode/schema/skill"
+import { Session } from "@opencode/schema/session"
+import { parseSessionMention } from "@opencode/util/session-mention"
+import { createServerSessionEntries } from "@/shell/commands/palette"
 import type { ComposerAdapter, ComposerControls, ComposerQueue } from "./adapter"
 import { isAttachment } from "./prompt-parts"
 import { isCommentItem } from "./state"
@@ -199,6 +202,27 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const skills = createMemo(() => data.location.skill.list({ directory: sdk().directory }) ?? [])
 
+  const sessions = createServerSessionEntries({
+    server: server.key,
+    projects: server.ctx.projects.list,
+    load: async (search, signal) => {
+      const page = await serverSDK.api.session.list({ parentID: null, search, limit: 50 }, { signal })
+      page.data.forEach(data.session.remember)
+
+      return page
+    },
+    get: async (sessionID, signal) => {
+      const session = await serverSDK.api.session.get({ sessionID }, { signal })
+      data.session.remember(session)
+
+      return session
+    },
+    untitled: () => language.t("command.session.new"),
+    category: () => language.t("command.category.session"),
+    recentCategory: () => language.t("palette.group.recentSessions"),
+    recentLimit: 50,
+  })
+
   const context = createMemo<ComposerSuggestion[]>(() => [
     ...references(),
     ...skills().map((skill) => ({
@@ -329,6 +353,34 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
     commands,
     context,
+    searchSessions: async (query) => {
+      if (interaction[0].popover.type !== "context") return []
+
+      return (await sessions(query))
+        .sort((a, b) => (b.updated ?? 0) - (a.updated ?? 0))
+        .flatMap((entry): ComposerSuggestion[] => {
+          if (adapter.kind === "active-session" && entry.sessionID === adapter.session().id) return []
+          const mention = entry.sessionID && parseSessionMention(entry.sessionID)
+
+          if (!mention) return []
+
+          return [
+            {
+              id: `session:${mention.id}`,
+              kind: "session",
+              label: entry.title,
+              description: entry.description,
+              mention: {
+                type: "session",
+                id: Session.ID.make(mention.id),
+                content: `@${entry.title}`,
+                start: 0,
+                end: 0,
+              },
+            },
+          ]
+        })
+    },
     searchContextFiles: async (query) =>
       (await files.searchFilesAndDirectories(query)).map((path) => ({
         id: `file:${path}`,

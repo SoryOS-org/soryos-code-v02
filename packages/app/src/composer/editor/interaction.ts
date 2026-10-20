@@ -65,6 +65,7 @@ export function createComposerEditor(input: {
   commands: Accessor<ComposerSuggestion[]>
   context: Accessor<ComposerSuggestion[]>
   searchContextFiles: (query: string) => ComposerSuggestion[] | Promise<ComposerSuggestion[]>
+  searchSessions?: (query: string) => Promise<ComposerSuggestion[]>
   openAttachment?: (attachment: ComposerAttachment, origin?: HTMLElement) => void
   /** An object URL for the image file at this path, which a path attachment references without its bytes. */
   readImage?: (path: string) => Promise<string | undefined>
@@ -132,16 +133,21 @@ export function createComposerEditor(input: {
       const fixed = input.context().filter((item) => item.kind !== "file")
       const recent = input.context().filter((item) => item.kind === "file" && item.recent)
 
-      if (!query.trim()) return [...fixed, ...recent]
       const seen = new Set(recent.map((item) => item.id))
-      const files = (await input.searchContextFiles(query)).filter((item) => !seen.has(item.id))
 
-      return [...fixed, ...recent, ...files]
+      const [sessions, files] = await Promise.all([
+        input.searchSessions?.(query) ?? [],
+        query.trim() ? input.searchContextFiles(query) : [],
+      ])
+
+      return [...sessions, ...fixed, ...recent, ...files.filter((item) => !seen.has(item.id))]
     },
     key: (item) => item.id,
     filterKeys: ["label"],
-    skipFilter: (item) => item.kind === "file" && !item.recent,
+    skipFilter: (item) => item.kind === "session" || (item.kind === "file" && !item.recent),
     groupBy: (item) => {
+      if (item.kind === "session") return "session"
+
       if (item.kind === "reference") return "reference"
 
       if (item.kind === "skill") return "skill"
@@ -155,7 +161,7 @@ export function createComposerEditor(input: {
       return "file"
     },
     sortGroupsBy: (a, b) => {
-      const order = ["reference", "skill", "agent", "resource", "recent", "file"]
+      const order = ["session", "reference", "skill", "agent", "resource", "recent", "file"]
 
       return order.indexOf(a.category) - order.indexOf(b.category)
     },

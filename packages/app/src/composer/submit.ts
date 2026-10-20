@@ -4,7 +4,7 @@ import type { Accessor } from "solid-js"
 import type { PromptComment } from "./comment-note"
 import type { PromptHistoryComment } from "./history/entry"
 import { isCommentItem, type ContextItem, type ImageAttachmentPart, type Prompt } from "./state"
-import { clonePrompt, promptLength } from "./prompt-parts"
+import { clonePrompt, promptLength, serializePrompt } from "./prompt-parts"
 import type { ComposerAdapter, ComposerDelivery, ComposerSelection, ComposerSession } from "./adapter"
 import { createComposerSubmission } from "./submission-state"
 import { buildPromptRequest, noteComment, quoteComment } from "./request"
@@ -251,10 +251,12 @@ function submissionText(prompt: Prompt) {
 }
 
 function handoffMessage(value: ComposerSubmission): SessionMessageUser {
+  const text = submissionText(serializePrompt(value.prompt))
+
   return {
     id: value.id,
     type: "user",
-    text: value.text,
+    text,
     files: value.images.map((image) => ({
       data: "",
       mime: image.mime,
@@ -262,7 +264,7 @@ function handoffMessage(value: ComposerSubmission): SessionMessageUser {
       name: image.sourcePath ?? image.filename,
     })),
     metadata: {
-      displayText: value.text,
+      displayText: text,
       attachments: value.prompt.flatMap((part) =>
         part.type === "path" ? [{ name: part.filename, mime: part.mime, path: part.path }] : [],
       ),

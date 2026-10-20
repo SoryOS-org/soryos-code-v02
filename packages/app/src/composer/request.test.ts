@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Skill } from "@opencode/schema/skill"
+import { Session } from "@opencode/schema/session"
 import type { ImageAttachmentPart, Prompt } from "@/composer/state"
 import type { FileSelection } from "@/workspaces/files/model"
 import { buildPromptRequest } from "./request"
@@ -9,6 +10,24 @@ function inline(filename: string, mime: string, extra?: Partial<ImageAttachmentP
 }
 
 describe("buildPromptRequest", () => {
+  test("serializes session chips and keeps subsequent file offsets aligned with the wire text", () => {
+    const result = buildPromptRequest({
+      prompt: [
+        { type: "session", id: Session.ID.make("ses_0123456789abcdefghijklmnop"), content: "@Auth", start: 0, end: 5 },
+        { type: "text", content: " ", start: 5, end: 6 },
+        { type: "file", path: "a.ts", content: "@a.ts", start: 6, end: 11 },
+      ],
+      context: [],
+      images: [],
+      text: "@Auth @a.ts",
+      sessionDirectory: "/repo",
+    })
+
+    expect(result.text).toBe("@session:ses_0123456789abcdefghijklmnop @a.ts")
+    expect(result.displayText).toBe(result.text)
+    expect(result.files[0]?.mention).toEqual({ start: 40, end: 45, text: "@a.ts" })
+  })
+
   test("builds text, files, and agents from the prompt", () => {
     const prompt: Prompt = [
       { type: "text", content: "hello", start: 0, end: 5 },

@@ -453,6 +453,8 @@ function renderComposerEditor(editor: HTMLDivElement, prompt: ComposerPrompt) {
       mention.dataset.mention =
         part.type === "file" && part.mime === "application/x-directory" ? "reference" : part.type
 
+      if (part.type === "session") mention.title = part.id
+
       if (part.type === "agent") mention.dataset.name = part.name
 
       if (part.type === "skill") {
@@ -497,6 +499,13 @@ function parseComposerEditor(editor: HTMLDivElement) {
     flush()
     const content = element.textContent ?? ""
     const original = mentionParts.get(element)
+
+    if (original?.type === "session") {
+      parts.push({ ...original, content, start: position, end: position + content.length })
+      position += content.length
+
+      return
+    }
 
     if (element.dataset.mention === "agent") {
       const agent: ComposerAgentPart = {
@@ -1276,6 +1285,8 @@ export function ComposerEditorSubmitButton(props: {
 }
 
 function ComposerSuggestionIcon(props: { item: ComposerSuggestion }) {
+  if (props.item.kind === "session") return <Icon name="speech-bubble" size="small" class="shrink-0" />
+
   if (props.item.kind === "agent") return <Icon name="brain" size="small" class="shrink-0 text-icon-info-active" />
 
   if (props.item.kind === "skill") return <Icon name="post-skill" size="small" class="shrink-0" />

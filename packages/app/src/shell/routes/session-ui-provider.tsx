@@ -66,6 +66,12 @@ export function SessionUIProvider(
     tabs.select(tabs.addSessionTab({ server: props.server, sessionId: session.id }))
   }
 
+  const sessionTitle = (id: string) => {
+    const session = data.session.get(id)
+
+    return session && !session.time.archived ? session.title || language.t("command.session.new") : undefined
+  }
+
   const providers = useProviders(directory)
 
   // Turn diffs live in the tab's in-memory state, so they outlast timeline remounts and go when the tab closes.
@@ -118,7 +124,7 @@ export function SessionUIProvider(
         data.session.prompt({ ...input, metadata: { genui: settings.general.generatedUI() } }).then(() => undefined)
       }
     >
-      <MarkdownProvider readImage={readImage()} openSession={openReferencedSession}>
+      <MarkdownProvider readImage={readImage()} openSession={openReferencedSession} sessionTitle={sessionTitle}>
         <LocalProvider>{props.children}</LocalProvider>
       </MarkdownProvider>
     </DataProvider>
