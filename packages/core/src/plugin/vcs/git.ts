@@ -617,7 +617,7 @@ const untrackedBatch = Effect.fnUntraced(function* (
   )
 })
 
-/** Entries a folder listing checks before it stops and reports the rest as omitted. */
+/** Entries a folder listing shows before it stops and reports the rest as omitted. */
 const MAX_FOLDER_ENTRIES = 500
 
 /**
@@ -637,10 +637,17 @@ const statusItems = Effect.fnUntraced(function* (ctx: Ctx, untracked: Untracked 
     return { list, omitted: 0 }
 
   const names = yield* Effect.promise(() => fs.readdir(ctx.directory).then((items) => items.toSorted()))
-  const checked = names.slice(0, MAX_FOLDER_ENTRIES)
+  // Ignored entries do not list, so check entries a batch at a time until the listing fills or the folder runs out.
+  const entries: Item[] = []
+  let checked = 0
+  while (checked < names.length && entries.length < MAX_FOLDER_ENTRIES) {
+    const batch = names.slice(checked, checked + MAX_FOLDER_ENTRIES)
+    checked += batch.length
+    entries.push(...(yield* ctx.git.status(ctx.directory, "normal", batch)))
+  }
   return {
-    list: checked.length === 0 ? [] : yield* ctx.git.status(ctx.directory, "normal", checked),
-    omitted: names.length - checked.length,
+    list: entries.slice(0, MAX_FOLDER_ENTRIES),
+    omitted: Math.max(0, entries.length - MAX_FOLDER_ENTRIES) + names.length - checked,
   }
 })
 

@@ -639,16 +639,21 @@ describe("Vcs", () => {
         yield* Effect.promise(async () => {
           await initGit(directory, "-b", "main")
           await fs.writeFile(path.join(directory, "keep.txt"), "one\n")
-          await fs.writeFile(path.join(directory, ".gitignore"), "artifacts/\n")
+          await fs.writeFile(path.join(directory, ".gitignore"), "artifacts/\nresearch/noisy/a-*\n")
           await commitAll(directory, "initial")
           await fs.writeFile(path.join(directory, "keep.txt"), "two\n")
           await fs.mkdir(path.join(directory, "artifacts"))
           await fs.mkdir(path.join(directory, "research/deep"), { recursive: true })
           await fs.mkdir(path.join(directory, "research/wide"), { recursive: true })
+          await fs.mkdir(path.join(directory, "research/noisy"), { recursive: true })
+          await fs.writeFile(path.join(directory, "research/noisy/z-important.ts"), "keep\n")
           await fs.writeFile(path.join(directory, "research/deep/inner.md"), "inner\n")
           await Promise.all(
             Array.from({ length: 505 }, (_, index) =>
-              fs.writeFile(path.join(directory, `research/wide/${String(index).padStart(3, "0")}.md`), "wide\n"),
+              Promise.all([
+                fs.writeFile(path.join(directory, `research/wide/${String(index).padStart(3, "0")}.md`), "wide\n"),
+                fs.writeFile(path.join(directory, `research/noisy/a-${index}.log`), "ignored\n"),
+              ]),
             ),
           )
           await Promise.all(
@@ -679,11 +684,11 @@ describe("Vcs", () => {
         expect(root.diff.map((row) => row.file)).toEqual(["keep.txt", "research/"])
         expect(root.diff[1]).toMatchObject({ status: "added", additions: 0, deletions: 0 })
         // Callers that do not ask for folders, such as the TUI and plugins, still get every file.
-        expect(root.all).toHaveLength(1 + 50 + 1 + 505)
-        expect(root.status).toHaveLength(1 + 50 + 1 + 505)
+        expect(root.all).toHaveLength(1 + 50 + 1 + 505 + 1)
+        expect(root.status).toHaveLength(1 + 50 + 1 + 505 + 1)
 
         const folder = yield* review("research")
-        expect(folder.diff).toHaveLength(52)
+        expect(folder.diff).toHaveLength(53)
         expect(folder.diff.find((row) => row.file === "research/7.md")).toMatchObject({
           status: "added",
           additions: 1,
@@ -691,6 +696,7 @@ describe("Vcs", () => {
         expect(folder.diff.find((row) => row.file === "research/7.md")?.patch).toContain("+line 7")
         expect(folder.diff.filter((row) => row.file.endsWith("/")).map((row) => row.file)).toEqual([
           "research/deep/",
+          "research/noisy/",
           "research/wide/",
         ])
         expect(folder.diff.some((row) => row.omitted)).toBeFalse()
@@ -699,6 +705,11 @@ describe("Vcs", () => {
         const wide = (yield* review("research/wide")).diff
         expect(wide).toHaveLength(500)
         expect(wide.at(-1)).toMatchObject({ file: "research/wide/499.md", omitted: 5 })
+
+        // 505 ignored entries sort before the one that lists.
+        expect((yield* review("research/noisy")).diff.map((row) => [row.file, row.omitted])).toEqual([
+          ["research/noisy/z-important.ts", undefined],
+        ])
       }),
     ),
   )
