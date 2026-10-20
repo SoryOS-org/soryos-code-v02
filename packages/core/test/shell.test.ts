@@ -49,17 +49,20 @@ describe("shell", () => {
   })
 
   test("builds command args per shell family", () => {
-    expect(ShellSelect.args("/bin/sh", "echo hi")).toEqual(["-c", "echo hi"])
-    expect(ShellSelect.args("/usr/bin/fish", "echo hi")).toEqual(["-c", "echo hi"])
-    expect(ShellSelect.args("/bin/zsh", "echo hi")).toEqual(["-c", "echo hi"])
-    expect(ShellSelect.args("/bin/bash", "echo hi")).toEqual(["-c", "echo hi"])
-    expect(ShellSelect.args("pwsh", "Write-Output hi")).toEqual([
-      "-NoLogo",
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      "Write-Output hi",
-    ])
+    // On Windows, bash and sh take the command from the environment; shell-gitbash.test.ts covers that.
+    if (process.platform !== "win32") {
+      expect(ShellSelect.launch("/bin/sh", "echo hi")).toEqual({ args: ["-c", "echo hi"] })
+      expect(ShellSelect.launch("/bin/bash", "echo hi")).toEqual({ args: ["-c", "echo hi"] })
+    }
+    expect(ShellSelect.launch("/usr/bin/fish", "echo hi")).toEqual({ args: ["-c", "echo hi"] })
+    expect(ShellSelect.launch("/bin/zsh", "echo hi")).toEqual({ args: ["-c", "echo hi"] })
+    // The WSL launcher does not forward the environment, so it keeps the command in its arguments.
+    expect(
+      ShellSelect.launch(path.join(process.env.SystemRoot ?? "C:/Windows", "System32", "bash.exe"), "echo hi"),
+    ).toEqual({ args: ["-c", "echo hi"] })
+    expect(ShellSelect.launch("pwsh", "Write-Output hi")).toEqual({
+      args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Write-Output hi"],
+    })
   })
 
   if (process.platform !== "win32") {

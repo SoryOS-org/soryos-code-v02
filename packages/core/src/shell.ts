@@ -275,7 +275,7 @@ const layer = () =>
         if (before) yield* before(invocation)
 
         const id = Shell.ID.ascending()
-        const args = ShellSelect.args(invocation.shell, invocation.command)
+        const launch = ShellSelect.launch(invocation.shell, invocation.command)
         const file = path.join(outputDir, `${id}.out`)
 
         const info: Info = {
@@ -298,9 +298,9 @@ const layer = () =>
             Effect.gen(function* () {
               const handle = yield* environment.spawner
                 .spawn(
-                  ChildProcess.make(invocation.shell, args, {
+                  ChildProcess.make(invocation.shell, launch.args, {
                     cwd: invocation.cwd,
-                    env: invocation.env,
+                    env: { ...invocation.env, ...launch.env },
                     stdin: "ignore",
                     detached: process.platform !== "win32",
                     forceKillAfter: Duration.seconds(3),

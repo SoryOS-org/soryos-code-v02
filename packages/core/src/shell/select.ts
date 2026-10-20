@@ -161,11 +161,32 @@ function info(file: string, options?: Options, bin?: string): Item {
   }
 }
 
-export function args(file: string, command: string) {
+// MSYS2 and Cygwin programs such as Git Bash split their Windows command line with rules that differ from the
+// MSVCRT quoting Node and Bun use: `\\` collapses to `\` and quoted arguments over 8192 chars are truncated.
+// On Windows, bash reads the command from the environment instead, which any native bash inherits. The fixed
+// script contains no `"` or `\`, so it decodes the same with or without MSYS=noglob. It disables globbing and
+// field splitting so the unquoted expansion stays verbatim; the variable's value restores both and unsets
+// itself before the command runs.
+const COMMAND_ENV = "OPENCODE_SHELL_COMMAND"
+
+export function launch(file: string, command: string): { args: string[]; env?: Record<string, string> } {
   const n = name(file)
-  if (n === "cmd") return ["/c", command]
-  if (ps(file)) return ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]
-  return ["-c", command]
+  if (n === "cmd") return { args: ["/c", command] }
+  if (ps(file)) return { args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command] }
+  if (process.platform === "win32" && (n === "bash" || n === "sh") && !wsl(file))
+    return {
+      args: ["-c", `set -f;IFS=;eval $${COMMAND_ENV}`],
+      env: { [COMMAND_ENV]: `set +f;IFS=$' \\t\\n';unset ${COMMAND_ENV};${command}` },
+    }
+  return { args: ["-c", command] }
+}
+
+// The WSL launcher is a system component under the Windows directory and does not forward the environment.
+function wsl(file: string) {
+  const exe = rooted(file) ? FSUtil.windowsPath(file) : findExecutable(file)
+  if (!exe) return false
+  const relative = path.win32.relative(process.env.SystemRoot ?? "C:\\Windows", exe)
+  return !relative.startsWith("..") && !path.win32.isAbsolute(relative)
 }
 
 // Resolve afresh so removing a shell does not leave terminals using a stale cached path.

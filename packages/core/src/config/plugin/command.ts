@@ -218,10 +218,13 @@ function evaluateTemplate(
       matches,
       (match) => {
         const source = match[1] ?? ""
+        const launch = ShellSelect.launch(shell, source)
         return services.processes
           .run(
-            ChildProcess.make(shell, ShellSelect.args(shell, source), {
+            ChildProcess.make(shell, launch.args, {
               cwd: services.location.directory,
+              env: launch.env,
+              extendEnv: true,
               stdin: "ignore",
             }),
             { combineOutput: true },
