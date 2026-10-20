@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, lt, or, sql } from "drizzle-orm"
 import { Effect, Schema } from "effect"
+import type { Model } from "@opencode/schema/model"
 import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { Database } from "../database/database.js"
 import { MessageDecodeError } from "./error.js"
@@ -7,7 +8,7 @@ import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
 import { Instructions } from "../instructions/index.js"
 import { InstructionState } from "./instruction-state.js"
-import { SessionProviderContext } from "./provider-context.js"
+import { SessionNative } from "./native.js"
 import { SessionRecentText } from "./recent-text.js"
 import { SessionMessageTable } from "./sql.js"
 
@@ -19,14 +20,14 @@ const decodeSync = Schema.decodeUnknownSync(SessionMessage.Info)
 /**
  * Which completed compactions bound a history read. Local summaries always do. Native
  * windows do for model-neutral readers (`latest`), never for the original transcript
- * (`local`), and only when the target model can replay them (a provenance).
+ * (`local`), and only when the target model can replay them.
  */
-export type Boundary = "latest" | "local" | SessionProviderContext.Provenance
+export type Boundary = "latest" | "local" | Model.Ref
 
 const replayable = (message: SessionMessage.Info, boundary: Boundary) =>
-  !SessionProviderContext.isCheckpoint(message) ||
+  !SessionNative.isCheckpoint(message) ||
   boundary === "latest" ||
-  (boundary !== "local" && SessionProviderContext.compatible(message.providerContext.provenance, boundary))
+  (boundary !== "local" && SessionNative.reusable(message.model, boundary))
 
 export const latestCompaction = Effect.fnUntraced(function* (
   db: DatabaseService,
@@ -44,14 +45,13 @@ export const latestCompaction = Effect.fnUntraced(function* (
         boundary === "latest"
           ? undefined
           : or(
-              sql`json_extract(${SessionMessageTable.data}, '$.providerContext') is null`,
+              // Rows written before v2.1 hold the window in `providerContext`.
+              sql`coalesce(json_extract(${SessionMessageTable.data}, '$.native.messages'), json_extract(${SessionMessageTable.data}, '$.providerContext')) is null`,
               boundary === "local"
                 ? undefined
                 : and(
-                    ...Object.entries(boundary).map(
-                      ([key, value]) =>
-                        sql`json_extract(${SessionMessageTable.data}, ${`$.providerContext.provenance.${key}`}) = ${value}`,
-                    ),
+                    sql`json_extract(${SessionMessageTable.data}, '$.model.providerID') = ${boundary.providerID}`,
+                    sql`json_extract(${SessionMessageTable.data}, '$.model.id') = ${boundary.id}`,
                   ),
             ),
       ),
@@ -73,11 +73,7 @@ export const decodeMessageRowSync = (row: typeof SessionMessageTable.$inferSelec
 
 export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) =>
   decode(rowInput(row)).pipe(
-    Effect.tap((message) =>
-      SessionProviderContext.isCheckpoint(message)
-        ? SessionProviderContext.validate(message.providerContext)
-        : Effect.void,
-    ),
+    Effect.tap((message) => (SessionNative.isCheckpoint(message) ? SessionNative.validate(message) : Effect.void)),
     Effect.mapError(
       () =>
         new MessageDecodeError({
@@ -112,7 +108,7 @@ const messageEntries = Effect.fnUntraced(function* (
   // Re-expansion may cross a native checkpoint whose completion already advanced the instruction
   // epoch: the baseline supersedes the chronological updates before it. Forks seed their baseline
   // at sequence 0 but retain parent sequences, so the copied checkpoint still retires them.
-  const native = entries.findLast((entry) => SessionProviderContext.isCheckpoint(entry.message))
+  const native = entries.findLast((entry) => SessionNative.isCheckpoint(entry.message))
   // Skipped native checkpoints are not textual summaries. Their original transcript remains available.
   return entries.filter(
     (entry) =>
