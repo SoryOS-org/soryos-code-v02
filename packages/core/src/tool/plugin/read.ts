@@ -88,6 +88,11 @@ export const Plugin = {
                 if (result.target.externalDirectory !== undefined) return
                 const resolved = yield* fs.resolve(result.target.absolute)
                 const root = yield* fs.resolve(location.directory)
+                // The walk below is bounded by the workspace root. A target outside
+                // it (for example a sibling project) never reaches the stop path, so
+                // the walk would run to the filesystem root and inject instructions
+                // from unrelated directories.
+                if (!FSUtil.contains(root, resolved)) return
                 // The Location and its ancestors are already supplied by initial instructions,
                 // even when an upward walk from elsewhere in the project cannot reach root.
                 const discovered = yield* fs.up({
