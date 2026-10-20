@@ -46,6 +46,7 @@ import { formatKeybindParts, useCommand } from "@/shell/commands/command"
 import { createMediaQuery } from "@solid-primitives/media"
 import { useIsRouting, useLocation } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
+import { createClosedTabs } from "./closed-tabs"
 import { createEmbeds } from "./embeds"
 import { useExtensionHost, type HostApiFactories } from "./host"
 import { createLocatedWrites } from "./located"
@@ -646,6 +647,7 @@ export function createExtensionAttachment(apis: HostApis) {
 
   // Writes made before a session's location is known wait for it rather than being dropped.
   const located = createLocatedWrites()
+  const closed = createClosedTabs()
 
   const open = (key: string, session: SessionRef, options?: OpenOptions) => {
     const item = provider(key)
@@ -695,14 +697,17 @@ export function createExtensionAttachment(apis: HostApis) {
     if (!value) return located.hold(session, () => close(key, session))
     const tab = listed(session, value).find((entry) => entry.key === key)?.tab
     const all = layout.panel.state(value).all
+    const view = mountedSession(session)
+    const currentScreen = screen()
+    const reopen = view && tab && currentScreen && item?.value.reopen?.({ tab, session: view, screen: currentScreen })
+
+    if (reopen) closed.push(session.key, reopen)
     batch(() => {
       layout.panel.close(value, key)
 
       // Closing the last tab closes the side region, which opens with a new tab next time.
       if (all.length === 1 && all[0] === key) tabs.setRegion(shellTab(session), "side", false)
     })
-    const view = mountedSession(session)
-    const currentScreen = screen()
 
     if (view && tab && currentScreen) item?.value.close?.({ tab, session: view, screen: currentScreen })
   }
@@ -866,6 +871,7 @@ export function createExtensionAttachment(apis: HostApis) {
     attach: () => apis.attach(mounted),
     /** The routed `MountedSession`. */
     current,
+    closed,
     region(value: Region) {
       setRegion(() => value)
 

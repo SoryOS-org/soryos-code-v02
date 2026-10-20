@@ -597,6 +597,8 @@ type RegionHost = {
     keys(): readonly string[]
     active(): string | undefined
     entry(key: string): { readonly tab: PanelTab; readonly extension: string; readonly provider: Panel } | undefined
+    close(key: string): void
+    reopen(): void
   }
   /** The real browser and file extensions. */
   definitions: readonly Definition[]
@@ -607,6 +609,8 @@ type RegionHost = {
     close: () => void
     review: () => void
     newSession: () => void
+    reopenSession: () => void
+    reopenSide: () => void
     /** The shortcut the browser's + menu item shows, as the host formats it; empty when it shows none. */
     shortcut: (shortcut: Accessor<string>) => void
   }>
@@ -629,6 +633,7 @@ type RegionFixtureState = {
   sessions: number
   /** How many browser tabs the pane asked main to open. */
   opens: number
+  reopens: number
   /** The page main reports, blank or loaded. */
   blank: boolean
   /** Native browser tab close requests, by tab id. */
@@ -663,6 +668,7 @@ export function mountBrowserRegion(input: RegionHost) {
       reviews: 0,
       sessions: 0,
       opens: 0,
+      reopens: 0,
       blank: false,
       closes: [],
       inspects: [],
@@ -671,6 +677,7 @@ export function mountBrowserRegion(input: RegionHost) {
     // The file tree's state, Changes or All files, as the file extension stores it.
     const [tree, setTree] = createSignal<object>()
     const [shortcut, setShortcut] = createSignal<Accessor<string>>(() => "")
+    const [sideRegion, setSideRegion] = createSignal<ReturnType<RegionHost["createRegion"]>>()
     const strip = (session: string) => store.strips[session] ?? { all: [] }
     const setAll = (session: string, all: string[]) => setStore("strips", session, "all", all)
 
@@ -758,7 +765,8 @@ export function mountBrowserRegion(input: RegionHost) {
 
         if (options?.tab !== "append") setStore("strips", session.key, "active", key)
       },
-      close: (key, session) => close(session.key, key),
+      // As the host does, the routed session's strip closes it.
+      close: (key, session) => (session.key === view().key ? sideRegion()?.close(key) : close(session.key, key)),
       toggle() {},
       hide() {},
       state(key, session) {
@@ -954,6 +962,8 @@ export function mountBrowserRegion(input: RegionHost) {
         }),
       })
 
+      setSideRegion(() => region)
+
       const browser = () => {
         const entry = region.entry(region.active() ?? "")
 
@@ -961,7 +971,7 @@ export function mountBrowserRegion(input: RegionHost) {
       }
 
       return (
-        <>
+        <aside id="review-panel" tabIndex={-1} aria-label="Side region">
           {/* The host strip draws a trigger for each of these keys. */}
           <div role="tablist" aria-label="Side panel" style={{ display: "flex", gap: "8px", margin: "16px 0" }}>
             <For each={region.keys()}>
@@ -1002,7 +1012,7 @@ export function mountBrowserRegion(input: RegionHost) {
               </PanelContext.Provider>
             )}
           </Show>
-        </>
+        </aside>
       )
     }
 
@@ -1030,6 +1040,8 @@ export function mountBrowserRegion(input: RegionHost) {
               close={() => setStore("closed", true)}
               review={() => setStore("reviews", (count) => count + 1)}
               newSession={() => setStore("sessions", (count) => count + 1)}
+              reopenSession={() => setStore("reopens", (count) => count + 1)}
+              reopenSide={() => sideRegion()?.reopen()}
               shortcut={(next) => setShortcut(() => next)}
             />
             <h1 style={{ "font-size": "24px", "margin-bottom": "16px" }}>Restored side strip</h1>
@@ -1067,6 +1079,7 @@ export function mountBrowserRegion(input: RegionHost) {
             <p data-testid="review-toggles">{store.reviews}</p>
             <p data-testid="new-sessions">{store.sessions}</p>
             <p data-testid="browser-opens">{store.opens}</p>
+            <p data-testid="session-reopens">{store.reopens}</p>
             <p data-testid="add-shortcut">{shortcut()() || "none"}</p>
             <p data-testid="browser-closes">{JSON.stringify(store.closes)}</p>
             <p data-testid="browser-inspects">{JSON.stringify(store.inspects)}</p>
