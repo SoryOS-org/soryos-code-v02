@@ -121,6 +121,7 @@ const generalSchema = Persistence.struct({
   }),
   showCustomAgents: Schema.Boolean,
   showTurnDiffs: Schema.Boolean,
+  showTurnNavigator: Schema.Boolean,
   backgroundActivity: Schema.Literals(["off", "left", "center", "right"]),
   // Lets agents render generated UI in the timeline; an experiment users can turn off.
   generatedUI: Schema.Boolean,
@@ -290,6 +291,7 @@ export const defaultSettings: Settings = {
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
     showTurnDiffs: false,
+    showTurnNavigator: true,
     backgroundActivity: "left",
     generatedUI: true,
     mobileTitlebarPosition: "top",
@@ -378,6 +380,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showTurnDiffs: withFallback(() => store.general?.showTurnDiffs, defaultSettings.general.showTurnDiffs),
         setShowTurnDiffs(value: boolean) {
           setStore("general", "showTurnDiffs", value)
+        },
+        showTurnNavigator: withFallback(
+          () => store.general?.showTurnNavigator,
+          defaultSettings.general.showTurnNavigator,
+        ),
+        setShowTurnNavigator(value: boolean) {
+          setStore("general", "showTurnNavigator", value)
         },
         backgroundActivity: withFallback(
           () => store.general?.backgroundActivity,

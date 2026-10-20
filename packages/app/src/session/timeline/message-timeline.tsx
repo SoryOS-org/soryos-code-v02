@@ -17,12 +17,14 @@ import { createSessionTimelineRowRenderer } from "@opencode/session-ui/timeline/
 import { getReadyMarkdown, preloadMarkdown } from "@opencode/session-ui/markdown-cache"
 import { createTimelineController, type TimelineController, type TimelineSessionSource } from "./controller"
 import { createTimelineVirtualizer } from "./virtualizer"
+import { TurnNavigator } from "./turn-navigator"
 import { containsDirectory } from "@opencode/util/path"
 import { isWorkspaceDirectory } from "@/workspaces/paths"
 import { parseCommentNote, readPromptPresentation } from "@/composer/comment-note"
 import { parseVoiceDelegation } from "./voice-delegation"
 import { useCommand } from "@/shell/commands/command"
 import { useExtensionScoped } from "@/runtime/extension/commands"
+import { useSettings } from "@/settings/model"
 import {
   SessionAncestorTrail,
   SessionHeaderLayout,
@@ -87,6 +89,7 @@ type MessageTimelineProps = {
   setVisibleRef?: (el: HTMLDivElement | undefined) => void
   anchor: (id: string) => string
   setRevealMessage?: (fn: (id: string, partID?: string) => void) => void
+  onRevealTurn?: (id: string) => Promise<void>
   setRevealPart?: (fn: (target: string) => boolean) => void
   setScrollToEnd?: (fn: (behavior?: ScrollBehavior) => void) => void
   reveal?: { target: () => string | undefined; done: () => void }
@@ -127,6 +130,7 @@ function MessageTimelineView(
   const language = useLanguage()
   const command = useCommand()
   const extensionScoped = useExtensionScoped()
+  const settings = useSettings()
   const server = useServer()
   const data = server.ctx.data
   const sdk = useWorkspaceLocation()
@@ -459,8 +463,27 @@ function MessageTimelineView(
     </div>
   )
 
+  const turnMessages = createMemo(() =>
+    props.session.history.messages().filter((message) => projection.messageRowIndex().has(message.id)),
+  )
+
   return (
     <VirtualizedTimeline
+      navigator={
+        <Show when={settings.general.showTurnNavigator() && props.onRevealTurn && sessionID()} keyed>
+          {(id) => (
+            <TurnNavigator
+              sessionID={id}
+              messages={turnMessages}
+              complete={() => !data.session.message.more(id)}
+              assistantMessagesByParent={projection.assistantMessagesByParent}
+              revertMessageID={() => props.session.data.info()?.revert?.messageID}
+              visibleUserMessageIDs={virtualized.visibleUserMessageIDs}
+              onSelect={(turn) => void props.onRevealTurn?.(turn).catch(() => undefined)}
+            />
+          )}
+        </Show>
+      }
       bottomSpacer={<Show when={!activityRow()}>{activity()}</Show>}
       deferred={(row) => {
         if (!Predicate.isTagged(row, "AssistantPart") || row.group.type !== "part") return false

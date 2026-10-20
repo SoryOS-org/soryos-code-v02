@@ -42,6 +42,7 @@ import type {
   SessionMessageUser,
 } from "@opencode/client/promise"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
+import { agentLabel } from "./agent-label"
 import { attached, typeLabel } from "../components/message-file"
 
 export async function writeClipboard(text: string): Promise<boolean> {
@@ -293,9 +294,7 @@ export function CurrentUserMessageDisplay(props: {
 
     if (mobile()) return pendingLabel
 
-    return [pendingLabel, agent ? agent[0]?.toUpperCase() + agent.slice(1) : "", model()]
-      .filter(Boolean)
-      .join("\u00A0\u00B7\u00A0")
+    return [pendingLabel, agentLabel(agent, data.agents), model()].filter(Boolean).join("\u00A0\u00B7\u00A0")
   })
 
   const stamp = createMemo(() => timefmt().format(props.message.time.created))
@@ -759,7 +758,7 @@ export function AssistantTextContent(props: {
     const agent = props.message.agent
 
     return [
-      ...(mobile() ? [] : [agent ? agent[0]?.toUpperCase() + agent.slice(1) : "", model()]),
+      ...(mobile() ? [] : [agentLabel(agent, data.agents), model()]),
       duration(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
     ]

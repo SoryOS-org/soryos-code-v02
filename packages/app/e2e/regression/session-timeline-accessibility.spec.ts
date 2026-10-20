@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test"
-import { assistantMessage, setupTimeline, shell, textPart, userMessage } from "../utils/timeline"
+import {
+  assistantMessage,
+  renderedPartID,
+  setupTimeline,
+  shell,
+  textPart,
+  userID,
+  userMessage,
+} from "../utils/timeline"
 
 test("space activates a focused timeline button instead of scrolling", async ({ page }) => {
   const shellID = "prt_space_button_shell"
@@ -64,4 +72,29 @@ test("jump to latest is reachable only while it is shown", async ({ page }) => {
 
 function lines(count: number) {
   return Array.from({ length: count }, (_, index) => `line ${index + 1}`).join("\n")
+}
+
+for (const visible of [false, true]) {
+  test(`${visible ? "shows" : "omits"} the agent name in message meta when agents are ${visible ? "on" : "off"}`, async ({
+    page,
+  }, testInfo) => {
+    await setupTimeline(page, {
+      messages: [userMessage(), assistantMessage([textPart("prt_agent_meta", "Done.")])],
+      settings: { showCustomAgents: visible },
+      seedHistory: true,
+    })
+    const user = page.locator(`[data-timeline-row="UserMessage"][data-message-id="${userID}"]`)
+    const assistant = page.locator(`[data-timeline-part-id="${renderedPartID("prt_agent_meta")}"]`)
+    await user.scrollIntoViewIfNeeded()
+    await user.hover()
+    await page.screenshot({ path: testInfo.outputPath(`agents-${visible ? "on" : "off"}.png`) })
+    await assistant.hover()
+
+    const meta = [user.locator('[data-slot="user-message-meta"]'), assistant.locator('[data-slot="text-part-meta"]')]
+
+    for (const item of meta) {
+      if (visible) await expect(item).toContainText(/^Build\s·\s/)
+      else await expect(item).not.toContainText("Build")
+    }
+  })
 }

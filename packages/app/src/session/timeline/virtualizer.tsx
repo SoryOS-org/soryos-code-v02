@@ -93,6 +93,7 @@ type Input = {
 
 type ViewProps = {
   header: JSX.Element
+  navigator?: JSX.Element
   bottomSpacer?: JSX.Element
   deferred: (row: TimelineRow.TimelineRow) => boolean
   renderRow: (row: Accessor<TimelineRow.TimelineRow>, onSizeChange?: () => void) => JSX.Element
@@ -203,6 +204,13 @@ export function createTimelineVirtualizer(input: Input) {
   let reportRect: ((rect: { width: number; height: number }) => void) | undefined
   let batchingColdSizes = false
 
+  const [viewport, setViewport] = createStore({
+    top: 0,
+    height: 0,
+    headerHeight: 48,
+    visibleUserMessageIDs: new Set<string>(),
+  })
+
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     get count() {
       return rows().length
@@ -211,7 +219,19 @@ export function createTimelineVirtualizer(input: Input) {
     // The viewport runs on under the composer region. The virtualizer sees only the part above it, which the
     // inset spacer below the rows keeps consistent with the native scroll range.
     observeElementRect: (instance, callback) => {
-      reportRect = (rect) => callback({ width: rect.width, height: Math.max(0, rect.height - bottomInset()) })
+      reportRect = (rect) => {
+        const height = Math.max(0, rect.height - bottomInset())
+        const root = listRoot()
+        batch(() => {
+          // The container-responsive header can be 48px or 80px; the composer covers the viewport's bottom edge.
+          setViewport(
+            "headerHeight",
+            root ? parseFloat(getComputedStyle(root).getPropertyValue("--session-header-height")) || 48 : 48,
+          )
+          setViewport("height", height)
+          callback({ width: rect.width, height })
+        })
+      }
 
       return observeElementRect(instance, (rect) => {
         if (active()) reportRect?.(rect)
@@ -225,7 +245,9 @@ export function createTimelineVirtualizer(input: Input) {
         // scrolling keeps its own offset. Range selection uses the logical offset.
         batch(() => {
           const logicalOffset = offset + rendering.scrollAdjustment
-          callback(rendering.scrollAdjustment ? Math.max(0, logicalOffset) : offset, scrolling)
+          const top = rendering.scrollAdjustment ? Math.max(0, logicalOffset) : offset
+          setViewport("top", top)
+          callback(top, scrolling)
           // Reconcile both start boundaries in one native write. Gradually
           // clamping row translations lets the compositor paint between
           // corrections and makes the content oscillate at the top.
@@ -301,6 +323,10 @@ export function createTimelineVirtualizer(input: Input) {
       return rows().length > 0 ? topOffset() : 0
     },
     paddingEnd: tailSize,
+    // Revealed prompts sit below the solid header and its 16px fade.
+    get scrollPaddingStart() {
+      return input.showHeader() ? viewport.headerHeight + 16 : 0
+    },
     get rangeExtractor() {
       return rangeExtractor()
     },
@@ -358,6 +384,7 @@ export function createTimelineVirtualizer(input: Input) {
       })
       batchingColdSizes = false
       pinAnchor()
+      scheduleVisibleTurns()
 
       if (coldPending) pinColdBottom()
       settleColdBottom()
@@ -503,6 +530,81 @@ export function createTimelineVirtualizer(input: Input) {
 
   const virtualRowKeys = createMemo(() => virtualizer.getVirtualItems().map((item) => String(item.key)))
 
+  const visibleUserMessageIDs = () => viewport.visibleUserMessageIDs
+  let visibleTurnsFrame: number | undefined
+
+  const updateVisibleTurns = () => {
+    if (!active()) return
+    const header = input.showHeader() ? viewport.headerHeight : 0
+    const top = viewport.top + header
+    const bottom = viewport.top + viewport.height
+    const list = rows()
+
+    const visible = virtualizer.getVirtualItems().flatMap((item) => {
+      if (item.end <= top || item.start >= bottom) return []
+      const row = list[item.index]
+
+      if (!row || Predicate.isTagged(row, "TurnGap") || Predicate.isTagged(row, "TurnDivider")) return []
+
+      return [{ item, row }]
+    })
+
+    const root = listRoot()
+    let rootTop: number | undefined
+
+    const prompts = visible.flatMap((entry) => {
+      if (!Predicate.isTagged(entry.row, "UserMessage")) return []
+
+      if (entry.item.start >= top && entry.item.end <= bottom) return [entry.row.userMessageID]
+
+      if (!root?.isConnected) return []
+      const element = virtualizer.elementsCache.get(entry.item.key)
+
+      // Bubble bounds exclude the invisible copy controls beneath a prompt.
+      const bubbles = element?.querySelectorAll<HTMLElement>(
+        '[data-slot="user-message-text"], [data-slot="user-message-attachments"], [data-slot="user-message-comments"]',
+      )
+
+      if (!bubbles) return []
+      rootTop ??= root.getBoundingClientRect().top
+
+      return [...bubbles].some((bubble) => {
+        const box = bubble.getBoundingClientRect()
+
+        return box.height > 0 && box.bottom > rootTop! + header && box.top < rootTop! + viewport.height
+      })
+        ? [entry.row.userMessageID]
+        : []
+    })
+
+    const ids = new Set(prompts.length ? prompts : visible[0] ? [visible[0].row.userMessageID] : [])
+
+    if (
+      viewport.visibleUserMessageIDs.size === ids.size &&
+      [...ids].every((id) => viewport.visibleUserMessageIDs.has(id))
+    )
+      return
+    setViewport("visibleUserMessageIDs", ids)
+  }
+
+  const scheduleVisibleTurns = () => {
+    if (visibleTurnsFrame !== undefined) return
+    visibleTurnsFrame = requestAnimationFrame(() => {
+      visibleTurnsFrame = undefined
+      updateVisibleTurns()
+    })
+  }
+
+  createEffect(() => {
+    if (!active()) return
+    viewport.top
+    viewport.height
+    viewport.headerHeight
+    input.showHeader()
+    virtualRowKeys()
+    scheduleVisibleTurns()
+  })
+
   createEffect(() => {
     if (!active()) return
     const root = listRoot()
@@ -537,11 +639,14 @@ export function createTimelineVirtualizer(input: Input) {
           )
         : -1
 
-      const index = partIndex >= 0 ? partIndex : input.projection.messageRowIndex().get(id)
+      const promptIndex = rows().findIndex((row) => Predicate.isTagged(row, "UserMessage") && row.userMessageID === id)
+
+      const index =
+        partIndex >= 0 ? partIndex : promptIndex >= 0 ? promptIndex : input.projection.messageRowIndex().get(id)
 
       if (index === undefined) return
       prepareNavigation()
-      virtualizer.scrollToIndex(index, { align: "center" })
+      virtualizer.scrollToIndex(index, { align: partIndex >= 0 ? "center" : "start" })
     })
     input.setScrollToEnd?.((behavior) => {
       const root = listRoot()
@@ -865,7 +970,9 @@ export function createTimelineVirtualizer(input: Input) {
               contentMeasureFrame = requestAnimationFrame(() => {
                 contentMeasureFrame = undefined
 
-                if (active() && element.isConnected) virtualizer.measureElement(element)
+                if (!active() || !element.isConnected) return
+                virtualizer.measureElement(element)
+                scheduleVisibleTurns()
               })
             })}
           </div>
@@ -879,6 +986,7 @@ export function createTimelineVirtualizer(input: Input) {
         class="relative w-full h-full min-w-0"
         style={{
           "--session-timeline-inset": `${bottomInset()}px`,
+          "--session-timeline-header-height": `${input.showHeader() ? viewport.headerHeight : 0}px`,
         }}
       >
         <div
@@ -910,6 +1018,7 @@ export function createTimelineVirtualizer(input: Input) {
             </svg>
           </button>
         </div>
+        {props.navigator}
         <ScrollView
           data-slot="session-timeline-scroll"
           viewportRef={bindListRoot}
@@ -976,6 +1085,8 @@ export function createTimelineVirtualizer(input: Input) {
     })
 
     while (cache.size > 16) cache.delete(cache.keys().next().value!)
+
+    if (visibleTurnsFrame !== undefined) cancelAnimationFrame(visibleTurnsFrame)
     coldPending = false
     contentObserver?.disconnect()
     viewportObserver?.disconnect()
@@ -989,6 +1100,7 @@ export function createTimelineVirtualizer(input: Input) {
   })
 
   return {
+    visibleUserMessageIDs,
     disclosure: {
       patchGroupKeys,
       value: (key: string) => toolOpen[key],
