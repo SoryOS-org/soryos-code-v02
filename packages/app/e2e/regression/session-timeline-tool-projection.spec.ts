@@ -2,7 +2,18 @@ import { expect, test } from "@playwright/test"
 import type { SessionMessageUser } from "@opencode/client/promise"
 import { Option, Schema } from "effect"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
-import { assistantMessage, partUpdated, setupTimeline, toolPart, userMessage } from "../utils/timeline"
+import { holdRoute } from "../utils/app"
+import {
+  assistantMessage,
+  inboxEnqueued,
+  partUpdated,
+  revertCommitted,
+  revertStaged,
+  sessionID,
+  setupTimeline,
+  toolPart,
+  userMessage,
+} from "../utils/timeline"
 
 test("keeps shell and question failures in their Used group", async ({ page }) => {
   const shellID = "prt_transition_error_shell"
@@ -70,7 +81,7 @@ const decodeReplyMetadata = Schema.decodeUnknownOption(
   }),
 )
 
-test("sends a generated form once and keeps it submitted after a reload", async ({ page }) => {
+test("sends a generated form once, keeps it submitted after a reload, and reopens it when the reply is reverted", async ({ page }) => {
   const callID = "call_genui_decisions"
 
   const code = [
@@ -88,7 +99,7 @@ test("sends a generated form once and keeps it submitted after a reload", async 
 
   const replies: SessionMessageUser[] = []
 
-  await setupTimeline(page, {
+  const timeline = await setupTimeline(page, {
     messages: seeded,
     pageMessages: () => ({ items: [...seeded, ...replies] }),
     onPrompt: ({ body }) => {
@@ -119,4 +130,38 @@ test("sends a generated form once and keeps it submitted after a reload", async 
   await expect(submit).toBeDisabled()
   await expect(form.getByRole("radio", { name: "B" })).toBeChecked()
   expect(replies.map((reply) => reply.metadata?.genuiReply)).toEqual([{ callID, fields: { scope: "B" } }])
+
+  // Reverting the reply reopens the form; sending again commits the revert first, then sends once.
+  const reply = replies[0]!
+
+  await timeline.transport.waitForConnection()
+  await timeline.send(revertStaged({ sessionID, revert: { messageID: reply.id } }))
+  await expect(submit).toBeEnabled()
+  await expect(form.getByText("Submitted", { exact: true })).toHaveCount(0)
+
+  const commit = await holdRoute(page, /\/api\/session\/[^/]+\/revert\/commit/, { method: "POST" })
+  const resent = page.waitForResponse(/\/api\/session\/[^/]+\/prompt/)
+
+  await submit.click()
+  await commit.arrived
+  expect(replies).toHaveLength(1)
+  await timeline.send(revertCommitted({ sessionID, to: reply.id }))
+  commit.release()
+  await resent
+
+  // The server's admission echo, which restores the row the committed echo may have dropped.
+  const resend = replies[1]!
+
+  await timeline.send(
+    inboxEnqueued({
+      sessionID,
+      inboxID: resend.id,
+      item: { type: "user", payload: { text: resend.text, metadata: resend.metadata }, delivery: "steer" },
+    }),
+  )
+
+  await expect(submit).toBeDisabled()
+  await expect(form.getByText("Submitted", { exact: true })).toBeVisible()
+  expect(replies.map((item) => item.id)).toEqual([reply.id, resend.id])
+  expect(commit.requests).toHaveLength(1)
 })

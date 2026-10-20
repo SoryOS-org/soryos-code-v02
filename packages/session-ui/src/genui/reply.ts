@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js"
+import { createStore } from "solid-js/store"
 
 /**
  * Sends a surface's reply once. The first press claims the send before its request goes out, so a double click or
@@ -6,21 +6,19 @@ import { createSignal } from "solid-js"
  * retried. Returns the send in flight, if this press started one.
  */
 export function createReplySender<T>(input: { sent: () => boolean; send: (reply: T) => Promise<void> }) {
-  const [sending, setSending] = createSignal(false)
-  const [failed, setFailed] = createSignal(false)
+  const [state, setState] = createStore({ sending: false, failed: false })
 
   return {
-    sending,
-    failed,
+    sending: () => state.sending,
+    failed: () => state.failed,
     send(reply: T) {
-      if (sending() || input.sent()) return
-      setSending(true)
-      setFailed(false)
+      if (state.sending || input.sent()) return
+      setState({ sending: true, failed: false })
 
       return input
         .send(reply)
-        .catch(() => setFailed(true))
-        .finally(() => setSending(false))
+        .catch(() => setState("failed", true))
+        .finally(() => setState("sending", false))
     },
   }
 }
