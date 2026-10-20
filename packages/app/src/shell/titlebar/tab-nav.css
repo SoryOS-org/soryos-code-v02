@@ -99,9 +99,8 @@
   transition: opacity 110ms cubic-bezier(0.4, 0, 1, 1);
 }
 
-[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-editing="true"], [data-active="true"]:not([data-status]))
-  [data-slot="tab-close"]
-  > button {
+/* Every row, the active one included, shows the close button only on hover or keyboard focus. */
+[data-titlebar-tab]:is(:hover, :has(:focus-visible), [data-editing="true"]) [data-slot="tab-close"] > button {
   opacity: 1;
   transition: opacity 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
