@@ -10,24 +10,31 @@ async function published(name: string, version: string) {
   return (await $`npm view ${name}@${version} version`.nothrow()).exitCode === 0
 }
 
+// Exports only the workspace imports: the app's and desktop's internal protocol, which npm users never see. Each maps
+// to null, so the `./*` export cannot reach it either.
+const workspaceOnly = ["./gui/host"]
+
+// A clean build, so no file an earlier build emitted, such as one now left out, reaches the package.
+await $`rm -rf dist`
 await $`bun run build`
 const originalText = await Bun.file("package.json").text()
 const pkg = JSON.parse(originalText) as {
   name: string
   version: string
-  exports: Record<string, string>
+  exports: Record<string, string | { import: string; types: string } | null>
   imports: Record<string, Record<string, string>>
 }
 if (await published(pkg.name, pkg.version)) {
   console.log(`already published ${pkg.name}@${pkg.version}`)
 } else {
-  for (const [key, value] of Object.entries(pkg.exports)) {
-    const file = value.replace("./src/", "./dist/").replace(".ts", "")
-    // @ts-ignore
-    pkg.exports[key] = {
-      import: file + ".js",
-      types: file + ".d.ts",
-    }
+  pkg.exports = {
+    ...Object.fromEntries(
+      Object.entries(pkg.exports).map(([key, value]) => {
+        if (workspaceOnly.includes(key)) return [key, null]
+        const file = String(value).replace("./src/", "./dist/").replace(".ts", "")
+        return [key, { import: file + ".js", types: file + ".d.ts" }]
+      }),
+    ),
   }
   pkg.imports = Object.fromEntries(
     Object.entries(pkg.imports).map(([key, conditions]) => [

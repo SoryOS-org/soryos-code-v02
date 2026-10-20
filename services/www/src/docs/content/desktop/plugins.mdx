@@ -1,0 +1,122 @@
+---
+title: "Plugins"
+description: "See, reload, and troubleshoot plugins in the OpenCode Desktop interface, and add new ones from opencode.json."
+---
+
+OpenCode Desktop lists the plugins that run in its interface under **Settings > Plugins**. The page shows the built-in plugins that ship with the app and the GUI parts of your [plugins](/plugins#desktop).
+
+- **Built-in plugins** ship with the app, carry a **Built-in** label, and always run.
+- **Your plugins** come from `opencode.json(c)`, when the plugin package exports `./gui-experimental`. Turn one off with its switch, or remove the plugin from `opencode.json(c)` to remove it.
+
+Built-in plugins provide the app's workspace features, such as the [terminal](/desktop/terminal), [review](/desktop/review) panel, and [browser](/desktop/browser).
+
+## Open Settings > Plugins
+
+Open **Settings** (**Cmd+,** on macOS or **Ctrl+,** on Windows and Linux) and select **Plugins** in the left navigation bar.
+
+```text
+/settings?tab=plugins
+```
+
+You can also open the command palette (**Cmd+K** / **Ctrl+K**), search for `Plugins`, and jump directly to the page.
+
+<Callout type="note">
+  The app-level **Plugins** page lists the plugins that run in this desktop app's interface. Each server's
+  **Extensions** tab lists [MCP servers](/mcp-servers), server [plugins](/plugins), and [skills](/skills) on that
+  server.
+</Callout>
+
+## Turn off and reload
+
+Every row in **Settings > Plugins** shows the plugin's ID and a **Reload** button. A row for a plugin from your config also has a switch. Built-in rows carry a **Built-in** label instead, because built-in plugins always run.
+
+```text
+terminal  Built-in     Reload
+acme      Server TUI   Reload  [on]
+```
+
+- **Switch:** turns the plugin's desktop UI on or off in all desktop windows. The setting persists across restarts. The server and TUI parts keep running; see [Other parts of a plugin](#other-parts-of-a-plugin).
+- **Reload:** reloads the plugin in every window and in the main process, and clears any recorded failure. If the main process reload fails, the last working revision stays active.
+
+When you disable a plugin, the host immediately withdraws all of its commands, panels, slots, titlebar items, native menu items, and settings pages in a single frame.
+
+If the desktop app no longer knows a plugin's ID, for example because the plugin was just removed, its switch and **Reload** button show a **Plugin not found** error.
+
+### Other parts of a plugin
+
+A plugin from your config can also run on the server and in the TUI. Its row tags those parts, and its switch leaves them running:
+
+```text
+acme      Server TUI   Reload  [on]
+```
+
+- **Server:** add `"-acme"` to `plugins` in your global [`opencode.json(c)`](/plugins). The desktop UI loads only for plugins that the server runs, so it turns off too.
+- **TUI:** add `"-acme"` to `plugins` in [`cli.json`](/cli/plugins). A row has the **TUI** tag only when the plugin exports `./tui`.
+
+## Add plugins
+
+Third-party GUI plugins come from [plugins](/plugins) in your configuration. A plugin package that exports `./gui-experimental` adds its GUI to the app; there is no separate install step. Add the plugin to your global configuration:
+
+```jsonc title="~/.config/opencode/opencode.jsonc"
+{
+  "plugins": ["opencode-acme"],
+}
+```
+
+The plugin appears in **Settings > Plugins** without a label. OpenCode Desktop loads GUI plugins from its own background server, so configure the plugin globally to make its GUI available in every window.
+
+### Remove a plugin
+
+Turn the plugin off with its switch, or remove it from `opencode.json(c)`. For a global package plugin, you can also use the CLI:
+
+```sh
+opencode plugin remove opencode-acme
+```
+
+<Callout type="note">
+  A plugin's GUI uses the plugin's ID. If a built-in plugin already uses that ID, the built-in plugin loads and the
+  plugin's GUI does not; **Settings > Plugins** lists the plugin as not loaded.
+</Callout>
+
+<CardGroup cols={1}>
+  <Card title="Build a GUI plugin" href="/build/plugins/gui/package">
+    Add a `./gui-experimental` export to your plugin package to ship panels, commands, settings pages, and main-process integrations.
+  </Card>
+</CardGroup>
+
+## Plugin statuses
+
+A row shows a status when its plugin is not running normally in the current window:
+
+- **Loading:** the plugin is loading its bundle, or waiting for its stored state or the plugins it requires.
+- **Blocked:** a plugin it requires is off, failed, or blocked itself. The plugin resumes when that plugin runs again.
+- **Failed:** the plugin's bundle failed to load, its setup threw an error, or one of its effects crashed.
+
+If a plugin fails during setup or while rendering a contribution, the error stack is displayed in red directly below its status in **Settings > Plugins**. One broken plugin never blocks the rest of the application.
+
+## Built-in plugin IDs
+
+All 13 built-in plugins always run. `wsl` runs on Windows only; all other built-ins run on macOS, Windows, and Linux.
+
+- `context`: the context usage ring, the token breakdown tab, and session JSON export.
+- `btw`: the `/btw` side-question slash command and its answer tabs.
+- `debug`: the provider performance metrics bar (`TPS`, `TTFT`, `TTFA`, `E2E`).
+- `terminal`: dock terminal tabs, powered by `ghostty-web`.
+- `file`: the workspace file tree, file viewers, local link handling, and the desktop **Open in** menu.
+- `review`: the uncommitted, branch, and last-turn diff viewer with line comments.
+- `details`: the session header summary popover, the worktree mover, and server status popovers.
+- `browser`: the native Chromium browser pane, the element comment picker, and the `browser.*` agent tools.
+- `pairing`: the **Settings > Pairing** QR code, custom address, and display sleep blocker.
+- `updater`: automatic desktop updates, the titlebar pill, and the What's New dialog.
+- `ssh`: remote SSH server connections and automatic remote CLI setup.
+- `wsl`: Windows Subsystem for Linux server management and the distro installer.
+- `microsoft-office`: read-only Word (`.docx`), Excel (`.xlsx`), and PowerPoint (`.pptx`) viewers.
+
+## Customizing plugin shortcuts
+
+Commands contributed by active plugins appear in **Settings > Shortcuts** alongside core commands.
+
+1. Open **Settings > Shortcuts** and use the **Search shortcuts** box to find the command.
+2. Click the shortcut button (or **Unassigned**) so it reads **Press keys**.
+3. Press the desired key combination to save it under the published command ID (such as `terminal.toggle` or `debug.toggle`).
+4. Press **Backspace** or **Delete** while recording to clear a binding, or **Escape** to cancel.

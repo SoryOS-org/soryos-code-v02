@@ -1,30 +1,30 @@
 import { expect, sourceURL, story } from "../../storybook/playwright/story"
 import type { ParentProps } from "solid-js"
-import type { Command } from "@opencode/gui-extensions/sdk"
-import type { Item } from "../src/runtime/extension/host"
+import type { Command } from "@opencode/plugin/gui"
+import type { Item } from "../src/runtime/plugin/host"
 
 const source = (path: string) => sourceURL(new URL(path, import.meta.url))
 
 const modules = {
-  fixture: source("../../gui-extensions/src/browser/panel.fixture.tsx"),
-  host: source("../src/runtime/extension/host.tsx"),
-  panels: source("../src/runtime/extension/panels.tsx"),
+  fixture: source("../../gui-plugins/src/browser/panel.fixture.tsx"),
+  host: source("../src/runtime/plugin/host.tsx"),
+  panels: source("../src/runtime/plugin/panels.tsx"),
   language: source("../src/runtime/i18n/language.tsx"),
-  browser: source("../../gui-extensions/src/browser/index.ts"),
-  browserRenderer: source("../../gui-extensions/src/browser/renderer.tsx"),
-  browserPanel: source("../../gui-extensions/src/browser/panel.tsx"),
-  file: source("../../gui-extensions/src/file/index.ts"),
-  fileRenderer: source("../../gui-extensions/src/file/renderer.tsx"),
+  browser: source("../../gui-plugins/src/browser/index.ts"),
+  browserRenderer: source("../../gui-plugins/src/browser/renderer.tsx"),
+  browserPanel: source("../../gui-plugins/src/browser/panel.tsx"),
+  file: source("../../gui-plugins/src/file/index.ts"),
+  fileRenderer: source("../../gui-plugins/src/file/renderer.tsx"),
   commands: source("../src/shell/commands/command.tsx"),
-  sdk: source("../../gui-extensions/src/sdk/index.ts"),
-  render: source("../src/runtime/extension/render.tsx"),
+  sdk: source("../../plugin/src/gui/index.ts"),
+  render: source("../src/runtime/plugin/render.tsx"),
   settings: source("../src/settings/model.tsx"),
   platform: source("../src/runtime/platform/platform.tsx"),
-  solid: source("./extension-host.fixture.tsx"),
+  solid: source("./plugin-host.fixture.tsx"),
 }
 
 story.beforeEach(async ({ mount, page }) => {
-  // Any story loads the app styles; the fixture mounts the real side region and extensions beside it.
+  // Any story loads the app styles; the fixture mounts the real side region and plugins beside it.
   await mount("ui-line-comment--editor")
   await page.evaluate(async (modules) => {
     const [
@@ -59,12 +59,12 @@ story.beforeEach(async ({ mount, page }) => {
 
     mountBrowserRegion({
       LanguageProvider: language.LanguageProvider,
-      ExtensionHostProvider: host.ExtensionHostProvider,
-      useExtensionHost: host.useExtensionHost,
+      PluginHostProvider: host.PluginHostProvider,
+      usePluginHost: host.usePluginHost,
       createRegion: panels.createRegion,
       definitions: [
-        { ...browser.default, renderer: () => import(modules.browserRenderer) },
-        { ...file.default, renderer: () => import(modules.fileRenderer) },
+        { ...browser.default, windowEntry: () => import(modules.browserRenderer) },
+        { ...file.default, windowEntry: () => import(modules.fileRenderer) },
       ],
       Shell: (props: ParentProps) =>
         solid.createComponent(platform.PlatformProvider, {
@@ -83,7 +83,7 @@ story.beforeEach(async ({ mount, page }) => {
         }),
       Commands: (props: { close: () => void }) => {
         const command = commands.useCommand()
-        const extensions = host.useExtensionHost()
+        const pluginHost = host.usePluginHost()
         command.register("fixture-session", () => [
           {
             id: "tab.close",
@@ -92,14 +92,14 @@ story.beforeEach(async ({ mount, page }) => {
             onSelect: props.close,
           },
         ])
-        // Storybook aliases the app's command hook to a no-op. Bridge the real extension contributions
+        // Storybook aliases the app's command hook to a no-op. Bridge the real plugin contributions
         // to the real dispatcher imported by source URL, so the shortcut runs rather than its alias.
-        command.register("fixture-extensions", () =>
-          extensions.items(sdk.Command).map((item: Item<Command>) => {
+        command.register("fixture-plugins", () =>
+          pluginHost.items(sdk.Command).map((item: Item<Command>) => {
             const scope = item.value.scope
 
             return {
-              id: `${item.extension}.${item.value.id}`,
+              id: `${item.plugin}.${item.value.id}`,
               title: item.value.title,
               keybind: item.value.bind,
               disabled: item.value.enabled === false,
@@ -180,7 +180,7 @@ story(
     await root.getByRole("button", { name: "First inventory", exact: true }).click()
     await expect(tabs).toHaveText(["beta.ts", "Preview"])
 
-    // The pane's main extension reloads: every binding goes with it, and the strip keeps the tab it will restore.
+    // The pane's main plugin reloads: every binding goes with it, and the strip keeps the tab it will restore.
     await root.getByRole("button", { name: "Pane away", exact: true }).click()
     await expect(tabs).toHaveText(["beta.ts", "Preview"])
     await expect(root.getByRole("tab", { name: "Preview", exact: true })).toHaveAttribute("aria-selected", "true")

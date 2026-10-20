@@ -12,6 +12,12 @@ export interface Entrypoints {
   readonly server?: string
   readonly tui?: string
   readonly rpc?: string
+  /**
+   * The prebuilt CommonJS GUI bundle (`./gui-experimental`, or `gui-experimental.cjs` or `gui-experimental.js` in a
+   * local directory). Each desktop app window runs its default export; the desktop app's main process runs its `main`
+   * export.
+   */
+  readonly gui?: string
 }
 
 export function resolve(target: Target): Entrypoints {
@@ -40,7 +46,15 @@ export function resolve(target: Target): Entrypoints {
     }
     return undefined
   }
-  return { server: entry(["server", ""]), tui: entry(["tui"]), rpc: entry(["rpc"]) }
+  return {
+    server: entry(["server", ""]),
+    tui: entry(["tui"]),
+    rpc: entry(["rpc"]),
+    // The app evaluates the bundle as CommonJS text, so a TypeScript source or an ES module is never a GUI entry.
+    gui: [target.name ? entry(["gui-experimental"]) : entry(["gui-experimental.cjs", "gui-experimental.js"])].find(
+      (file) => file && /\.c?js$/.test(file),
+    ),
+  }
 }
 
 export function load(entrypoint: string): Promise<unknown> {

@@ -1,0 +1,424 @@
+---
+title: "GUI plugins"
+description: "Build the GUI half of an OpenCode plugin for OpenCode Desktop using @opencode/plugin/gui."
+---
+
+Every feature of OpenCode Desktop and the web app outside the core shell is a built-in plugin that uses the GUI plugin
+SDK, `@opencode/plugin/gui`. Third-party GUI plugins use the same SDK, registries, host APIs, and IPC bridge.
+
+A GUI plugin is the `./gui-experimental` half of an OpenCode [plugin package](/build/plugins/gui/package), beside the
+[server half](/build/plugins) and the optional [TUI half](/build/plugins/cli). OpenCode Desktop loads the GUI of each
+plugin on its own background server, so configure the plugin in your global `opencode.json(c)` to use it in every
+window.
+
+```json title="package.json"
+{
+  "exports": {
+    ".": "./dist/server.js",
+    "./tui": "./src/tui.tsx",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
+  }
+}
+```
+
+<Callout type="note">
+  The GUI plugin API is experimental and may change between releases. The `-experimental` export name says so in your
+  package.
+</Callout>
+
+The `./gui-experimental` file default-exports `Plugin.define`, like the server and TUI halves:
+
+```tsx title="src/gui.tsx"
+import { Command, Plugin } from "@opencode/plugin/gui"
+import { Acme } from "./gui/contract"
+import { AcmeRpc } from "./rpc"
+
+export default Plugin.define({
+  id: "acme",
+  provides: { acme: Acme },
+  i18n: { en: { "command.open": "Open Acme" } },
+  setup(ctx) {
+    ctx.add(Command, {
+      id: "open",
+      title: ctx.t("command.open"),
+      run: () => void ctx.client?.rpc(AcmeRpc).open({}),
+    })
+  },
+  main(ctx) {
+    ctx.provide(Acme, { ping: () => "pong" })
+  },
+})
+```
+
+A GUI plugin can run in two processes:
+
+- **`setup`** runs in every desktop app window. It contributes panels, commands, settings pages, slots, server sources,
+  link handlers, and styles. See [Window SDK](/build/plugins/gui/window).
+- **`main`** runs once, in the Electron main process. It provides typed `Ipc` contracts, native menu items,
+  `WebContentsView` embeds, and Node and Electron integrations. See [Main process & IPC](/build/plugins/gui/main).
+
+## Anatomy of a GUI plugin
+
+A small GUI plugin fits in `src/gui.tsx`. For a larger one, declare the plugin in `definition.ts`, put shared tokens in
+`contract.ts`, write each setup in its own file, and combine them in `src/gui.tsx`.
+
+```text
+src/
+├── server.ts           Server half: Plugin.define from @opencode/plugin
+├── rpc.ts              RPC contract between the server half and its clients
+├── gui.tsx             ./gui-experimental entry: export default Plugin.define({ ...definition, setup, main })
+└── gui/
+    ├── definition.ts   Plugin.define: id, os, provides, uses, requires, stores, i18n
+    ├── contract.ts     Tokens other code may import: Ipc, Contract, Registry
+    ├── window.tsx      Window setup: Plugin.Setup<typeof definition>
+    ├── main.ts         Main setup: Plugin.MainSetup<typeof definition> (desktop only)
+    ├── page.tsx        Components that panels and pages render
+    └── i18n/en.ts      English copy
+```
+
+The whole `./gui-experimental` file evaluates when a window boots, so keep module scope and `setup` light. Register
+contributions there and do expensive work inside components, `createKeyed`, or `createLatest`. See [Split across
+files](/build/plugins/gui/package#split-across-files) for how the files fit together.
+
+## Define the GUI plugin
+
+`Plugin.define` declares the plugin's id, dependencies, stored state, and copy. The host reads these declarations before
+either setup runs.
+
+```ts title="src/gui/definition.ts"
+import { Schema } from "effect"
+import { Plugin, Store } from "@opencode/plugin/gui"
+import { Changes } from "@opencode/plugin/gui/review"
+import { Acme } from "./contract"
+
+export const definition = Plugin.define({
+  id: "acme",
+  os: ["macos", "linux"],
+  provides: { acme: Acme },
+  uses: { changes: Changes },
+  stores: {
+    prefs: Store.global(Schema.Struct({ enabled: Schema.Boolean }), { enabled: true }),
+  },
+  i18n: {
+    en: {
+      title: "Acme",
+      "command.open": "Open Acme",
+    },
+  },
+})
+```
+
+- `id` must equal your server plugin's id; a different id fails the plugin. It prefixes every id the plugin creates:
+  commands (`<id>.<command>`), panel keys (`<id>:<tab>`), stored keys (`plugin.<id>.<key>`), and contract ids. Read it
+  as `ctx.id`.
+- `os` restricts the plugin to some operating systems. Omit it to run on every OS. A plugin that lists an OS does not
+  run on the web.
+- `provides` lists the `Contract` tokens the window setup provides and the `Ipc` tokens `main` provides, with
+  `ctx.provide(token, impl)`.
+- `uses` lists optional dependencies from other plugins. `ctx.uses.<key>()` returns a [`Live<T>`](#live-dependencies-and-failure-handling),
+  and setup still runs when a provider is off.
+- `requires` lists hard dependencies. `ctx.requires.<key>` returns `T`. Setup runs only while every required token is
+  active, and restarts when one restarts.
+- `stores` declares [stored state](/build/plugins/gui/window#stored-state). Read it as `ctx.stores.<key>`.
+- `i18n` holds copy by locale; write every locale inline. Read it with `ctx.t(key, params)` and
+  `ctx.plural(key, count)`.
+- Define `setup`, `main`, or both. A GUI without either fails to load.
+- Without setups, `Plugin.define` returns the declarations as a `Plugin.Declarations`, so setups in other files can be
+  typed from them. `Plugin.Definition` is the type of the full definition.
+
+#### Reference
+
+```ts
+interface Declarations {
+  id: string
+  os?: ("macos" | "windows" | "linux")[]
+  provides?: Record<string, Contract | Ipc>
+  uses?: Record<string, Contract | Ipc>
+  requires?: Record<string, Contract | Ipc>
+  stores?: Record<string, StoreDeclaration>
+  i18n?: { en: Messages; [locale: string]: Messages }
+}
+
+interface Definition extends Declarations {
+  setup?(ctx: Context): Cleanup | void
+  main?(ctx: MainContext): Cleanup | void | Promise<Cleanup | void>
+}
+
+type Cleanup = () => void | Promise<void>
+```
+
+## Shared context
+
+Both setups receive the plugin's options, a client for its server half, and app metadata, like the server and TUI
+halves.
+
+### Options
+
+`ctx.options` holds the `options` from the plugin's `opencode.json(c)` entry. It is the same object the server half gets.
+
+```jsonc title="opencode.jsonc"
+{
+  "plugins": [{ "package": "opencode-acme", "options": { "team": "core" } }],
+}
+```
+
+```ts
+setup(ctx) {
+  const team = ctx.options.team
+}
+```
+
+- `ctx.options` is empty for built-in plugins.
+- Changing the options reloads the plugin.
+
+### Server client
+
+`ctx.client` is the OpenCode client of the server that runs the plugin: the desktop app's own server. Use it to call
+your server half through its [RPC](/build/plugins/rpc).
+
+```ts
+import { Command } from "@opencode/plugin/gui"
+import { AcmeRpc } from "./rpc"
+
+ctx.add(Command, {
+  id: "search",
+  title: ctx.t("command.search"),
+  run: async () => {
+    const result = await ctx.client?.rpc(AcmeRpc).search({ query: "todo" })
+  },
+})
+```
+
+- Read `ctx.client` where you call it. It changes after that server restarts.
+- `ctx.client` is `undefined` for built-in plugins.
+
+### App metadata
+
+`ctx.app` describes the running app.
+
+```ts
+if (!ctx.app.packaged) console.log(`Acme on ${ctx.app.name} ${ctx.app.version} (${ctx.app.channel})`)
+```
+
+- `name` is `"opencode"`, as in a server plugin's `ctx.app.name`.
+- `platform` is `"desktop"` in the Electron app and in `main`, and `"web"` in a browser tab.
+- `packaged` is `true` when the desktop app runs packaged. It is always `false` on the web.
+- Server plugins get `name`, `version`, and `channel`; TUI plugins get `version` and `channel`.
+
+#### Reference
+
+```ts
+interface App {
+  name: string
+  version: string
+  channel: "local" | "dev" | "beta" | "prod"
+  platform: "web" | "desktop"
+  packaged: boolean
+}
+```
+
+## Contracts and tokens
+
+Tokens let GUI plugins talk across processes and to each other without importing each other's runtime code. Put every
+token in `contract.ts`.
+
+### Contracts
+
+Use `Contract.define` when one plugin's window setup exposes an API or a Solid component to other plugins' window
+setups.
+
+```ts title="src/gui/contract.ts"
+import type { JSX } from "solid-js"
+import { Contract } from "@opencode/plugin/gui"
+
+export interface AcmeBadge {
+  Badge(props: { readonly label: string }): JSX.Element
+  count(): number
+}
+
+export const AcmeBadge = Contract.define<AcmeBadge, "acme.badge">("acme.badge")
+```
+
+When you provide a component on a contract, wrap it with `bindPlugin` during setup. Then `usePlugin()` inside it reads
+the provider's context, not the consumer's.
+
+```tsx title="src/gui.tsx"
+import { bindPlugin, Plugin } from "@opencode/plugin/gui"
+import { AcmeBadge } from "./gui/contract"
+
+export default Plugin.define({
+  id: "acme",
+  provides: { badge: AcmeBadge },
+  i18n: { en: { title: "Acme" } },
+  setup(ctx) {
+    ctx.provide(AcmeBadge, {
+      Badge: bindPlugin((props) => (
+        <span>
+          {ctx.t("title")}: {props.label}
+        </span>
+      )),
+      count: () => 42,
+    })
+  },
+})
+```
+
+### IPC between main and windows
+
+Use `Ipc.define` with Effect `Schema` codecs to define a typed bridge between `main` and `setup`. Declare your own `Ipc`
+in `provides`: `main` implements it with `ctx.provide`, and `setup` reads its client from `ctx.uses.<key>()`.
+
+```ts title="src/gui/contract.ts"
+import { Schema } from "effect"
+import { Ipc } from "@opencode/plugin/gui"
+
+export const KeepAwake = Ipc.define({
+  id: "acme.awake",
+  methods: {
+    screenActive: { output: Schema.Boolean },
+    setScreenActive: { input: Schema.Boolean },
+  },
+})
+```
+
+See [Main process & IPC](/build/plugins/gui/main#define-and-provide-an-ipc) for state, events, and the provider.
+
+### Registries your plugin owns
+
+Use `Registry.define` for a list your plugin owns. Other plugins contribute items with `ctx.add`, and your plugin reads
+them with `ctx.list`.
+
+```ts title="src/gui/contract.ts"
+import { Registry } from "@opencode/plugin/gui"
+
+export interface Exporter {
+  readonly id: string
+  readonly title: string
+  run(text: string): void
+}
+
+export const Exporter = Registry.define<Exporter>("acme.exporter")
+```
+
+```tsx
+// Another plugin contributes an item.
+ctx.add(Exporter, { id: "gist", title: "Gist", run: (text) => upload(text) })
+
+// The owner lists every contribution. Reactive: read it in render or in a memo.
+const exporters = () => ctx.list(Exporter)
+```
+
+## Live dependencies and failure handling
+
+Every optional dependency in `ctx.uses.<name>()` returns a reactive `Live<T>`. Handle the states that are not active,
+so no control is dead and no spinner runs forever.
+
+```ts
+ctx.add(Command, {
+  id: "wake",
+  title: ctx.t("command.wake"),
+  get enabled() {
+    return ctx.uses.awake().status === "active"
+  },
+  run: async () => {
+    const live = ctx.uses.awake()
+
+    if (live.status === "active") await live.value.setScreenActive(true)
+  },
+})
+```
+
+- **`pending`:** the provider has not finished starting. Show a loading state or hide optional controls.
+- **`active`:** the provider runs, and `value` is its API. `generation` increments on each restart.
+- **`inactive`, `restarting`:** the provider was active and is reloading. Keep the UI state and resume when it returns.
+- **`inactive`, `disabled`:** the provider is off, not composed, or not supported on this platform, as every `Ipc` token
+  is on the web. Show an unavailable state or omit the control.
+- **`inactive`, `failed`:** the provider's setup threw an error. Show an unavailable state or an error toast.
+- **`inactive`, `blocked`:** a hard dependency of the provider is off or failed. Show an unavailable state and resume if
+  it returns.
+
+#### Reference
+
+```ts
+type Live<T> =
+  | { status: "pending" }
+  | { status: "active"; value: T; generation: number }
+  | { status: "inactive"; reason: "disabled" | "failed" | "blocked" | "restarting" }
+```
+
+## Lifetimes and cleanup
+
+Everything registered through `ctx` (`ctx.add`, `ctx.provide`, `ctx.dialogs.open`, `ctx.embeds.create`, and `Ipc`
+event listeners) is withdrawn when its owning scope ends:
+
+- Inside a component or a `createKeyed` callback, registrations end when that component or `createKeyed` run disposes.
+- At the top level of `setup`, registrations end when the plugin is disabled, reloaded, or removed, or its window
+  closes.
+
+For other resources, such as timers or sockets, return a cleanup function from the setup. It runs at the same time.
+
+- **Window `setup`** cannot be `async`, because it runs under a Solid owner. Return a cleanup function, or use
+  `onCleanup` or `ctx.signal`.
+- **`main`** may be `async`. Return, or resolve to, a cleanup function, or use `ctx.scope.addFinalizer`.
+
+### Window setup
+
+Window `setup` must be synchronous. Start asynchronous work inside `createKeyed` or `createLatest`.
+
+```tsx title="src/gui.tsx"
+import { Command, createKeyed, Plugin } from "@opencode/plugin/gui"
+import { KeepAwake } from "./gui/contract"
+
+export default Plugin.define({
+  id: "acme",
+  provides: { awake: KeepAwake },
+  i18n: { en: { wake: "Keep screen awake" } },
+  setup(ctx) {
+    // Runs once per active generation of `awake`; the command is withdrawn with it.
+    createKeyed(ctx.uses.awake, (client) => {
+      ctx.add(Command, {
+        id: "wake",
+        title: ctx.t("wake"),
+        run: () => void client.setScreenActive(true),
+      })
+    })
+
+    const timer = setInterval(() => console.log("still here"), 60_000)
+
+    return () => clearInterval(timer)
+  },
+  // The window's `awake` is active only while a main setup provides it.
+  main(ctx) {
+    ctx.provide(KeepAwake, { screenActive: () => false, setScreenActive: () => {} })
+  },
+})
+```
+
+### Main setup
+
+`main` may be `async`. Return, or resolve to, a cleanup function for resources it opens.
+
+```ts
+async main(ctx) {
+  const socket = await connect(ctx.options)
+
+  return () => socket.close()
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Package and build" href="/build/plugins/gui/package">
+    Ship the GUI plugin from the same npm package as your server and TUI plugin.
+  </Card>
+  <Card title="Window SDK" href="/build/plugins/gui/window">
+    Contribute panels, commands, settings pages, menus, slots, and server sources in every window.
+  </Card>
+  <Card title="Main process & IPC" href="/build/plugins/gui/main">
+    Provide typed IPC state and methods, native menu items, and embedded WebContentsViews.
+  </Card>
+  <Card title="TUI plugins" href="/build/plugins/cli">
+    Add the terminal half of the same plugin.
+  </Card>
+</CardGroup>

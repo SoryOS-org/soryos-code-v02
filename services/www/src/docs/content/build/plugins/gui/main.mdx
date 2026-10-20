@@ -1,0 +1,449 @@
+---
+title: "Main process & IPC"
+description: "Write a plugin's Electron main-process setup, provide typed IPC contracts, add native menu items, and embed WebContentsViews."
+---
+
+On OpenCode Desktop, a plugin's `main` setup runs once in the Electron main process as an app-wide singleton. It has
+full access to Node.js built-ins, `electron`, and the main host APIs. Pass it to `Plugin.define` in the plugin's
+[`./gui-experimental` file](/build/plugins/gui/package#define-the-gui), beside the window `setup` or on its own.
+
+```tsx title="src/gui.tsx"
+import { Schema } from "effect"
+import { powerSaveBlocker } from "electron"
+import { Plugin, Store } from "@opencode/plugin/gui"
+import { KeepAwake } from "./gui/contract"
+
+export default Plugin.define({
+  id: "acme",
+  provides: { awake: KeepAwake },
+  stores: { keepScreenActive: Store.main(Schema.Boolean, false) },
+  main(ctx) {
+    const stored = ctx.stores.keepScreenActive
+    let blockerId: number | undefined
+
+    const release = () => {
+      if (blockerId === undefined) return
+      powerSaveBlocker.stop(blockerId)
+      blockerId = undefined
+    }
+
+    const setActive = (enabled: boolean) => {
+      if (enabled && blockerId === undefined) blockerId = powerSaveBlocker.start("prevent-display-sleep")
+      if (!enabled) release()
+      stored.set(enabled)
+    }
+
+    if (stored.value) setActive(true)
+
+    ctx.provide(KeepAwake, {
+      screenActive: () => blockerId !== undefined && powerSaveBlocker.isStarted(blockerId),
+      setScreenActive: (enabled) => setActive(enabled),
+    })
+
+    return release
+  },
+})
+```
+
+In a window, `electron` is an inert placeholder, so the import is safe in the shared `./gui-experimental` file. See
+[One file, two processes](/build/plugins/gui/package#one-file-two-processes).
+
+## Main setup in its own file
+
+In a larger plugin, move `main` to its own file and type it from the plugin's declarations:
+
+```ts title="src/gui/main.ts"
+import type { Plugin } from "@opencode/plugin/gui"
+import type { definition } from "./definition"
+
+export const main: Plugin.MainSetup<typeof definition> = async (ctx) => {
+  const socket = await connect(ctx.options)
+
+  return () => socket.close()
+}
+```
+
+Then define the plugin with it: `Plugin.define({ ...definition, setup, main })`. See
+[Split across files](/build/plugins/gui/package#split-across-files).
+
+## Main context
+
+`main` receives a `MainContext`. Unlike the window `setup`, `main` may be `async`, and it may return, or resolve to, a
+cleanup function.
+
+```ts
+main(ctx) {
+  ctx.log.write("info", "acme started", { version: ctx.app.version })
+}
+```
+
+- `ctx.options`, `ctx.client`, and `ctx.app` are the [shared context](/build/plugins/gui#shared-context). In `main`,
+  `ctx.app.platform` is always `"desktop"`.
+- `ctx.stores` holds every store declared with `Store.main`. They load before `main` runs, and each `set` or `update`
+  reaches SQLite at once.
+- `ctx.storage` opens SQLite stores for keys known only at runtime.
+- `ctx.scope` is the instance's lifetime. Finalizers may return a promise; the host waits up to 3 seconds for them
+  during teardown.
+- `ctx.provide` implements an `Ipc` token declared in `provides`; see [Define and provide an Ipc](#define-and-provide-an-ipc).
+- `ctx.add` contributes to main-process registries such as [`MenubarItem`](#native-app-menu).
+- `ctx.windows` lists the app's `BrowserWindow`s and reports when one opens or closes.
+- `ctx.embeds` places a `WebContentsView` in a window's layout; see [Embedded web views](#embedded-web-views).
+- `ctx.serverEndpoints.get(id)` returns a server's URL and credentials. The desktop app's own server is `"sidecar"`.
+- `ctx.cli` describes the OpenCode CLI the desktop app runs.
+- `ctx.lifecycle.restart(handoff?, { keep: ctx.scope })` disposes the other plugins, then runs `handoff` or relaunches
+  the app. It keeps the caller alive until `handoff` settles.
+- `ctx.log.write` writes to the desktop log file.
+
+#### Reference
+
+```ts
+interface MainContext {
+  id: string
+  options: PluginOptions
+  client: OpenCodeClient | undefined
+  app: App
+  stores: Record<string, Persisted<unknown>>
+  storage: MainStorage
+  scope: Scope
+  provide<S extends IpcSpec>(token: Ipc<S>, impl: IpcImpl<S>): IpcProvider<S>
+  add<T>(registry: Registry<T>, item: T | (() => T | undefined)): Cleanup
+  list<T>(registry: Registry<T>): T[]
+  t(key: string, params?: Record<string, string | number | boolean>): string
+  plural(key: string, count: number, params?: Record<string, string | number | boolean>): string
+  windows: Windows
+  embeds: MainEmbeds
+  serverEndpoints: { get(id: string): ServerEndpoint | undefined }
+  cli: { version: string; command: string[]; binary?: string; development: boolean }
+  lifecycle: { restart(handoff?: () => void | Promise<void>, options?: { keep?: Scope }): Promise<void> }
+  log: { write(level: "debug" | "info" | "warn" | "error", message: string, data?: Record<string, unknown>): void }
+}
+
+interface MainStorage {
+  store(key: string, options: { schema: Schema; initial: T; from?: MainStoreFrom | MainStoreFrom[] }): Persisted<T>
+  remove(key: string, options?: { from?: MainStoreFrom | MainStoreFrom[] }): void
+}
+
+type MainStoreFrom = { settings: string; file?: string } | { state: [namespace: string, key: string] }
+
+interface Scope {
+  signal: AbortSignal
+  addFinalizer(fn: Cleanup): Cleanup
+  fork(name: string): Scope
+  close(): Promise<void>
+}
+
+interface Windows {
+  get(id: number): BrowserWindow | undefined
+  list(): BrowserWindow[]
+  focused(): BrowserWindow | undefined
+  on(event: "open" | "close", handler: (window: BrowserWindow) => void): Cleanup
+}
+
+interface ServerEndpoint {
+  id: string
+  url: string
+  headers: Record<string, string>
+  local: boolean
+  username?: string
+  password?: string
+}
+```
+
+## Define and provide an Ipc
+
+An `Ipc` spec can declare per-window `state`, callable `methods`, and pushed `events`. Effect `Schema` validates and
+encodes every value that crosses the bridge.
+
+```ts title="src/gui/contract.ts"
+import { Schema } from "effect"
+import { Ipc } from "@opencode/plugin/gui"
+
+export const Counter = Ipc.define({
+  id: "acme.counter",
+  state: Schema.Struct({ count: Schema.Number }),
+  methods: {
+    increment: {
+      input: Schema.Number,
+      output: Schema.Number,
+    },
+    reset: {},
+  },
+  events: {
+    overflow: Schema.Struct({ limit: Schema.Number }),
+  },
+})
+```
+
+Declare the `Ipc` in `provides`, so `main` can provide it and `setup` can use it:
+
+```ts title="src/gui/definition.ts"
+import { Plugin } from "@opencode/plugin/gui"
+import { Counter } from "./contract"
+
+export const definition = Plugin.define({ id: "acme", provides: { counter: Counter } })
+```
+
+#### Reference
+
+```ts
+interface IpcSpec {
+  id: string
+  state?: Schema
+  methods: Record<string, { input?: Schema; output?: Schema }>
+  events?: Record<string, Schema>
+}
+```
+
+### Implement the provider in main
+
+Each method receives the decoded input and a `Caller` (`{ window, signal }`). Call `provider.changed(window?)` when
+`state` changes to push the new snapshot to subscribed windows, or `provider.emit(name, payload, window?)` to send an
+event.
+
+```ts title="src/gui/main.ts"
+import type { Plugin } from "@opencode/plugin/gui"
+import { Counter } from "./contract"
+import type { definition } from "./definition"
+
+export const main: Plugin.MainSetup<typeof definition> = (ctx) => {
+  const counts = new Map<number, number>()
+
+  const provider = ctx.provide(Counter, {
+    state: (window) => ({ count: counts.get(window) ?? 0 }),
+    increment: (step, caller) => {
+      const next = (counts.get(caller.window) ?? 0) + step
+      counts.set(caller.window, next)
+      provider.changed(caller.window)
+
+      if (next > 100) provider.emit("overflow", { limit: 100 }, caller.window)
+
+      return next
+    },
+    reset: (_input, caller) => {
+      counts.set(caller.window, 0)
+      provider.changed(caller.window)
+    },
+  })
+}
+```
+
+- A spec with `state` also needs `state(window)` in the implementation. Main reads it when a window subscribes and on
+  every `changed`.
+- A method that throws rejects the window's call.
+- `changed` and `emit` reach every window when you omit `window`.
+- `dispose()` withdraws the `Ipc` early, and windows see it `inactive`. The host also withdraws it when the plugin
+  stops.
+
+#### Reference
+
+```ts
+type IpcImpl<S extends IpcSpec> = {
+  [Name in keyof S["methods"]]: (input: Input<Name>, caller: Caller) => Output<Name> | Promise<Output<Name>>
+} & { state(window: number): State }
+
+interface Caller {
+  window: number
+  signal: AbortSignal
+}
+
+interface IpcProvider<S extends IpcSpec> {
+  changed(window?: number): void
+  emit(name: keyof S["events"], data: EventData, window?: number): void
+  dispose(): void
+}
+```
+
+### Use the Ipc in a window
+
+In the window, `ctx.uses.counter()` resolves to a `Live<IpcClient<typeof Counter.spec>>`. A method without an `input`
+schema takes only optional `{ signal }` call options. Do not pass `undefined` as its first argument.
+
+```tsx title="src/gui/window.tsx"
+import { Command, createKeyed, type Plugin } from "@opencode/plugin/gui"
+import type { definition } from "./definition"
+
+export const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const counter = ctx.uses.counter
+
+  createKeyed(counter, (client) => {
+    // Removed when main restarts or the plugin unloads.
+    client.on("overflow", ({ limit }) => {
+      console.log(`Counter exceeded ${limit}`)
+    })
+  })
+
+  ctx.add(Command, {
+    id: "increment",
+    title: ctx.t("command.increment"),
+    get enabled() {
+      return counter().status === "active"
+    },
+    run: async () => {
+      const live = counter()
+
+      if (live.status !== "active") return
+      await live.value.increment(1, { signal: ctx.signal })
+      await live.value.reset({ signal: ctx.signal })
+    },
+  })
+}
+```
+
+Read this window's `state` with `client.state()`. It is `undefined` until the first snapshot arrives, and updates each
+time `main` calls `changed`.
+
+```tsx
+const count = () => {
+  const live = ctx.uses.counter()
+
+  return live.status === "active" ? (live.value.state()?.count ?? 0) : 0
+}
+```
+
+#### Reference
+
+```ts
+type IpcClient<S extends IpcSpec> = {
+  [Name in keyof S["methods"]]: S["methods"][Name] extends { input: Schema }
+    ? (input: Input<Name>, options?: { signal?: AbortSignal }) => Promise<Output<Name>>
+    : (options?: { signal?: AbortSignal }) => Promise<Output<Name>>
+} & {
+  state(): State | undefined
+  on(name: keyof S["events"], listener: (data: EventData) => void): Cleanup
+}
+```
+
+Define the plugin with both setups in `src/gui.tsx`: `Plugin.define({ ...definition, setup, main })`.
+
+### Lazy-load IPC schemas
+
+When an `Ipc` has a large schema that should stay off the window's startup path, declare a reference with `Ipc.ref` in
+the definition, and load the full token from a lazy chunk:
+
+```ts title="src/gui/definition.ts"
+import { Ipc, Plugin } from "@opencode/plugin/gui"
+import type { AcmePane } from "./ipc"
+
+const Pane = Ipc.ref<typeof AcmePane>("acme.pane")
+
+export const definition = Plugin.define({
+  id: "acme",
+  provides: { pane: Pane },
+})
+```
+
+```tsx title="src/gui/pane.tsx"
+import { usePlugin } from "@opencode/plugin/gui"
+import type { definition } from "./definition"
+import { AcmePane } from "./ipc"
+
+export default function PaneView() {
+  const ctx = usePlugin<typeof definition>()
+  // Resolves the reference with the full token, which this lazy chunk loads.
+  const pane = ctx.uses.pane.load(AcmePane)
+
+  return <p>{pane().status}</p>
+}
+```
+
+A reference cannot go in `requires`: it resolves only once code loads the full token.
+
+## Native app menu
+
+`main` adds items to the native menus (the macOS app menu, File, Edit, View, Go, Window, and Help) and to the in-app
+menu on Windows and Linux with `MenubarItem` from `@opencode/plugin/gui/main`:
+
+```ts
+import { MenubarItem } from "@opencode/plugin/gui/main"
+
+ctx.add(MenubarItem, {
+  menu: "help",
+  id: "diagnostics",
+  after: "about",
+  get label() {
+    return ctx.t("menu.diagnostics")
+  },
+  enabled: () => true,
+  run: (focusedWindow) => {
+    focusedWindow?.webContents.focus()
+  },
+})
+```
+
+- `after` is the item it follows: another of this plugin's items by id, or a built-in item.
+- `run` receives the focused window, if any.
+
+#### Reference
+
+```ts
+interface MenubarItem {
+  menu: "app" | "file" | "edit" | "view" | "go" | "window" | "help"
+  id: string
+  label: string
+  after?: string
+  enabled?(): boolean
+  run(window: BrowserWindow | undefined): void
+}
+```
+
+## Embedded web views
+
+To embed an isolated `WebContentsView` in a panel, as the built-in `browser` plugin does, create it in `main` and render
+its box from the window.
+
+```ts title="src/gui/main.ts"
+import { WebContentsView } from "electron"
+
+const view = new WebContentsView()
+const embed = ctx.embeds.create(view, window)
+embed.show(true)
+// Send embed.id to the window over your Ipc.
+```
+
+```tsx title="src/gui/pane.tsx"
+<ctx.embeds.View id={embedId} visible radius={8} />
+```
+
+- A window passes the embed's `id` to `ctx.embeds.View` and `ctx.embeds.capture`.
+- `show(visible)` is the page's side of visibility: the view shows only while the window lays it out and `show(true)`
+  holds.
+- `on("visible", handler)` runs when the view goes on or off screen, including when the window paints a still in its
+  place.
+- `capture()` returns a still of the page, or `undefined` while it is hidden.
+- `dispose()` removes the view. The host also disposes it when the plugin goes away.
+- In the window, `View` fills its box with the embed. The host keeps the view's bounds, zoom, rounded corners, and
+  dialog occlusion in step, and hides it while the window is hidden or a dialog is open.
+- `frozen` paints a still in place of the live view, so DOM content can float above it. `radius` rounds the bottom
+  corners, and `background` is the color the corners show.
+- The window's `capture(id)` returns a JPEG still, or `undefined` while the embed is hidden and always on the web.
+
+#### Reference
+
+```ts
+interface MainEmbeds {
+  create(view: WebContentsView, window: BrowserWindow): Embed
+}
+
+interface Embed {
+  id: string
+  show(visible: boolean): void
+  on(event: "visible", handler: (visible: boolean) => void): Cleanup
+  capture(): Promise<NativeImage | undefined>
+  dispose(): void
+}
+
+interface Embeds {
+  View(props: EmbedProps): JSX.Element
+  capture(id: string): Promise<Uint8Array | undefined>
+}
+
+interface EmbedProps {
+  id: string | undefined
+  visible: boolean
+  frozen?: boolean
+  radius?: number
+  background?: string
+  class?: string
+  children?: JSX.Element
+}
+```
