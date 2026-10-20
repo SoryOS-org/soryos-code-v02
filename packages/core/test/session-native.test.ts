@@ -20,12 +20,12 @@ import { SessionNative } from "@opencode/core/session/native"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { toLLMMessages } from "@opencode/core/session/runner/to-llm-message"
 import { SessionSchema } from "@opencode/core/session/schema"
-import { InstructionStateTable, SessionTable } from "@opencode/core/session/sql"
+import { InstructionStateTable, SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Model } from "@opencode/schema/model"
 import { Provider } from "@opencode/schema/provider"
-import { asc, eq } from "drizzle-orm"
+import { asc, eq, sql } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 import { testEffect } from "./lib/effect"
 import legacyMedia from "./fixture/native/2.0.14-media.json"
@@ -144,7 +144,7 @@ it.effect("loads and replays a pre-v2.1 providerContext checkpoint with pre-2.0.
     yield* s.prepare
     yield* s.prompt("original request")
     yield* s.bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "manual" })
-    // The event and projected row as releases before v2.1 stored them.
+    // An event as releases before v2.1 stored it.
     yield* s.bus.replay({
       id: Event.ID.create(),
       created: 1,
@@ -159,6 +159,18 @@ it.effect("loads and replays a pre-v2.1 providerContext checkpoint with pre-2.0.
         providerContext: { version: 1, provenance: { providerID: "openai" }, messages: legacyMedia },
       },
     })
+    // Its projected row, too: the event upgrades before projecting, so restore the old row shape directly.
+    const providerContext = JSON.stringify({ version: 1, provenance: { providerID: "openai" }, messages: legacyMedia })
+    yield* s.db
+      .update(SessionMessageTable)
+      .set({
+        data: sql`json_set(json_remove(${SessionMessageTable.data}, '$.native'), '$.providerContext', json(${providerContext}))`,
+      })
+      .where(eq(SessionMessageTable.type, "compaction"))
+      .run()
+    expect(
+      (yield* s.db.select().from(SessionMessageTable).where(eq(SessionMessageTable.type, "compaction")).get())?.data,
+    ).not.toHaveProperty("native")
     yield* s.prompt("continue")
     const history = yield* SessionHistory.load(s.db, sessionID, target)
     expect(toLLMMessages(history, model.ref).slice(0, 2)).toEqual([...SessionNative.decode(legacyCheckpoint)])
