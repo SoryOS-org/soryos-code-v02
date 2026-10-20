@@ -307,6 +307,11 @@ download_with_progress() {
 download_and_install() {
     print_message info "\n${MUTED}Installing ${NC}$APP ${MUTED}version: ${NC}$specific_version"
     local tmp_dir="${TMPDIR:-/tmp}/opencode_install_$$"
+    # Git Bash reports TMPDIR as a Windows path (`C:\...`); tar would read the drive
+    # letter as a remote host. Convert it so extraction works in either shell.
+    if [ "$os" = "windows" ] && command -v cygpath >/dev/null 2>&1; then
+        tmp_dir="$(cygpath -u "$tmp_dir")"
+    fi
     mkdir -p "$tmp_dir"
 
     if [[ "$os" == "windows" ]] || ! [ -t 2 ] || ! download_with_progress "$url" "$tmp_dir/$filename"; then
@@ -314,7 +319,11 @@ download_and_install() {
         curl -f -# -L -o "$tmp_dir/$filename" "$url"
     fi
 
-    tar -xzf "$tmp_dir/$filename" -C "$tmp_dir"
+    if [ "$os" = "windows" ]; then
+        tar --force-local -xzf "$tmp_dir/$filename" -C "$tmp_dir"
+    else
+        tar -xzf "$tmp_dir/$filename" -C "$tmp_dir"
+    fi
     local installed_binary="$APP"
     if [ "$os" = "windows" ]; then
         installed_binary="$APP.exe"
