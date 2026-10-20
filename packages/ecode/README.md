@@ -35,7 +35,7 @@ npx --yes bun@1.4.2 run packages/cli/script/build.ts \
   --single \
   --skip-install \
   --skip-web-ui \
-  --outdir=packages/cli/dist-ecode
+  --outdir=dist-ecode
 
 cp packages/cli/dist-ecode/cli-darwin-arm64/bin/opencode ~/.local/bin/ecode
 chmod 755 ~/.local/bin/ecode

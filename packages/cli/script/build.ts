@@ -209,7 +209,13 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     process.exit(1)
   }
   verifySimulationGraph(simulationInputs)
-  await NativeArch.verify(path.join(outdir, name, "bin", item.os === "win32" ? `${binary}.exe` : binary), item.arch)
+  const artifact = path.join(outdir, name, "bin", item.os === "win32" ? `${binary}.exe` : binary)
+  await NativeArch.verify(artifact, item.arch)
+  // Bun emits a linker-signed Mach-O. Refresh the ad-hoc signature after compilation so
+  // newer macOS code-signing monitors do not terminate local builds with "Invalid Page".
+  if (item.os === "darwin" && process.platform === "darwin") {
+    await $`codesign --force --sign - --timestamp=none ${artifact}`
+  }
 
   await Bun.write(
     path.join(outdir, name, "package.json"),
