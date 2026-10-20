@@ -33,10 +33,12 @@ const STEP = Math.SQRT2
 
 const group = "Image open"
 
-// One spring carries the open and the close, and the backdrop dims on it too. Snappy is Claude's measured preview.
+// One spring carries the open and the close, and the backdrop dims on it too. Snappy is Claude's measured preview; Smooth
+// ships, since opening an image is rare enough to take its time.
 const tuning = motionTuning.spring("imagePreview", {
   label: "Spring",
   group,
+  shipped: "smooth",
   presets: {
     snappy: FLIGHT_SPRING,
     smooth: { duration: 0.3, bounce: 0 },

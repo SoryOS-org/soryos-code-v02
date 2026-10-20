@@ -1,11 +1,11 @@
 import type { DurationOptions } from "./motion"
-import { motionPresets, motionTuning, type MotionKnob } from "./motion-tuning"
+import { motionPresets, motionTuning, type MotionKnob, type MotionPreset } from "./motion-tuning"
 
 const global = "Global"
 
 /**
- * Mounts the Motion workspace into `container`: a tab per surface under the Snappy, Smooth and Calm presets for every
- * spring at once. Each tab shows one Global card (speed, slow motion and other settings every surface reads), then one
+ * Mounts the Motion workspace into `container`: a tab per surface under the shipped values and the Snappy, Smooth and
+ * Calm presets for every spring at once. Each tab shows one Global card (speed, slow motion and other settings every surface reads), then one
  * card for its surface: its springs and knobs, with its replay buttons under a Replay sub-heading. knobs loads on first
  * mount, so importing this module costs nothing until then. Works anywhere a surface registered its knobs, including
  * Storybook stories. Returns its removal.
@@ -60,6 +60,7 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
       const actions = motionTuning.actions()
       const mounted = identity()
       const springs = list.flatMap((item) => (item.kind === "spring" ? [item] : []))
+      const preset = (id: MotionPreset) => Object.fromEntries(springs.map((item) => [item.id, item.presets[id]]))
       const sections = [...new Set([...list, ...actions].map((item) => item.group))].filter((group) => group !== global)
 
       const controls = defineControls(
@@ -86,13 +87,10 @@ export function mountMotionPanel(container: HTMLElement, options: { title?: stri
           enabled: true,
           ship: () => import("knobs/panel"),
           persist: "variants",
-          // The defaults are Snappy; the strip names them so rather than "default".
-          defaultLabel: motionPresets.snappy,
-          presetLabels: { smooth: motionPresets.smooth, calm: motionPresets.calm },
-          presets: {
-            smooth: Object.fromEntries(springs.map((item) => [item.id, item.presets.smooth])),
-            calm: Object.fromEntries(springs.map((item) => [item.id, item.presets.calm])),
-          },
+          // Springs ship different presets, so the defaults get their own chip.
+          defaultLabel: "Shipped",
+          presetLabels: motionPresets,
+          presets: { snappy: preset("snappy"), smooth: preset("smooth"), calm: preset("calm") },
           onChange: (patch) =>
             list.forEach((item) => {
               // SAFETY: each field was made from its knob above, so its value is that knob's kind.

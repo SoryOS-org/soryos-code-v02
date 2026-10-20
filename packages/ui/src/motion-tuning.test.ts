@@ -19,7 +19,15 @@ describe("motionTuning.spring", () => {
 
     expect(spring()).toEqual(presets.snappy)
     expect(knob?.kind === "spring" && knob.initial).toEqual(presets.snappy)
-    expect(knob?.kind === "spring" && knob.presets).toEqual({ smooth: presets.smooth, calm: presets.calm })
+    expect(knob?.kind === "spring" && knob.presets).toEqual(presets)
+  })
+
+  test("ships the preset a spring names", () => {
+    const spring = motionTuning.spring("test.smooth", { label: "Spring", group: "Test", shipped: "smooth", presets })
+    const knob = motionTuning.list().find((item) => item.id === "test.smooth")
+
+    expect(spring()).toEqual(presets.smooth)
+    expect(knob?.kind === "spring" && knob.initial).toEqual(presets.smooth)
   })
 
   test("runs a preset applied to its knob, stretched by the global speed and slow motion", () => {

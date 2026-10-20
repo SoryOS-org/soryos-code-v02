@@ -13,13 +13,13 @@ type Knob<Kind extends string, Value> = {
   value: Value
 }
 
-/** The presets every spring offers. Its shipped value is Snappy; Smooth and Calm are slower, all without bounce. */
+/** The presets every spring offers, all without bounce. A spring ships Snappy unless it names another. */
 export const motionPresets = { snappy: "Snappy", smooth: "Smooth", calm: "Calm" } as const
 
 export type MotionPreset = keyof typeof motionPresets
 
 export type MotionKnob =
-  | (Knob<"spring", DurationOptions> & { presets: Record<Exclude<MotionPreset, "snappy">, DurationOptions> })
+  | (Knob<"spring", DurationOptions> & { presets: Record<MotionPreset, DurationOptions> })
   | Knob<"toggle", boolean>
   | (Knob<"number", number> & { min: number; max: number; step: number; unit?: string })
 
@@ -41,8 +41,8 @@ const saved = load()
 
 export const motionTuning = {
   /** The spring to run now: its tuned duration scaled by the global speed and slow motion. */
-  spring(id: string, meta: Meta & { presets: Record<MotionPreset, DurationOptions> }) {
-    const initial = meta.presets.snappy
+  spring(id: string, meta: Meta & { presets: Record<MotionPreset, DurationOptions>; shipped?: MotionPreset }) {
+    const initial = meta.presets[meta.shipped ?? "snappy"]
 
     const knob = register({
       kind: "spring",
@@ -51,7 +51,7 @@ export const motionTuning = {
       group: meta.group,
       initial,
       value: { duration: number(`${id}.duration`, initial.duration), bounce: number(`${id}.bounce`, initial.bounce) },
-      presets: { smooth: meta.presets.smooth, calm: meta.presets.calm },
+      presets: meta.presets,
     })
 
     return (): DurationOptions => ({
