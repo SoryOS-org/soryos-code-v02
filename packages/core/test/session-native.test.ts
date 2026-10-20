@@ -15,6 +15,7 @@ import { SessionHistory } from "@opencode/core/session/history"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { InstructionState } from "@opencode/core/session/instruction-state"
 import { SessionMessage } from "@opencode/core/session/message"
+import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionNative } from "@opencode/core/session/native"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
@@ -48,11 +49,17 @@ const replacement = [
 const native = SessionNative.encode(replacement)
 const sessionID = SessionSchema.ID.make("ses_native")
 
+// A window as releases before v2.1 stored it, read the way history reads stored rows.
+const legacy = (messages: unknown) =>
+  SessionLegacy.message("compaction", { providerContext: { version: 1, messages } }) as Pick<
+    SessionNative.Checkpoint,
+    "native"
+  >
 // Frozen serialized data, deliberately not constructed using today's Message API.
-const legacyCheckpoint = { native: { messages: legacyMedia } }
+const legacyCheckpoint = legacy(legacyMedia)
 
 test("reads pre-2.0.15 checkpoint media without rewriting the stored payload", async () => {
-  const before = JSON.stringify(legacyCheckpoint)
+  const before = JSON.stringify(legacyMedia)
   const decoded = SessionNative.decode(legacyCheckpoint)
   expect(await Effect.runPromise(SessionNative.validate(legacyCheckpoint))).toEqual(decoded)
   expect(decoded[0]?.content).toMatchObject([
@@ -68,7 +75,7 @@ test("reads pre-2.0.15 checkpoint media without rewriting the stored payload", a
     { type: "media", media: { source: { type: "base64", data: "BAUG", mediaType: "image/jpeg" } } },
   ])
   expect(decoded[1]?.content).toMatchObject(legacyMedia[1]?.content ?? [])
-  expect(JSON.stringify(legacyCheckpoint)).toBe(before)
+  expect(JSON.stringify(legacyMedia)).toBe(before)
 })
 
 test("reads mixed legacy and current media without overriding an existing asset", async () => {
@@ -78,13 +85,11 @@ test("reads mixed legacy and current media without overriding an existing asset"
     mediaType: "image/png",
     data: "AQID",
   }
-  const checkpoint = {
-    native: { messages: [{ role: "user", content: [...(legacyMedia[0]?.content ?? []), current] }] },
-  }
+  const checkpoint = legacy([{ role: "user", content: [...(legacyMedia[0]?.content ?? []), current] }])
   const decoded = SessionNative.decode(checkpoint)
   expect(await Effect.runPromise(SessionNative.validate(checkpoint))).toEqual(decoded)
   expect(decoded[0]?.content.at(-1)).toMatchObject({ media: current.media })
-  const invalid = { native: { messages: [{ role: "user", content: [{ ...current, media: null }] }] } }
+  const invalid = legacy([{ role: "user", content: [{ ...current, media: null }] }])
   expect(() => SessionNative.decode(invalid)).toThrow()
   expect(await Effect.runPromise(Effect.isFailure(SessionNative.validate(invalid)))).toBe(true)
 })

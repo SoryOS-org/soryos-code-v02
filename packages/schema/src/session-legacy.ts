@@ -70,7 +70,24 @@ function providerContext(data: Record<string, unknown>) {
   const context = data.providerContext
   const rest = omit(data, "providerContext")
   if (!isRecord(context)) return rest
-  return { ...rest, native: { messages: context.messages } }
+  return {
+    ...rest,
+    native: { messages: Array.isArray(context.messages) ? context.messages.map(media) : context.messages },
+  }
+}
+
+/** Before 2.0.15, window media parts stored `mediaType` and base64 `data` directly. */
+function media(message: unknown) {
+  if (!isRecord(message) || !Array.isArray(message.content)) return message
+  return {
+    ...message,
+    content: message.content.map((part: unknown) => {
+      if (!isRecord(part) || part.type !== "media" || part.media !== undefined || typeof part.data !== "string")
+        return part
+      const { mediaType, data, ...rest } = part
+      return { ...rest, media: { source: { type: "base64", data, mediaType } } }
+    }),
+  }
 }
 
 function omit(value: Record<string, unknown>, key: string) {
