@@ -1,5 +1,5 @@
 import { afterEach, expect, mock, spyOn, test } from "bun:test"
-import { enterpriseSpamProbability, ENTERPRISE_SPAM_MODEL } from "./enterprise-spam"
+import { enterpriseSpamProbability, ENTERPRISE_SPAM_MODEL, ENTERPRISE_SPAM_URL } from "./enterprise-spam"
 import { enterpriseEmailContent, handleEnterpriseRequest } from "./enterprise"
 
 const submission = {
@@ -20,7 +20,6 @@ test("scores a submission through the System One gateway", async () => {
   // The form handler passes the whole submission, phone included; the classifier must not receive it.
   const withPhone = { ...submission, phone: "+1 555 0100" }
   const probability = await enterpriseSpamProbability(withPhone, {
-    inferenceUrl: "https://opencode.test/inference",
     apiKey: "test-key",
     fetch: async (request) => {
       requests.push(request)
@@ -30,7 +29,7 @@ test("scores a submission through the System One gateway", async () => {
 
   expect(probability).toBe(0.97)
   expect(requests).toHaveLength(1)
-  expect(requests[0].url).toBe("https://opencode.test/inference/systemone/v1/systemone")
+  expect(requests[0].url).toBe(ENTERPRISE_SPAM_URL)
   expect(requests[0].headers.get("authorization")).toBe("Bearer test-key")
   const body = await requests[0].json()
   expect(body.model).toBe(ENTERPRISE_SPAM_MODEL)
@@ -40,7 +39,7 @@ test("scores a submission through the System One gateway", async () => {
 })
 
 test("returns no score when the gateway fails, times out, or answers without a probability", async () => {
-  const options = { inferenceUrl: "https://opencode.test/inference", apiKey: "test-key" }
+  const options = { apiKey: "test-key" }
   const failures = [
     async () => new Response("nope", { status: 401 }),
     async () => {
@@ -59,12 +58,6 @@ test("returns no score when the gateway fails, times out, or answers without a p
   }
 })
 
-test("returns no score without logging an error when the gateway is not configured", async () => {
-  const error = spyOn(console, "error").mockImplementation(() => {})
-  expect(await enterpriseSpamProbability(submission, { inferenceUrl: "", apiKey: "test-key" })).toBeUndefined()
-  expect(error).not.toHaveBeenCalled()
-})
-
 const submit = async (fetch: (request: Request) => Promise<Response>) => {
   const leads: Record<string, unknown>[] = []
   const response = await handleEnterpriseRequest(
@@ -74,7 +67,7 @@ const submit = async (fetch: (request: Request) => Promise<Response>) => {
       body: JSON.stringify({ ...submission, alias: "" }),
     }),
     {
-      spam: { inferenceUrl: "https://opencode.test/inference", apiKey: "test-key", fetch },
+      spam: { apiKey: "test-key", fetch },
       salesforceSubmit: async (payload) => {
         leads.push(payload)
         return true

@@ -1,13 +1,12 @@
 import { domain } from "./stage"
 import { EMAILOCTOPUS_API_KEY } from "./app"
 
-// Preview stages have no new Console or inference deployment to forward to.
+// Preview stages have no new Console deployment to forward to.
 const migrationDomain =
   $app.stage === "production" ? "opencode.ai" : $app.stage === "dev" ? "dev.opencode.ai" : undefined
 const consoleMigration = new sst.Linkable("ConsoleMigration", {
   properties: {
     consoleUrl: migrationDomain ? `https://${migrationDomain}/console` : "",
-    inferenceUrl: migrationDomain ? `https://${migrationDomain}/inference` : "",
   },
 })
 
@@ -63,12 +62,6 @@ new sst.cloudflare.x.SolidStart("Console", {
             ...(flags ?? []),
             "global_fetch_strictly_public",
           ])
-          // Same-zone fetch to inference re-enters as a public request and loses the client IP.
-          if (migrationDomain)
-            args.bindings = $resolve(args.bindings).apply((bindings) => [
-              ...(bindings ?? []),
-              { type: "service", name: "INFERENCE", service: `opencode-inference-${$app.stage}` },
-            ])
         },
       },
     },

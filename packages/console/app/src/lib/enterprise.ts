@@ -175,10 +175,6 @@ export async function handleEnterpriseRequest(
     ])
 
     if (!lead && !mail && !octopus) {
-      if (import.meta.env.DEV) {
-        console.warn("Enterprise inquiry accepted in dev mode without integrations", { email: body.email })
-        return Response.json({ success: true, message: dict["enterprise.form.success.submitted"] }, { status: 200 })
-      }
       console.error("Enterprise inquiry delivery failed", { email: body.email })
       return Response.json({ error: dict["enterprise.form.error.internalServer"] }, { status: 500 })
     }
