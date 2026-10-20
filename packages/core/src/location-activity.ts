@@ -27,16 +27,6 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
       const timeToLive = Duration.toMillis(options.timeToLive ?? "60 minutes")
       const entries = new Map<string, { readonly ref: Location.Ref; expiresAt: number }>()
       const key = (ref: Location.Ref) => `${LocationServiceMap.canonical(ref).directory}\0${ref.workspaceID ?? ""}`
-      const backgroundSessions = jobs.runningBackground.pipe(
-        Effect.flatMap((running) =>
-          Effect.forEach(
-            running.flatMap((recovery) =>
-              recovery.kind === "shell" ? [recovery.sessionID] : [recovery.childSessionID, recovery.parentSessionID],
-            ),
-            (sessionID) => sessions.get(sessionID),
-          ),
-        ),
-      )
       const touch = (ref: Location.Ref) =>
         Effect.sync(() => {
           entries.set(key(ref), { ref, expiresAt: clock.currentTimeMillisUnsafe() + timeToLive })
@@ -62,46 +52,29 @@ export function layer(options: { readonly timeToLive?: Duration.Input; readonly 
         const now = clock.currentTimeMillisUnsafe()
         const expired = Array.from(entries.values()).filter((entry) => entry.expiresAt <= now)
         if (expired.length === 0) return
-        const active = yield* Effect.forEach(yield* execution.active, (sessionID) => sessions.get(sessionID))
-        const background = yield* backgroundSessions
+        // Waiting on a question, a long tool call, or a background job emits no durable activity.
+        const owners = [
+          ...(yield* execution.active),
+          ...(yield* jobs.runningBackground).flatMap((recovery) =>
+            recovery.kind === "shell" ? [recovery.sessionID] : [recovery.childSessionID, recovery.parentSessionID],
+          ),
+        ]
+        const occupied = new Set(
+          (yield* Effect.forEach(owners, (sessionID) => sessions.get(sessionID))).flatMap((session) =>
+            session ? [key(session.location)] : [],
+          ),
+        )
         yield* Effect.forEach(
           expired,
-          (entry) =>
-            Effect.gen(function* () {
-              // Background jobs report no durable activity while they run; keep their graph until they finish.
-              if (background.some((session) => session && key(session.location) === key(entry.ref))) {
-                yield* touch(entry.ref)
-                return
-              }
-              const owners = active.flatMap((session) =>
-                session && key(session.location) === key(entry.ref) ? [session] : [],
-              )
-              // Invalidation only detaches the cache entry; borrowers retain the old
-              // graph. Stop its executions and settle tool cleanup before detaching it.
-              yield* Effect.forEach(
-                owners,
-                (session) => execution.interrupt(session.id, { reason: "inactivity", awaitSettlement: true }),
-                {
-                  discard: true,
-                  concurrency: "unbounded",
-                },
-              )
-              const remaining = [
-                ...(yield* Effect.forEach(yield* execution.active, (sessionID) => sessions.get(sessionID))),
-                ...(yield* backgroundSessions),
-              ]
-              // New work admitted or backgrounded during cleanup may now own the cached graph.
-              if (remaining.some((session) => session && key(session.location) === key(entry.ref))) {
-                yield* touch(entry.ref)
-                return
-              }
-              entries.delete(key(entry.ref))
-              yield* Effect.logInfo("location services evicted", {
-                directory: entry.ref.directory,
-                workspaceID: entry.ref.workspaceID,
-              }).pipe(Effect.andThen(locations.invalidate(entry.ref)))
-            }),
-          { discard: true, concurrency: "unbounded" },
+          (entry) => {
+            if (occupied.has(key(entry.ref))) return touch(entry.ref)
+            entries.delete(key(entry.ref))
+            return Effect.logInfo("location services evicted", {
+              directory: entry.ref.directory,
+              workspaceID: entry.ref.workspaceID,
+            }).pipe(Effect.andThen(locations.invalidate(entry.ref)))
+          },
+          { discard: true },
         )
       }).pipe(Effect.forever, Effect.forkScoped)
 
