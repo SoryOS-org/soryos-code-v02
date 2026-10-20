@@ -105,7 +105,7 @@ export const configure = (input: Config = {}) => {
   const chat = (id: string | ModelID) =>
     chatRoute.with(withOpenAIOptions(id, modelDefaults)).model<OpenAIProviderOptionsInput>({
       id,
-      compatibility: { supportsPromptCacheKey: true },
+      compatibility: { supportsStore: true, supportsPromptCacheKey: true },
     })
   const deployment = MediaRoute.deployment(input, auth(input))
   const media = {

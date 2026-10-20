@@ -57,6 +57,7 @@ describe("request option precedence", () => {
       })
       const model = route.model({
         id: "gpt-4o-mini",
+        compatibility: { supportsStore: true },
         defaults: {
           generation: { maxTokens: 20, temperature: 0.5, frequencyPenalty: 0.25, stop: ["model"] },
           providerOptions: { reasoningEffort: "medium" },

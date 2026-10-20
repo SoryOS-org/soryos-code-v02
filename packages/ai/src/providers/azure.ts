@@ -129,7 +129,10 @@ export const configure = (input: Config) => {
   const chat = (modelID: string | ModelID) =>
     configuredRoute(chatRoute, input, modelID)
       .with(withOpenAIOptions(modelID, modelDefaults))
-      .model<OpenAIProviderOptionsInput>({ id: modelID, compatibility: { supportsPromptCacheKey: true } })
+      .model<OpenAIProviderOptionsInput>({
+        id: modelID,
+        compatibility: { supportsStore: true, supportsPromptCacheKey: true },
+      })
 
   return {
     id,

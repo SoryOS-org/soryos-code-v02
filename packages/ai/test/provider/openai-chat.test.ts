@@ -57,10 +57,35 @@ describe("OpenAI Chat route", () => {
         ],
         stream: true,
         stream_options: { include_usage: true },
-        store: false,
         max_completion_tokens: 20,
         temperature: 0,
       })
+    }),
+  )
+
+  it.effect("sends store only when compatibility opts in", () =>
+    Effect.gen(function* () {
+      const omitted = yield* compileRequest(
+        LLM.request({ model, prompt: "Say hello.", providerOptions: { store: true } }),
+      )
+      const stateless = yield* compileRequest(
+        LLM.request({
+          model: LanguageModel.update(model, { compatibility: { supportsStore: true } }),
+          prompt: "Say hello.",
+        }),
+      )
+      const azure = yield* compileRequest(
+        LLM.request({
+          model: Azure.configure({ baseURL: "https://opencode-test.openai.azure.com/openai/", apiKey: "test" }).chat(
+            "gpt-4o-mini",
+          ),
+          prompt: "Say hello.",
+        }),
+      )
+
+      expect(omitted.body).not.toHaveProperty("store")
+      expect(stateless.body.store).toBe(false)
+      expect(azure.body.store).toBe(false)
     }),
   )
 
@@ -467,7 +492,6 @@ describe("OpenAI Chat route", () => {
         tools: [],
         stream: true,
         stream_options: { include_usage: true },
-        store: false,
       })
     }),
   )
