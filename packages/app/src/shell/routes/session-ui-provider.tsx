@@ -3,7 +3,7 @@ import { MarkdownProvider, type ReadMarkdownImage } from "@opencode/session-ui/c
 import { useNavigate, useParams } from "@solidjs/router"
 import { createMemo, type ParentProps } from "solid-js"
 import { useProviders } from "@/providers/catalog/providers"
-import { LocalProvider } from "@/providers/models/selection"
+import { LocalProvider, useLocal } from "@/providers/models/selection"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { sessionHref } from "@/shell/routes/session"
 import { useData } from "@/runtime/server/current"
@@ -108,25 +108,28 @@ export function SessionUIProvider(
   }))
 
   return (
-    <DataProvider
-      data={sessionUIData()}
-      directory={directory()}
-      sessionID={params.id}
-      shellRunning={(id) => !!data.shell.get(id)}
-      shellOutput={(input) => serverSDK.api.shell.output(input)}
-      turnDiff={{
-        get: (input) => turnDiffs()?.get(input),
-        load: (input) => turnDiffs()?.load(input, () => serverSDK.api.session.diff(input)),
-      }}
-      onNavigateToSession={navigateToSession}
-      onSessionHref={href}
-      onPrompt={(input) =>
-        data.session.prompt({ ...input, metadata: { genui: settings.general.generatedUI() } }).then(() => undefined)
-      }
-    >
-      <MarkdownProvider readImage={readImage()} openSession={openReferencedSession} sessionTitle={sessionTitle}>
-        <LocalProvider>{props.children}</LocalProvider>
-      </MarkdownProvider>
-    </DataProvider>
+    <LocalProvider>
+      <DataProvider
+        data={sessionUIData()}
+        directory={directory()}
+        sessionID={params.id}
+        agents={useLocal().agent.visible()}
+        shellRunning={(id) => !!data.shell.get(id)}
+        shellOutput={(input) => serverSDK.api.shell.output(input)}
+        turnDiff={{
+          get: (input) => turnDiffs()?.get(input),
+          load: (input) => turnDiffs()?.load(input, () => serverSDK.api.session.diff(input)),
+        }}
+        onNavigateToSession={navigateToSession}
+        onSessionHref={href}
+        onPrompt={(input) =>
+          data.session.prompt({ ...input, metadata: { genui: settings.general.generatedUI() } }).then(() => undefined)
+        }
+      >
+        <MarkdownProvider readImage={readImage()} openSession={openReferencedSession} sessionTitle={sessionTitle}>
+          {props.children}
+        </MarkdownProvider>
+      </DataProvider>
+    </LocalProvider>
   )
 }
