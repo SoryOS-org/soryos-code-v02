@@ -576,6 +576,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           },
           session: {
             width: createMemo(() => regions.sessionWidth() ?? DEFAULT_SESSION_WIDTH),
+            /** The user has dragged the divider, so the width is theirs rather than the default. */
+            resized: createMemo(() => regions.sessionWidth() !== undefined),
             resize: regions.setSessionWidth,
           },
         }

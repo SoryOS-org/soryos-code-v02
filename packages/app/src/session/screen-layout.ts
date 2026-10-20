@@ -45,6 +45,7 @@ export function createSessionScreenLayout(
       width: view().session.width(),
       available: available(),
       split: splitSide(),
+      resized: view().session.resized(),
     }),
   )
 
@@ -61,7 +62,7 @@ export function createSessionScreenLayout(
 
     if (width === undefined) return 1000
 
-    return sessionPanelWidthMax({ available: width, split: splitSide() })
+    return sessionPanelWidthMax({ available: width, split: splitSide(), resized: true })
   })
 
   const sideOpen = createMemo(() => tabsOpen() || fileTreeOpen())

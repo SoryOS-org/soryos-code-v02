@@ -423,10 +423,7 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
 
   const handle = sidebar.locator('[data-component="resize-handle"]')
 
-  for (const [offset, width] of [
-    [-80, "180px"],
-    [-200, "140px"],
-  ] as const) {
+  const resize = async (offset: number, width: string) => {
     const box = await handle.boundingBox()
 
     if (!box) throw new Error("vertical tab resize handle has no bounding box")
@@ -437,6 +434,9 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
     await expect(sidebar).toHaveCSS("width", width)
   }
 
+  await resize(-80, "180px")
+  await resize(-40, "140px")
+
   for (const name of ["Home", "New session"]) {
     const label = sidebar.getByRole("button", { name, exact: true }).getByText(name, { exact: true })
     await expect(label).toBeVisible()
@@ -444,6 +444,14 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
       .poll(() => label.evaluate((element) => element.scrollWidth - element.clientWidth), { message: name })
       .toBeLessThanOrEqual(1)
   }
+
+  await resize(-200, "120px")
+  const homeLabel = sidebar.getByRole("button", { name: "Home", exact: true }).getByText("Home", { exact: true })
+  await expect
+    .poll(() => homeLabel.evaluate((element) => element.scrollWidth - element.clientWidth))
+    .toBeLessThanOrEqual(1)
+  await resize(800, "640px")
+  await resize(-380, "260px")
 
   const scroll = sidebar.locator('[data-slot="vertical-tabs-scroll"]')
   await scroll.evaluate((element) => element.scrollTo(0, element.scrollHeight))
