@@ -74,6 +74,7 @@ import { clampSessionTabsWidth, sessionTabsFitVertically, SESSION_SIDEBAR_WIDTH 
 import { createPaneResize } from "./ui/pane-resize"
 import { PaneResizeHandle } from "./ui/pane-resize-handle"
 import { clickedLink } from "./ui/link"
+import { openLink } from "./ui/open-link"
 import { ThemeErrorToast } from "./component/theme-error-toast"
 import { createThemeSource, ThemeProvider, useTheme, useThemes } from "./context/theme"
 import { Home } from "./routes/home"
@@ -1334,7 +1335,7 @@ function App() {
       }}
       onMouseUp={(event) => {
         const url = clickedLink(renderer, event)
-        if (url) return void openUrl(url).catch(toast.error)
+        if (url) return void openLink(url).catch(toast.error)
         if (copyOnSelectEnabled()) Selection.copyOnSelectRelease(event, renderer, toast, clipboard)
       }}
     >
