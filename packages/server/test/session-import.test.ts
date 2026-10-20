@@ -51,6 +51,22 @@ it.live("preserves imported parentID through HTTP import, read, and parent filte
   }).pipe(Effect.scoped),
 )
 
+it.live("keeps transcript timestamps when the import asks to preserve them", () =>
+  Effect.gen(function* () {
+    const request = yield* setup
+    const template = Schema.decodeUnknownSync(SessionResponse)(yield* request("/api/session", {}))
+    const id = Session.ID.create()
+    const imported = Schema.decodeUnknownSync(SessionResponse)(
+      yield* request("/api/experimental/session/import", {
+        info: { ...template.data, id, time: { ...template.data.time, created: 500, updated: 1_000 } },
+        messages: [],
+        preserveTimestamps: true,
+      }),
+    )
+    expect(imported.data.time).toMatchObject({ created: 500, updated: 1_000 })
+  }).pipe(Effect.scoped),
+)
+
 it.live("upgrades native data in transcripts exported before v2.1", () =>
   Effect.gen(function* () {
     const request = yield* setup

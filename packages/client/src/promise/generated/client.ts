@@ -606,7 +606,12 @@ export function make(options: ClientOptions) {
           {
             method: "POST",
             path: `/api/experimental/session/import`,
-            body: { info: input["info"], messages: input["messages"], location: input["location"] },
+            body: {
+              info: input["info"],
+              messages: input["messages"],
+              location: input["location"],
+              preserveTimestamps: input["preserveTimestamps"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 409],
             empty: false,

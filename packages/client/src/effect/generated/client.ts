@@ -430,7 +430,12 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
 const EndpointSessionImport = (raw: RawClient["server.session"]) => (input: SessionImportInput) =>
   preserveEffect<SessionImportOutput>()(
     raw["session.import"]({
-      payload: { info: input["info"], messages: input["messages"], location: input["location"] },
+      payload: {
+        info: input["info"],
+        messages: input["messages"],
+        location: input["location"],
+        preserveTimestamps: input["preserveTimestamps"],
+      },
     }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((value) => value.data),

@@ -181,6 +181,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           info: PublicSessionTransfer.fields.info,
           messages: ImportedMessages,
           location: Location.PublicRef.pipe(Schema.optional),
+          preserveTimestamps: Schema.Boolean.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
         error: [ConflictError, SessionNotFoundError],
@@ -189,7 +190,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           identifier: "experimental.session.import",
           summary: "Import session",
           description:
-            "Import a projected session transcript at the requested location. Accepts transcripts exported by earlier releases. If parentID is supplied, the parent session must already exist; import parents before children.",
+            "Import a projected session transcript at the requested location. Accepts transcripts exported by earlier releases. If parentID is supplied, the parent session must already exist; import parents before children. When preserveTimestamps is true, the session keeps the transcript's time.updated instead of the import time.",
         }),
       ),
     )

@@ -218,6 +218,7 @@ export type SessionImportInput = {
   readonly info: Session.Info
   readonly messages: ReadonlyArray<SessionMessage.Info>
   readonly location?: Location.PublicRef | undefined
+  readonly preserveTimestamps?: boolean | undefined
 }
 export type SessionImportOutput = Session.Info
 export type SessionImportOperation<E = never> = (input: SessionImportInput) => Effect.Effect<SessionImportOutput, E>

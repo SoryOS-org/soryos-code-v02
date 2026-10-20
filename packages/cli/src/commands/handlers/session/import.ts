@@ -46,6 +46,7 @@ export default Runtime.handler(
         body: JSON.stringify({
           ...data,
           location: { directory: location.directory },
+          ...(input.preserveTimestamps ? { preserveTimestamps: true } : {}),
         }),
       }),
     )

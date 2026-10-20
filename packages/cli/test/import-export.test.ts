@@ -199,6 +199,51 @@ test("import sends the file unchanged to the resolved location", async () => {
   }
 })
 
+test("import preserves transcript timestamps when asked", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-import-preserve-"))
+  const file = path.join(root, "session.json")
+  await fs.writeFile(file, JSON.stringify(transfer))
+  let imported: unknown
+  const server = Bun.serve({
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url)
+      if (url.pathname === "/api/info") return status()
+      if (url.pathname === "/api/location") {
+        return Response.json({
+          directory: root,
+          project: { id: "global", directory: root, canonical: root },
+        })
+      }
+      if (url.pathname === "/api/experimental/session/import") {
+        imported = await request.json()
+        return Response.json({ data: { ...info, location: { directory: root } } })
+      }
+      return new Response("Not found", { status: 404 })
+    },
+  })
+
+  try {
+    const [stdout, , exitCode] = await run([
+      "session",
+      "import",
+      file,
+      "--directory",
+      root,
+      "--preserve-timestamps",
+      "--server",
+      server.url.toString(),
+    ])
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe(`Imported session: ${info.id}${os.EOL}`)
+    expect(imported).toEqual({ ...transfer, location: { directory: root }, preserveTimestamps: true })
+  } finally {
+    await server.stop(true)
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
 test("import reports an existing session without a stack trace", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-import-conflict-"))
   const file = path.join(root, "session.json")

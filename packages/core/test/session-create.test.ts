@@ -1505,4 +1505,32 @@ describe("SessionTransfer", () => {
       expect(imported.outcome).toBe("succeeded")
     }),
   )
+
+  it.effect("keeps the transcript's last-updated time only when asked", () =>
+    Effect.gen(function* () {
+      const session = yield* Session.Service
+      const transfer = yield* SessionTransfer.Service
+      const template = yield* session.create({ location })
+      const transcript = DateTime.makeUnsafe(1_000)
+      const data = (id: Session.ID) => ({
+        info: {
+          ...template,
+          id,
+          time: { ...template.time, created: DateTime.makeUnsafe(500), updated: transcript },
+        },
+        messages: [],
+      })
+      const stamped = yield* transfer.import({ data: data(Session.ID.create()), location })
+      const preserved = yield* transfer.import({
+        data: data(Session.ID.create()),
+        location,
+        preserveTimestamps: true,
+      })
+
+      expect(DateTime.toEpochMillis(stamped.time.created)).toBe(500)
+      expect(DateTime.toEpochMillis(stamped.time.updated)).not.toBe(1_000)
+      expect(DateTime.toEpochMillis(preserved.time.created)).toBe(500)
+      expect(DateTime.toEpochMillis(preserved.time.updated)).toBe(1_000)
+    }),
+  )
 })

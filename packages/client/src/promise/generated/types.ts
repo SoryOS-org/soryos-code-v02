@@ -3275,6 +3275,7 @@ export type SessionImportInput = {
     }
     readonly messages: ReadonlyArray<JsonValue>
     readonly location?: { readonly directory: string } | null
+    readonly preserveTimestamps?: boolean | null
   }["info"]
   readonly messages: {
     readonly info: {
@@ -3328,6 +3329,7 @@ export type SessionImportInput = {
     }
     readonly messages: ReadonlyArray<JsonValue>
     readonly location?: { readonly directory: string } | null
+    readonly preserveTimestamps?: boolean | null
   }["messages"]
   readonly location?: {
     readonly info: {
@@ -3381,7 +3383,62 @@ export type SessionImportInput = {
     }
     readonly messages: ReadonlyArray<JsonValue>
     readonly location?: { readonly directory: string } | null
+    readonly preserveTimestamps?: boolean | null
   }["location"]
+  readonly preserveTimestamps?: {
+    readonly info: {
+      readonly id: string
+      readonly parentID?: string
+      readonly fork?: {
+        readonly sessionID: string
+        readonly boundary:
+          | { readonly type: "before"; readonly messageID: string }
+          | { readonly type: "through"; readonly messageID: string }
+      }
+      readonly projectID: string
+      readonly agent?: string
+      readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+      readonly cost: number
+      readonly tokens: {
+        readonly input: number
+        readonly output: number
+        readonly reasoning: number
+        readonly cache: { readonly read: number; readonly write: number }
+      }
+      readonly outcome?: "succeeded" | "failed" | "interrupted"
+      readonly time: {
+        readonly created: number
+        readonly updated: number
+        readonly idle?: number
+        readonly viewed?: number
+        readonly archived?: number
+      }
+      readonly title?: string
+      readonly subpath?: string
+      readonly metadata?: { readonly [x: string]: JsonValue }
+      readonly permissions?: ReadonlyArray<{
+        readonly action: string
+        readonly resource: string
+        readonly effect: "allow" | "deny" | "ask"
+      }>
+      readonly revert?: {
+        readonly messageID: string
+        readonly partID?: string
+        readonly snapshot?: string
+        readonly files?: ReadonlyArray<{
+          readonly file: string
+          readonly patch: string
+          readonly additions: number
+          readonly deletions: number
+          readonly status: "added" | "deleted" | "modified"
+        }>
+      }
+      readonly location: { readonly directory: string }
+    }
+    readonly messages: ReadonlyArray<JsonValue>
+    readonly location?: { readonly directory: string } | null
+    readonly preserveTimestamps?: boolean | null
+  }["preserveTimestamps"]
 }
 
 export type SessionImportOutput = { data: SessionInfo }["data"]

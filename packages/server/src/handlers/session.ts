@@ -117,6 +117,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               .import({
                 data: { info: ctx.payload.info, messages: ctx.payload.messages },
                 location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
+                preserveTimestamps: ctx.payload.preserveTimestamps,
               })
               .pipe(
                 Effect.catchTag("Session.NotFoundError", missingSession),

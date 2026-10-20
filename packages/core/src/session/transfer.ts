@@ -38,6 +38,7 @@ export interface Interface {
   readonly import: (input: {
     data: Data
     location: Location.Ref
+    preserveTimestamps?: boolean
   }) => Effect.Effect<Session.Info, ImportConflictError | Session.NotFoundError>
 }
 
@@ -123,7 +124,9 @@ const layer = Layer.effect(
                       tokens_cache_read: input.data.info.tokens.cache.read,
                       tokens_cache_write: input.data.info.tokens.cache.write,
                       time_created: DateTime.toEpochMillis(input.data.info.time.created),
-                      time_updated: importedAt,
+                      time_updated: input.preserveTimestamps
+                        ? DateTime.toEpochMillis(input.data.info.time.updated)
+                        : importedAt,
                       time_idle: input.data.info.time.idle ? DateTime.toEpochMillis(input.data.info.time.idle) : null,
                       time_viewed:
                         input.data.info.time.idle && input.data.info.time.viewed

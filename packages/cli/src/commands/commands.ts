@@ -464,6 +464,10 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
               Flag.withDescription("Directory in which to import the session"),
               Flag.optional,
             ),
+            preserveTimestamps: Flag.Boolean("preserve-timestamps").pipe(
+              Flag.withDescription("Keep the transcript's last-updated time instead of the import time"),
+              Flag.withDefault(false),
+            ),
           },
         }),
       ],
