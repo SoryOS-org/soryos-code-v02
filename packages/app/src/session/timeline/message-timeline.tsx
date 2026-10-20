@@ -4,11 +4,8 @@ import { Predicate } from "effect"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import type { SessionUserActions } from "@opencode/session-ui/actions"
 import { Button } from "@opencode/ui/button"
-import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
 import { InlineInput } from "@opencode/ui/inline-input"
 import { Keybind } from "@opencode/ui/keybind"
-import { Menu } from "@opencode/ui/menu"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import type { BackgroundTask, MountedSession, SessionScreen } from "@opencode/gui-extensions/sdk"
 import { ExtensionSlot } from "@/runtime/extension/render"
@@ -250,8 +247,6 @@ function MessageTimelineView(
   const [title, setTitle] = createStore({
     draft: "",
     editing: false,
-    menuOpen: false,
-    pendingRename: false,
   })
 
   let titleRef: HTMLInputElement | undefined
@@ -263,8 +258,6 @@ function MessageTimelineView(
         setTitle({
           draft: "",
           editing: false,
-          menuOpen: false,
-          pendingRename: false,
         }),
       { defer: true },
     ),
@@ -304,12 +297,23 @@ function MessageTimelineView(
             skip: (event) => extensionScoped(event.target),
             onSelect: openTitleEditor,
           },
+          {
+            id: "session.delete",
+            category: language.t("command.category.session"),
+            title: language.t("command.session.delete"),
+            disabled: !sessionID() || !!parentID(),
+            onSelect: () => {
+              const id = sessionID()
+
+              if (id) props.action.showDelete(id)
+            },
+          },
         ],
   )
 
   createEffect(() => {
     if (props.active !== false) return
-    setTitle({ draft: "", editing: false, menuOpen: false, pendingRename: false })
+    setTitle({ draft: "", editing: false })
   })
 
   const rowRenderer = createSessionTimelineRowRenderer({
@@ -584,59 +588,6 @@ function MessageTimelineView(
                     onBlur={() => void saveTitleEditor()}
                   />
                 </Show>
-              </Show>
-              <Show when={!parentID() && sessionID()} keyed>
-                {(id) => (
-                  <Menu
-                    gutter={6}
-                    placement="bottom-start"
-                    open={title.menuOpen}
-                    onOpenChange={(open) => setTitle("menuOpen", open)}
-                  >
-                    <Menu.Trigger
-                      as={IconButton}
-                      icon={<Icon name="outline-dots" />}
-                      variant="ghost-muted"
-                      size="large"
-                      class="shrink-0"
-                      aria-label={language.t("common.moreOptions")}
-                      aria-expanded={title.menuOpen}
-                    />
-                    <Menu.Portal>
-                      <Menu.Content
-                        class="session-options-menu w-max"
-                        style={{ "min-width": "0" }}
-                        onCloseAutoFocus={(event) => {
-                          if (!title.pendingRename) return
-                          event.preventDefault()
-                          setTitle("pendingRename", false)
-                          openTitleEditor()
-                        }}
-                      >
-                        <Show when={!parentID()}>
-                          <Menu.Item
-                            onSelect={() => {
-                              setTitle("pendingRename", true)
-                              setTitle("menuOpen", false)
-                            }}
-                          >
-                            {language.t("common.rename")}
-                          </Menu.Item>
-                          <Menu.Item onSelect={() => void props.action.export(id)}>
-                            {language.t("common.export")}…
-                          </Menu.Item>
-                        </Show>
-                        <Show when={!parentID()}>
-                          {/* TODO: Need a session archive API. */}
-                          <Menu.Separator />
-                          <Menu.Item onSelect={() => props.action.showDelete(id)}>
-                            {language.t("common.delete")}…
-                          </Menu.Item>
-                        </Show>
-                      </Menu.Content>
-                    </Menu.Portal>
-                  </Menu>
-                )}
               </Show>
             </SessionHeaderLayout>
           </SessionTitleHeader>

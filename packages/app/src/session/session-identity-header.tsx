@@ -96,6 +96,9 @@ export function SessionLocation(props: {
   const branch = () =>
     props.directory ? server.ctx.data.location.vcs.info({ directory: props.directory })?.branch.current : undefined
 
+  const baseBranch = () =>
+    props.project ? server.ctx.data.location.vcs.info({ directory: props.project.worktree })?.branch.current : undefined
+
   // Revealing a path only makes sense on the machine the app runs on.
   const canReveal = () =>
     platform.platform === "desktop" && !!platform.revealPath && servers.current(server.conn) && !!props.directory
@@ -103,6 +106,9 @@ export function SessionLocation(props: {
   const onOpenChange = (open: boolean) => {
     if (!open || !props.directory || !git()) return
     void server.ctx.data.location.vcs.sync({ directory: props.directory }).catch(() => undefined)
+
+    if (props.project && props.project.worktree !== props.directory)
+      void server.ctx.data.location.vcs.sync({ directory: props.project.worktree }).catch(() => undefined)
   }
 
   const copyPath = async () => {
@@ -209,8 +215,29 @@ export function SessionLocation(props: {
                 {worktree() ?? language.t("session.new.workspace.local")}
               </SessionLocationDetail>
             </Show>
-            <Show when={branch()}>
-              {(name) => <SessionLocationDetail icon="branch">{name()}</SessionLocationDetail>}
+            <Show when={git()}>
+              <SessionLocationDetail icon="branch">
+                <Show
+                  when={branch()}
+                  fallback={
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <span class="shrink-0 whitespace-nowrap">{language.t("session.location.noBranch")}</span>
+                      <Show when={baseBranch()}>
+                        {(base) => (
+                          <>
+                            <span class="text-v2-text-text-muted">·</span>
+                            <span class="truncate text-v2-text-text-faint">
+                              {language.t("session.summary.basedOn", { branch: base() })}
+                            </span>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  }
+                >
+                  {branch()}
+                </Show>
+              </SessionLocationDetail>
             </Show>
             <SessionLocationDetail icon="server">
               <ServerLabel server={server.conn} hint />

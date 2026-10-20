@@ -2,26 +2,11 @@ import { createMemo, lazy, onCleanup, Show, Suspense } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createKeyed, onIdle, Panel, Slot, Style, useDrawer, usePanel, type Setup } from "../sdk"
 import type Details from "./index"
-import type { Disclosure } from "./panel"
 import { DetailsHeader } from "./popover"
 
 const setup: Setup<typeof Details> = (ctx) => {
   const sessions = ctx.sessions
   const changes = ctx.uses.changes
-  const prefs = ctx.stores.prefs
-
-  const disclosure: Disclosure = {
-    project: () => prefs.value.projectExpanded,
-    server: () => prefs.value.serverExpanded,
-    setProject: (expanded) =>
-      prefs.update((draft) => {
-        draft.projectExpanded = expanded
-      }),
-    setServer: (expanded) =>
-      prefs.update((draft) => {
-        draft.serverExpanded = expanded
-      }),
-  }
 
   const DetailsPanel = lazy(() =>
     Promise.all([import("./panel"), import("./details.css?inline")]).then(([panel, css]) => {
@@ -38,13 +23,7 @@ const setup: Setup<typeof Details> = (ctx) => {
     at: "session.header",
     order: 20,
     render: (input) => (
-      <DetailsHeader
-        session={input.session}
-        screen={input.screen}
-        active={input.active}
-        panel={DetailsPanel}
-        disclosure={disclosure}
-      />
+      <DetailsHeader session={input.session} screen={input.screen} active={input.active} panel={DetailsPanel} />
     ),
   })
 
@@ -99,7 +78,6 @@ const setup: Setup<typeof Details> = (ctx) => {
                 moveDismissed={store.dismissed}
                 onMoveDismiss={() => setStore("dismissed", true)}
                 onReview={review()?.open}
-                disclosure={disclosure}
               />
             </Suspense>
           )}

@@ -54,11 +54,6 @@ export function SessionHeaderActions(props: { state: SessionHeaderActionsState }
             variant="ghost-muted"
             size="large"
             class="shrink-0"
-            style={{
-              // This fixed control sits above moving panel contents.
-              "--v2-overlay-simple-overlay-hover": "var(--v2-background-bg-layer-01)",
-              "--v2-overlay-simple-overlay-pressed": "var(--v2-background-bg-layer-02)",
-            }}
             onMouseDown={(event) => event.preventDefault()}
             onClick={props.state.onReviewToggle}
             aria-label={props.state.reviewLabel}

@@ -61,11 +61,12 @@ type Attached = {
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
-  layout: Omit<Layout, "narrow" | "settings" | "project" | "stored"> & {
+  layout: Omit<Layout, "narrow" | "settings" | "project" | "command" | "stored"> & {
     stored(extension: string, session: SessionRef): readonly string[]
   }
   settings: (page?: string) => void
   project: (server: string, title: string) => void
+  command: (id: string) => void
   font: Accessor<string>
   routing: Accessor<boolean>
   path: Accessor<string>
@@ -319,6 +320,7 @@ export function createHostApis() {
       },
       settings: (page) => write((value) => value.settings(page)),
       project: (server, title) => write((value) => value.project(server, title)),
+      command: (id) => write((value) => value.command(id)),
     }),
     embeds: () => embeds,
   }
@@ -819,6 +821,7 @@ export function createExtensionAttachment(apis: HostApis) {
     scope,
     scoped: layout.sessionState.track,
     project: (server, title) => setProjects((pending) => [...pending, { server, title }]),
+    command: (id) => command.trigger(id),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,

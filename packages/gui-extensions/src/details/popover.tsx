@@ -1,21 +1,20 @@
-import { Popover } from "@kobalte/core/popover"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
+import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { createMemo, onCleanup, Show, Suspense, type Component, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Command, createKeyed, createVisitState, useExtension, type MountedSession, type SessionScreen } from "../sdk"
 import type Details from "./index"
-import type { Disclosure, DetailsPanelProps } from "./panel"
+import type { DetailsPanelProps } from "./panel"
 
-/** The session details button of one timeline header. Cached timelines each keep their own. */
+/** The session details menu of one timeline header. Cached timelines each keep their own. */
 export function DetailsHeader(props: {
   session: MountedSession
   screen: SessionScreen
   active: boolean
   panel: Component<DetailsPanelProps>
-  disclosure: Disclosure
 }) {
   const changes = useExtension<typeof Details>().uses.changes
   const Panel = props.panel
@@ -53,6 +52,7 @@ export function DetailsHeader(props: {
         <DetailsPopover active={props.active} open={open()} onOpenChange={setOpen}>
           <Suspense>
             <Panel
+              menu
               session={props.session}
               shown={open()}
               project={project()}
@@ -60,7 +60,6 @@ export function DetailsHeader(props: {
               moveDismissed={store.dismissed}
               onMoveDismiss={() => setStore("dismissed", true)}
               onReview={review()?.open}
-              disclosure={props.disclosure}
             />
           </Suspense>
         </DetailsPopover>
@@ -90,9 +89,7 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
   const keybind = () => [...keybinds.keybind(`${ctx.id}.toggle`)]
 
   return (
-    <Popover open={props.open} placement="bottom-end" gutter={8} overflowPadding={16} onOpenChange={props.onOpenChange}>
-      {/* Match the button's vertical bounds; the 8px gutter plus 4px content padding gives a 12px card gap. */}
-      <Popover.Anchor class="pointer-events-none absolute end-3 top-2.5 h-7 w-0" aria-hidden="true" />
+    <Menu placement="bottom-end" gutter={4} modal={false} open={props.open} onOpenChange={props.onOpenChange}>
       <Tooltip
         placement="bottom"
         value={
@@ -104,24 +101,20 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
           </>
         }
       >
-        <Popover.Trigger
+        <Menu.Trigger
           as={IconButton}
-          icon={<Icon name="window-analytics" />}
+          icon={<Icon name="outline-dots" />}
           variant="ghost-muted"
           size="large"
           state={props.open ? "pressed" : undefined}
           aria-label={ctx.t("title")}
-          aria-expanded={props.open}
         />
       </Tooltip>
-      <Popover.Portal>
-        <Popover.Content
-          class="session-summary-popover z-50 max-h-[calc(100dvh-96px)] overflow-y-auto border-0 bg-transparent p-1 outline-none"
-          aria-label={ctx.t("title")}
-        >
+      <Menu.Portal>
+        <Menu.Content class="w-[280px]" aria-label={ctx.t("title")}>
           {props.children}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu>
   )
 }

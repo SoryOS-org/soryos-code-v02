@@ -90,6 +90,7 @@ export const dict = {
   "command.session.import": "Import session",
   "command.session.copyID": "Copy Session ID",
   "command.session.rename": "Rename session",
+  "command.session.delete": "Delete session",
 
   "palette.search.placeholder": "Search files, commands, and sessions",
   "palette.search.placeholder.home": "Search commands and sessions",
@@ -624,6 +625,7 @@ export const dict = {
   "session.header.reveal.fileExplorer": "Reveal in File Explorer",
   "session.header.reveal.containingFolder": "Open containing folder",
   "session.location.copyPath": "Copy path",
+  "session.location.noBranch": "No branch",
 
   "settings.tab.servers": "Servers",
   "settings.extensions.tab.plugins": "Plugins",
