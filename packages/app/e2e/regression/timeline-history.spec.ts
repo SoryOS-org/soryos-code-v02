@@ -154,7 +154,7 @@ test.describe("timeline history", () => {
     await expect(page.locator("#message-msg_00001_turn_a_user")).toBeInViewport()
     await expect.poll(activeIndexes).toEqual([0, 1])
 
-    // Beta's narrow, two-row header and floating composer delimit which prompts are actually visible.
+    // The 48px header and floating composer delimit which prompts are actually visible.
     await page.setViewportSize({ width: 820, height: 500 })
     await turns.nth(0).click()
     const firstPrompt = page.locator('#message-msg_00000_turn_a_user [data-slot="user-message-text"]')
@@ -165,7 +165,7 @@ test.describe("timeline history", () => {
         const prompt = await firstPrompt.boundingBox()
         const area = await visibleArea.boundingBox()
 
-        return !!prompt && !!area && prompt.y >= area.y + 80 && prompt.y + prompt.height <= area.y + area.height
+        return !!prompt && !!area && prompt.y >= area.y + 48 && prompt.y + prompt.height <= area.y + area.height
       })
       .toBe(true)
     await expect
