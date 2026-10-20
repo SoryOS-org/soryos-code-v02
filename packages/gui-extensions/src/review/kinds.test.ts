@@ -81,5 +81,13 @@ describe("expandReviewFolders", () => {
     expect(expanded).toHaveLength(54)
     expect(expanded.slice(0, 3)).toEqual(["keep.txt", "research/", "research/0.md"])
     expect(expanded.slice(-2)).toEqual(["research/deep/", "research/deep/inner.md"])
+
+    // A listing that stopped early ends with a `more` entry for the folder itself, which stays out of the rows.
+    const stopped = expandReviewFolders(
+      rows,
+      new Map([["research/", [row("research/a.md"), { ...row("research/"), more: true as const }]]]),
+    )
+
+    expect(stopped.map((diff) => diff.file)).toEqual(["keep.txt", "research/", "research/a.md"])
   })
 })

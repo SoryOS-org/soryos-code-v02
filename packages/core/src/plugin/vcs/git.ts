@@ -617,8 +617,12 @@ const untrackedBatch = Effect.fnUntraced(function* (
   )
 })
 
-/** Entries a folder listing shows before it stops and reports the rest as omitted. */
+/** Entries a folder listing shows, and checks per Git call. */
 const MAX_FOLDER_ENTRIES = 500
+
+/** Entries, and time, a folder listing spends checking before it stops and reports that more were not checked. */
+const MAX_FOLDER_SCAN = 5_000
+const MAX_FOLDER_SCAN_MS = 1_000
 
 /**
  * Untracked files, one by one unless the caller asks for folders. With folders, Git lists an untracked folder as one
@@ -626,7 +630,7 @@ const MAX_FOLDER_ENTRIES = 500
  * its subfolders again as one entry each.
  */
 const statusItems = Effect.fnUntraced(function* (ctx: Ctx, untracked: Untracked = "files") {
-  if (untracked === "files") return { list: yield* ctx.git.status(ctx.directory, "all"), omitted: 0 }
+  if (untracked === "files") return { list: yield* ctx.git.status(ctx.directory, "all"), more: undefined }
 
   const list = yield* ctx.git.status(ctx.directory)
   const prefix = path.relative(ctx.worktree, ctx.directory).split(path.sep).join("/")
@@ -634,25 +638,35 @@ const statusItems = Effect.fnUntraced(function* (ctx: Ctx, untracked: Untracked 
     !prefix ||
     !list.some((item) => item.code === "??" && item.file.endsWith("/") && `${prefix}/`.startsWith(item.file))
   )
-    return { list, omitted: 0 }
+    return { list, more: undefined }
 
   const names = yield* Effect.promise(() => fs.readdir(ctx.directory).then((items) => items.toSorted()))
-  // Ignored entries do not list, so check entries a batch at a time until the listing fills or the folder runs out.
+  // Ignored entries do not list, so check entries a batch at a time until the listing fills, the folder runs out, or
+  // the scan budget does.
   const entries: Item[] = []
+  const started = Date.now()
   let checked = 0
-  while (checked < names.length && entries.length < MAX_FOLDER_ENTRIES) {
+  while (
+    checked < names.length &&
+    entries.length < MAX_FOLDER_ENTRIES &&
+    checked < MAX_FOLDER_SCAN &&
+    Date.now() - started < MAX_FOLDER_SCAN_MS
+  ) {
     const batch = names.slice(checked, checked + MAX_FOLDER_ENTRIES)
     checked += batch.length
     entries.push(...(yield* ctx.git.status(ctx.directory, "normal", batch)))
   }
   return {
     list: entries.slice(0, MAX_FOLDER_ENTRIES),
-    omitted: Math.max(0, entries.length - MAX_FOLDER_ENTRIES) + names.length - checked,
+    more: entries.length > MAX_FOLDER_ENTRIES || checked < names.length ? `${prefix}/` : undefined,
   }
 })
 
-const withOmitted = (rows: FileDiff.Info[], omitted: number) =>
-  omitted === 0 ? rows : rows.map((row, index) => (index === rows.length - 1 ? { ...row, omitted } : row))
+/** A folder listing that stopped early ends with an entry for the folder itself, marked `more`. */
+const withMore = (rows: FileDiff.Info[], folder: string | undefined) =>
+  folder === undefined
+    ? rows
+    : [...rows, { file: folder, patch: "", additions: 0, deletions: 0, status: "added" as const, more: true as const }]
 
 const nums = (list: Stat[]) =>
   new Map(list.map((item) => [item.file, { additions: item.additions, deletions: item.deletions }] as const))
@@ -781,7 +795,7 @@ const diffAgainstRef = Effect.fnUntraced(function* (ctx: Ctx, ref: string, optio
     [
       ctx.git.diff(ctx.directory, ref, options?.target),
       ctx.git.stats(ctx.directory, ref, options?.target),
-      options?.target ? Effect.succeed({ list: [], omitted: 0 }) : statusItems(ctx, options?.untracked),
+      options?.target ? Effect.succeed({ list: [], more: undefined }) : statusItems(ctx, options?.untracked),
     ],
     { concurrency: 3 },
   )
@@ -796,13 +810,13 @@ const diffAgainstRef = Effect.fnUntraced(function* (ctx: Ctx, ref: string, optio
     yield* batchPatches(ctx, ref, list, options),
     options,
   )
-  return withOmitted(rows, extra.omitted)
+  return withMore(rows, extra.more)
 })
 
 const track = Effect.fnUntraced(function* (ctx: Ctx, ref: string | undefined, options?: DiffOptions) {
   if (!ref) {
     const status = yield* statusItems(ctx, options?.untracked)
-    return withOmitted(yield* files(ctx, ref, status.list, new Map(), emptyBatch(), options), status.omitted)
+    return withMore(yield* files(ctx, ref, status.list, new Map(), emptyBatch(), options), status.more)
   }
   return yield* diffAgainstRef(ctx, ref, options)
 })

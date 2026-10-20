@@ -46,12 +46,18 @@ export function isReviewFolder(file: string) {
   return file.endsWith("/")
 }
 
-/** The rows with each loaded folder's entries after its row, depth first. */
+/** The rows with each loaded folder's entries after its row, depth first. A folder's `more` entry stays out. */
 export function expandReviewFolders(
   rows: readonly RenderDiff[],
   loaded: ReadonlyMap<string, readonly RenderDiff[]>,
 ): RenderDiff[] {
-  return rows.flatMap((row) => [row, ...expandReviewFolders(loaded.get(row.file) ?? [], loaded)])
+  return rows.flatMap((row) => [
+    row,
+    ...expandReviewFolders(
+      (loaded.get(row.file) ?? []).filter((entry) => !entry.more),
+      loaded,
+    ),
+  ])
 }
 
 export function reviewDiffKinds(diffs: readonly RenderDiff[]) {

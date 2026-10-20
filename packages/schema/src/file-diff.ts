@@ -9,8 +9,8 @@ export const Info = Schema.Struct({
   additions: NonNegativeInt,
   deletions: NonNegativeInt,
   status: Schema.Literals(["added", "deleted", "modified"]),
-  /** On the last entry of a folder listing that stopped at its cap: the folder's entries it did not check. */
-  omitted: NonNegativeInt.pipe(optional),
+  /** Marks the entry a folder listing adds for itself when it stopped before showing or checking every entry. */
+  more: Schema.Literal(true).pipe(optional),
 }).annotate({ identifier: "FileDiff.Info" })
 export interface Info extends Schema.Schema.Type<typeof Info> {}
 

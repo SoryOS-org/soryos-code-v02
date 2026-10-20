@@ -271,7 +271,7 @@ export function createReviewModel(input: {
     ),
   )
 
-  // An opened folder's entry count, and the entries a capped listing left out.
+  // An opened folder's entry count, and whether its listing stopped before showing or checking every entry.
   const folderLabels = createMemo(
     () =>
       new Map(
@@ -279,8 +279,8 @@ export function createReviewModel(input: {
           const entries = folderQueries[index]?.data
 
           if (!entries) return []
-          const more = entries.at(-1)?.omitted ?? 0
-          const label = more > 0 ? ctx.t("folder.more", { shown: entries.length, count: more }) : `${entries.length}`
+          const shown = entries.filter((entry) => !entry.more).length
+          const label = entries.some((entry) => entry.more) ? ctx.t("folder.more", { count: shown }) : `${shown}`
 
           return [[normalizePath(folder), label] as const]
         }),

@@ -4,7 +4,7 @@ export default {
   "tab.count.other": "Files Changed {{count}}",
   "menu.count.one": "{{count}} file changed",
   "menu.count.other": "{{count}} files changed",
-  "folder.more": "{{shown}} · {{count}} more",
+  "folder.more": "{{count}} · more not shown",
   "command.open": "Open review",
   "mobile.title.one": "Change",
   "mobile.title.other": "Changes",

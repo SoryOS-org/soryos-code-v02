@@ -699,18 +699,63 @@ describe("Vcs", () => {
           "research/noisy/",
           "research/wide/",
         ])
-        expect(folder.diff.some((row) => row.omitted)).toBeFalse()
+        expect(folder.diff.some((row) => row.more)).toBeFalse()
         expect((yield* review("research/deep")).diff.map((row) => row.file)).toEqual(["research/deep/inner.md"])
 
         const wide = (yield* review("research/wide")).diff
-        expect(wide).toHaveLength(500)
-        expect(wide.at(-1)).toMatchObject({ file: "research/wide/499.md", omitted: 5 })
+        expect(wide).toHaveLength(501)
+        expect(wide.at(-2)?.file).toBe("research/wide/499.md")
+        expect(wide.at(-1)).toMatchObject({ file: "research/wide/", more: true })
 
         // 505 ignored entries sort before the one that lists.
-        expect((yield* review("research/noisy")).diff.map((row) => [row.file, row.omitted])).toEqual([
+        expect((yield* review("research/noisy")).diff.map((row) => [row.file, row.more])).toEqual([
           ["research/noisy/z-important.ts", undefined],
         ])
       }),
+    ),
+  )
+
+  it.live("stops listing an untracked folder after its scan budget and says more were not checked", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          await initGit(directory, "-b", "main")
+          await fs.writeFile(path.join(directory, ".gitignore"), "huge/a-*\n")
+          await commitAll(directory, "initial")
+          await fs.mkdir(path.join(directory, "huge"))
+          await Promise.all(
+            Array.from({ length: 5_000 }, (_, index) =>
+              fs.writeFile(path.join(directory, `huge/a-${String(index).padStart(4, "0")}.log`), ""),
+            ),
+          )
+          await fs.writeFile(path.join(directory, "huge/z-visible.ts"), "visible\n")
+        })
+        const vcs = yield* Vcs.Service
+        const processes = yield* AppProcess.Service
+        const context = host()
+        let statuses = 0
+        yield* VcsGitPlugin.Plugin.effect({
+          ...context,
+          vcs: { ...context.vcs, transform: vcs.transform, reload: vcs.reload },
+        }).pipe(
+          Effect.provideService(
+            AppProcess.Service,
+            AppProcess.Service.of({
+              ...processes,
+              run: (command, options) => {
+                if ("args" in command && command.args.includes("status")) statuses++
+                return processes.run(command, options)
+              },
+            }),
+          ),
+        )
+
+        const diff = yield* vcs.diff("working", { untracked: "folders" })
+        expect(diff.map((row) => [row.file, row.more])).toEqual([["huge/", true]])
+        // One status for the folder, then at most ten batches of 500.
+        expect(statuses).toBeGreaterThan(1)
+        expect(statuses).toBeLessThanOrEqual(11)
+      }).pipe(provide(path.join(directory, "huge"), { git: true, worktree: directory })),
     ),
   )
 
