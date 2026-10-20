@@ -433,6 +433,18 @@
   }
 }
 
+[data-slot="linked-text-link"] {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: var(--v2-text-text-base);
+    text-decoration-color: currentColor;
+  }
+}
+
 [data-component="bash-output"] {
   direction: ltr;
   unicode-bidi: isolate;

@@ -15,6 +15,7 @@ import { useData } from "../context"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Markdown } from "../components/markdown"
+import { linkSegments } from "../components/link-segments"
 import { ImagePreview } from "@opencode/ui/image-preview"
 import { getFilename } from "@opencode/util/path"
 import { AttachmentCard } from "./attachment-card"
@@ -534,21 +535,13 @@ function CurrentHighlightedText(props: {
 
     const result: HighlightSegment[] = []
     // Plain text between references may contain URLs, which become links.
-    const pushText = (text: string) => {
-      let last = 0
-
-      for (const match of text.matchAll(urlPattern)) {
-        const href = match[0].replace(/[),.;:!?\]]+$/, "")
-
-        if (!URL.canParse(href)) continue
-
-        if (match.index > last) result.push({ text: text.slice(last, match.index) })
-        result.push({ text: href, type: "link" })
-        last = match.index + href.length
-      }
-
-      if (last < text.length) result.push({ text: text.slice(last) })
-    }
+    const pushText = (text: string) =>
+      result.push(
+        ...linkSegments(text).map((segment): HighlightSegment => ({
+          text: segment.text,
+          type: segment.href ? "link" : undefined,
+        })),
+      )
 
     let last = 0
     references.forEach((reference) => {
@@ -586,8 +579,6 @@ function CurrentHighlightedText(props: {
     </For>
   )
 }
-
-const urlPattern = /https?:\/\/[^\s<>"'`]+/g
 
 type HighlightSegment = { text: string; type?: "file" | "agent" | "link" }
 
