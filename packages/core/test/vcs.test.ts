@@ -582,12 +582,10 @@ describe("Vcs", () => {
           await initGit(directory, "-b", "main")
           await fs.writeFile(path.join(directory, "keep.txt"), "one\n")
           await fs.writeFile(path.join(directory, ".gitignore"), "*.log\n")
-          // A tracked folder lists its untracked files one by one.
-          await fs.mkdir(path.join(directory, "evals/nested"), { recursive: true })
-          await fs.writeFile(path.join(directory, "evals/nested/.keep"), "")
           await commitAll(directory, "initial")
           await fs.writeFile(path.join(directory, "staged.txt"), "staged\n")
           await $`git add staged.txt`.cwd(directory).quiet()
+          await fs.mkdir(path.join(directory, "evals/nested"), { recursive: true })
           await Promise.all(
             Array.from({ length: count }, (_, index) =>
               fs.writeFile(path.join(directory, `evals/nested/file-${index}.md`), `line ${index}\nmore\n`),
@@ -635,7 +633,7 @@ describe("Vcs", () => {
     ),
   )
 
-  it.live("lists an untracked folder as one entry and its files from inside it", () =>
+  it.live("lists an untracked folder as one entry and its entries from inside it when asked for folders", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
         yield* Effect.promise(async () => {
@@ -646,7 +644,13 @@ describe("Vcs", () => {
           await fs.writeFile(path.join(directory, "keep.txt"), "two\n")
           await fs.mkdir(path.join(directory, "artifacts"))
           await fs.mkdir(path.join(directory, "research/deep"), { recursive: true })
+          await fs.mkdir(path.join(directory, "research/wide"), { recursive: true })
           await fs.writeFile(path.join(directory, "research/deep/inner.md"), "inner\n")
+          await Promise.all(
+            Array.from({ length: 505 }, (_, index) =>
+              fs.writeFile(path.join(directory, `research/wide/${String(index).padStart(3, "0")}.md`), "wide\n"),
+            ),
+          )
           await Promise.all(
             Array.from({ length: 50 }, (_, index) =>
               Promise.all([
@@ -664,23 +668,37 @@ describe("Vcs", () => {
               ...context,
               vcs: { ...context.vcs, transform: vcs.transform, reload: vcs.reload },
             })
-            return { diff: yield* vcs.diff("working"), status: yield* vcs.status() }
+            return {
+              diff: yield* vcs.diff("working", { untracked: "folders" }),
+              all: yield* vcs.diff("working"),
+              status: yield* vcs.status(),
+            }
           }).pipe(provide(path.join(directory, scope), { git: true, worktree: directory }))
 
         const root = yield* review(".")
         expect(root.diff.map((row) => row.file)).toEqual(["keep.txt", "research/"])
-        expect(root.status.map((row) => row.file)).toEqual(["keep.txt", "research/"])
         expect(root.diff[1]).toMatchObject({ status: "added", additions: 0, deletions: 0 })
+        // Callers that do not ask for folders, such as the TUI and plugins, still get every file.
+        expect(root.all).toHaveLength(1 + 50 + 1 + 505)
+        expect(root.status).toHaveLength(1 + 50 + 1 + 505)
 
         const folder = yield* review("research")
-        expect(folder.diff).toHaveLength(51)
+        expect(folder.diff).toHaveLength(52)
         expect(folder.diff.find((row) => row.file === "research/7.md")).toMatchObject({
           status: "added",
           additions: 1,
         })
         expect(folder.diff.find((row) => row.file === "research/7.md")?.patch).toContain("+line 7")
-        expect(folder.diff.filter((row) => row.file.endsWith("/")).map((row) => row.file)).toEqual(["research/deep/"])
+        expect(folder.diff.filter((row) => row.file.endsWith("/")).map((row) => row.file)).toEqual([
+          "research/deep/",
+          "research/wide/",
+        ])
+        expect(folder.diff.some((row) => row.omitted)).toBeFalse()
         expect((yield* review("research/deep")).diff.map((row) => row.file)).toEqual(["research/deep/inner.md"])
+
+        const wide = (yield* review("research/wide")).diff
+        expect(wide).toHaveLength(500)
+        expect(wide.at(-1)).toMatchObject({ file: "research/wide/499.md", omitted: 5 })
       }),
     ),
   )

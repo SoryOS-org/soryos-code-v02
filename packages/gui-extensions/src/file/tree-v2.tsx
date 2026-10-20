@@ -62,8 +62,8 @@ const FileTreeNodeV2 = (
       active?: string
       draggable: boolean
       kinds?: ReadonlyMap<string, ChangeKind>
-      /** The entries a folder listed as one entry has, once listed. */
-      count?: number
+      /** Text after a folder row's name. */
+      label?: string
       as?: "div" | "button"
     },
 ) => {
@@ -73,7 +73,7 @@ const FileTreeNodeV2 = (
     "active",
     "draggable",
     "kinds",
-    "count",
+    "label",
     "as",
     "children",
     "class",
@@ -112,7 +112,7 @@ const FileTreeNodeV2 = (
       {(() => {
         const value = kind()
 
-        if (local.count) return <span class="text-12-regular text-text-weak">{local.count}</span>
+        if (local.label) return <span class="text-12-regular text-text-weak">{local.label}</span>
 
         if (!value || local.node.type !== "file") return <span data-slot="file-tree-v2-end" />
 
@@ -140,6 +140,7 @@ export default function FileTreeV2(props: {
   active?: string
   allowed?: readonly string[]
   kinds?: ReadonlyMap<string, ChangeKind>
+  labels?: ReadonlyMap<string, string>
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
   onFileDoubleClick?: (file: FileNode) => void
@@ -359,9 +360,7 @@ export default function FileTreeV2(props: {
                         class="relative"
                         onFocus={() => setFocused(row().node.path)}
                         onBlur={() => setFocused(undefined)}
-                        count={
-                          folders().has(row().node.path) ? model()?.children.get(row().node.path)?.length : undefined
-                        }
+                        label={props.labels?.get(row().node.path)}
                         aria-expanded={expanded(row().node.path)}
                         onClick={() => toggleDirectory(row().node.path, row().node.originalPath)}
                       >

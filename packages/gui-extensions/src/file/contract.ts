@@ -10,6 +10,8 @@ export interface FileTreeProps {
   /** The files to show, as a tree of only these paths. */
   readonly allowed: readonly string[]
   readonly kinds?: ReadonlyMap<string, ChangeKind>
+  /** Text after a folder row's name, such as how many entries it has. */
+  readonly labels?: ReadonlyMap<string, string>
   readonly active?: string
   onFileClick(path: string): void
 }

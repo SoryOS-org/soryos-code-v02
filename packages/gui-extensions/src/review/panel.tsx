@@ -51,6 +51,8 @@ type ReviewPanelProps = {
   /** Renderable diffs and their change kinds, computed once by the review model. */
   diffs: FileDiffInfo[]
   kinds: ReturnType<typeof reviewDiffKinds>
+  /** Labels for opened untracked folders in the change tree. */
+  folderLabels?: ReadonlyMap<string, string>
   diffsReady: boolean
   diffVersion?: number
   loadDiff?: (path: string, version?: number) => Promise<RenderDiff | undefined>
@@ -88,6 +90,7 @@ export default function ReviewPanelContent(props: {
       empty={<ReviewPanelEmpty review={props.review} />}
       diffs={props.review.renderable()}
       kinds={props.review.kinds()}
+      folderLabels={props.review.folderLabels()}
       diffsReady={props.review.ready()}
       diffVersion={props.review.diffVersion()}
       loadDiff={props.review.loadDiff}
@@ -221,6 +224,7 @@ function ReviewPanel(props: ReviewPanelProps) {
           filteredFiles={filteredFiles()}
           searching={searching()}
           kinds={treeKinds()}
+          folderLabels={props.folderLabels}
           activeDiff={activeDiff()}
         />
       }
@@ -273,6 +277,7 @@ function ReviewPanelSidebar(props: {
   filteredFiles: string[]
   searching: boolean
   kinds: ReturnType<typeof reviewDiffKinds>
+  folderLabels?: ReadonlyMap<string, string>
   activeDiff: string | undefined
 }) {
   const ctx = useExtension<typeof Review>()
@@ -340,6 +345,7 @@ function ReviewPanelSidebar(props: {
                   session={props.session}
                   allowed={props.filteredFiles}
                   kinds={props.kinds}
+                  labels={props.folderLabels}
                   active={props.activeDiff}
                   onFileClick={props.onSelectFile}
                 />

@@ -11,7 +11,7 @@ import { FileDiff } from "@opencode/schema/file-diff"
 import { Base, BranchList, FileStatus, Info, Mode } from "@opencode/schema/vcs"
 import { AppProcess } from "@opencode/util/process"
 import { Location } from "../../location.js"
-import type { Adapter, BranchOptions, DiffOptions } from "../../vcs.js"
+import type { Adapter, BranchOptions, DiffOptions, Untracked } from "../../vcs.js"
 import { DiffError } from "../../vcs.js"
 import { gitExecutable } from "../../util/git-executable.js"
 import {
@@ -52,7 +52,8 @@ export const Plugin = define({
         base: () => adapter.base(),
         branches: (input) => adapter.branches({ search: input.search, limit: input.limit }),
         status: () => adapter.status(),
-        diff: (input) => adapter.diff(input.mode, { context: input.context, base: input.base }),
+        diff: (input) =>
+          adapter.diff(input.mode, { context: input.context, base: input.base, untracked: input.untracked }),
       })
     })
   }),
@@ -83,7 +84,10 @@ function make(proc: AppProcess.Interface, input: { directory: string; worktree: 
       const git = ctx.git
       const ref = (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined
       const [list, stats] = yield* Effect.all(
-        [statusItems(ctx), ref ? git.stats(ctx.directory, ref) : Effect.succeed([] as Stat[])],
+        [
+          statusItems(ctx).pipe(Effect.map((result) => result.list)),
+          ref ? git.stats(ctx.directory, ref) : Effect.succeed([] as Stat[]),
+        ],
         { concurrency: 2 },
       )
       const map = nums(stats)
@@ -363,11 +367,17 @@ function makeGit(proc: AppProcess.Interface, env?: Record<string, string>) {
     return result.text().trim() || undefined
   })
 
-  const status = Effect.fn("VcsGit.statusNames")(function* (cwd: string, untracked: "normal" | "all" = "normal") {
+  const status = Effect.fn("VcsGit.statusNames")(function* (
+    cwd: string,
+    untracked: "normal" | "all" = "normal",
+    names?: readonly string[],
+  ) {
+    const pathspecs = names ? names.map((name) => `:(literal)${name}`) : ["."]
     return nuls(
-      yield* text(["status", "--porcelain=v1", `--untracked-files=${untracked}`, "--no-renames", "-z", "--", "."], {
-        cwd,
-      }),
+      yield* text(
+        ["status", "--porcelain=v1", `--untracked-files=${untracked}`, "--no-renames", "-z", "--", ...pathspecs],
+        { cwd },
+      ),
     ).flatMap((item) => {
       const file = item.slice(3)
       if (!file) return []
@@ -607,27 +617,35 @@ const untrackedBatch = Effect.fnUntraced(function* (
   )
 })
 
+/** Entries a folder listing checks before it stops and reports the rest as omitted. */
+const MAX_FOLDER_ENTRIES = 500
+
 /**
- * Git lists an untracked folder as one `dir/` entry, as `git status` shows it. A directory inside such a folder lists
- * its own entries instead, with deeper untracked folders again as one entry each.
+ * Untracked files, one by one unless the caller asks for folders. With folders, Git lists an untracked folder as one
+ * `dir/` entry, as `git status` shows it, and a directory inside such a folder lists only its immediate entries, with
+ * its subfolders again as one entry each.
  */
-const statusItems = Effect.fnUntraced(function* (ctx: Ctx) {
+const statusItems = Effect.fnUntraced(function* (ctx: Ctx, untracked: Untracked = "files") {
+  if (untracked === "files") return { list: yield* ctx.git.status(ctx.directory, "all"), omitted: 0 }
+
   const list = yield* ctx.git.status(ctx.directory)
   const prefix = path.relative(ctx.worktree, ctx.directory).split(path.sep).join("/")
   if (
     !prefix ||
     !list.some((item) => item.code === "??" && item.file.endsWith("/") && `${prefix}/`.startsWith(item.file))
   )
-    return list
+    return { list, omitted: 0 }
 
-  const entries = new Map<string, Item>()
-  for (const item of yield* ctx.git.status(ctx.directory, "all")) {
-    const rest = item.file.slice(prefix.length + 1)
-    const file = rest.includes("/") ? `${prefix}/${rest.slice(0, rest.indexOf("/") + 1)}` : item.file
-    if (!entries.has(file)) entries.set(file, { ...item, file })
+  const names = yield* Effect.promise(() => fs.readdir(ctx.directory).then((items) => items.toSorted()))
+  const checked = names.slice(0, MAX_FOLDER_ENTRIES)
+  return {
+    list: checked.length === 0 ? [] : yield* ctx.git.status(ctx.directory, "normal", checked),
+    omitted: names.length - checked.length,
   }
-  return [...entries.values()]
 })
+
+const withOmitted = (rows: FileDiff.Info[], omitted: number) =>
+  omitted === 0 ? rows : rows.map((row, index) => (index === rows.length - 1 ? { ...row, omitted } : row))
 
 const nums = (list: Stat[]) =>
   new Map(list.map((item) => [item.file, { additions: item.additions, deletions: item.deletions }] as const))
@@ -756,24 +774,28 @@ const diffAgainstRef = Effect.fnUntraced(function* (ctx: Ctx, ref: string, optio
     [
       ctx.git.diff(ctx.directory, ref, options?.target),
       ctx.git.stats(ctx.directory, ref, options?.target),
-      options?.target ? Effect.succeed([]) : statusItems(ctx),
+      options?.target ? Effect.succeed({ list: [], omitted: 0 }) : statusItems(ctx, options?.untracked),
     ],
     { concurrency: 3 },
   )
-  return yield* files(
+  const rows = yield* files(
     ctx,
     ref,
     merge(
       list,
-      extra.filter((item) => item.code === "??"),
+      extra.list.filter((item) => item.code === "??"),
     ),
     nums(stats),
     yield* batchPatches(ctx, ref, list, options),
     options,
   )
+  return withOmitted(rows, extra.omitted)
 })
 
 const track = Effect.fnUntraced(function* (ctx: Ctx, ref: string | undefined, options?: DiffOptions) {
-  if (!ref) return yield* files(ctx, ref, yield* statusItems(ctx), new Map(), emptyBatch(), options)
+  if (!ref) {
+    const status = yield* statusItems(ctx, options?.untracked)
+    return withOmitted(yield* files(ctx, ref, status.list, new Map(), emptyBatch(), options), status.omitted)
+  }
   return yield* diffAgainstRef(ctx, ref, options)
 })

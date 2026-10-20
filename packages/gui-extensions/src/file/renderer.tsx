@@ -494,6 +494,7 @@ const setup: Setup<typeof File> = (ctx) => {
             screen={props.screen}
             allowed={props.allowed}
             kinds={props.kinds}
+            labels={props.labels}
             draggable={false}
             active={props.active}
             onFileClick={(node) => props.onFileClick(node.path)}

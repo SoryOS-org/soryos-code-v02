@@ -172,6 +172,7 @@ export function createReviewModel(input: {
               .server.client.vcs.diff({
                 location: { directory: directory() },
                 mode: value === "git" ? "working" : value,
+                untracked: "folders",
               })
               .then((result) => result.data),
     }
@@ -257,6 +258,7 @@ export function createReviewModel(input: {
               directory: reviewFolderDirectory(reviewRootDirectory(view().project?.worktree ?? directory()), folder),
             },
             mode: mode() === "branch" ? "branch" : "working",
+            untracked: "folders",
           })
           .then((result) => result.data),
     })),
@@ -267,6 +269,22 @@ export function createReviewModel(input: {
       rows(),
       new Map(openFolders().map((folder, index) => [folder, folderQueries[index]?.data ?? []] as const)),
     ),
+  )
+
+  // An opened folder's entry count, and the entries a capped listing left out.
+  const folderLabels = createMemo(
+    () =>
+      new Map(
+        openFolders().flatMap((folder, index) => {
+          const entries = folderQueries[index]?.data
+
+          if (!entries) return []
+          const more = entries.at(-1)?.omitted ?? 0
+          const label = more > 0 ? ctx.t("folder.more", { shown: entries.length, count: more }) : `${entries.length}`
+
+          return [[normalizePath(folder), label] as const]
+        }),
+      ),
   )
 
   // The tree's expanded state belongs to the session screen's file model.
@@ -414,6 +432,7 @@ export function createReviewModel(input: {
                 location: { directory: scope },
                 mode: value === "git" ? "working" : value,
                 context,
+                untracked: "folders",
               })
               .then((result) => result.data),
         })
@@ -647,6 +666,7 @@ export function createReviewModel(input: {
     details: (): FileDiffInfo[] | undefined => (detailsQuery.isFetched ? (detailsQuery.data ?? []) : undefined),
     diffVersion: () => diffQuery.dataUpdatedAt,
     diffs,
+    folderLabels,
     renderable,
     kinds,
     focusFile,
