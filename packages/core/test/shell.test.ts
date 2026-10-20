@@ -92,6 +92,24 @@ describe("shell", () => {
       })
     })
 
+    test("finds Git Bash when git resolves to mingw64/bin", async () => {
+      await using directory = await tmpdir()
+      const root = path.win32.join(directory.path, "Git")
+      const git = path.win32.join(root, "mingw64", "bin", "git.exe")
+      const bash = path.win32.join(root, "bin", "bash.exe")
+      await fs.mkdir(path.win32.dirname(git), { recursive: true })
+      await fs.mkdir(path.win32.dirname(bash), { recursive: true })
+      await fs.writeFile(git, "")
+      await fs.writeFile(bash, "bash")
+      const previous = process.env.PATH
+      process.env.PATH = path.win32.dirname(git)
+      try {
+        expect(ShellSelect.gitbash()).toBe(bash)
+      } finally {
+        process.env.PATH = previous
+      }
+    })
+
     test("resolves /usr/bin/bash from env to Git Bash", async () => {
       const bash = ShellSelect.gitbash()
       if (!bash) return

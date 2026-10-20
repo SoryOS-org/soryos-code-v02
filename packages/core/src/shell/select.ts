@@ -1,6 +1,7 @@
 export * as ShellSelect from "./select.js"
 
 import path from "path"
+import { spawnSync } from "child_process"
 import { readFile } from "fs/promises"
 import { statSync } from "fs"
 import { Context, Effect, Layer, Schema } from "effect"
@@ -122,13 +123,44 @@ function select(file: string | undefined, options?: Options, opts?: { compatible
   return fallback(bin)
 }
 
+let gitbashCache: { git: string; value: string | undefined } | undefined
+
 export function gitbash(options?: Options, bin?: string) {
   if (process.platform !== "win32") return
   if (options?.gitbash) return options.gitbash
   const git = findExecutable("git", bin)
   if (!git) return
-  const file = path.join(git, "..", "..", "bin", "bash.exe")
-  if (stat(file)?.size) return file
+  if (gitbashCache?.git === git) return gitbashCache.value
+  const value = detectGitBash(git)
+  gitbashCache = { git, value }
+  return value
+}
+
+function detectGitBash(git: string) {
+  // `git` sits in `cmd`, `mingw64/bin`, `ucrt64/bin`, or a package-manager shim
+  // depending on the install and on how the shell was started, so derive the
+  // installation root from `--exec-path` and fall back to walking up from the
+  // executable. Git Bash is at `<root>/bin/bash.exe` (MSYS2: `usr/bin`).
+  const roots = [
+    execRoot(git),
+    path.win32.join(git, "..", ".."),
+    path.win32.join(git, "..", "..", ".."),
+  ].filter((root): root is string => root !== undefined)
+  for (const root of new Set(roots)) {
+    for (const directory of ["bin", "usr/bin"]) {
+      const file = path.win32.join(root, directory, "bash.exe")
+      if (stat(file)?.size) return file
+    }
+  }
+}
+
+function execRoot(git: string) {
+  const result = spawnSync(git, ["--exec-path"], { encoding: "utf8", windowsHide: true })
+  const output = result.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : ""
+  const exec = FSUtil.windowsPath(output)
+  if (!/^[a-zA-Z]:[\\/]/.test(exec)) return
+  // <root>/mingw64/libexec/git-core or <root>/usr/libexec/git-core.
+  return path.win32.dirname(path.win32.dirname(path.win32.dirname(exec)))
 }
 
 function fallback(bin?: string) {
