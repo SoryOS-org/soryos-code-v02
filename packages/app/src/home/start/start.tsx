@@ -50,6 +50,8 @@ function StartGreeting(props: { model: StartModel }) {
   const language = useLanguage()
   const command = useCommand()
   const platform = usePlatform()
+  // `settings.open` is registered only by the session and new-session routes, so Home opens the surface directly.
+  const settings = useSettingsSurface()
   const groups = props.model.groups
   const hour = () => new Date(props.model.inbox.now()).getHours()
   const period = () => (hour() < 12 ? "morning" : hour() < 18 ? "afternoon" : "evening")
@@ -105,7 +107,7 @@ function StartGreeting(props: { model: StartModel }) {
             size="large"
             aria-label={language.t("sidebar.settings")}
             icon={<Icon name="settings-gear" />}
-            onClick={() => command.trigger("settings.open")}
+            onClick={() => settings.open()}
           />
         </Tooltip>
         <Tooltip
@@ -174,11 +176,11 @@ function StartSections(props: { model: StartModel }) {
 
   return (
     <div class="flex flex-col gap-6">
-      <Section title={language.t("start.section.needsYou")} count={groups().needs.length} icon="warning">
-        <For each={groups().needs} fallback={<Empty text={language.t("start.caughtUp")} />}>
-          {(entry) => <StartRow model={props.model} entry={entry} />}
-        </For>
-      </Section>
+      <Show when={groups().needs.length > 0} fallback={<InboxZero />}>
+        <Section title={language.t("start.section.needsYou")} count={groups().needs.length} icon="warning">
+          <For each={groups().needs}>{(entry) => <StartRow model={props.model} entry={entry} />}</For>
+        </Section>
+      </Show>
       <Show when={groups().done.length > 0}>
         <Section
           title={language.t("start.section.done")}
@@ -319,8 +321,21 @@ function Section(props: { title: string; count?: number; icon: string; action?: 
   )
 }
 
-function Empty(props: { text: string }) {
-  return <div class="flex h-10 items-center pe-2 ps-9 text-[13px] leading-4 text-v2-text-text-faint">{props.text}</div>
+/** Nothing is waiting on you: the one state worth celebrating, so it takes Needs you's place instead of an empty list. */
+function InboxZero() {
+  const language = useLanguage()
+
+  return (
+    <div data-slot="start-inbox-zero" class="flex h-12 items-center gap-3 rounded-[8px] px-2">
+      <span class="flex size-4 shrink-0 items-center justify-center motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fade-in motion-safe:duration-300">
+        <Icon name="circle-check" class="text-v2-state-fg-success" />
+      </span>
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <span class="text-[13px] font-medium leading-4 text-v2-text-text-base">{language.t("start.inboxZero")}</span>
+        <span class="text-[12px] leading-4 text-v2-text-text-faint">{language.t("start.inboxZero.description")}</span>
+      </div>
+    </div>
+  )
 }
 
 function StartRow(props: { model: StartModel; entry: InboxEntry }) {
