@@ -266,7 +266,11 @@ export function createSessionInbox() {
         .reply({ sessionID: request.sessionID, requestID: request.id, decision })
         .catch(requestFailed)
     },
-    markViewed: (entry: InboxEntry) => entry.ctx.notification.session.markViewed(entry.session.id),
+    // Marking viewed reads the loaded session, and rows from the index usually are not loaded, so load it first.
+    markViewed: (entry: InboxEntry) => {
+      if (!entry.ctx.data.session.get(entry.session.id)) entry.ctx.data.session.remember(entry.session)
+      entry.ctx.notification.session.markViewed(entry.session.id)
+    },
   }
 }
 
