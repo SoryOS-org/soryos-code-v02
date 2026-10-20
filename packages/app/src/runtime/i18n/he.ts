@@ -215,7 +215,6 @@ export const dict = {
   "prompt.placeholder.normal": 'אפשר לשאול כל דבר… "{{example}}"',
   "prompt.mode.shell": "מעטפת",
   "prompt.mode.normal": "פרומפט",
-  "session.child.promptDisabled": "לא ניתן לשלוח פרומפט להפעלה של סוכן משנה.",
   "session.child.backToParent": "חזרה להפעלה הראשית.",
   "prompt.action.attachFile": "הוסף קבצים",
   "prompt.toast.attachmentDuplicate.title": "הקובץ הזה כבר הועלה",

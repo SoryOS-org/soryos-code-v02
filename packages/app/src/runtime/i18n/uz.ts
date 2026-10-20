@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Har qanday narsani so\'rang… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Tezkor",
-  "session.child.promptDisabled": "Subagent seanslarini so'rash mumkin emas.",
   "session.child.backToParent": "Asosiy sessiyaga qaytish.",
   "prompt.action.attachFile": "Fayllarni qo'shish",
   "prompt.toast.attachmentDuplicate.title": "Bu fayl allaqachon yuklangan",

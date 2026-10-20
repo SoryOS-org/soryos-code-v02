@@ -233,7 +233,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Tanyakan apa saja… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Sesi subagen tidak dapat diberi prompt.",
   "session.child.backToParent": "Kembali ke sesi utama.",
 
   "prompt.action.attachFile": "Tambah berkas",

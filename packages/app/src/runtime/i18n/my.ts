@@ -212,7 +212,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ဘာမဆိုမေးပါ… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Subagent ဆက်ရှင်များကို တောင်းဆို၍မရပါ။",
   "session.child.backToParent": "ပင်မစက်ရှင်သို့ ပြန်သွားရန်။",
   "prompt.action.attachFile": "ဖိုင်များထည့်ပါ။",
   "prompt.toast.attachmentDuplicate.title": "ဤဖိုင်ကို အပ်လုဒ်လုပ်ပြီးပါပြီ။",

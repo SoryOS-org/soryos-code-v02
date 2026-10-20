@@ -225,7 +225,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pitaj bilo šta… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Sesijama podagenta nije moguće slati upite.",
   "session.child.backToParent": "Nazad na glavnu sesiju.",
 
   "prompt.action.attachFile": "Dodaj datoteke",

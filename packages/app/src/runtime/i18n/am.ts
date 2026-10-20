@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ማንኛውንም ነገር ይጠይቁ… "{{example}}"',
   "prompt.mode.shell": "ሼል",
   "prompt.mode.normal": "ፕሮምፕት",
-  "session.child.promptDisabled": "ንዑስ ክፍለ ጊዜዎች ሊጠየቁ አይችሉም።",
   "session.child.backToParent": "ወደ ዋናው ክፍለ ጊዜ ተመለስ",
   "prompt.action.attachFile": "ፋይሎችን አክል",
   "prompt.toast.attachmentDuplicate.title": "ይህ ፋይል አስቀድሞ ተሰቅሏል",

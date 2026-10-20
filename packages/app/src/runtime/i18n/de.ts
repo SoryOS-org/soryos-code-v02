@@ -352,7 +352,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Beliebige Frage stellen… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Unteragenten-Sitzungen können keine Prompts erhalten.",
   "session.child.backToParent": "Zurück zur Hauptsitzung.",
   "prompt.action.attachFile": "Datei anhängen",
   "prompt.toast.attachmentDuplicate.title": "Diese Datei wurde bereits hochgeladen",

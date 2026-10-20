@@ -250,7 +250,6 @@ export const dict = {
   "prompt.placeholder.normal": '随便问点什么… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "无法向子智能体会话发送提示词。",
   "session.child.backToParent": "返回主会话。",
   "prompt.action.attachFile": "附加文件",
   "prompt.toast.attachmentDuplicate.title": "此文件已上传",

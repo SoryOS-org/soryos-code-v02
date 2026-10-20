@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Zeptejte se na cokoliv… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Nelze vyžádat relace podagenta.",
   "session.child.backToParent": "Zpět k hlavní relaci.",
   "prompt.action.attachFile": "Přidat soubory",
   "prompt.toast.attachmentDuplicate.title": "Tento soubor již byl nahrán",

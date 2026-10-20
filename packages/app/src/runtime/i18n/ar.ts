@@ -219,7 +219,6 @@ export const dict = {
   "prompt.placeholder.normal": 'اسأل أي شيء… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "موجّه",
-  "session.child.promptDisabled": "لا يمكن إرسال موجّهات إلى جلسات الوكلاء الفرعيين.",
   "session.child.backToParent": "العودة إلى الجلسة الرئيسية.",
   "prompt.action.attachFile": "إضافة ملفات",
   "prompt.toast.attachmentDuplicate.title": "تم تحميل هذا الملف بالفعل",

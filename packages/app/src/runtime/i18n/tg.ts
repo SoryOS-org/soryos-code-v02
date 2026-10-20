@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Ҳама чизро пурсед… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Промпт",
-  "session.child.promptDisabled": "Сеансҳои субагентро дархост кардан мумкин нест.",
   "session.child.backToParent": "Бозгашт ба ҷаласаи асосӣ.",
   "prompt.action.attachFile": "Илова кардани файлҳо",
   "prompt.toast.attachmentDuplicate.title": "Ин файл аллакай бор карда шудааст",

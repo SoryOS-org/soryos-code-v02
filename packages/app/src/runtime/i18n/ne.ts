@@ -211,7 +211,6 @@ export const dict = {
   "prompt.placeholder.normal": 'केहि सोध्नुहोस्… "{{example}}"',
   "prompt.mode.shell": "शेल",
   "prompt.mode.normal": "प्रम्प्ट",
-  "session.child.promptDisabled": "Subagent सत्रहरू प्रोम्प्ट गर्न सकिँदैन।",
   "session.child.backToParent": "मुख्य सत्रमा फर्कनुहोस्।",
   "prompt.action.attachFile": "फाइलहरू थप्नुहोस्",
   "prompt.toast.attachmentDuplicate.title": "यो फाइल पहिले नै अपलोड गरिएको छ",

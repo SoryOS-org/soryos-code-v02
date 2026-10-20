@@ -759,7 +759,6 @@ export const dict = {
 
   "common.clear": "Tøm",
 
-  "session.child.promptDisabled": "Underagentsesjoner kan ikke motta forespørsler.",
   "session.child.backToParent": "Tilbake til hovedsesjonen.",
 
   "error.page.description.localServerStartup": "Det oppstod en feil under oppstart av den lokale serveren.",

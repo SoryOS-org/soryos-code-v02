@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Ρωτήστε οτιδήποτε… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Προτροπή",
-  "session.child.promptDisabled": "Δεν είναι δυνατή η αποστολή προτροπών σε συνεδρίες υποπρακτόρων.",
   "session.child.backToParent": "Επιστροφή στην κύρια συνεδρία.",
   "prompt.action.attachFile": "Προσθήκη αρχείων",
   "prompt.toast.attachmentDuplicate.title": "Αυτό το αρχείο έχει ήδη μεταφορτωθεί",

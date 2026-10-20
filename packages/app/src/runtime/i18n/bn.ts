@@ -211,7 +211,6 @@ export const dict = {
   "prompt.placeholder.normal": 'কিছু জিজ্ঞাসা করুন… "{{example}}"',
   "prompt.mode.shell": "শেল",
   "prompt.mode.normal": "প্রম্পট",
-  "session.child.promptDisabled": "সাবজেন্ট সেশন প্রম্পট করা যাবে না.",
   "session.child.backToParent": "মূল সেশনে ফিরে যান।",
   "prompt.action.attachFile": "ফাইল যোগ করুন",
   "prompt.toast.attachmentDuplicate.title": "এই ফাইল ইতিমধ্যে আপলোড করা হয়েছে",

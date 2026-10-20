@@ -337,7 +337,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Kysy mitä tahansa… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Kehote",
-  "session.child.promptDisabled": "Aliagentti-istuntoihin ei voi lähettää kehotteita.",
   "session.child.backToParent": "Takaisin pääistuntoon.",
   "prompt.action.attachFile": "Lisää tiedostoja",
   "prompt.toast.attachmentDuplicate.title": "Tämä tiedosto on jo ladattu",

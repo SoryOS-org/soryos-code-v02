@@ -220,7 +220,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Питајте било шта… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Промпт",
-  "session.child.promptDisabled": "сесије субагента не могу да буду упитане.",
   "session.child.backToParent": "Назад на главну сесију.",
   "prompt.action.attachFile": "Додајте датотеке",
   "prompt.toast.attachmentDuplicate.title": "Ова датотека је већ отпремљена",

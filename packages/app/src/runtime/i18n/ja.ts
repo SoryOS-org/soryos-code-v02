@@ -215,7 +215,6 @@ export const dict = {
   "prompt.placeholder.normal": '何でも聞いてください… "{{example}}"',
   "prompt.mode.shell": "シェル",
   "prompt.mode.normal": "プロンプト",
-  "session.child.promptDisabled": "サブエージェントのセッションにはプロンプトを送信できません。",
   "session.child.backToParent": "メインセッションに戻る。",
   "prompt.action.attachFile": "ファイルを添付",
   "prompt.toast.attachmentDuplicate.title": "このファイルはすでにアップロードされています",

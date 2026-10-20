@@ -224,7 +224,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Спросите что угодно… "{{example}}"',
   "prompt.mode.shell": "Оболочка",
   "prompt.mode.normal": "Промпт",
-  "session.child.promptDisabled": "В сессиях субагентов нельзя отправлять запросы.",
   "session.child.backToParent": "Вернуться к основной сессии.",
 
   "prompt.action.attachFile": "Прикрепить файл",

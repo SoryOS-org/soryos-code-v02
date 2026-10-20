@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Spyr nakað sum helst… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Subagent setur kunnu ikki biðjast um.",
   "session.child.backToParent": "Aftur til høvuðsløtu.",
   "prompt.action.attachFile": "Legg fílur til",
   "prompt.toast.attachmentDuplicate.title": "Hendan fílan er longu løgd upp.",

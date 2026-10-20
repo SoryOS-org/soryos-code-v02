@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": "Հարցրեք որևէ բան… «{{example}}»",
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Հուշում",
-  "session.child.promptDisabled": "Ենթագենտի նիստերը չեն կարող հուշվել:",
   "session.child.backToParent": "Վերադառնալ հիմնական նիստին։",
   "prompt.action.attachFile": "Ավելացնել ֆայլեր",
   "prompt.toast.attachmentDuplicate.title": "Այս ֆայլն արդեն վերբեռնվել է",

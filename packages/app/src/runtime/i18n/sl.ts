@@ -232,7 +232,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Vprašajte karkoli … "{{example}}"',
   "prompt.mode.shell": "školjka",
   "prompt.mode.normal": "Poziv",
-  "session.child.promptDisabled": "Sej podagenta ni mogoče pozvati.",
   "session.child.backToParent": "Nazaj na glavno sejo.",
   "prompt.action.attachFile": "Dodajte datoteke",
   "prompt.toast.attachmentDuplicate.title": "Ta datoteka je že naložena",

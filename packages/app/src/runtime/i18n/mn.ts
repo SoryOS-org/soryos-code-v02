@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Юу ч асуугаарай… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Промпт",
-  "session.child.promptDisabled": "Subagent сессийг сануулах боломжгүй.",
   "session.child.backToParent": "Үндсэн хуралдаан руу буцах.",
   "prompt.action.attachFile": "Файл нэмэх",
   "prompt.toast.attachmentDuplicate.title": "Энэ файлыг аль хэдийн байршуулсан байна",

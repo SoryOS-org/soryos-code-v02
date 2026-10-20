@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Попитайте каквото и да е… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "подкана",
-  "session.child.promptDisabled": "Субагентните сесии не могат да бъдат подканени.",
   "session.child.backToParent": "Назад към основната сесия.",
   "prompt.action.attachFile": "Добавете файлове",
   "prompt.toast.attachmentDuplicate.title": "Този файл вече е качен",

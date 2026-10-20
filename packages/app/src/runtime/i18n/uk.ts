@@ -253,7 +253,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Запитайте що завгодно… "{{example}}"',
   "prompt.mode.shell": "Команда",
   "prompt.mode.normal": "Запит",
-  "session.child.promptDisabled": "Сесії підагентів не можна надсилати запити.",
   "session.child.backToParent": "Назад до основної сесії.",
 
   "prompt.action.attachFile": "Додати файли",

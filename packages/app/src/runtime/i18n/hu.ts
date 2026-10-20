@@ -219,7 +219,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Kérdezz bármit… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Utasítás",
-  "session.child.promptDisabled": "Az alügynöki munkamenetek nem kérhetők fel.",
   "session.child.backToParent": "Vissza a fő munkamenethez.",
   "prompt.action.attachFile": "Fájlok hozzáadása",
   "prompt.toast.attachmentDuplicate.title": "Ezt a fájlt már feltöltötték",

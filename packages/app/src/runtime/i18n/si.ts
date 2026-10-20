@@ -210,7 +210,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ඕනෑම දෙයක් අසන්න… "{{example}}"',
   "prompt.mode.shell": "ෂෙල්",
   "prompt.mode.normal": "ප්‍රොම්ප්ට්",
-  "session.child.promptDisabled": "උපකාරක සැසි ඉල්ලා සිටිය නොහැක.",
   "session.child.backToParent": "ප්‍රධාන සැසිය වෙත ආපසු.",
   "prompt.action.attachFile": "ගොනු එකතු කරන්න",
   "prompt.toast.attachmentDuplicate.title": "මෙම ගොනුව දැනටමත් උඩුගත කර ඇත",

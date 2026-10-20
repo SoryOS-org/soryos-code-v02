@@ -35,6 +35,9 @@ import { SessionQueuePanel } from "./queue-panel"
 import { SessionActivityChips, type SessionActivityItem } from "./activity-chips"
 import { useOpenSessionRoute } from "../session-identity-header"
 import { resolveSessionComposerSelection } from "./selection"
+import { composerProviderName } from "@/composer/selection"
+import { useProviders } from "@/providers/catalog/providers"
+import { SubagentBar } from "./subagent-bar"
 import { createSessionRequestModel } from "../requests/model"
 import type { Region } from "@/runtime/extension/panels"
 import { SessionLocationMissing } from "./location-missing"
@@ -393,9 +396,46 @@ export function ActiveSessionComposerRegion(props: {
     )
   }
 
+  const providers = useProviders(() => props.session.data.info()?.location.directory)
+
+  const subagentModel = () => {
+    const ref =
+      props.session.data.info()?.model ??
+      props.session.history.messages().findLast((message) => message.type === "assistant")?.model
+
+    if (!ref) return
+    const catalog = providers.all()
+
+    return {
+      provider: composerProviderName(ref.providerID, catalog),
+      name: catalog.get(ref.providerID)?.models[ref.id]?.name.replace("(latest)", "").trim() ?? ref.id,
+      variant: ref.variant,
+    }
+  }
+
+  const subagentStatus = () => {
+    if (props.session.data.working()) return "running"
+
+    return props.session.data.info()?.outcome
+  }
+
   return (
     <SessionComposerRegion
       controller={props.model.region}
+      subagent={
+        <Show when={props.session.data.info()}>
+          {(info) => (
+            <SubagentBar
+              agent={info().agent}
+              model={subagentModel()}
+              status={subagentStatus()}
+              started={info().time.created}
+              ended={subagentStatus() === "running" ? undefined : (info().time.idle ?? info().time.updated)}
+              onBack={props.model.region.openParent}
+            />
+          )}
+        </Show>
+      }
       composer={
         <Show
           when={missing()}

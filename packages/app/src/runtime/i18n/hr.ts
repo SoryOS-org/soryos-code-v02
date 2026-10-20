@@ -219,7 +219,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pitajte bilo što… "{{example}}"',
   "prompt.mode.shell": "Ljuska",
   "prompt.mode.normal": "Upit",
-  "session.child.promptDisabled": "Sesije subagenta ne mogu se tražiti.",
   "session.child.backToParent": "Povratak na glavnu sesiju.",
   "prompt.action.attachFile": "Dodajte datoteke",
   "prompt.toast.attachmentDuplicate.title": "Ova datoteka je već učitana",

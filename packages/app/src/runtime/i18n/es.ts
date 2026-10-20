@@ -438,7 +438,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pregunta cualquier cosa… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "No se pueden enviar prompts a las sesiones de subagentes.",
   "session.child.backToParent": "Volver a la sesión principal.",
 
   "prompt.action.attachFile": "Añadir archivos",

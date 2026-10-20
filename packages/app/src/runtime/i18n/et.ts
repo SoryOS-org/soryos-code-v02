@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Küsige mida tahes… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Viip",
-  "session.child.promptDisabled": "Alamagendi seansse ei saa küsida.",
   "session.child.backToParent": "Tagasi põhiseansse.",
   "prompt.action.attachFile": "Lisa faile",
   "prompt.toast.attachmentDuplicate.title": "See fail on juba üles laaditud",

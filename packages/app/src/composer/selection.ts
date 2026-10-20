@@ -20,23 +20,7 @@ export function createComposerControls(input: { model?: ModelSelection } = {}) {
   const providers = useProviders(() => sdk().directory)
   const models = useGlobal().models
 
-  const canonical = (provider: { id: string; canonical?: string }) =>
-    provider.canonical ?? provider.id.replace(/^console-/, "")
-
-  // Like the model picker, a Console-managed provider drops its "Workspace / " prefix unless the
-  // same provider is also connected directly and the workspace is what tells them apart.
-  const providerName = (providerID: string, catalog = providers.all()) => {
-    const provider = catalog.get(providerID)
-
-    if (!provider) return providerID
-    const all = [...catalog.values()]
-    const managed = consoleProviderGroup(all)
-
-    if (!managed?.providers.includes(provider)) return provider.name
-    const direct = all.some((item) => !managed.providers.includes(item) && canonical(item) === canonical(provider))
-
-    return direct ? provider.name : consoleProviderName(managed, provider.name)
-  }
+  const providerName = (providerID: string, catalog = providers.all()) => composerProviderName(providerID, catalog)
 
   const loading = () => {
     const selection = input.model ?? local.model
@@ -108,6 +92,24 @@ export function createComposerControls(input: { model?: ModelSelection } = {}) {
     }
   })
 }
+
+// Like the model picker, a Console-managed provider drops its "Workspace / " prefix unless the
+// same provider is also connected directly and the workspace is what tells them apart.
+export function composerProviderName(providerID: string, catalog: ReturnType<typeof normalizeProviderList>["all"]) {
+  const provider = catalog.get(providerID)
+
+  if (!provider) return providerID
+  const all = [...catalog.values()]
+  const managed = consoleProviderGroup(all)
+
+  if (!managed?.providers.includes(provider)) return provider.name
+  const direct = all.some((item) => !managed.providers.includes(item) && canonical(item) === canonical(provider))
+
+  return direct ? provider.name : consoleProviderName(managed, provider.name)
+}
+
+const canonical = (provider: { id: string; canonical?: string }) =>
+  provider.canonical ?? provider.id.replace(/^console-/, "")
 
 export function createComposerModelSelection(input: {
   agent: () => { name: string; model?: ModelKey; variant?: string } | undefined

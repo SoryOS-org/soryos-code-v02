@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pregunta qualsevol cosa… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Indicació",
-  "session.child.promptDisabled": "No es poden demanar sessions de subagent.",
   "session.child.backToParent": "Torna a la sessió principal.",
   "prompt.action.attachFile": "Afegeix fitxers",
   "prompt.toast.attachmentDuplicate.title": "Aquest fitxer ja s'ha penjat",

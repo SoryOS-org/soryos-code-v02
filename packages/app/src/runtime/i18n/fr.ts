@@ -424,7 +424,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Demandez n\'importe quoi… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Invite",
-  "session.child.promptDisabled": "Les sessions de sous-agents ne peuvent pas recevoir de messages.",
   "session.child.backToParent": "Revenir à la session principale.",
   "prompt.action.attachFile": "Joindre un fichier",
   "prompt.toast.attachmentDuplicate.title": "Ce fichier a déjà été téléversé",

@@ -403,7 +403,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Fråga vad som helst… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Det går inte att skicka promptar till underagentsessioner.",
   "session.child.backToParent": "Tillbaka till huvudsessionen.",
   "prompt.action.attachFile": "Lägg till filer",
   "prompt.toast.attachmentDuplicate.title": "Den här filen har redan laddats upp",

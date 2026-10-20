@@ -230,7 +230,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ถามอะไรก็ได้… "{{example}}"',
   "prompt.mode.shell": "เชลล์",
   "prompt.mode.normal": "พรอมต์",
-  "session.child.promptDisabled": "ไม่สามารถส่งพรอมต์ในเซสชันเอเจนต์ย่อยได้",
   "session.child.backToParent": "กลับไปยังเซสชันหลัก",
 
   "prompt.action.attachFile": "แนบไฟล์",

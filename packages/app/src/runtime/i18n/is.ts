@@ -219,7 +219,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Spyrðu hvað sem er… "{{example}}"',
   "prompt.mode.shell": "Skel",
   "prompt.mode.normal": "Kvaðning",
-  "session.child.promptDisabled": "Ekki er hægt að biðja um undirboðslotur.",
   "session.child.backToParent": "Aftur í aðalfund.",
   "prompt.action.attachFile": "Bæta við skrám",
   "prompt.toast.attachmentDuplicate.title": "Þessari skrá hefur þegar verið hlaðið upp",

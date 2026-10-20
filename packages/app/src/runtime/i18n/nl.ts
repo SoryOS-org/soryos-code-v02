@@ -409,7 +409,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Vraag wat je wilt… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Je kunt geen prompts naar subagentsessies sturen.",
   "session.child.backToParent": "Terug naar de hoofdsessie.",
   "prompt.action.attachFile": "Bestanden toevoegen",
   "prompt.toast.attachmentDuplicate.title": "Dit bestand is al geüpload",

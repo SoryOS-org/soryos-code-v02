@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'იკითხეთ რაიმე… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "მოთხოვნა",
-  "session.child.promptDisabled": "სუბაგენტის სესიების მოთხოვნა შეუძლებელია.",
   "session.child.backToParent": "უკან მთავარ სესიაზე.",
   "prompt.action.attachFile": "ფაილების დამატება",
   "prompt.toast.attachmentDuplicate.title": "ეს ფაილი უკვე ატვირთულია",

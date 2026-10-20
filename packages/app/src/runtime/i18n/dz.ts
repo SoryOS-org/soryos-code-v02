@@ -218,7 +218,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ག་ཅི་ཡང་དྲིས… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "འདི་འཕྲོ་ལས",
-  "session.child.promptDisabled": "ཡན་ལག་ལས་ཚབ་ལཱ་ཡུན་ཚུ་ བརྡ་སྟོན་འབད་མི་བཏུབ།",
   "session.child.backToParent": "ལཱ་ཡུན་ངོ་མ་ལུ་ལོག་འགྱོ།",
   "prompt.action.attachFile": "ཡིག་སྣོད་ཚུ་ཁ་སྐོང་རྐྱབས།",
   "prompt.toast.attachmentDuplicate.title": "ཡིག་སྣོད་འདི་ཧེ་མ་ལས་སྐྱེལ་བཙུགས་འབད་ཡི།",

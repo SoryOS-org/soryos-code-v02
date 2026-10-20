@@ -208,7 +208,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Nə istəsəniz soruşun… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Alt agent sessiyalarına prompt göndərmək olmaz.",
   "session.child.backToParent": "Əsas sessiyaya qayıt.",
   "prompt.action.attachFile": "Fayllar əlavə et",
   "prompt.toast.attachmentDuplicate.title": "Bu fayl artıq yüklənib",

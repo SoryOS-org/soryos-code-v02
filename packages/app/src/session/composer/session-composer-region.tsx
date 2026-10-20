@@ -1,5 +1,4 @@
 import { Show, type JSX } from "solid-js"
-import { useLanguage } from "@/runtime/i18n/language"
 import { SessionPermissionDock } from "@/session/requests/session-permission-dock"
 import { SessionQuestionDock } from "@/session/requests/session-question-dock"
 import { SessionWebSearchDock } from "@/session/requests/session-websearch-dock"
@@ -12,14 +11,14 @@ type SessionComposerRegionState = Pick<
 
 export type SessionComposerRegionViewController = Pick<
   SessionComposerRegionController,
-  "centered" | "onResponseSubmit" | "openParent" | "setPromptRef" | "setDockRef" | "parentID" | "child" | "showComposer"
+  "centered" | "onResponseSubmit" | "setDockRef" | "child" | "showComposer"
 > & { state: SessionComposerRegionState }
 
 export function SessionComposerRegion(props: {
   controller: SessionComposerRegionViewController
   composer: JSX.Element
+  subagent: JSX.Element
 }) {
-  const language = useLanguage()
   const controller = props.controller
 
   return (
@@ -68,21 +67,7 @@ export function SessionComposerRegion(props: {
             }}
           >
             <Show when={controller.child()} fallback={<Show when={!controller.state.blocked()}>{props.composer}</Show>}>
-              <div
-                ref={controller.setPromptRef}
-                class="w-full rounded-[12px] border border-border-weak-base bg-background-base p-3 text-16-regular text-text-weak"
-              >
-                <span>{language.t("session.child.promptDisabled")} </span>
-                <Show when={controller.parentID()}>
-                  <button
-                    type="button"
-                    class="text-text-base transition-colors hover:text-text-strong"
-                    onClick={controller.openParent}
-                  >
-                    {language.t("session.child.backToParent")}
-                  </button>
-                </Show>
-              </div>
+              {props.subagent}
             </Show>
           </div>
         </Show>

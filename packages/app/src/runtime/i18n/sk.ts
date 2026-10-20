@@ -232,7 +232,6 @@ export const dict = {
   "prompt.placeholder.normal": "Opýtajte sa na čokoľvek… „{{example}}“",
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Výzva",
-  "session.child.promptDisabled": "V reláciách podagenta nie je možné zadávať výzvy.",
   "session.child.backToParent": "Späť na hlavnú reláciu.",
   "prompt.action.attachFile": "Pridať súbory",
   "prompt.toast.attachmentDuplicate.title": "Tento súbor už bol nahraný",

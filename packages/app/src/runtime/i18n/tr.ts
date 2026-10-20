@@ -237,7 +237,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Bir şeyler sorun… "{{example}}"',
   "prompt.mode.shell": "Kabuk",
   "prompt.mode.normal": "İstem",
-  "session.child.promptDisabled": "Alt ajan oturumlarına istem gönderilemez.",
   "session.child.backToParent": "Ana oturuma dön.",
 
   "prompt.action.attachFile": "Dosya ekle",

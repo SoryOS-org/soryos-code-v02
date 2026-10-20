@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pyet çdo gjë… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Kërkesë",
-  "session.child.promptDisabled": "Seancat e nënagjentit nuk mund të kërkohen.",
   "session.child.backToParent": "Kthehu në sesionin kryesor.",
   "prompt.action.attachFile": "Shtoni skedarë",
   "prompt.toast.attachmentDuplicate.title": "Ky skedar tashmë është ngarkuar",

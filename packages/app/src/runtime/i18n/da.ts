@@ -352,7 +352,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Spørg om hvad som helst… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Der kan ikke sendes prompts til underagentsessioner.",
   "session.child.backToParent": "Tilbage til hovedsessionen.",
 
   "prompt.action.attachFile": "Vedhæft fil",

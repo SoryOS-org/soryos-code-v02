@@ -212,7 +212,6 @@ export const dict = {
   "prompt.placeholder.normal": 'कुछ भी पूछें… "{{example}}"',
   "prompt.mode.shell": "शेल",
   "prompt.mode.normal": "प्रॉम्प्ट",
-  "session.child.promptDisabled": "सबएजेंट सेशन में प्रॉम्प्ट नहीं भेजा जा सकता।",
   "session.child.backToParent": "मुख्य सेशन पर वापस जाएँ।",
   "prompt.action.attachFile": "फ़ाइलें जोड़ें",
   "prompt.toast.attachmentDuplicate.title": "यह फ़ाइल पहले ही अपलोड की जा चुकी है",

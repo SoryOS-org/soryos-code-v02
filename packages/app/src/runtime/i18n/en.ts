@@ -302,8 +302,11 @@ export const dict = {
   "prompt.placeholder.normal": 'Ask anything… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Subagent sessions cannot be prompted.",
-  "session.child.backToParent": "Back to main session.",
+  "session.child.backToParent": "Main session",
+  "session.child.status.running": "Running",
+  "session.child.status.succeeded": "Done",
+  "session.child.status.failed": "Failed",
+  "session.child.status.interrupted": "Interrupted",
 
   "prompt.action.attachFile": "Add files",
 

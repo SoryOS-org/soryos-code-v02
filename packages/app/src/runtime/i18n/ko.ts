@@ -444,7 +444,6 @@ export const dict = {
   "model.tooltip.provider": "공급자",
   "model.tooltip.reasoning": "추론",
   "common.clear": "지우기",
-  "session.child.promptDisabled": "하위 에이전트 세션에는 프롬프트를 입력할 수 없습니다.",
   "session.child.backToParent": "메인 세션으로 돌아가기.",
 
   "error.page.description.localServerStartup": "로컬 서버를 시작하는 동안 오류가 발생했습니다.",

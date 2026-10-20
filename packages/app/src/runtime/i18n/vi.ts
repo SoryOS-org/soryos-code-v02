@@ -217,7 +217,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Hỏi bất cứ điều gì… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Lời nhắc",
-  "session.child.promptDisabled": "Không thể gửi lời nhắc trong phiên tác nhân phụ.",
   "session.child.backToParent": "Quay lại phiên chính.",
   "prompt.action.attachFile": "Thêm tệp",
   "prompt.toast.attachmentDuplicate.title": "Tệp này đã được tải lên",

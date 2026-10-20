@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": "Întreabă orice… „{{example}}”",
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Solicitare",
-  "session.child.promptDisabled": "Sesiunile subagent nu pot fi interogate.",
   "session.child.backToParent": "Înapoi la sesiunea principală.",
   "prompt.action.attachFile": "Adaugă fișiere",
   "prompt.toast.attachmentDuplicate.title": "Acest fișier a fost deja încărcat",

@@ -206,7 +206,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Uzdodiet jebko… "{{example}}"',
   "prompt.mode.shell": "Čaula",
   "prompt.mode.normal": "Uzdot",
-  "session.child.promptDisabled": "Apakšaģenta sesijās nevar uzdot jautājumus.",
   "session.child.backToParent": "Atpakaļ uz galveno sesiju.",
   "prompt.action.attachFile": "Pievienot failus",
   "prompt.toast.attachmentDuplicate.title": "Šis fails jau ir augšupielādēts",

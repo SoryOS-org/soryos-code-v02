@@ -214,7 +214,6 @@ export const dict = {
   "prompt.placeholder.normal": 'کجھ وی پچھ… "\u2068{{example}}\u2069"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "پرامپٹ",
-  "session.child.promptDisabled": "ذیلی ایجنٹ سیشناں نو اشارہ نئیں کیتا جا سکدا۔",
   "session.child.backToParent": "مین سیشن تے واپس جاؤ۔",
   "prompt.action.attachFile": "فائلاں شامل کرو",
   "prompt.toast.attachmentDuplicate.title": "ایہہ فائل پہلے ای اپ لوڈ ہو چکی اے",

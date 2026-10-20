@@ -211,7 +211,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ކޮންމެ އެއްޗަކާ އަހާލަން… "\u2068{{example}}\u2069".',
   "prompt.mode.shell": "ޝެލް",
   "prompt.mode.normal": "ޕްރޮމްޕްޓް",
-  "session.child.promptDisabled": "ސަބްއޭޖެންޓް ސެޝަންތަކަށް ޕްރޮމްޕްޓް ނުކުރެވޭނެއެވެ.",
   "session.child.backToParent": "އަނބުރާ މައި ސެޝަނަށް.",
   "prompt.action.attachFile": "ފައިލްތައް އިތުރުކުރުން",
   "prompt.toast.attachmentDuplicate.title": "މި ފައިލް މިހާރު ވަނީ އަޕްލޯޑްކޮށްފައެވެ",

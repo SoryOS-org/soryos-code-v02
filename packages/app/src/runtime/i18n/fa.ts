@@ -216,7 +216,6 @@ export const dict = {
   "prompt.placeholder.normal": 'هر چیزی بپرسید… "{{example}}"',
   "prompt.mode.shell": "پوسته",
   "prompt.mode.normal": "پرامپت",
-  "session.child.promptDisabled": "جلسات Subagent را نمی توان درخواست کرد.",
   "session.child.backToParent": "بازگشت به جلسه اصلی",
   "prompt.action.attachFile": "فایل ها را اضافه کنید",
   "prompt.toast.attachmentDuplicate.title": "این فایل قبلا آپلود شده است",

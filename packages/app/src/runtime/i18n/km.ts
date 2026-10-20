@@ -211,7 +211,6 @@ export const dict = {
   "prompt.placeholder.normal": 'សួរអ្វីក៏បាន… "{{example}}"',
   "prompt.mode.shell": "សែល",
   "prompt.mode.normal": "ប្រអប់បញ្ចូល",
-  "session.child.promptDisabled": "សម័យ Subagent មិនអាចត្រូវបានសួរ។",
   "session.child.backToParent": "ត្រឡប់ទៅសម័យមេ។",
   "prompt.action.attachFile": "បន្ថែមឯកសារ",
   "prompt.toast.attachmentDuplicate.title": "ឯកសារនេះត្រូវបានផ្ទុកឡើងរួចហើយ",

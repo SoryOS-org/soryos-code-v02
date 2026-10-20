@@ -215,7 +215,6 @@ export const dict = {
   "prompt.placeholder.normal": 'کچھ بھی پوچھیں… "\u2068{{example}}\u2069"',
   "prompt.mode.shell": "شیل",
   "prompt.mode.normal": "پرامپٹ",
-  "session.child.promptDisabled": "ذیلی ایجنٹ کے سیشنز میں پرامپٹ نہیں دیا جا سکتا۔",
   "session.child.backToParent": "مرکزی سیشن پر واپس جائیں۔",
   "prompt.action.attachFile": "فائلیں شامل کریں۔",
   "prompt.toast.attachmentDuplicate.title": "یہ فائل پہلے ہی اپ لوڈ ہو چکی ہے",

@@ -232,7 +232,6 @@ export const dict = {
   "prompt.placeholder.shell": "輸入 shell 命令… {{example}}",
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "無法在子代理程式工作階段中輸入提示詞。",
   "session.child.backToParent": "返回主要工作階段。",
 
   "prompt.action.attachFile": "附加檔案",

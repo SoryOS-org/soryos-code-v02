@@ -219,7 +219,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Paklauskite bet ko… "{{example}}"',
   "prompt.mode.shell": "Apvalkalas",
   "prompt.mode.normal": "Užklausa",
-  "session.child.promptDisabled": "Poagento seansui negalima siųsti užklausų.",
   "session.child.backToParent": "Grįžti į pagrindinį seansą.",
   "prompt.action.attachFile": "Pridėti failus",
   "prompt.toast.attachmentDuplicate.title": "Šis failas jau buvo įkeltas",

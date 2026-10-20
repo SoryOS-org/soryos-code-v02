@@ -211,7 +211,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ຖາມຫຍັງ … "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "ບໍ່ສາມາດສົ່ງ prompt ໃຫ້ເຊດຊັນ subagent ໄດ້.",
   "session.child.backToParent": "ກັບໄປທີ່ເຊດຊັນຫຼັກ.",
   "prompt.action.attachFile": "ເພີ່ມໄຟລ໌",
   "prompt.toast.attachmentDuplicate.title": "ໄຟລ໌ນີ້ໄດ້ຖືກອັບໂຫລດໄປກ່ອນແລ້ວ",

@@ -7,6 +7,7 @@ import {
   type SessionComposerRegionViewController,
 } from "@/session/composer/session-composer-region"
 import { SessionActivityChips, type SessionActivityItem } from "@/session/composer/activity-chips"
+import { SubagentBar } from "@/session/composer/subagent-bar"
 import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import type { FormInfo, PermissionRequest, SessionStatus } from "@opencode/client/promise"
 import type { SessionDocument } from "@opencode/session-ui/document"
@@ -18,7 +19,7 @@ import type { ComposerPersistedState } from "@/composer/types"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
-import { Show } from "solid-js"
+import { Show, type ComponentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { WebSearchRequestModel } from "./requests/websearch"
@@ -86,7 +87,7 @@ export type SessionPreviewProps = {
   draft?: string
   request?: { type: "permission"; value: PermissionRequest } | { type: "question" | "websearch"; value: FormInfo }
   reviewOpened?: boolean
-  child?: { parentID: string }
+  child?: Omit<ComponentProps<typeof SubagentBar>, "onBack">
   activity?: {
     subagents: SessionActivityItem[]
     shells: SessionActivityItem[]
@@ -245,10 +246,7 @@ function SessionSurfaceState(props: SessionPreviewProps & { onReset: () => void 
       setState("request", undefined)
       setState("activity", "Submitted the answer locally")
     },
-    openParent: () => setState("activity", "Opened the parent Session locally"),
-    setPromptRef() {},
     setDockRef() {},
-    parentID: () => props.child?.parentID,
     child: () => !!props.child,
     showComposer: () => true,
   } satisfies SessionComposerRegionViewController
@@ -286,6 +284,16 @@ function SessionSurfaceState(props: SessionPreviewProps & { onReset: () => void 
                   </div>
                   <SessionComposerRegion
                     controller={region}
+                    subagent={
+                      <Show when={props.child}>
+                        {(child) => (
+                          <SubagentBar
+                            {...child()}
+                            onBack={() => setState("activity", "Opened the parent Session locally")}
+                          />
+                        )}
+                      </Show>
+                    }
                     composer={
                       <div class="relative">
                         <SessionActivityChips

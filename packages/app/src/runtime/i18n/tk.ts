@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Islän zadyňyzy soraň … "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Subagent sessiýalary soralyp bilinmez.",
   "session.child.backToParent": "Esasy sessiýa dolan.",
   "prompt.action.attachFile": "Faýl goşuň",
   "prompt.toast.attachmentDuplicate.title": "Bu faýl eýýäm ýüklendi",

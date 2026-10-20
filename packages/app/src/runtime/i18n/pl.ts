@@ -210,7 +210,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Zapytaj o cokolwiek… "{{example}}"',
   "prompt.mode.shell": "Terminal",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Nie można wysyłać promptów w sesjach podagentów.",
   "session.child.backToParent": "Wróć do głównej sesji.",
   "prompt.action.attachFile": "Dodaj pliki",
   "prompt.toast.attachmentDuplicate.title": "Ten plik został już przesłany",

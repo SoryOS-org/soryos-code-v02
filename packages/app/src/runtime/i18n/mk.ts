@@ -207,7 +207,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Прашај што било… "{{example}}"',
   "prompt.mode.shell": "Школка",
   "prompt.mode.normal": "Прашај",
-  "session.child.promptDisabled": "Сесиите на субагентите не можат да бидат поттикнати.",
   "session.child.backToParent": "Назад на главната сесија.",
   "prompt.action.attachFile": "Додадете датотеки",
   "prompt.toast.attachmentDuplicate.title": "Оваа датотека е веќе поставена",
