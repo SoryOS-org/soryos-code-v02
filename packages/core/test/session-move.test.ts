@@ -1,30 +1,30 @@
-import type { FileSystem } from "@opencode/core/filesystem"
+import type { FileSystem } from "@lutungcode/core/filesystem"
 import { describe, expect } from "bun:test"
 import path from "path"
 import { chmod, mkdir, readdir, rm } from "fs/promises"
 import { Cause, Context, Deferred, Duration, Effect, Exit, Fiber, Layer, LayerMap, Queue } from "effect"
-import { Worktree } from "@opencode/schema/worktree"
-import { Workspace } from "@opencode/schema/workspace"
-import { Bus } from "@opencode/core/bus"
-import { Config } from "@opencode/core/config"
-import { Database } from "@opencode/core/database/database"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { Instance } from "@opencode/core/instance"
-import { Location } from "@opencode/core/location"
-import { LocationServiceMap } from "@opencode/core/location-service-map"
-import type { LocationServices } from "@opencode/core/location-services"
-import { Project } from "@opencode/core/project"
-import { AbsolutePath } from "@opencode/core/schema"
-import { Session } from "@opencode/core/session"
-import { SessionEvent } from "@opencode/core/session/event"
-import { SessionExecution } from "@opencode/core/session/execution"
-import { SessionMove } from "@opencode/core/session/move"
-import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionRunner } from "@opencode/core/session/runner/index"
-import { SessionStore } from "@opencode/core/session/store"
-import { LayerNode } from "@opencode/util/effect/layer-node"
-import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { Global } from "@opencode/util/global"
+import { Worktree } from "@lutungcode/schema/worktree"
+import { Workspace } from "@lutungcode/schema/workspace"
+import { Bus } from "@lutungcode/core/bus"
+import { Config } from "@lutungcode/core/config"
+import { Database } from "@lutungcode/core/database/database"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { Instance } from "@lutungcode/core/instance"
+import { Location } from "@lutungcode/core/location"
+import { LocationServiceMap } from "@lutungcode/core/location-service-map"
+import type { LocationServices } from "@lutungcode/core/location-services"
+import { Project } from "@lutungcode/core/project"
+import { AbsolutePath } from "@lutungcode/core/schema"
+import { Session } from "@lutungcode/core/session"
+import { SessionEvent } from "@lutungcode/core/session/event"
+import { SessionExecution } from "@lutungcode/core/session/execution"
+import { SessionMove } from "@lutungcode/core/session/move"
+import { SessionProjector } from "@lutungcode/core/session/projector"
+import { SessionRunner } from "@lutungcode/core/session/runner/index"
+import { SessionStore } from "@lutungcode/core/session/store"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
+import { makeGlobalNode } from "@lutungcode/util/effect/app-node"
+import { Global } from "@lutungcode/util/global"
 import { tempGlobalLayer } from "./fixture/global"
 import { offlineModels } from "./fixture/models"
 import { tmpdirScoped } from "./fixture/tmpdir"
@@ -215,7 +215,7 @@ describe("Session.move", () => {
           yield* Effect.promise(() => Promise.all([mkdir(source), mkdir(destination)]))
           if (broken)
             yield* Effect.promise(() =>
-              Bun.write(path.join(source, "opencode.json"), JSON.stringify({ instructions: ["{file:.}"] })),
+              Bun.write(path.join(source, "lutungcode.json"), JSON.stringify({ instructions: ["{file:.}"] })),
             )
           const session = yield* Session.Service
           const execution = yield* SessionExecution.Service
@@ -272,7 +272,7 @@ describe("Session.move", () => {
           const destination = AbsolutePath.make(path.join(tmp.path, "destination"))
           yield* Effect.promise(() => Promise.all([mkdir(source.directory), mkdir(destination)]))
           const config = JSON.stringify({ instructions: ["{file:.}"] })
-          if (!broken) yield* Effect.promise(() => Bun.write(path.join(source.directory, "opencode.json"), config))
+          if (!broken) yield* Effect.promise(() => Bun.write(path.join(source.directory, "lutungcode.json"), config))
           const selectedID = Session.ID.create()
           const replacements: LayerNode.Replacements = [
             Global.node.replace(tempGlobalLayer),

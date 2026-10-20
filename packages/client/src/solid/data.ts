@@ -35,13 +35,13 @@ import type {
   ShellInfo,
   SkillInfo,
   VcsInfo,
-  OpenCodeEvent,
-  OpenCodeClient,
+  LutungCodeEvent,
+  LutungCodeClient,
   WebSearchProvider,
 } from "../promise"
-import { Worktree } from "@opencode/schema/worktree"
-import { SessionID } from "@opencode/schema/session-id"
-import { SessionMessage } from "@opencode/schema/session-message"
+import { Worktree } from "@lutungcode/schema/worktree"
+import { SessionID } from "@lutungcode/schema/session-id"
+import { SessionMessage } from "@lutungcode/schema/session-message"
 import {
   isFormAlreadySettledError,
   isFormNotFoundError,
@@ -49,7 +49,7 @@ import {
   type SessionPromptInput,
 } from "../promise"
 import { createStore, produce, reconcile } from "solid-js/store"
-import type { SessionInbox } from "@opencode/schema/session-inbox"
+import type { SessionInbox } from "@lutungcode/schema/session-inbox"
 import { batch, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 
 export type DataSessionStatus = "idle" | "running"
@@ -59,19 +59,19 @@ export type DataSessionStatus = "idle" | "running"
  * execution that ended without delivering it, and `queued` waits for every steer to drain.
  */
 export type DataPendingStatus = "starting" | "steering" | "stranded" | "queued"
-type OpenCodeEventMap = { [Type in OpenCodeEvent["type"]]: Extract<OpenCodeEvent, { type: Type }> }
+type LutungCodeEventMap = { [Type in LutungCodeEvent["type"]]: Extract<LutungCodeEvent, { type: Type }> }
 
 export type CreateDataInput = {
-  readonly api: () => OpenCodeClient
+  readonly api: () => LutungCodeClient
   readonly directory: string
   /** Raw-message window used for an initial transcript read. Older pages retain their normal size. */
   readonly initialMessageLimit?: () => number
   readonly event: {
-    readonly on: <Type extends OpenCodeEvent["type"]>(
+    readonly on: <Type extends LutungCodeEvent["type"]>(
       type: Type,
-      handler: (event: OpenCodeEventMap[Type]) => void,
+      handler: (event: LutungCodeEventMap[Type]) => void,
     ) => () => void
-    readonly listen: (handler: (event: { name: OpenCodeEvent["type"]; details: OpenCodeEvent }) => void) => () => void
+    readonly listen: (handler: (event: { name: LutungCodeEvent["type"]; details: LutungCodeEvent }) => void) => () => void
   }
   readonly connection?: {
     readonly status: () => "connected" | "connecting" | "reconnecting"
@@ -166,7 +166,7 @@ function formRequestOptions(sessionID: string, ref?: LocationRef) {
   if (sessionID !== "global" || !ref) return undefined
   return {
     headers: {
-      "x-opencode-directory": encodeURIComponent(ref.directory),
+      "x-lutungcode-directory": encodeURIComponent(ref.directory),
     },
   }
 }
@@ -630,7 +630,7 @@ export function createData(config: CreateDataInput) {
     )
   }
 
-  function handleEvent(event: OpenCodeEvent) {
+  function handleEvent(event: LutungCodeEvent) {
     switch (event.type) {
       case "server.connected": {
         const updates = new Map<string, DataSessionStatus | undefined>()

@@ -1,14 +1,14 @@
-import { Plugin } from "@opencode/plugin/tui"
+import { Plugin } from "@lutungcode/plugin/tui"
 import { createMermaidCodeBlockRenderer } from "./markdown.js"
-import { resolveOpenCodeDiagramPalette } from "./palette.js"
+import { resolveLutungCodeDiagramPalette } from "./palette.js"
 
 export default Plugin.define({
-  id: "opencode.merman",
+  id: "lutungcode.merman",
   setup(context) {
     context.markdown.registerCodeBlockRenderer(
       "mermaid",
       createMermaidCodeBlockRenderer(context.renderer, () => ({
-        colors: resolveOpenCodeDiagramPalette(context.theme, context.themeMode),
+        colors: resolveLutungCodeDiagramPalette(context.theme, context.themeMode),
       })),
     )
   },

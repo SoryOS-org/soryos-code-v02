@@ -1,13 +1,13 @@
-import { Icon } from "@opencode/ui/icon"
+import { Icon } from "@lutungcode/ui/icon"
 import {
   displayName,
   getProjectAvatarVariant,
   ProjectAvatar,
   PROJECT_AVATAR_VARIANTS,
-} from "@opencode/ui/project-avatar"
-import { Select } from "@opencode/ui/select"
-import { Textarea } from "@opencode/ui/textarea"
-import { TextInput } from "@opencode/ui/text-input"
+} from "@lutungcode/ui/project-avatar"
+import { Select } from "@lutungcode/ui/select"
+import { Textarea } from "@lutungcode/ui/textarea"
+import { TextInput } from "@lutungcode/ui/text-input"
 import { For, Show, createMemo, type Component } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { LocalProject } from "@/shell/state/layout"

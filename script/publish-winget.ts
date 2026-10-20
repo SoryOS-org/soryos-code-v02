@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@opencode/script"
+import { Script } from "@lutungcode/script"
 import { mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -12,50 +12,50 @@ if (Script.channel !== "latest" || !/^\d+\.\d+\.\d+$/.test(Script.version)) {
 const root = fileURLToPath(new URL("..", import.meta.url))
 const dryRun = process.argv.includes("--dry-run")
 const token = process.env.WINGET_GITHUB_TOKEN
-const cli = path.resolve(process.env.OPENCODE_CLI_DIST ?? path.join(root, "packages", "cli", "dist"))
-const desktop = process.env.OPENCODE_DESKTOP_DIST
-if (!desktop) throw new Error("OPENCODE_DESKTOP_DIST is required")
+const cli = path.resolve(process.env.LUTUNGCODE_CLI_DIST ?? path.join(root, "packages", "cli", "dist"))
+const desktop = process.env.LUTUNGCODE_DESKTOP_DIST
+if (!desktop) throw new Error("LUTUNGCODE_DESKTOP_DIST is required")
 const outdir = path.join(cli, "winget")
 const manifestVersion = "1.12.0"
 
 const packages = [
   {
-    identifier: "Anomaly.OpenCode",
-    name: "OpenCode CLI",
-    moniker: "opencode",
+    identifier: "Anomaly.LutungCode",
+    name: "LutungCode CLI",
+    moniker: "lutungcode",
     description: "The open source AI coding agent for the terminal.",
     installer: [
       "InstallerType: zip",
       "NestedInstallerType: portable",
       "NestedInstallerFiles:",
-      "- RelativeFilePath: opencode.exe",
-      "  PortableCommandAlias: opencode",
+      "- RelativeFilePath: lutungcode.exe",
+      "  PortableCommandAlias: lutungcode",
       "Commands:",
-      "- opencode",
+      "- lutungcode",
     ],
     files: [
-      { architecture: "x64", file: path.join(cli, "opencode-windows-x64-baseline.zip") },
-      { architecture: "arm64", file: path.join(cli, "opencode-windows-arm64.zip") },
+      { architecture: "x64", file: path.join(cli, "lutungcode-windows-x64-baseline.zip") },
+      { architecture: "arm64", file: path.join(cli, "lutungcode-windows-arm64.zip") },
     ],
   },
   {
-    identifier: "Anomaly.OpenCode.Desktop",
+    identifier: "Anomaly.LutungCode.Desktop",
     // Matches the display name the installer registers with Windows, without its version suffix.
-    name: "OpenCode",
-    moniker: "opencode-desktop",
+    name: "LutungCode",
+    moniker: "lutungcode-desktop",
     description: "The open source AI coding agent as a desktop app.",
     installer: [
       "InstallerType: nullsoft",
       "Scope: user",
       "UpgradeBehavior: install",
-      // electron-builder derives the NSIS uninstall key from the production app ID, ai.opencode.desktop.
+      // electron-builder derives the NSIS uninstall key from the production app ID, app.lutungcode.desktop.
       "ProductCode: d074f30d-5f88-5885-b075-be1348cc7676",
       "Protocols:",
-      "- opencode",
+      "- lutungcode",
     ],
     files: [
-      { architecture: "x64", file: path.join(desktop, "opencode-desktop-win-x64.exe") },
-      { architecture: "arm64", file: path.join(desktop, "opencode-desktop-win-arm64.exe") },
+      { architecture: "x64", file: path.join(desktop, "lutungcode-desktop-win-x64.exe") },
+      { architecture: "arm64", file: path.join(desktop, "lutungcode-desktop-win-arm64.exe") },
     ],
   },
 ]
@@ -87,7 +87,7 @@ async function prepare(input: (typeof packages)[number]) {
       for await (const chunk of file.stream()) sha256.update(chunk)
       return [
         `- Architecture: ${item.architecture}`,
-        `  InstallerUrl: https://opencode.ai/files/bin/${encodeURIComponent(Script.version)}/${path.basename(item.file)}`,
+        `  InstallerUrl: https://lutungcode.ai/files/bin/${encodeURIComponent(Script.version)}/${path.basename(item.file)}`,
         `  InstallerSha256: ${sha256.digest("hex").toUpperCase()}`,
       ]
     }),
@@ -106,14 +106,14 @@ async function prepare(input: (typeof packages)[number]) {
       ...header("defaultLocale"),
       "PackageLocale: en-US",
       // Matches the publisher the desktop installer registers with Windows.
-      "Publisher: OpenCode",
+      "Publisher: LutungCode",
       "PublisherUrl: https://anoma.ly/",
-      "PublisherSupportUrl: https://github.com/anomalyco/opencode/issues",
-      "PrivacyUrl: https://opencode.ai/legal/privacy-policy",
+      "PublisherSupportUrl: https://github.com/anomalyco/lutungcode/issues",
+      "PrivacyUrl: https://lutungcode.ai/legal/privacy-policy",
       `PackageName: ${input.name}`,
-      "PackageUrl: https://opencode.ai/",
+      "PackageUrl: https://lutungcode.ai/",
       "License: MIT",
-      "LicenseUrl: https://github.com/anomalyco/opencode/blob/HEAD/LICENSE",
+      "LicenseUrl: https://github.com/anomalyco/lutungcode/blob/HEAD/LICENSE",
       `ShortDescription: ${input.description}`,
       `Moniker: ${input.moniker}`,
       "Tags:",
@@ -122,7 +122,7 @@ async function prepare(input: (typeof packages)[number]) {
       "- developer-tools",
       "Documentations:",
       "- DocumentLabel: Docs",
-      "  DocumentUrl: https://opencode.ai/docs/",
+      "  DocumentUrl: https://lutungcode.ai/docs/",
       ...footer("defaultLocale"),
     ],
   }
@@ -198,7 +198,7 @@ async function submit(input: Awaited<ReturnType<typeof prepare>>) {
         title,
         head: `${fork.owner.login}:${branch}`,
         base: "master",
-        body: `Published by the [OpenCode](https://github.com/anomalyco/opencode) release workflow${run ? ` in ${run}` : ""}.`,
+        body: `Published by the [LutungCode](https://github.com/anomalyco/lutungcode) release workflow${run ? ` in ${run}` : ""}.`,
       },
     }),
   )

@@ -7,17 +7,17 @@ import { RemoteCli } from "./remote-cli"
 // complete private discovery contract; no remote Python/Node runtime is needed.
 const registrationScript = `status=$("$cli" service status) || exit 0
 if [ "$status" = stopped ]; then exit 0; fi
-printf 'OPENCODE_SSH_STATUS=%s\\n' "$status"
-for file in "\${XDG_STATE_HOME:-$HOME/.local/state}"/opencode/service*.json; do
+printf 'LUTUNGCODE_SSH_STATUS=%s\\n' "$status"
+for file in "\${XDG_STATE_HOME:-$HOME/.local/state}"/lutungcode/service*.json; do
   if [ ! -f "$file" ]; then continue; fi
-  printf 'OPENCODE_SSH_REGISTRATION_BEGIN\\n'
+  printf 'LUTUNGCODE_SSH_REGISTRATION_BEGIN\\n'
   cat "$file"
-  printf '\\nOPENCODE_SSH_REGISTRATION_END\\n'
+  printf '\\nLUTUNGCODE_SSH_REGISTRATION_END\\n'
 done
 `
 
 export const discoverScript = `set -eu
-${RemoteCli.discoverScript({ fromPath: true, cache: { directory: ".opencode/desktop-ssh", prefix: "0.0.0-beta-" } })}
+${RemoteCli.discoverScript({ fromPath: true, cache: { directory: ".lutungcode/desktop-ssh", prefix: "0.0.0-beta-" } })}
 if [ -z "$cli" ]; then exit 0; fi
 ${registrationScript}`
 
@@ -40,13 +40,13 @@ const Registration = Schema.fromJsonString(
 export function parseRegistration(output: string) {
   const status = output
     .split(/\r?\n/)
-    .findLast((line) => line.startsWith("OPENCODE_SSH_STATUS="))
-    ?.slice("OPENCODE_SSH_STATUS=".length)
+    .findLast((line) => line.startsWith("LUTUNGCODE_SSH_STATUS="))
+    ?.slice("LUTUNGCODE_SSH_STATUS=".length)
 
   if (!status) return undefined
 
   for (const match of output.matchAll(
-    /OPENCODE_SSH_REGISTRATION_BEGIN\r?\n([\s\S]*?)\r?\nOPENCODE_SSH_REGISTRATION_END/g,
+    /LUTUNGCODE_SSH_REGISTRATION_BEGIN\r?\n([\s\S]*?)\r?\nLUTUNGCODE_SSH_REGISTRATION_END/g,
   )) {
     const result = Schema.decodeUnknownOption(Registration)(match[1])
 
@@ -57,7 +57,7 @@ export function parseRegistration(output: string) {
 }
 
 export function binaryPath(version: string) {
-  return `$HOME/.opencode/desktop-ssh/${RemoteCli.requireVersion(version)}/opencode`
+  return `$HOME/.lutungcode/desktop-ssh/${RemoteCli.requireVersion(version)}/lutungcode`
 }
 
 function connectionAddress(address: string, password: string) {
@@ -110,14 +110,14 @@ export const bootstrap = Effect.fn("Ssh.bootstrap")(function* (input: {
   const version =
     input.development && !staged ? yield* RemoteCli.latestBeta().pipe(Effect.mapError(SshFailure.from)) : input.version
 
-  const setup = { version, directory: `.opencode/desktop-ssh/${version}` }
+  const setup = { version, directory: `.lutungcode/desktop-ssh/${version}` }
 
   if (!staged) {
     const output = yield* run(RemoteCli.probeScript).pipe(Effect.mapError(() => new SshFailure("platform")))
 
     const target = output
       .split(/\r?\n/)
-      .findLast((line) => line.startsWith("OPENCODE_REMOTE_TARGET="))
+      .findLast((line) => line.startsWith("LUTUNGCODE_REMOTE_TARGET="))
       ?.split("=")[1]
 
     const url = yield* Effect.try({ try: () => RemoteCli.archiveUrl(target ?? "", version), catch: SshFailure.from })

@@ -23,7 +23,7 @@ export const settings: Setting[] = [
     title: "Theme",
     category: "Appearance",
     path: ["theme", "name"],
-    default: "opencode",
+    default: "lutungcode",
     keywords: ["color scheme", "colors"],
   },
   {

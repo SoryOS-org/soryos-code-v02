@@ -1,9 +1,9 @@
-import type { OpenCodeClient } from "@opencode/client/effect"
-import { AbsolutePath } from "@opencode/schema/schema"
-import { Session } from "@opencode/schema/session"
-import { FSUtil } from "@opencode/util/fs-util"
+import type { LutungCodeClient } from "@lutungcode/client/effect"
+import { AbsolutePath } from "@lutungcode/schema/schema"
+import { Session } from "@lutungcode/schema/session"
+import { FSUtil } from "@lutungcode/util/fs-util"
 import { DateTime, Effect, Ref, Schema } from "effect"
-import { withTimestampedFallback } from "@opencode/util/session-title-fallback"
+import { withTimestampedFallback } from "@lutungcode/util/session-title-fallback"
 import type {
   AuthenticateRequest,
   AuthenticateResponse,
@@ -33,7 +33,7 @@ import type {
   SetSessionModeRequest,
   SetSessionModeResponse,
 } from "@agentclientprotocol/sdk"
-import { OPENCODE_VERSION } from "../version"
+import { LUTUNGCODE_VERSION } from "../version"
 import { ACPCapabilities, type Capabilities } from "./capabilities"
 import type { ACPCatalog } from "./catalog"
 import { ACPClient } from "./client"
@@ -45,7 +45,7 @@ import { ACPReplay } from "./replay"
 import type { ACPSessions, Attached, SupportedMcpServer } from "./sessions"
 import type { ACPTurn } from "./turn"
 
-const AuthMethodID = "opencode-login"
+const AuthMethodID = "lutungcode-login"
 
 export interface Interface {
   readonly initialize: (input: InitializeRequest) => Effect.Effect<InitializeResponse>
@@ -66,7 +66,7 @@ export interface Interface {
 }
 
 export function make(input: {
-  readonly client: OpenCodeClient
+  readonly client: LutungCodeClient
   readonly connection: ACPConnection.Interface
   readonly catalog: ACPCatalog.Interface
   readonly sessions: ACPSessions.Interface
@@ -106,14 +106,14 @@ export function make(input: {
     initialize: Effect.fnUntraced(function* (params) {
       yield* Ref.set(input.capabilities, ACPCapabilities.parse(params.clientCapabilities))
       const authMethod: AuthMethod = {
-        description: "Run `opencode auth login` in the terminal",
-        name: "Login with opencode",
+        description: "Run `lutungcode auth login` in the terminal",
+        name: "Login with lutungcode",
         id: AuthMethodID,
         ...(params.clientCapabilities?.auth?.terminal ? { type: "terminal" as const, args: ["--login"] } : {}),
       }
       if (params.clientCapabilities?._meta?.["terminal-auth"] === true) {
         authMethod._meta = {
-          "terminal-auth": { command: "opencode", args: ["auth", "login"], label: "OpenCode Login" },
+          "terminal-auth": { command: "lutungcode", args: ["auth", "login"], label: "LutungCode Login" },
         }
       }
       return {
@@ -126,7 +126,7 @@ export function make(input: {
           _meta: { [ACPCapabilities.ChildSessionUpdates]: true },
         },
         authMethods: [authMethod],
-        agentInfo: { name: "OpenCode", version: OPENCODE_VERSION },
+        agentInfo: { name: "LutungCode", version: LUTUNGCODE_VERSION },
       }
     }),
     authenticate: Effect.fnUntraced(function* (params) {

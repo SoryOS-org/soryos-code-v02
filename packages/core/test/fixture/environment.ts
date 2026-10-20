@@ -1,6 +1,6 @@
-import { Environment } from "@opencode/core/environment/index"
-import { CrossSpawnSpawner } from "@opencode/util/cross-spawn-spawner"
-import { LayerNode } from "@opencode/util/effect/layer-node"
+import { Environment } from "@lutungcode/core/environment/index"
+import { CrossSpawnSpawner } from "@lutungcode/util/cross-spawn-spawner"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
 import { Effect, Layer } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 

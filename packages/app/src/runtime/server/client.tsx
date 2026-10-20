@@ -1,5 +1,5 @@
-import type { OpenCodeEvent } from "@opencode/client/promise"
-import { createClientConnection, createPtyClient, type ClientConnectionStatus } from "@opencode/client/solid"
+import type { LutungCodeEvent } from "@lutungcode/client/promise"
+import { createClientConnection, createPtyClient, type ClientConnectionStatus } from "@lutungcode/client/solid"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { type Accessor, createEffect, on, onCleanup } from "solid-js"
 import { createApiForServer, type ServerApi } from "@/runtime/server/api"
@@ -10,21 +10,21 @@ import { createRequestQueue } from "@/runtime/server/request-queue"
 import { ServerScope } from "@/runtime/server/scope"
 import { useServer } from "./current"
 
-type OpenCodeEventMap = { [Type in OpenCodeEvent["type"]]: Extract<OpenCodeEvent, { type: Type }> }
+type LutungCodeEventMap = { [Type in LutungCodeEvent["type"]]: Extract<LutungCodeEvent, { type: Type }> }
 
-export type OpenCodeEventStream = {
-  on<Type extends OpenCodeEvent["type"]>(type: Type, handler: (event: OpenCodeEventMap[Type]) => void): VoidFunction
-  listen(handler: (event: OpenCodeEvent) => void): VoidFunction
+export type LutungCodeEventStream = {
+  on<Type extends LutungCodeEvent["type"]>(type: Type, handler: (event: LutungCodeEventMap[Type]) => void): VoidFunction
+  listen(handler: (event: LutungCodeEvent) => void): VoidFunction
 }
 
-type OpenCodeEventSource = OpenCodeEventStream & {
-  location(directory: string): OpenCodeEventStream
+type LutungCodeEventSource = LutungCodeEventStream & {
+  location(directory: string): LutungCodeEventStream
 }
 
-export function createOpenCodeEventSource() {
-  const emitter = createGlobalEmitter<OpenCodeEventMap>()
+export function createLutungCodeEventSource() {
+  const emitter = createGlobalEmitter<LutungCodeEventMap>()
 
-  function stream(directory?: string): OpenCodeEventStream {
+  function stream(directory?: string): LutungCodeEventStream {
     return {
       on(type, handler) {
         return emitter.on(type, (event) => {
@@ -41,7 +41,7 @@ export function createOpenCodeEventSource() {
     }
   }
 
-  const event: OpenCodeEventSource = {
+  const event: LutungCodeEventSource = {
     ...stream(),
     location: (directory) => stream(directory),
   }
@@ -50,7 +50,7 @@ export function createOpenCodeEventSource() {
 
   return {
     event,
-    publish(event: OpenCodeEvent) {
+    publish(event: LutungCodeEvent) {
       emitter.emit(event.type, event)
     },
   }
@@ -69,7 +69,7 @@ type ServerSDKBase = {
     attempt: Accessor<number>
     error: Accessor<string | undefined>
   }
-  event: OpenCodeEventSource
+  event: LutungCodeEventSource
 }
 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope): ServerSDKBase {
@@ -86,7 +86,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     )
   }
 
-  const events = createOpenCodeEventSource()
+  const events = createLutungCodeEventSource()
   const reconnect = server.type === "extension" || server.type === "sidecar" ? server.reconnect : undefined
 
   const connection = createClientConnection(transport.api, {
@@ -175,7 +175,7 @@ export const useServerSDK = () => {
 
 export type LocationContext = {
   directory: string
-  event: OpenCodeEventStream
+  event: LutungCodeEventStream
 }
 
 function createDirSdkContext(directory: string, serverSDK: ServerSDKBase): LocationContext {

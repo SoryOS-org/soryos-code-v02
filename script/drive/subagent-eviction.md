@@ -12,25 +12,25 @@ It does not change the server clock or restart the server.
 
 ## Run
 
-Use Bun 1.4.2, an available `opencode-drive` 2.1.3 installation on the module path,
+Use Bun 1.4.2, an available `lutungcode-drive` 2.1.3 installation on the module path,
 and a dependency-installed V2 checkout. The script is an Effect program, run with
-`opencode-drive run` (which typechecks before launch).
+`lutungcode-drive run` (which typechecks before launch).
 
 ```sh
-OPENCODE_DRIVE_DB=proof.sqlite \
-OPENCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
+LUTUNGCODE_DRIVE_DB=proof.sqlite \
+LUTUNGCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
 DEMO_LABEL=AFTER \
-opencode-drive run script/drive/subagent-eviction.ts
+lutungcode-drive run script/drive/subagent-eviction.ts
 ```
 
 Run that same script against an immutable base checkout:
 
 ```sh
-OPENCODE_DEV=/path/to/base-checkout \
-OPENCODE_DRIVE_DB=proof.sqlite \
-OPENCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
+LUTUNGCODE_DEV=/path/to/base-checkout \
+LUTUNGCODE_DRIVE_DB=proof.sqlite \
+LUTUNGCODE_DRIVE_MEDIA_DIR=$PWD/.drive-output \
 DEMO_LABEL=BEFORE \
-opencode-drive run script/drive/subagent-eviction.ts
+lutungcode-drive run script/drive/subagent-eviction.ts
 ```
 
 `DEMO_LABEL=BEFORE` asserts the known missing wake; `AFTER` asserts successful
@@ -50,7 +50,7 @@ duplicate the notification.
 | Background marker    | completed, unacknowledged | absent                      |
 
 The dynamic hold tool avoids the static adapter loading issue in
-[opencode-drive#116](https://github.com/anomalyco/opencode-drive/issues/116).
+[lutungcode-drive#116](https://github.com/anomalyco/lutungcode-drive/issues/116).
 
 ## History
 

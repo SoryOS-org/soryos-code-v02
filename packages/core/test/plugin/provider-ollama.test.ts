@@ -1,15 +1,15 @@
-import { Bus } from "@opencode/core/bus"
-import { Config } from "@opencode/core/config"
-import { Environment, makeFiles } from "@opencode/core/environment/index"
-import { EnvironmentUnavailable } from "@opencode/core/environment/unavailable"
-import { Integration } from "@opencode/core/integration"
-import { Model } from "@opencode/core/model"
-import { Plugin } from "@opencode/core/plugin"
-import { PluginHost } from "@opencode/core/plugin/host"
-import { OllamaPlugin, make } from "@opencode/core/plugin/provider/ollama"
-import { ProviderPlugins } from "@opencode/core/plugin/provider"
-import { Provider } from "@opencode/core/provider"
-import { Document, Event, Info } from "@opencode/schema/config"
+import { Bus } from "@lutungcode/core/bus"
+import { Config } from "@lutungcode/core/config"
+import { Environment, makeFiles } from "@lutungcode/core/environment/index"
+import { EnvironmentUnavailable } from "@lutungcode/core/environment/unavailable"
+import { Integration } from "@lutungcode/core/integration"
+import { Model } from "@lutungcode/core/model"
+import { Plugin } from "@lutungcode/core/plugin"
+import { PluginHost } from "@lutungcode/core/plugin/host"
+import { OllamaPlugin, make } from "@lutungcode/core/plugin/provider/ollama"
+import { ProviderPlugins } from "@lutungcode/core/plugin/provider"
+import { Provider } from "@lutungcode/core/provider"
+import { Document, Event, Info } from "@lutungcode/schema/config"
 import { describe, expect } from "bun:test"
 import { Duration, Effect, Layer, Schema } from "effect"
 import { testEffect } from "../lib/effect"
@@ -102,8 +102,8 @@ describe("OllamaPlugin", () => {
           const providers = yield* Provider.Service
           const modelState = yield* Model.Service
           const providerID = Provider.ID.make("ollama")
-          expect(OllamaPlugin.id).toBe("opencode.provider.ollama")
-          expect(ProviderPlugins.map((item) => item.id)).toContain("opencode.provider.ollama")
+          expect(OllamaPlugin.id).toBe("lutungcode.provider.ollama")
+          expect(ProviderPlugins.map((item) => item.id)).toContain("lutungcode.provider.ollama")
           yield* addPlugin(server.url.origin)
           const model = yield* eventually(
             modelState.get(providerID, Model.ID.make("gemma3:4b")),
@@ -114,7 +114,7 @@ describe("OllamaPlugin", () => {
             id: providerID,
             name: "Ollama",
             activation: "enabled",
-            package: "@opencode/ai/providers/openai-compatible",
+            package: "@lutungcode/ai/providers/openai-compatible",
             settings: { baseURL: `${server.url.origin}/v1`, provider: "ollama", apiKey: "" },
           })
           expect(model).toMatchObject({
@@ -222,7 +222,7 @@ describe("OllamaPlugin", () => {
           yield* providers.transform((editor) => {
             editor.update(providerID, (provider) => {
               provider.name = "Ollama"
-              provider.package = "@opencode/ai/providers/openai-compatible"
+              provider.package = "@lutungcode/ai/providers/openai-compatible"
               provider.integrationID = Integration.ID.make("ollama")
             })
             editor.models.update(providerID, Model.ID.make("static-model"), () => {})

@@ -2,7 +2,7 @@ import type { MainContext } from "../sdk/main"
 import type {
   WslDistroProbe,
   WslJob,
-  WslOpencodeCheck,
+  WslLutungcodeCheck,
   WslServerConfig,
   WslServerItem,
   WslServerRuntime,
@@ -79,10 +79,10 @@ export function createWslServersController(options: WslServersControllerOptions)
     updateServer(id, (item) => ({ ...item, runtime }))
   }
 
-  const setCliCheck = (distro: string, check: WslOpencodeCheck) => {
+  const setCliCheck = (distro: string, check: WslLutungcodeCheck) => {
     setState({
-      opencodeChecks: {
-        ...state.opencodeChecks,
+      lutungcodeChecks: {
+        ...state.lutungcodeChecks,
         [distro]: check,
       },
     })
@@ -115,16 +115,16 @@ export function createWslServersController(options: WslServersControllerOptions)
       setState({ distroProbes: { ...state.distroProbes, ...Object.fromEntries(distroProbes) } })
     }
 
-    const opencodeChecks = await Promise.all(
+    const lutungcodeChecks = await Promise.all(
       unique.flatMap((distro) =>
-        distroProbeReady(state.distroProbes[distro]) && !state.opencodeChecks[distro]
+        distroProbeReady(state.distroProbes[distro]) && !state.lutungcodeChecks[distro]
           ? [inspectCli(distro).then((check) => [distro, check] as const)]
           : [],
       ),
     )
 
-    if (opencodeChecks.length) {
-      setState({ opencodeChecks: { ...state.opencodeChecks, ...Object.fromEntries(opencodeChecks) } })
+    if (lutungcodeChecks.length) {
+      setState({ lutungcodeChecks: { ...state.lutungcodeChecks, ...Object.fromEntries(lutungcodeChecks) } })
     }
   }
 
@@ -280,8 +280,8 @@ export function createWslServersController(options: WslServersControllerOptions)
       await runJob({ kind: "probe-addable", distros, startedAt: Date.now() }, () => probeAddableDistros(distros))
     },
 
-    async installOpencode(distro: string) {
-      await runJob({ kind: "install-opencode", distro, startedAt: Date.now() }, async () => {
+    async installLutungcode(distro: string) {
+      await runJob({ kind: "install-lutungcode", distro, startedAt: Date.now() }, async () => {
         const id = state.servers.find((item) => item.config.distro === distro)?.config.id
 
         if (id) await stopServer(id)
@@ -345,7 +345,7 @@ function initialState(): WslServersState {
     installed: [],
     online: [],
     distroProbes: {},
-    opencodeChecks: {},
+    lutungcodeChecks: {},
     pendingRestart: false,
     servers: [],
     job: null,
@@ -358,7 +358,7 @@ function cliCheck(
   resolvedPath: string | null,
   version: string | null,
   expectedVersion: string,
-): WslOpencodeCheck {
+): WslLutungcodeCheck {
   if (!resolvedPath) {
     return {
       distro,
@@ -366,7 +366,7 @@ function cliCheck(
       version: null,
       expectedVersion,
       matchesDesktop: null,
-      error: t("error.opencodeMissing"),
+      error: t("error.lutungcodeMissing"),
     }
   }
 
@@ -377,7 +377,7 @@ function cliCheck(
       version: null,
       expectedVersion,
       matchesDesktop: null,
-      error: t("error.opencodeCannotRun"),
+      error: t("error.lutungcodeCannotRun"),
     }
   }
 
@@ -391,7 +391,7 @@ function cliCheck(
   }
 }
 
-function requireMatchingCli(t: MainContext["t"], check: WslOpencodeCheck, expected: string) {
+function requireMatchingCli(t: MainContext["t"], check: WslLutungcodeCheck, expected: string) {
   if (check.version === expected) return
   throw new Error(
     t("error.updateVersion", {
@@ -404,11 +404,11 @@ function requireMatchingCli(t: MainContext["t"], check: WslOpencodeCheck, expect
 
 function removeDistroState(state: WslServersState, distro: string) {
   const distroProbes = { ...state.distroProbes }
-  const opencodeChecks = { ...state.opencodeChecks }
+  const lutungcodeChecks = { ...state.lutungcodeChecks }
   delete distroProbes[distro]
-  delete opencodeChecks[distro]
+  delete lutungcodeChecks[distro]
 
-  return { distroProbes, opencodeChecks }
+  return { distroProbes, lutungcodeChecks }
 }
 
 function distroProbeReady(probe: WslDistroProbe | undefined) {

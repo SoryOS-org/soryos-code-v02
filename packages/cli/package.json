@@ -1,12 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode/cli",
+  "name": "@lutungcode/cli",
   "version": "2.0.32",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "opencode": "./bin/opencode.cjs",
-    "opencode2": "./bin/opencode2.cjs"
+    "lutungcode": "./bin/lutungcode.cjs"
   },
   "files": [
     "bin"
@@ -28,13 +27,13 @@
     "@clack/core": "1.0.0-alpha.1",
     "@clack/prompts": "1.0.0-alpha.1",
     "@effect/platform-node": "catalog:",
-    "@opencode/client": "workspace:*",
-    "@opencode/plugin": "workspace:*",
+    "@lutungcode/client": "workspace:*",
+    "@lutungcode/plugin": "workspace:*",
     "@opencode-ai/pty": "0.3.1",
-    "@opencode/schema": "workspace:*",
-    "@opencode/server": "workspace:*",
-    "@opencode/tui": "workspace:*",
-    "@opencode/util": "workspace:*",
+    "@lutungcode/schema": "workspace:*",
+    "@lutungcode/server": "workspace:*",
+    "@lutungcode/tui": "workspace:*",
+    "@lutungcode/util": "workspace:*",
     "@opentui/core": "catalog:",
     "@opentui/solid": "catalog:",
     "@opentunnel/client": "0.4.0",
@@ -53,8 +52,8 @@
     "ws": "8.21.0"
   },
   "devDependencies": {
-    "@opencode/script": "workspace:*",
-    "@opencode/protocol": "workspace:*",
+    "@lutungcode/script": "workspace:*",
+    "@lutungcode/protocol": "workspace:*",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native": "catalog:",

@@ -1,6 +1,6 @@
-import { Database } from "@opencode/core/database/database"
-import { ModelsDev } from "@opencode/core/models-dev"
-import { PersistentPty } from "@opencode/core/persistent-pty"
+import { Database } from "@lutungcode/core/database/database"
+import { ModelsDev } from "@lutungcode/core/models-dev"
+import { PersistentPty } from "@lutungcode/core/persistent-pty"
 import { Schema } from "effect"
 
 export const ServerOptions = Schema.Struct({

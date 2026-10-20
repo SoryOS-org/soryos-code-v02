@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=LutungCode
+Exec=/opt/LutungCode/app.lutungcode.desktop %U
+Terminal=false
+Type=Application
+Icon=app.lutungcode.desktop
+StartupWMClass=app.lutungcode.desktop
+NoDisplay=true
+Comment=Open source AI coding agent
+Categories=Development;

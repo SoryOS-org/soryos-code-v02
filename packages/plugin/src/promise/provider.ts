@@ -1,7 +1,7 @@
-import type { ProviderApi } from "@opencode/client/promise/api"
-import type { Model } from "@opencode/schema/model"
-import type { Provider } from "@opencode/schema/provider"
-import type { ConnectionInfo } from "@opencode/client"
+import type { ProviderApi } from "@lutungcode/client/promise/api"
+import type { Model } from "@lutungcode/schema/model"
+import type { Provider } from "@lutungcode/schema/provider"
+import type { ConnectionInfo } from "@lutungcode/client"
 import type { Transform } from "./registration.js"
 import type { DeepMutable } from "./types.js"
 

@@ -1,93 +1,93 @@
 import { NodeFileSystem } from "@effect/platform-node"
-import { compile, emitEffectImported, emitEffectShape, emitPromise, write } from "@opencode/httpapi-codegen"
-import { ClientApi, effectOmitEndpoints, groupNames, promiseOmitEndpoints } from "@opencode/protocol/client"
-import { Agent } from "@opencode/schema/agent"
-import { Command } from "@opencode/schema/command"
-import { Config } from "@opencode/schema/config"
-import { Credential } from "@opencode/schema/credential"
-import { Event } from "@opencode/schema/event"
-import { EventLog } from "@opencode/schema/event-log"
-import { FileDiff } from "@opencode/schema/file-diff"
-import { FileSystem } from "@opencode/schema/filesystem"
-import { Form } from "@opencode/schema/form"
-import { Instruction } from "@opencode/schema/instruction"
-import { InstructionEntry } from "@opencode/schema/instruction-entry"
-import { Integration } from "@opencode/schema/integration"
-import { Location } from "@opencode/schema/location"
-import { Mcp } from "@opencode/schema/mcp"
-import { Model } from "@opencode/schema/model"
-import { Money } from "@opencode/schema/money"
-import { Permission } from "@opencode/schema/permission"
-import { PermissionSaved } from "@opencode/schema/permission-saved"
-import { Plugin } from "@opencode/schema/plugin"
-import { Project } from "@opencode/schema/project"
-import { Worktree } from "@opencode/schema/worktree"
-import { AgentAttachment, FileAttachment, Prompt, PromptMention } from "@opencode/schema/prompt"
-import { PromptInput } from "@opencode/schema/prompt-input"
-import { Provider } from "@opencode/schema/provider"
-import { Pty } from "@opencode/schema/pty"
-import { PtyTicket } from "@opencode/schema/pty-ticket"
-import { Question } from "@opencode/schema/question"
-import { Reference } from "@opencode/schema/reference"
-import { AbsolutePath, RelativePath } from "@opencode/schema/schema"
-import { Session } from "@opencode/schema/session"
-import { SessionMessage } from "@opencode/schema/session-message"
-import { SessionInbox } from "@opencode/schema/session-inbox"
-import { Shell } from "@opencode/schema/shell"
-import { Skill } from "@opencode/schema/skill"
-import { Snapshot } from "@opencode/schema/snapshot"
-import { Vcs } from "@opencode/schema/vcs"
-import { WebSearch } from "@opencode/schema/websearch"
-import { Workspace } from "@opencode/schema/workspace"
+import { compile, emitEffectImported, emitEffectShape, emitPromise, write } from "@lutungcode/httpapi-codegen"
+import { ClientApi, effectOmitEndpoints, groupNames, promiseOmitEndpoints } from "@lutungcode/protocol/client"
+import { Agent } from "@lutungcode/schema/agent"
+import { Command } from "@lutungcode/schema/command"
+import { Config } from "@lutungcode/schema/config"
+import { Credential } from "@lutungcode/schema/credential"
+import { Event } from "@lutungcode/schema/event"
+import { EventLog } from "@lutungcode/schema/event-log"
+import { FileDiff } from "@lutungcode/schema/file-diff"
+import { FileSystem } from "@lutungcode/schema/filesystem"
+import { Form } from "@lutungcode/schema/form"
+import { Instruction } from "@lutungcode/schema/instruction"
+import { InstructionEntry } from "@lutungcode/schema/instruction-entry"
+import { Integration } from "@lutungcode/schema/integration"
+import { Location } from "@lutungcode/schema/location"
+import { Mcp } from "@lutungcode/schema/mcp"
+import { Model } from "@lutungcode/schema/model"
+import { Money } from "@lutungcode/schema/money"
+import { Permission } from "@lutungcode/schema/permission"
+import { PermissionSaved } from "@lutungcode/schema/permission-saved"
+import { Plugin } from "@lutungcode/schema/plugin"
+import { Project } from "@lutungcode/schema/project"
+import { Worktree } from "@lutungcode/schema/worktree"
+import { AgentAttachment, FileAttachment, Prompt, PromptMention } from "@lutungcode/schema/prompt"
+import { PromptInput } from "@lutungcode/schema/prompt-input"
+import { Provider } from "@lutungcode/schema/provider"
+import { Pty } from "@lutungcode/schema/pty"
+import { PtyTicket } from "@lutungcode/schema/pty-ticket"
+import { Question } from "@lutungcode/schema/question"
+import { Reference } from "@lutungcode/schema/reference"
+import { AbsolutePath, RelativePath } from "@lutungcode/schema/schema"
+import { Session } from "@lutungcode/schema/session"
+import { SessionMessage } from "@lutungcode/schema/session-message"
+import { SessionInbox } from "@lutungcode/schema/session-inbox"
+import { Shell } from "@lutungcode/schema/shell"
+import { Skill } from "@lutungcode/schema/skill"
+import { Snapshot } from "@lutungcode/schema/snapshot"
+import { Vcs } from "@lutungcode/schema/vcs"
+import { WebSearch } from "@lutungcode/schema/websearch"
+import { Workspace } from "@lutungcode/schema/workspace"
 import { Effect, Schema } from "effect"
 import { fileURLToPath } from "url"
 
 const promiseContract = compile(ClientApi, { groupNames, omitEndpoints: promiseOmitEndpoints })
 const effectContract = compile(ClientApi, { groupNames, omitEndpoints: effectOmitEndpoints })
 const effectTypeReferences = [
-  ...namespaceTypes("Agent", "@opencode/schema/agent", Agent),
-  ...namespaceTypes("Command", "@opencode/schema/command", Command),
-  ...namespaceTypes("Config", "@opencode/schema/config", Config),
-  ...namespaceTypes("Credential", "@opencode/schema/credential", Credential),
-  ...namespaceTypes("Event", "@opencode/schema/event", Event),
-  ...namespaceTypes("EventLog", "@opencode/schema/event-log", EventLog),
-  ...namespaceTypes("FileDiff", "@opencode/schema/file-diff", FileDiff),
-  ...namespaceTypes("FileSystem", "@opencode/schema/filesystem", FileSystem),
-  ...namespaceTypes("Form", "@opencode/schema/form", Form),
-  ...namespaceTypes("Instruction", "@opencode/schema/instruction", Instruction),
-  ...namespaceTypes("InstructionEntry", "@opencode/schema/instruction-entry", InstructionEntry),
-  ...namespaceTypes("Integration", "@opencode/schema/integration", Integration),
-  typeReference("Location.PublicRef", "@opencode/schema/location", Location.PublicRef),
-  typeReference("Location.PublicInfo", "@opencode/schema/location", Location.PublicInfo),
-  ...namespaceTypes("Mcp", "@opencode/schema/mcp", Mcp),
-  ...namespaceTypes("Model", "@opencode/schema/model", Model),
-  ...namespaceTypes("Money", "@opencode/schema/money", Money),
-  ...namespaceTypes("Permission", "@opencode/schema/permission", Permission),
-  ...namespaceTypes("PermissionSaved", "@opencode/schema/permission-saved", PermissionSaved),
-  ...namespaceTypes("Plugin", "@opencode/schema/plugin", Plugin),
-  ...namespaceTypes("Project", "@opencode/schema/project", Project),
-  ...namespaceTypes("Worktree", "@opencode/schema/worktree", Worktree),
-  ...namespaceTypes("PromptInput", "@opencode/schema/prompt-input", PromptInput),
-  ...namespaceTypes("Provider", "@opencode/schema/provider", Provider),
-  ...namespaceTypes("Pty", "@opencode/schema/pty", Pty),
-  ...namespaceTypes("PtyTicket", "@opencode/schema/pty-ticket", PtyTicket),
-  ...namespaceTypes("Question", "@opencode/schema/question", Question),
-  ...namespaceTypes("Reference", "@opencode/schema/reference", Reference),
-  ...namespaceTypes("Session", "@opencode/schema/session", Session),
-  ...namespaceTypes("SessionMessage", "@opencode/schema/session-message", SessionMessage),
-  ...namespaceTypes("SessionInbox", "@opencode/schema/session-inbox", SessionInbox),
-  ...namespaceTypes("Shell", "@opencode/schema/shell", Shell),
-  ...namespaceTypes("Skill", "@opencode/schema/skill", Skill),
-  ...namespaceTypes("Snapshot", "@opencode/schema/snapshot", Snapshot),
-  ...namespaceTypes("Vcs", "@opencode/schema/vcs", Vcs),
-  ...namespaceTypes("WebSearch", "@opencode/schema/websearch", WebSearch),
-  ...namespaceTypes("Workspace", "@opencode/schema/workspace", Workspace),
-  typeReference("Prompt", "@opencode/schema/prompt", Prompt),
-  typeReference("PromptMention", "@opencode/schema/prompt", PromptMention),
-  typeReference("FileAttachment", "@opencode/schema/prompt", FileAttachment),
-  typeReference("AgentAttachment", "@opencode/schema/prompt", AgentAttachment),
-  typeReference("AbsolutePath", "@opencode/schema/schema", AbsolutePath),
-  typeReference("RelativePath", "@opencode/schema/schema", RelativePath),
+  ...namespaceTypes("Agent", "@lutungcode/schema/agent", Agent),
+  ...namespaceTypes("Command", "@lutungcode/schema/command", Command),
+  ...namespaceTypes("Config", "@lutungcode/schema/config", Config),
+  ...namespaceTypes("Credential", "@lutungcode/schema/credential", Credential),
+  ...namespaceTypes("Event", "@lutungcode/schema/event", Event),
+  ...namespaceTypes("EventLog", "@lutungcode/schema/event-log", EventLog),
+  ...namespaceTypes("FileDiff", "@lutungcode/schema/file-diff", FileDiff),
+  ...namespaceTypes("FileSystem", "@lutungcode/schema/filesystem", FileSystem),
+  ...namespaceTypes("Form", "@lutungcode/schema/form", Form),
+  ...namespaceTypes("Instruction", "@lutungcode/schema/instruction", Instruction),
+  ...namespaceTypes("InstructionEntry", "@lutungcode/schema/instruction-entry", InstructionEntry),
+  ...namespaceTypes("Integration", "@lutungcode/schema/integration", Integration),
+  typeReference("Location.PublicRef", "@lutungcode/schema/location", Location.PublicRef),
+  typeReference("Location.PublicInfo", "@lutungcode/schema/location", Location.PublicInfo),
+  ...namespaceTypes("Mcp", "@lutungcode/schema/mcp", Mcp),
+  ...namespaceTypes("Model", "@lutungcode/schema/model", Model),
+  ...namespaceTypes("Money", "@lutungcode/schema/money", Money),
+  ...namespaceTypes("Permission", "@lutungcode/schema/permission", Permission),
+  ...namespaceTypes("PermissionSaved", "@lutungcode/schema/permission-saved", PermissionSaved),
+  ...namespaceTypes("Plugin", "@lutungcode/schema/plugin", Plugin),
+  ...namespaceTypes("Project", "@lutungcode/schema/project", Project),
+  ...namespaceTypes("Worktree", "@lutungcode/schema/worktree", Worktree),
+  ...namespaceTypes("PromptInput", "@lutungcode/schema/prompt-input", PromptInput),
+  ...namespaceTypes("Provider", "@lutungcode/schema/provider", Provider),
+  ...namespaceTypes("Pty", "@lutungcode/schema/pty", Pty),
+  ...namespaceTypes("PtyTicket", "@lutungcode/schema/pty-ticket", PtyTicket),
+  ...namespaceTypes("Question", "@lutungcode/schema/question", Question),
+  ...namespaceTypes("Reference", "@lutungcode/schema/reference", Reference),
+  ...namespaceTypes("Session", "@lutungcode/schema/session", Session),
+  ...namespaceTypes("SessionMessage", "@lutungcode/schema/session-message", SessionMessage),
+  ...namespaceTypes("SessionInbox", "@lutungcode/schema/session-inbox", SessionInbox),
+  ...namespaceTypes("Shell", "@lutungcode/schema/shell", Shell),
+  ...namespaceTypes("Skill", "@lutungcode/schema/skill", Skill),
+  ...namespaceTypes("Snapshot", "@lutungcode/schema/snapshot", Snapshot),
+  ...namespaceTypes("Vcs", "@lutungcode/schema/vcs", Vcs),
+  ...namespaceTypes("WebSearch", "@lutungcode/schema/websearch", WebSearch),
+  ...namespaceTypes("Workspace", "@lutungcode/schema/workspace", Workspace),
+  typeReference("Prompt", "@lutungcode/schema/prompt", Prompt),
+  typeReference("PromptMention", "@lutungcode/schema/prompt", PromptMention),
+  typeReference("FileAttachment", "@lutungcode/schema/prompt", FileAttachment),
+  typeReference("AgentAttachment", "@lutungcode/schema/prompt", AgentAttachment),
+  typeReference("AbsolutePath", "@lutungcode/schema/schema", AbsolutePath),
+  typeReference("RelativePath", "@lutungcode/schema/schema", RelativePath),
 ]
 
 await Effect.runPromise(
@@ -112,8 +112,8 @@ await Effect.runPromise(
           typeReferences: effectTypeReferences,
           outputTypes: {
             "event.subscribe": {
-              name: "OpenCodeEvent",
-              import: 'import type { OpenCodeEvent } from "@opencode/protocol/groups/event"',
+              name: "LutungCodeEvent",
+              import: 'import type { LutungCodeEvent } from "@lutungcode/protocol/groups/event"',
             },
           },
         }),

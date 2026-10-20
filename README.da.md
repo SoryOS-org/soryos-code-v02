@@ -1,17 +1,17 @@
 <p align="center">
-  <a href="https://opencode.ai">
+  <a href="https://lutungcode.ai">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="LutungCode logo">
     </picture>
   </a>
 </p>
 <p align="center">Den open source AI-kodeagent.</p>
 <p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/@opencode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@opencode/cli?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
+  <a href="https://lutungcode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://www.npmjs.com/package/@lutungcode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@lutungcode/cli?style=flat-square" /></a>
+  <a href="https://github.com/anomalyco/lutungcode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/lutungcode/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
 <p align="center">
@@ -39,7 +39,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+[![LutungCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://lutungcode.ai)
 
 ---
 
@@ -47,16 +47,16 @@
 
 ```bash
 # YOLO
-curl -fsSL https://opencode.ai/v2/install | bash
+./install --binary /path/to/lutungcode
 
 # Pakkehåndteringer
-npm i -g @opencode/cli@latest      # eller bun/pnpm/yarn
-brew install anomalyco/tap/opencode-v2 # macOS og Linux (anbefalet, altid up to date)
-brew install opencode              # macOS og Linux (officiel brew formula, opdateres sjældnere)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-beta              # Arch Linux (Latest from AUR)
-mise use -g opencode               # alle OS
-nix run github:anomalyco/opencode  # Nix
+npm i -g @lutungcode/cli@latest      # eller bun/pnpm/yarn
+# Homebrew packages are not published yet # macOS og Linux (anbefalet, altid up to date)
+brew install lutungcode              # macOS og Linux (officiel brew formula, opdateres sjældnere)
+sudo pacman -S lutungcode            # Arch Linux (Stable)
+paru -S lutungcode-beta              # Arch Linux (Latest from AUR)
+mise use -g lutungcode               # alle OS
+# Nix packages are not published yet  # Nix
 ```
 
 > [!TIP]
@@ -64,38 +64,38 @@ nix run github:anomalyco/opencode  # Nix
 
 ### Desktop-app (BETA)
 
-OpenCode findes også som desktop-app. Download fra [opencode.ai/download](https://opencode.ai/download).
+LutungCode findes også som desktop-app. Download fra [lutungcode.ai/download](https://lutungcode.ai/download).
 
 | Platform              | Download                           |
 | --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-win-x64.exe`     |
+| macOS (Apple Silicon) | `lutungcode-desktop-mac-arm64.dmg`   |
+| macOS (Intel)         | `lutungcode-desktop-mac-x64.dmg`     |
+| Windows               | `lutungcode-desktop-win-x64.exe`     |
 | Linux                 | `.deb`, `.rpm`, eller AppImage     |
 
 ```bash
 # macOS (Homebrew)
-brew install --cask opencode-desktop
+brew install --cask lutungcode-desktop
 ```
 
 #### Installationsmappe
 
 Installationsscriptet bruger følgende prioriteringsrækkefølge for installationsstien:
 
-1. `$OPENCODE_INSTALL_DIR` - Tilpasset installationsmappe
+1. `$LUTUNGCODE_INSTALL_DIR` - Tilpasset installationsmappe
 2. `$XDG_BIN_DIR` - Sti der følger XDG Base Directory Specification
 3. `$HOME/bin` - Standard bruger-bin-mappe (hvis den findes eller kan oprettes)
-4. `$HOME/.opencode/bin` - Standard fallback
+4. `$HOME/.lutungcode/bin` - Standard fallback
 
 ```bash
 # Eksempler
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/v2/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/v2/install | bash
+LUTUNGCODE_INSTALL_DIR=/usr/local/bin ./install --binary /path/to/lutungcode
+XDG_BIN_DIR=$HOME/.local/bin ./install --binary /path/to/lutungcode
 ```
 
 ### Agents
 
-OpenCode har to indbyggede agents, som du kan skifte mellem med `Tab`-tasten.
+LutungCode har to indbyggede agents, som du kan skifte mellem med `Tab`-tasten.
 
 - **build** - Standard, agent med fuld adgang til udviklingsarbejde
 - **plan** - Skrivebeskyttet agent til analyse og kodeudforskning
@@ -106,20 +106,20 @@ OpenCode har to indbyggede agents, som du kan skifte mellem med `Tab`-tasten.
 Derudover findes der en **general**-subagent til komplekse søgninger og flertrinsopgaver.
 Den bruges internt og kan kaldes via `@general` i beskeder.
 
-Læs mere om [agents](https://opencode.ai/docs/agents).
+Læs mere om [agents](https://lutungcode.ai/docs/agents).
 
 ### Dokumentation
 
-For mere info om konfiguration af OpenCode, [**se vores docs**](https://opencode.ai/docs).
+For mere info om konfiguration af LutungCode, [**se vores docs**](https://lutungcode.ai/docs).
 
 ### Bidrag
 
-Hvis du vil bidrage til OpenCode, så læs vores [contributing docs](./CONTRIBUTING.md) før du sender en pull request.
+Hvis du vil bidrage til LutungCode, så læs vores [contributing docs](./CONTRIBUTING.md) før du sender en pull request.
 
-### Bygget på OpenCode
+### Bygget på LutungCode
 
-Hvis du arbejder på et projekt der er relateret til OpenCode og bruger "opencode" som en del af navnet; f.eks. "opencode-dashboard" eller "opencode-mobile", så tilføj en note i din README, der tydeliggør at projektet ikke er bygget af OpenCode-teamet og ikke er tilknyttet os på nogen måde.
+Hvis du arbejder på et projekt der er relateret til LutungCode og bruger "lutungcode" som en del af navnet; f.eks. "lutungcode-dashboard" eller "lutungcode-mobile", så tilføj en note i din README, der tydeliggør at projektet ikke er bygget af LutungCode-teamet og ikke er tilknyttet os på nogen måde.
 
 ---
 
-**Bliv en del af vores community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+**Bliv en del af vores community** [Discord](https://discord.gg/lutungcode) | [X.com](https://x.com/lutungcode)

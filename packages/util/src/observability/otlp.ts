@@ -42,19 +42,19 @@ function resourceAttributes() {
   }
 }
 
-export function resource(app: App = { client: "opencode", version: "unknown", channel: "local" }): {
+export function resource(app: App = { client: "lutungcode", version: "unknown", channel: "local" }): {
   serviceName: string
   serviceVersion: string
   attributes: Record<string, string>
 } {
   return {
-    serviceName: "opencode",
+    serviceName: "lutungcode",
     serviceVersion: app.version,
     attributes: {
       ...resourceAttributes(),
       "deployment.environment.name": app.channel,
-      "opencode.client": app.client,
-      "opencode.run": runID(),
+      "lutungcode.client": app.client,
+      "lutungcode.run": runID(),
       "service.instance.id": runID(),
     },
   }

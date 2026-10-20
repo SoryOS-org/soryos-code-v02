@@ -5,8 +5,8 @@ export function createWebApp(domain: string) {
     environment:
       $app.stage === "beta"
         ? {
-            OPENCODE_CHANNEL: "beta",
-            VITE_OPENCODE_SERVER_MODE: "none",
+            LUTUNGCODE_CHANNEL: "beta",
+            VITE_LUTUNGCODE_SERVER_MODE: "none",
             VITE_SENTRY_ENVIRONMENT: "beta",
           }
         : undefined,

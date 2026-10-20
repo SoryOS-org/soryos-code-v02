@@ -2,23 +2,23 @@
 title: "Plugins"
 ---
 
-Add published packages, versioned packages, scoped packages, or local plugin directories to `opencode.json(c)`.
+Add published packages, versioned packages, scoped packages, or local plugin directories to `lutungcode.json(c)`.
 
 ## Configure
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://lutungcode.ai/config.json",
   "plugins": [
-    "opencode-acme-plugin",
-    "opencode-acme-plugin@1.2.0",
-    "@acme/opencode-plugin",
+    "lutungcode-acme-plugin",
+    "lutungcode-acme-plugin@1.2.0",
+    "@acme/lutungcode-plugin",
     "./plugins/local",
     "../shared/plugin.ts",
     "/absolute/path/plugin.ts",
     "file:///home/me/plugins/local",
     {
-      "package": "@acme/opencode-plugin",
+      "package": "@acme/lutungcode-plugin",
       "options": {
         "agent": "reviewer",
         "strict": true,
@@ -32,34 +32,34 @@ Relative paths resolve from the config file containing the entry. Plugin arrays 
 from lowest to highest precedence instead of replacing one another.
 
 ```text
-~/.config/opencode/opencode.jsonc
-./opencode.jsonc
-./.opencode/opencode.jsonc
+~/.config/lutungcode/lutungcode.jsonc
+./lutungcode.jsonc
+./.lutungcode/lutungcode.jsonc
 ```
 
 ## Discover
 
-OpenCode also loads direct `.ts` and `.js` files and immediate plugin package directories from every discovered
-`.opencode/plugins/` directory.
+LutungCode also loads direct `.ts` and `.js` files and immediate plugin package directories from every discovered
+`.lutungcode/plugins/` directory.
 
 ```text
-.opencode/
+.lutungcode/
 └── plugins/
     ├── concise.ts
     ├── reviewer.js
     └── acme-package/
 ```
 
-Global plugins use the same discovery layout under the OpenCode config directory.
+Global plugins use the same discovery layout under the LutungCode config directory.
 
 ```text
-~/.config/opencode/plugins/
+~/.config/lutungcode/plugins/
 ```
 
-A `plugins/` directory beside a project-root `opencode.json(c)` is not discovered automatically; configure its files
-explicitly or move it under `.opencode/`.
+A `plugins/` directory beside a project-root `lutungcode.json(c)` is not discovered automatically; configure its files
+explicitly or move it under `.lutungcode/`.
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
   "plugins": ["./plugins/local"]
 }
@@ -70,15 +70,15 @@ explicitly or move it under `.opencode/`.
 Plugin entries are processed in order. Prefix an ID or wildcard with `-` to disable it, use `*` for every plugin, and
 use `.*` to match an ID prefix. A later ID re-enables a plugin.
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "plugins": ["*", "-opencode.provider.*", "opencode.provider.openai", "-acme.reviewer"]
+  "plugins": ["*", "-lutungcode.provider.*", "lutungcode.provider.openai", "-acme.reviewer"]
 }
 ```
 
 Two built-in plugins ignore removals so that a repository cannot switch off
-[policy](/policies) enforcement: `opencode.config.policy` and
-`opencode.provider.opencode`, the Console connection that delivers organization
+[policy](/policies) enforcement: `lutungcode.config.policy` and
+`lutungcode.provider.lutungcode`, the Console connection that delivers organization
 policy.
 
 ## Manage
@@ -86,13 +86,13 @@ policy.
 Install, list, check, update, or remove global package plugins with the CLI.
 
 ```sh
-opencode plugin add opencode-acme-plugin@1.2.0
-opencode plugin list
-opencode plugin list --builtin
-opencode plugin check
-opencode plugin update
-opencode plugin update opencode-acme-plugin
-opencode plugin remove opencode-acme-plugin@1.2.0
+lutungcode plugin add lutungcode-acme-plugin@1.2.0
+lutungcode plugin list
+lutungcode plugin list --builtin
+lutungcode plugin check
+lutungcode plugin update
+lutungcode plugin update lutungcode-acme-plugin
+lutungcode plugin remove lutungcode-acme-plugin@1.2.0
 ```
 
 `plugin check` checks server and TUI-only package plugins for updates. `plugin update` updates every outdated package;
@@ -103,10 +103,10 @@ Git repositories can use hosted shortcuts, HTTPS, or SSH, including private repo
 Git credentials.
 
 ```sh
-opencode plugin add @acme/opencode-plugin@latest
-opencode plugin add github:acme/opencode-plugin
-opencode plugin add git+ssh://git@github.com/acme/opencode-plugin.git#main
-opencode plugin add 'github:acme/plugins#main::path:packages/opencode-plugin'
+lutungcode plugin add @acme/lutungcode-plugin@latest
+lutungcode plugin add github:acme/lutungcode-plugin
+lutungcode plugin add git+ssh://git@github.com/acme/lutungcode-plugin.git#main
+lutungcode plugin add 'github:acme/plugins#main::path:packages/lutungcode-plugin'
 ```
 
 Branches, tags, complete commit hashes, and npm's `::path:` repository-subdirectory selectors are supported. Configure
@@ -117,11 +117,11 @@ local paths directly; tarball and npm alias targets are not accepted by `plugin 
 Changes under watched config directories reload automatically. Server startup loads cached package plugins immediately,
 installs missing packages in the background, and checks unpinned npm and Git plugins for updates without changing the
 installed package. Exact npm versions and full Git commit hashes stay pinned. Changes to unwatched local dependencies may
-still require restarting OpenCode.
+still require restarting LutungCode.
 
 ```sh
-touch .opencode/plugins/concise/index.ts
-opencode service restart
+touch .lutungcode/plugins/concise/index.ts
+lutungcode service restart
 ```
 
 ## Terminal
@@ -130,7 +130,7 @@ CLI-only plugins are configured separately and remain active when connected to a
 
 ```json title="cli.json"
 {
-  "plugins": ["opencode-acme-cli"]
+  "plugins": ["lutungcode-acme-cli"]
 }
 ```
 

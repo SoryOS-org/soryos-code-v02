@@ -1,8 +1,8 @@
 export * as EventFeed from "./event-feed"
 
-import { Bus } from "@opencode/core/bus"
-import { Event } from "@opencode/schema/event"
-import { isOpenCodeEvent, type OpenCodeEvent } from "@opencode/protocol/groups/event"
+import { Bus } from "@lutungcode/core/bus"
+import { Event } from "@lutungcode/schema/event"
+import { isLutungCodeEvent, type LutungCodeEvent } from "@lutungcode/protocol/groups/event"
 import { Cause, Context, Effect, Layer, Queue, Schema, Scope, Stream } from "effect"
 
 export const SubscriberCapacity = 4_096
@@ -24,15 +24,15 @@ export interface Interface {
   readonly subscribe: Effect.Effect<Stream.Stream<string, Error>, never, Scope.Scope>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/server/EventFeed") {}
+export class Service extends Context.Service<Service, Interface>()("@lutungcode/server/EventFeed") {}
 
-export function frame(event: OpenCodeEvent) {
+export function frame(event: LutungCodeEvent) {
   return `data: ${JSON.stringify(event)}\n\n`
 }
 
 export const make = Effect.fn("EventFeed.make")(function* (
   observe: (subscriber: Bus.Subscriber) => Effect.Effect<Bus.Unsubscribe>,
-  options?: { readonly capacity?: number; readonly encode?: (event: OpenCodeEvent) => string },
+  options?: { readonly capacity?: number; readonly encode?: (event: LutungCodeEvent) => string },
 ) {
   const capacity = options?.capacity ?? SubscriberCapacity
   const render = options?.encode ?? frame
@@ -46,7 +46,7 @@ export const make = Effect.fn("EventFeed.make")(function* (
     })
 
   const publish = Effect.fnUntraced(function* (event: Event.Payload) {
-    if (!isOpenCodeEvent(event)) return
+    if (!isLutungCodeEvent(event)) return
     if (subscribers.size === 0) return
     const encoded = yield* Effect.try({
       try: () => render(event),

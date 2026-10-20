@@ -1,10 +1,10 @@
 import { createSignal, Show } from "solid-js"
 import { render } from "solid-js/web"
-import { DialogProvider } from "@opencode/ui/context/dialog"
+import { DialogProvider } from "@lutungcode/ui/context/dialog"
 import { Markdown } from "../src/components/markdown"
 import { preloadMarkdown } from "../src/components/markdown-cache"
 import { MarkdownProvider } from "../src/context/markdown"
-import { OpenCode } from "@opencode/client/promise"
+import { LutungCode } from "@lutungcode/client/promise"
 import { readLocalImage } from "../../app/src/runtime/server/image"
 
 export {
@@ -34,9 +34,9 @@ export async function mountMarkdown(options: {
   host.dataset.testid = "markdown-fixture"
   document.body.appendChild(host)
   render(() => {
-    const api = OpenCode.make({
+    const api = LutungCode.make({
       baseUrl: location.origin,
-      headers: { Authorization: `Basic ${btoa("opencode:fixture")}` },
+      headers: { Authorization: `Basic ${btoa("lutungcode:fixture")}` },
     })
 
     const [text, setText] = createSignal(options.text)

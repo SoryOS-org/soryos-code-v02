@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-APP=opencode
-SOURCE_APP=opencode
+APP=lutungcode
+SOURCE_APP=lutungcode
 
 MUTED='\033[0;2m'
 RED='\033[0;31m'
@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 usage() {
     cat <<EOF
-OpenCode Installer
+LutungCode Installer
 
 Usage: install.sh [options]
 
@@ -20,10 +20,12 @@ Options:
     -b, --binary <path>     Install from a local binary instead of downloading
         --no-modify-path    Don't modify shell config files (.zshrc, .bashrc, etc.)
 
+Downloads stay disabled until LUTUNGCODE_UPDATE_BASE is set.
+Pass --binary to install a local executable without a download service.
+
 Examples:
-    curl -fsSL https://opencode.ai/v2/install | bash
-    curl -fsSL https://opencode.ai/v2/install | bash -s -- --version 0.0.0-beta-17236
-    ./install --binary /path/to/opencode
+    LUTUNGCODE_UPDATE_BASE=https://example.com/update/api ./install
+    ./install --binary /path/to/lutungcode
 EOF
 }
 
@@ -66,8 +68,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-INSTALL_DIR=$HOME/.opencode/bin
+INSTALL_DIR=$HOME/.lutungcode/bin
 mkdir -p "$INSTALL_DIR"
+
+UPDATE_BASE="${LUTUNGCODE_UPDATE_BASE:-}"
+INSTALL_URL="${LUTUNGCODE_INSTALL_URL:-}"
 
 # If --binary is provided, skip all download/detection logic
 if [ -n "$binary_path" ]; then
@@ -77,6 +82,10 @@ if [ -n "$binary_path" ]; then
     fi
     specific_version="local"
 else
+    if [ -z "$UPDATE_BASE" ]; then
+        echo -e "${RED}LutungCode downloads are not configured. Set LUTUNGCODE_UPDATE_BASE to an update service you control.${NC}"
+        exit 1
+    fi
     raw_os=$(uname -s)
     os=$(echo "$raw_os" | tr '[:upper:]' '[:lower:]')
     case "$raw_os" in
@@ -174,9 +183,9 @@ else
         exit 1
     fi
 
-    package_scope="@opencode"
+    package_scope="@lutungcode"
     if [ -z "$requested_version" ]; then
-        metadata=$(curl -fsSL https://opencode.ai/update/api/latest/cli/npm || true)
+        metadata=$(curl -fsSL "$UPDATE_BASE/latest/cli/npm" || true)
         specific_version=$(echo "$metadata" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
         package=$(echo "$metadata" | sed -n 's/.*"package":"\([^"]*\)".*/\1/p')
 
@@ -193,11 +202,6 @@ else
 
     package_name="$package_scope/cli-$target"
     http_status=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/$package_scope%2fcli-$target/$specific_version" || true)
-    # Older clients install the minimum release before they can migrate package names.
-    if [ "$http_status" = "404" ] && [ -n "$requested_version" ]; then
-        package_name="@opencode-ai/cli-$target"
-        http_status=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/@opencode-ai%2fcli-$target/$specific_version" || true)
-    fi
     if [ "$http_status" = "404" ]; then
         echo -e "${RED}Error: Version ${specific_version} is not available for $target${NC}"
         echo -e "${MUTED}Available versions: https://www.npmjs.com/package/$package_name?activeTab=versions${NC}"
@@ -232,7 +236,7 @@ print_message() {
 
 check_version() {
     if command -v "$APP" >/dev/null 2>&1; then
-        opencode_path=$(which "$APP")
+        lutungcode_path=$(which "$APP")
 
         ## Check the installed version
         installed_version=$("$APP" --version 2>/dev/null || echo "")
@@ -306,7 +310,7 @@ download_with_progress() {
 
 download_and_install() {
     print_message info "\n${MUTED}Installing ${NC}$APP ${MUTED}version: ${NC}$specific_version"
-    local tmp_dir="${TMPDIR:-/tmp}/opencode_install_$$"
+    local tmp_dir="${TMPDIR:-/tmp}/lutungcode_install_$$"
     mkdir -p "$tmp_dir"
 
     if [[ "$os" == "windows" ]] || ! [ -t 2 ] || ! download_with_progress "$url" "$tmp_dir/$filename"; then
@@ -341,20 +345,20 @@ install_legacy_shim() {
             MINGW*|MSYS*|CYGWIN*) shim_os="windows" ;;
         esac
     fi
-    rm -f "$INSTALL_DIR/opencode2" "$INSTALL_DIR/opencode2.exe" "$INSTALL_DIR/opencode2.cmd"
+    rm -f "$INSTALL_DIR/lutungcode2" "$INSTALL_DIR/lutungcode2.exe" "$INSTALL_DIR/lutungcode2.cmd"
     if [[ "$shim_os" == "windows" ]]; then
-        cat > "$INSTALL_DIR/opencode2.cmd" <<'EOF'
+        cat > "$INSTALL_DIR/lutungcode2.cmd" <<'EOF'
 @echo off
-"%~dp0opencode.exe" %*
+"%~dp0lutungcode.exe" %*
 exit /b %errorlevel%
 EOF
         return
     fi
-    cat > "$INSTALL_DIR/opencode2" <<'EOF'
+    cat > "$INSTALL_DIR/lutungcode2" <<'EOF'
 #!/bin/sh
-exec "$(dirname "$0")/opencode" "$@"
+exec "$(dirname "$0")/lutungcode" "$@"
 EOF
-    chmod 755 "$INSTALL_DIR/opencode2"
+    chmod 755 "$INSTALL_DIR/lutungcode2"
 }
 
 if [ -n "$binary_path" ]; then
@@ -373,9 +377,9 @@ add_to_path() {
     if grep -Fxq "$command" "$config_file"; then
         print_message info "Command already exists in $config_file, skipping write."
     elif [[ -w $config_file ]]; then
-        echo -e "\n# opencode" >> "$config_file"
+        echo -e "\n# lutungcode" >> "$config_file"
         echo "$command" >> "$config_file"
-        print_message info "${MUTED}Successfully added ${NC}opencode ${MUTED}to \$PATH in ${NC}$config_file"
+        print_message info "${MUTED}Successfully added ${NC}lutungcode ${MUTED}to \$PATH in ${NC}$config_file"
     else
         print_message warning "Manually add the directory to $config_file (or similar):"
         print_message info "  $command"
@@ -457,11 +461,11 @@ echo -e "${MUTED}█░░█ █░░█ █▀▀▀ █░░█ ${NC}█░
 echo -e "${MUTED}▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀  ▀ ${NC}▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀"
 echo -e ""
 echo -e ""
-echo -e "${MUTED}OpenCode includes free models, to start:${NC}"
+echo -e "${MUTED}LutungCode includes free models, to start:${NC}"
 echo -e ""
 echo -e "cd <project>  ${MUTED}# Open directory${NC}"
-echo -e "opencode      ${MUTED}# Run command${NC}"
+echo -e "lutungcode      ${MUTED}# Run command${NC}"
 echo -e ""
-echo -e "${MUTED}For more information visit ${NC}https://opencode.ai/v2/docs"
+echo -e "${MUTED}For more information visit ${NC}https://lutungcode.ai/v2/docs"
 echo -e ""
 echo -e ""

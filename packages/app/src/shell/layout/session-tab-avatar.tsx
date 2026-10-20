@@ -6,8 +6,8 @@ import {
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
-} from "@opencode/ui/project-avatar"
-import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
+} from "@lutungcode/ui/project-avatar"
+import { SessionProgressIndicatorV2 } from "@lutungcode/session-ui/v2/session-progress-indicator-v2"
 import { Show } from "solid-js"
 
 export function SessionTabAvatar(props: {

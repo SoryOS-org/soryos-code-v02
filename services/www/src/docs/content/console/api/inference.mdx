@@ -3,11 +3,11 @@ title: "Inference API"
 description: "Call OpenAI, Anthropic, and Gemini-compatible models through Console inference with one authentication header."
 ---
 
-Console inference serves OpenAI, Anthropic, and Gemini-compatible APIs from `https://opencode.ai/inference`. Send a
+Console inference serves OpenAI, Anthropic, and Gemini-compatible APIs from `https://lutungcode.ai/inference`. Send a
 JSON `POST` request to the endpoint that matches the model's API family.
 
 ```bash
-curl -X POST "https://opencode.ai/inference/openai/v1/chat/completions" \
+curl -X POST "https://lutungcode.ai/inference/openai/v1/chat/completions" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -18,7 +18,7 @@ curl -X POST "https://opencode.ai/inference/openai/v1/chat/completions" \
 
 ## Authentication
 
-Replace `<token>` with a [personal API key](/console/api#personal-api-keys) or a [service account key](/console/api#service-accounts) created in the [Console](https://opencode.ai/console). Paid models
+Replace `<token>` with a [personal API key](/console/api#personal-api-keys) or a [service account key](/console/api#service-accounts) created in the [Console](https://lutungcode.ai/console). Paid models
 require the header; free chat models can be called without it.
 
 ```text
@@ -38,7 +38,7 @@ Each model is served by one API family. See the [model endpoints](/console/model
 list:
 
 ```bash
-curl https://opencode.ai/inference/v1/models
+curl https://lutungcode.ai/inference/v1/models
 ```
 
 ### OpenAI Chat Completions
@@ -46,7 +46,7 @@ curl https://opencode.ai/inference/v1/models
 Open models such as `kimi-k2.6`, `glm-5.1`, `minimax-m2.7`, and the free models use the Chat Completions API.
 
 ```bash
-curl -X POST "https://opencode.ai/inference/openai/v1/chat/completions" \
+curl -X POST "https://lutungcode.ai/inference/openai/v1/chat/completions" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -60,7 +60,7 @@ curl -X POST "https://opencode.ai/inference/openai/v1/chat/completions" \
 GPT models use the Responses API.
 
 ```bash
-curl -X POST "https://opencode.ai/inference/openai/v1/responses" \
+curl -X POST "https://lutungcode.ai/inference/openai/v1/responses" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -74,7 +74,7 @@ curl -X POST "https://opencode.ai/inference/openai/v1/responses" \
 Claude and Qwen models use the Messages API. `max_tokens` is required.
 
 ```bash
-curl -X POST "https://opencode.ai/inference/anthropic/v1/messages" \
+curl -X POST "https://lutungcode.ai/inference/anthropic/v1/messages" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -90,7 +90,7 @@ Gemini models take the model and method in the path. Replace `:generateContent` 
 stream the response.
 
 ```bash
-curl -X POST "https://opencode.ai/inference/google/v1beta/models/gemini-3.1-pro:generateContent" \
+curl -X POST "https://lutungcode.ai/inference/google/v1beta/models/gemini-3.1-pro:generateContent" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{

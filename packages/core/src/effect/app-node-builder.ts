@@ -1,7 +1,7 @@
 import { buildLocationServiceMap } from "../location-services.js"
 import { LocationServiceMap } from "../location-service-map.js"
-import { LayerNode } from "@opencode/util/effect/layer-node"
-import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
+import { makeGlobalNode } from "@lutungcode/util/effect/app-node"
 import { Effect, Layer } from "effect"
 import { Instance } from "../instance/service.js"
 

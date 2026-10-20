@@ -8,28 +8,28 @@
     ".github/workflows/test.yml",
     "package.json"
   ],
-  "globalEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
-  "globalPassThroughEnv": ["CI", "OPENCODE_DISABLE_SHARE"],
+  "globalEnv": ["CI", "LUTUNGCODE_DISABLE_SHARE"],
+  "globalPassThroughEnv": ["CI", "LUTUNGCODE_DISABLE_SHARE"],
   "tasks": {
     "typecheck": {},
-    "@opencode/cli#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
+    "@lutungcode/cli#typecheck": {
+      "dependsOn": ["@lutungcode/core#typecheck"]
     },
     "test:components": {
       "outputs": [],
       "cache": false
     },
-    "@opencode/sdk#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
+    "@lutungcode/sdk#typecheck": {
+      "dependsOn": ["@lutungcode/core#typecheck"]
     },
-    "@opencode/server#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
+    "@lutungcode/server#typecheck": {
+      "dependsOn": ["@lutungcode/core#typecheck"]
     },
-    "@opencode/simulation#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
+    "@lutungcode/simulation#typecheck": {
+      "dependsOn": ["@lutungcode/core#typecheck"]
     },
-    "@opencode/tui#typecheck": {
-      "dependsOn": ["@opencode/core#typecheck"]
+    "@lutungcode/tui#typecheck": {
+      "dependsOn": ["@lutungcode/core#typecheck"]
     },
     "build": {
       "dependsOn": ["transit"],
@@ -46,11 +46,11 @@
       "dependsOn": ["transit"],
       "outputs": []
     },
-    "@opencode/desktop#test": {
+    "@lutungcode/desktop#test": {
       "outputs": [],
       "cache": false
     },
-    "@opencode/sdk#verify:package": {
+    "@lutungcode/sdk#verify:package": {
       "outputs": []
     }
   }

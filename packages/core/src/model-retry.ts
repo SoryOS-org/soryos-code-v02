@@ -1,6 +1,6 @@
 export * as ModelRetry from "./model-retry.js"
 
-import { AIError, isRetryable } from "@opencode/ai"
+import { AIError, isRetryable } from "@lutungcode/ai"
 import { Clock, Duration, Effect, Pull, Schedule } from "effect"
 
 interface Input {

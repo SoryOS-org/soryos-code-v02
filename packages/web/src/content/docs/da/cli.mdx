@@ -1,30 +1,30 @@
 ---
 title: CLI
-description: OpenCode CLI muligheder og kommandoer.
+description: LutungCode CLI muligheder og kommandoer.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components"
 
-OpenCode CLI starter som standard [TUI](/docs/tui), når den kører uden nogen argumenter.
+LutungCode CLI starter som standard [TUI](/docs/tui), når den kører uden nogen argumenter.
 
 ```bash
-opencode
+lutungcode
 ```
 
-Men den accepterer også kommandoer som dokumenteret på denne side. Dette giver dig mulighed for at interagere med OpenCode programmatisk.
+Men den accepterer også kommandoer som dokumenteret på denne side. Dette giver dig mulighed for at interagere med LutungCode programmatisk.
 
 ```bash
-opencode run "Explain how closures work in JavaScript"
+lutungcode run "Explain how closures work in JavaScript"
 ```
 
 ---
 
 ### tui
 
-Start OpenCode terminalbrugergrænsefladen.
+Start LutungCode terminalbrugergrænsefladen.
 
 ```bash
-opencode [project]
+lutungcode [project]
 ```
 
 #### Flag
@@ -44,36 +44,36 @@ opencode [project]
 
 ## Kommandoer
 
-OpenCode CLI har også følgende kommandoer.
+LutungCode CLI har også følgende kommandoer.
 
 ---
 
 ### agent
 
-Administrer agenter i OpenCode.
+Administrer agenter i LutungCode.
 
 ```bash
-opencode agent [command]
+lutungcode agent [command]
 ```
 
 ---
 
 ### attach
 
-Tilslut en terminal til en allerede kørende OpenCode backend-server startet via `serve` eller `web` kommandoer.
+Tilslut en terminal til en allerede kørende LutungCode backend-server startet via `serve` eller `web` kommandoer.
 
 ```bash
-opencode attach [url]
+lutungcode attach [url]
 ```
 
-Dette gør det muligt at bruge TUI med en ekstern OpenCode backend. For eksempel:
+Dette gør det muligt at bruge TUI med en ekstern LutungCode backend. For eksempel:
 
 ```bash
 # Start the backend server for web/mobile access
-opencode web --port 4096 --hostname 0.0.0.0
+lutungcode web --port 4096 --hostname 0.0.0.0
 
 # In another terminal, attach the TUI to the running backend
-opencode attach http://10.20.30.40:4096
+lutungcode attach http://10.20.30.40:4096
 ```
 
 #### Flag
@@ -84,8 +84,8 @@ opencode attach http://10.20.30.40:4096
 | <nobr><code>{"--continue"}</code></nobr> | `-c` | Fortsæt den seneste session                                                       |
 | <nobr><code>{"--session"}</code></nobr>  | `-s` | Sessions-id for at fortsætte                                                      |
 | <nobr><code>{"--fork"}</code></nobr>     |      | Forgren sessionen ved fortsættelse (brug med `--continue` eller `--session`)      |
-| <nobr><code>{"--password"}</code></nobr> | `-p` | Adgangskode til basic auth (standard: `OPENCODE_SERVER_PASSWORD`)                 |
-| <nobr><code>{"--username"}</code></nobr> | `-u` | Brugernavn til basic auth (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`) |
+| <nobr><code>{"--password"}</code></nobr> | `-p` | Adgangskode til basic auth (standard: `LUTUNGCODE_SERVER_PASSWORD`)                 |
+| <nobr><code>{"--username"}</code></nobr> | `-u` | Brugernavn til basic auth (standard: `LUTUNGCODE_SERVER_USERNAME` eller `lutungcode`) |
 
 ---
 
@@ -94,7 +94,7 @@ opencode attach http://10.20.30.40:4096
 Opret en ny agent med brugerdefineret konfiguration.
 
 ```bash
-opencode agent create
+lutungcode agent create
 ```
 
 Denne kommando vil guide dig gennem oprettelse af en ny agent med en brugerdefineret systemprompt og værktøjskonfiguration.
@@ -106,7 +106,7 @@ Denne kommando vil guide dig gennem oprettelse af en ny agent med en brugerdefin
 Liste over alle tilgængelige agenter.
 
 ```bash
-opencode agent list
+lutungcode agent list
 ```
 
 ---
@@ -116,20 +116,20 @@ opencode agent list
 Kommando til at administrere legitimationsoplysninger og login for udbydere.
 
 ```bash
-opencode auth [command]
+lutungcode auth [command]
 ```
 
 ---
 
 #### login
 
-OpenCode drives af udbyderlisten på [Models.dev](https://models.dev), så du kan bruge `opencode auth login` til at konfigurere API-nøgler for enhver udbyder, du vil bruge. Dette er gemt i `~/.local/share/opencode/auth.json`.
+LutungCode drives af udbyderlisten på [Models.dev](https://models.dev), så du kan bruge `lutungcode auth login` til at konfigurere API-nøgler for enhver udbyder, du vil bruge. Dette er gemt i `~/.local/share/lutungcode/auth.json`.
 
 ```bash
-opencode auth login
+lutungcode auth login
 ```
 
-Når OpenCode starter op, indlæser den udbyderne fra legitimationsfilen. Og hvis der er nogen nøgler defineret i dine miljøer eller en `.env` fil i dit projekt.
+Når LutungCode starter op, indlæser den udbyderne fra legitimationsfilen. Og hvis der er nogen nøgler defineret i dine miljøer eller en `.env` fil i dit projekt.
 
 ---
 
@@ -138,13 +138,13 @@ Når OpenCode starter op, indlæser den udbyderne fra legitimationsfilen. Og hvi
 Viser alle de godkendte udbydere som gemt i legitimationsfilen.
 
 ```bash
-opencode auth list
+lutungcode auth list
 ```
 
 Eller den korte version.
 
 ```bash
-opencode auth ls
+lutungcode auth ls
 ```
 
 ---
@@ -154,7 +154,7 @@ opencode auth ls
 Logger dig ud af en udbyder ved at rydde den fra legitimationsfilen.
 
 ```bash
-opencode auth logout
+lutungcode auth logout
 ```
 
 ---
@@ -164,7 +164,7 @@ opencode auth logout
 Administrator GitHub-agenten til lagerautomatisering.
 
 ```bash
-opencode github [command]
+lutungcode github [command]
 ```
 
 ---
@@ -174,7 +174,7 @@ opencode github [command]
 Installatør GitHub-agenten i dit lager.
 
 ```bash
-opencode github install
+lutungcode github install
 ```
 
 Dette opsætter det nødvendige GitHub Actions workflow og guider dig gennem konfigurationsprocessen. [Learn more](/docs/github).
@@ -186,7 +186,7 @@ Dette opsætter det nødvendige GitHub Actions workflow og guider dig gennem kon
 Kør GitHub-agenten. Dette bruges typisk i GitHub Actions.
 
 ```bash
-opencode github run
+lutungcode github run
 ```
 
 ##### Flag
@@ -203,7 +203,7 @@ opencode github run
 Administrator Model Context Protocol-servere.
 
 ```bash
-opencode mcp [command]
+lutungcode mcp [command]
 ```
 
 ---
@@ -213,7 +213,7 @@ opencode mcp [command]
 Tilføj en MCP-server til din konfiguration.
 
 ```bash
-opencode mcp add
+lutungcode mcp add
 ```
 
 Denne kommando vil guide dig gennem tilføjelse af enten en lokal eller ekstern MCP-server.
@@ -225,13 +225,13 @@ Denne kommando vil guide dig gennem tilføjelse af enten en lokal eller ekstern 
 Liste over alle konfigurerede MCP-servere og deres forbindelsesstatus.
 
 ```bash
-opencode mcp list
+lutungcode mcp list
 ```
 
 Eller brug den korte version.
 
 ```bash
-opencode mcp ls
+lutungcode mcp ls
 ```
 
 ---
@@ -241,7 +241,7 @@ opencode mcp ls
 Godkendt med en OAuth-aktiveret MCP-server.
 
 ```bash
-opencode mcp auth [name]
+lutungcode mcp auth [name]
 ```
 
 Hvis du ikke angiver et servernavn, bliver du bedt om at vælge blandt tilgængelige OAuth-kompatible servere.
@@ -249,13 +249,13 @@ Hvis du ikke angiver et servernavn, bliver du bedt om at vælge blandt tilgænge
 Du kan også angive OAuth-kompatible servere og deres godkendelsesstatus.
 
 ```bash
-opencode mcp auth list
+lutungcode mcp auth list
 ```
 
 Eller brug den korte version.
 
 ```bash
-opencode mcp auth ls
+lutungcode mcp auth ls
 ```
 
 ---
@@ -265,7 +265,7 @@ opencode mcp auth ls
 Fjern OAuth-legitimationsoplysninger for en MCP-server.
 
 ```bash
-opencode mcp logout [name]
+lutungcode mcp logout [name]
 ```
 
 ---
@@ -275,7 +275,7 @@ opencode mcp logout [name]
 Fejlfinding af OAuth-forbindelsesproblemer for en MCP-server.
 
 ```bash
-opencode mcp debug <name>
+lutungcode mcp debug <name>
 ```
 
 ---
@@ -285,7 +285,7 @@ opencode mcp debug <name>
 Liste over alle tilgængelige modeller fra konfigurerede udbydere.
 
 ```bash
-opencode models [provider]
+lutungcode models [provider]
 ```
 
 Denne kommando viser alle tilgængelige modeller på tværs af dine konfigurerede udbydere i formatet `provider/model`.
@@ -295,7 +295,7 @@ Dette er nyttigt til at finde ud af det nøjagtige modelnavn, der skal bruges i 
 Du kan eventuelt videregive et udbyder-id for at filtrere modeller efter den udbyder.
 
 ```bash
-opencode models anthropic
+lutungcode models anthropic
 ```
 
 #### Flag
@@ -305,36 +305,36 @@ opencode models anthropic
 | <nobr><code>{"--refresh"}</code></nobr> | Opdater modelcachen fra models.dev                                      |
 | <nobr><code>{"--verbose"}</code></nobr> | Brug mere detaljeret modeloutput (inkluderer metadata som omkostninger) |
 
-Brug flaget `--refresh` til at opdatere den cachelagrede modelliste. Dette er nyttigt, når nye modeller er blevet tilføjet til en udbyder, og du vil se dem i OpenCode.
+Brug flaget `--refresh` til at opdatere den cachelagrede modelliste. Dette er nyttigt, når nye modeller er blevet tilføjet til en udbyder, og du vil se dem i LutungCode.
 
 ```bash
-opencode models --refresh
+lutungcode models --refresh
 ```
 
 ---
 
 ### run
 
-Kør opencode i ikke-interaktiv tilstand ved at sende en prompt direkte.
+Kør lutungcode i ikke-interaktiv tilstand ved at sende en prompt direkte.
 
 ```bash
-opencode run [message..]
+lutungcode run [message..]
 ```
 
 Dette er nyttigt til scripting, automatisering, eller når du vil have et hurtigt svar uden at starte hele TUI. F.eks.
 
-```bash "opencode run"
-opencode run Explain the use of context in Go
+```bash "lutungcode run"
+lutungcode run Explain the use of context in Go
 ```
 
-Du kan også vedhæfte til en kørende `opencode serve`-instans for at undgå MCP serverens kolde opstartstider ved hver kørsel:
+Du kan også vedhæfte til en kørende `lutungcode serve`-instans for at undgå MCP serverens kolde opstartstider ved hver kørsel:
 
 ```bash
 # Start a headless server in one terminal
-opencode serve
+lutungcode serve
 
 # In another terminal, run commands that attach to it
-opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
+lutungcode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 ```
 
 #### Flag
@@ -350,9 +350,9 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 | <nobr><code>{"--file"}</code></nobr>     | `-f` | Fil(er), der skal vedhæftes til meddelelsen                                         |
 | <nobr><code>{"--format"}</code></nobr>   |      | Format: standard (formateret) eller json (rå JSON hændelser)                        |
 | <nobr><code>{"--title"}</code></nobr>    |      | Titel for sessionen (bruger trunkeret prompt, hvis der ikke er angivet nogen værdi) |
-| <nobr><code>{"--attach"}</code></nobr>   |      | Tilslut til en kørende opencode-server (f.eks. http://localhost:4096)               |
-| <nobr><code>{"--password"}</code></nobr> | `-p` | Adgangskode til basic auth (standard: `OPENCODE_SERVER_PASSWORD`)                   |
-| <nobr><code>{"--username"}</code></nobr> | `-u` | Brugernavn til basic auth (standard: `OPENCODE_SERVER_USERNAME` eller `opencode`)   |
+| <nobr><code>{"--attach"}</code></nobr>   |      | Tilslut til en kørende lutungcode-server (f.eks. http://localhost:4096)               |
+| <nobr><code>{"--password"}</code></nobr> | `-p` | Adgangskode til basic auth (standard: `LUTUNGCODE_SERVER_PASSWORD`)                   |
+| <nobr><code>{"--username"}</code></nobr> | `-u` | Brugernavn til basic auth (standard: `LUTUNGCODE_SERVER_USERNAME` eller `lutungcode`)   |
 | <nobr><code>{"--dir"}</code></nobr>      |      | Mappe at køre i, eller sti på fjernserveren ved tilkobling                          |
 | <nobr><code>{"--variant"}</code></nobr>  |      | Modelvariant (udbyder-specifik ræsonneringsindsats)                                 |
 | <nobr><code>{"--thinking"}</code></nobr> |      | Vis tænkeblokke                                                                     |
@@ -362,13 +362,13 @@ opencode run --attach http://localhost:4096 "Explain async/await in JavaScript"
 
 ### serve
 
-Start en hovedløs OpenCode-server til API-adgang. Tjek [server docs](/docs/server) for den fulde HTTP-grænseflade.
+Start en hovedløs LutungCode-server til API-adgang. Tjek [server docs](/docs/server) for den fulde HTTP-grænseflade.
 
 ```bash
-opencode serve
+lutungcode serve
 ```
 
-Dette starter en HTTP-server, der giver API-adgang til opencode-funktionalitet uden TUI-grænsefladen. Indstil `OPENCODE_SERVER_PASSWORD` for at aktivere HTTP grundlæggende godkendelse (brugernavn er standard til `opencode`).
+Dette starter en HTTP-server, der giver API-adgang til lutungcode-funktionalitet uden TUI-grænsefladen. Indstil `LUTUNGCODE_SERVER_PASSWORD` for at aktivere HTTP grundlæggende godkendelse (brugernavn er standard til `lutungcode`).
 
 #### Flag
 
@@ -383,20 +383,20 @@ Dette starter en HTTP-server, der giver API-adgang til opencode-funktionalitet u
 
 ### session
 
-Administrator OpenCode sessionsholder.
+Administrator LutungCode sessionsholder.
 
 ```bash
-opencode session [command]
+lutungcode session [command]
 ```
 
 ---
 
 #### list
 
-Liste over alle OpenCode sessioner.
+Liste over alle LutungCode sessioner.
 
 ```bash
-opencode session list
+lutungcode session list
 ```
 
 ##### Flag
@@ -410,10 +410,10 @@ opencode session list
 
 ### stats
 
-Vis tokenbrug og omkostningsstatistikker for dine OpenCode-sessioner.
+Vis tokenbrug og omkostningsstatistikker for dine LutungCode-sessioner.
 
 ```bash
-opencode stats
+lutungcode stats
 ```
 
 #### Flag
@@ -432,7 +432,7 @@ opencode stats
 Eksporter sessionsdata som JSON.
 
 ```bash
-opencode export [sessionID]
+lutungcode export [sessionID]
 ```
 
 Hvis du ikke angiver et sessions-id, bliver du bedt om at vælge mellem tilgængelige sessioner.
@@ -444,24 +444,24 @@ Hvis du ikke angiver et sessions-id, bliver du bedt om at vælge mellem tilgæng
 Importer sessionsdata fra en JSON fil.
 
 ```bash
-opencode import <file>
+lutungcode import <file>
 ```
 
 ```bash
-opencode import session.json
+lutungcode import session.json
 ```
 
 ---
 
 ### web
 
-Start en hovedløs OpenCode-server med en webgrænseflade.
+Start en hovedløs LutungCode-server med en webgrænseflade.
 
 ```bash
-opencode web
+lutungcode web
 ```
 
-Dette starter en HTTP-server og åbner en webbrowser for at få adgang til OpenCode via en webgrænseflade. Indstil `OPENCODE_SERVER_PASSWORD` for at aktivere HTTP grundlæggende godkendelse (brugernavn er standard til `opencode`).
+Dette starter en HTTP-server og åbner en webbrowser for at få adgang til LutungCode via en webgrænseflade. Indstil `LUTUNGCODE_SERVER_PASSWORD` for at aktivere HTTP grundlæggende godkendelse (brugernavn er standard til `lutungcode`).
 
 #### Flag
 
@@ -479,7 +479,7 @@ Dette starter en HTTP-server og åbner en webbrowser for at få adgang til OpenC
 Start en ACP-server (Agent Client Protocol).
 
 ```bash
-opencode acp
+lutungcode acp
 ```
 
 Denne kommando starter en ACP-server, der kommunikerer via stdin/stdout ved hjælp af nd-JSON.
@@ -496,10 +496,10 @@ Denne kommando starter en ACP-server, der kommunikerer via stdin/stdout ved hjæ
 
 ### uninstall
 
-Afinstaller OpenCode og fjern alle relaterede filer.
+Afinstaller LutungCode og fjern alle relaterede filer.
 
 ```bash
-opencode uninstall
+lutungcode uninstall
 ```
 
 #### Flag
@@ -515,22 +515,22 @@ opencode uninstall
 
 ### upgrade
 
-Opdaterer OpenCode til den nyeste version eller en specifik version.
+Opdaterer LutungCode til den nyeste version eller en specifik version.
 
 ```bash
-opencode upgrade [target]
+lutungcode upgrade [target]
 ```
 
 For at opgradere til den nyeste version.
 
 ```bash
-opencode upgrade
+lutungcode upgrade
 ```
 
 For at opgradere til en bestemt version.
 
 ```bash
-opencode upgrade v0.1.48
+lutungcode upgrade v0.1.48
 ```
 
 #### upgrade
@@ -543,7 +543,7 @@ opencode upgrade v0.1.48
 
 ## Globale flag
 
-opencode CLI tager følgende globale flag.
+lutungcode CLI tager følgende globale flag.
 
 | Flag                                       | Kort | Beskrivelse                          |
 | ------------------------------------------ | ---- | ------------------------------------ |
@@ -556,33 +556,33 @@ opencode CLI tager følgende globale flag.
 
 ## Miljøvariabler
 
-OpenCode kan konfigureres ved hjælp af miljøvariabler.
+LutungCode kan konfigureres ved hjælp af miljøvariabler.
 
 | Variabel                              | Skriv   | Beskrivelse                                                           |
 | ------------------------------------- | ------- | --------------------------------------------------------------------- |
-| `OPENCODE_GIT_BASH_PATH`              | string  | Sti til Git Bash eksekverbar på Windows                               |
-| `OPENCODE_CONFIG`                     | string  | Sti til konfigurationsfil                                             |
-| `OPENCODE_TUI_CONFIG`                 | string  | Sti til TUI-konfigurationsfil                                         |
-| `OPENCODE_CONFIG_DIR`                 | string  | Sti til konfigurationsmappe                                           |
-| `OPENCODE_CONFIG_CONTENT`             | string  | Indbygget json-konfigurationsindhold                                  |
-| `OPENCODE_DISABLE_AUTOUPDATE`         | boolean | Deaktiver automatisk opdateringskontrol                               |
-| `OPENCODE_DISABLE_PRUNE`              | boolean | Deaktiver beskæring af gamle data                                     |
-| `OPENCODE_DISABLE_TERMINAL_TITLE`     | boolean | Deaktiver automatisk opdatering af terminaltitel                      |
-| `OPENCODE_PERMISSION`                 | string  | Indbygget json-tilladelseskonfiguration                               |
-| `OPENCODE_DISABLE_DEFAULT_PLUGINS`    | boolean | Deaktiver standard plugins                                            |
-| `OPENCODE_DISABLE_LSP_DOWNLOAD`       | boolean | Deaktiver automatisk LSP-serverdownloads                              |
-| `OPENCODE_ENABLE_EXPERIMENTAL_MODELS` | boolean | Aktive eksperimentelle modeller                                       |
-| `OPENCODE_DISABLE_AUTOCOMPACT`        | boolean | Deaktiver automatisk kontekstkomprimering                             |
-| `OPENCODE_DISABLE_CLAUDE_CODE`        | boolean | Deaktiver læsning fra `.claude` (prompt + færdigheder)                |
-| `OPENCODE_DISABLE_CLAUDE_CODE_PROMPT` | boolean | Deaktiver læsning `~/.claude/CLAUDE.md`                               |
-| `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS` | boolean | Deaktiver indlæsning af `.claude/skills`                              |
-| `OPENCODE_DISABLE_MODELS_FETCH`       | boolean | Deaktivering af modeller fra eksterne kilder                          |
-| `OPENCODE_FAKE_VCS`                   | string  | Falsk VCS-udbyder til testformål                                      |
-| `OPENCODE_CLIENT`                     | string  | Klient-id (standard til `cli`)                                        |
-| `OPENCODE_ENABLE_EXA`                 | boolean | Aktiver Exa-websøgeværktøjer                                          |
-| `OPENCODE_SERVER_PASSWORD`            | string  | Aktiver grundlæggende godkendelse for `serve`/`web`                   |
-| `OPENCODE_SERVER_USERNAME`            | string  | Tilsidesæt grundlæggende godkendelsesbrugernavn (standard `opencode`) |
-| `OPENCODE_MODELS_URL`                 | string  | Brugerdefineret URL til hentning af modelkonfiguration                |
+| `LUTUNGCODE_GIT_BASH_PATH`              | string  | Sti til Git Bash eksekverbar på Windows                               |
+| `LUTUNGCODE_CONFIG`                     | string  | Sti til konfigurationsfil                                             |
+| `LUTUNGCODE_TUI_CONFIG`                 | string  | Sti til TUI-konfigurationsfil                                         |
+| `LUTUNGCODE_CONFIG_DIR`                 | string  | Sti til konfigurationsmappe                                           |
+| `LUTUNGCODE_CONFIG_CONTENT`             | string  | Indbygget json-konfigurationsindhold                                  |
+| `LUTUNGCODE_DISABLE_AUTOUPDATE`         | boolean | Deaktiver automatisk opdateringskontrol                               |
+| `LUTUNGCODE_DISABLE_PRUNE`              | boolean | Deaktiver beskæring af gamle data                                     |
+| `LUTUNGCODE_DISABLE_TERMINAL_TITLE`     | boolean | Deaktiver automatisk opdatering af terminaltitel                      |
+| `LUTUNGCODE_PERMISSION`                 | string  | Indbygget json-tilladelseskonfiguration                               |
+| `LUTUNGCODE_DISABLE_DEFAULT_PLUGINS`    | boolean | Deaktiver standard plugins                                            |
+| `LUTUNGCODE_DISABLE_LSP_DOWNLOAD`       | boolean | Deaktiver automatisk LSP-serverdownloads                              |
+| `LUTUNGCODE_ENABLE_EXPERIMENTAL_MODELS` | boolean | Aktive eksperimentelle modeller                                       |
+| `LUTUNGCODE_DISABLE_AUTOCOMPACT`        | boolean | Deaktiver automatisk kontekstkomprimering                             |
+| `LUTUNGCODE_DISABLE_CLAUDE_CODE`        | boolean | Deaktiver læsning fra `.claude` (prompt + færdigheder)                |
+| `LUTUNGCODE_DISABLE_CLAUDE_CODE_PROMPT` | boolean | Deaktiver læsning `~/.claude/CLAUDE.md`                               |
+| `LUTUNGCODE_DISABLE_CLAUDE_CODE_SKILLS` | boolean | Deaktiver indlæsning af `.claude/skills`                              |
+| `LUTUNGCODE_DISABLE_MODELS_FETCH`       | boolean | Deaktivering af modeller fra eksterne kilder                          |
+| `LUTUNGCODE_FAKE_VCS`                   | string  | Falsk VCS-udbyder til testformål                                      |
+| `LUTUNGCODE_CLIENT`                     | string  | Klient-id (standard til `cli`)                                        |
+| `LUTUNGCODE_ENABLE_EXA`                 | boolean | Aktiver Exa-websøgeværktøjer                                          |
+| `LUTUNGCODE_SERVER_PASSWORD`            | string  | Aktiver grundlæggende godkendelse for `serve`/`web`                   |
+| `LUTUNGCODE_SERVER_USERNAME`            | string  | Tilsidesæt grundlæggende godkendelsesbrugernavn (standard `lutungcode`) |
+| `LUTUNGCODE_MODELS_URL`                 | string  | Brugerdefineret URL til hentning af modelkonfiguration                |
 
 ---
 
@@ -592,20 +592,20 @@ Disse miljøvariabler muliggør eksperimentelle funktioner, der kan ændres elle
 
 | Variabel                                        | Skriv   | Beskrivelse                                          |
 | ----------------------------------------------- | ------- | ---------------------------------------------------- |
-| `OPENCODE_EXPERIMENTAL`                         | boolean | Aktiver eksperimentelle funktioner under samleflaget |
-| `OPENCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Aktiver ikonopdagelse                                |
-| `OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | Deaktiver kopi ved valg i TUI                        |
-| `OPENCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | nummer  | Standard timeout for bash-kommandoer i ms            |
-| `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | nummer  | Maks. output-tokens for LLM-svar                     |
-| `OPENCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Aktiver filovervågning for hele dir                  |
-| `OPENCODE_EXPERIMENTAL_OXFMT`                   | boolean | Aktiver oxfmt formatter                              |
-| `OPENCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Aktive eksperimenter LSP værktøj                     |
-| `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Deaktiver filovervågning                             |
-| `OPENCODE_EXPERIMENTAL_EXA`                     | boolean | Aktive eksperimenter Exa-funktioner                  |
-| `OPENCODE_EXPERIMENTAL_LSP_TY`                  | boolean | Aktiver TY LSP for python-filer                      |
-| `OPENCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Aktiver plantilstand                                 |
-| `OPENCODE_EXPERIMENTAL_EVENT_SYSTEM`            | boolean | Aktiver eksperimentelt hændelsessystem               |
-| `OPENCODE_EXPERIMENTAL_NATIVE_LLM`              | boolean | Aktiver native LLM-anmodningssti                     |
-| `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Aktiver parallel udførelse af websøgning             |
-| `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Aktiver Scout-subagent                               |
-| `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Aktiver workspace-understøttelse                     |
+| `LUTUNGCODE_EXPERIMENTAL`                         | boolean | Aktiver eksperimentelle funktioner under samleflaget |
+| `LUTUNGCODE_EXPERIMENTAL_ICON_DISCOVERY`          | boolean | Aktiver ikonopdagelse                                |
+| `LUTUNGCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT`  | boolean | Deaktiver kopi ved valg i TUI                        |
+| `LUTUNGCODE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS` | nummer  | Standard timeout for bash-kommandoer i ms            |
+| `LUTUNGCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX`        | nummer  | Maks. output-tokens for LLM-svar                     |
+| `LUTUNGCODE_EXPERIMENTAL_FILEWATCHER`             | boolean | Aktiver filovervågning for hele dir                  |
+| `LUTUNGCODE_EXPERIMENTAL_OXFMT`                   | boolean | Aktiver oxfmt formatter                              |
+| `LUTUNGCODE_EXPERIMENTAL_LSP_TOOL`                | boolean | Aktive eksperimenter LSP værktøj                     |
+| `LUTUNGCODE_EXPERIMENTAL_DISABLE_FILEWATCHER`     | boolean | Deaktiver filovervågning                             |
+| `LUTUNGCODE_EXPERIMENTAL_EXA`                     | boolean | Aktive eksperimenter Exa-funktioner                  |
+| `LUTUNGCODE_EXPERIMENTAL_LSP_TY`                  | boolean | Aktiver TY LSP for python-filer                      |
+| `LUTUNGCODE_EXPERIMENTAL_PLAN_MODE`               | boolean | Aktiver plantilstand                                 |
+| `LUTUNGCODE_EXPERIMENTAL_EVENT_SYSTEM`            | boolean | Aktiver eksperimentelt hændelsessystem               |
+| `LUTUNGCODE_EXPERIMENTAL_NATIVE_LLM`              | boolean | Aktiver native LLM-anmodningssti                     |
+| `LUTUNGCODE_EXPERIMENTAL_PARALLEL`                | boolean | Aktiver parallel udførelse af websøgning             |
+| `LUTUNGCODE_EXPERIMENTAL_SCOUT`                   | boolean | Aktiver Scout-subagent                               |
+| `LUTUNGCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Aktiver workspace-understøttelse                     |

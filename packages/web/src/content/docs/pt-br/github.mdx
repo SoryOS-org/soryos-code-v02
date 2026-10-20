@@ -1,17 +1,17 @@
 ---
 title: GitHub
-description: Use o opencode em problemas e pull-requests do GitHub.
+description: Use o lutungcode em problemas e pull-requests do GitHub.
 ---
 
-O opencode integra-se ao seu fluxo de trabalho do GitHub. Mencione `/opencode` ou `/oc` em seu comentário, e o opencode executará tarefas dentro do seu runner do GitHub Actions.
+O lutungcode integra-se ao seu fluxo de trabalho do GitHub. Mencione `/lutungcode` ou `/oc` em seu comentário, e o lutungcode executará tarefas dentro do seu runner do GitHub Actions.
 
 ---
 
 ## Recursos
 
-- **Triagem de problemas**: Peça ao opencode para analisar um problema e explicá-lo para você.
-- **Corrigir e implementar**: Peça ao opencode para corrigir um problema ou implementar um recurso. E ele trabalhará em um novo branch e enviará um PR com todas as alterações.
-- **Seguro**: O opencode é executado dentro dos runners do seu GitHub.
+- **Triagem de problemas**: Peça ao lutungcode para analisar um problema e explicá-lo para você.
+- **Corrigir e implementar**: Peça ao lutungcode para corrigir um problema ou implementar um recurso. E ele trabalhará em um novo branch e enviará um PR com todas as alterações.
+- **Seguro**: O lutungcode é executado dentro dos runners do seu GitHub.
 
 ---
 
@@ -20,7 +20,7 @@ O opencode integra-se ao seu fluxo de trabalho do GitHub. Mencione `/opencode` o
 Execute o seguinte comando em um projeto que está em um repositório do GitHub:
 
 ```bash
-opencode github install
+lutungcode github install
 ```
 
 Isso o guiará pela instalação do aplicativo GitHub, criação do fluxo de trabalho e configuração de segredos.
@@ -33,14 +33,14 @@ Ou você pode configurá-lo manualmente.
 
 1. **Instale o aplicativo GitHub**
 
-   Acesse [**github.com/apps/opencode-agent**](https://github.com/apps/opencode-agent). Certifique-se de que está instalado no repositório de destino.
+   Acesse [**github.com/apps/lutungcode-agent**](https://github.com/apps/lutungcode-agent). Certifique-se de que está instalado no repositório de destino.
 
 2. **Adicione o fluxo de trabalho**
 
-   Adicione o seguinte arquivo de fluxo de trabalho em `.github/workflows/opencode.yml` no seu repositório. Certifique-se de definir o `model` apropriado e as chaves de API necessárias em `env`.
+   Adicione o seguinte arquivo de fluxo de trabalho em `.github/workflows/lutungcode.yml` no seu repositório. Certifique-se de definir o `model` apropriado e as chaves de API necessárias em `env`.
 
-   ```yml title=".github/workflows/opencode.yml" {24,26}
-   name: opencode
+   ```yml title=".github/workflows/lutungcode.yml" {24,26}
+   name: lutungcode
 
    on:
      issue_comment:
@@ -49,10 +49,10 @@ Ou você pode configurá-lo manualmente.
        types: [created]
 
    jobs:
-     opencode:
+     lutungcode:
        if: |
          contains(github.event.comment.body, '/oc') ||
-         contains(github.event.comment.body, '/opencode')
+         contains(github.event.comment.body, '/lutungcode')
        runs-on: ubuntu-latest
        permissions:
          id-token: write
@@ -63,8 +63,8 @@ Ou você pode configurá-lo manualmente.
               fetch-depth: 1
               persist-credentials: false
 
-          - name: Run OpenCode
-           uses: anomalyco/opencode/github@latest
+          - name: Run LutungCode
+           uses: anomalyco/lutungcode/github@latest
            env:
              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
            with:
@@ -80,12 +80,12 @@ Ou você pode configurá-lo manualmente.
 
 ## Configuração
 
-- `model`: O modelo a ser usado com o opencode. Tem o formato de `provider/model`. Isso é **obrigatório**.
+- `model`: O modelo a ser usado com o lutungcode. Tem o formato de `provider/model`. Isso é **obrigatório**.
 - `agent`: O agente a ser usado. Deve ser um agente primário. Retorna ao `default_agent` da configuração ou `"build"` se não encontrado.
-- `prompt`: Prompt personalizado opcional para substituir o comportamento padrão. Use isso para personalizar como o opencode processa solicitações.
-- `token`: Token de acesso do GitHub opcional para realizar operações como criar comentários, confirmar alterações e abrir pull requests. Por padrão, o opencode usa o token de acesso da instalação do aplicativo GitHub opencode, então commits, comentários e pull requests aparecem como se fossem da aplicação.
+- `prompt`: Prompt personalizado opcional para substituir o comportamento padrão. Use isso para personalizar como o lutungcode processa solicitações.
+- `token`: Token de acesso do GitHub opcional para realizar operações como criar comentários, confirmar alterações e abrir pull requests. Por padrão, o lutungcode usa o token de acesso da instalação do aplicativo GitHub lutungcode, então commits, comentários e pull requests aparecem como se fossem da aplicação.
 
-  Alternativamente, você pode usar o [`GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) embutido do runner do GitHub Action sem instalar o aplicativo GitHub opencode. Apenas certifique-se de conceder as permissões necessárias em seu fluxo de trabalho:
+  Alternativamente, você pode usar o [`GITHUB_TOKEN`](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token) embutido do runner do GitHub Action sem instalar o aplicativo GitHub lutungcode. Apenas certifique-se de conceder as permissões necessárias em seu fluxo de trabalho:
 
   ```yaml
   permissions:
@@ -101,30 +101,30 @@ Ou você pode configurá-lo manualmente.
 
 ## Eventos Suportados
 
-O opencode pode ser acionado pelos seguintes eventos do GitHub:
+O lutungcode pode ser acionado pelos seguintes eventos do GitHub:
 
 | Tipo de Evento                | Acionado Por                                        | Detalhes                                                                                                                               |
 | ----------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `issue_comment`               | Comentário em um problema ou PR                     | Mencione `/opencode` ou `/oc` em seu comentário. O opencode lê o contexto e pode criar branches, abrir PRs ou responder.               |
-| `pull_request_review_comment` | Comentário em linhas de código específicas em um PR | Mencione `/opencode` ou `/oc` enquanto revisa o código. O opencode recebe o caminho do arquivo, números das linhas e contexto do diff. |
-| `issues`                      | Problema aberto ou editado                          | Aciona automaticamente o opencode quando problemas são criados ou modificados. Requer entrada de `prompt`.                             |
-| `pull_request`                | PR aberto ou atualizado                             | Aciona automaticamente o opencode quando PRs são abertos, sincronizados ou reabertos. Útil para revisões automatizadas.                |
-| `schedule`                    | Cron baseado em agendamento                         | Execute o opencode em um cronograma. Requer entrada de `prompt`. A saída vai para logs e PRs (sem problema para comentar).             |
-| `workflow_dispatch`           | Acionamento manual pela interface do GitHub         | Acione o opencode sob demanda através da aba Ações. Requer entrada de `prompt`. A saída vai para logs e PRs.                           |
+| `issue_comment`               | Comentário em um problema ou PR                     | Mencione `/lutungcode` ou `/oc` em seu comentário. O lutungcode lê o contexto e pode criar branches, abrir PRs ou responder.               |
+| `pull_request_review_comment` | Comentário em linhas de código específicas em um PR | Mencione `/lutungcode` ou `/oc` enquanto revisa o código. O lutungcode recebe o caminho do arquivo, números das linhas e contexto do diff. |
+| `issues`                      | Problema aberto ou editado                          | Aciona automaticamente o lutungcode quando problemas são criados ou modificados. Requer entrada de `prompt`.                             |
+| `pull_request`                | PR aberto ou atualizado                             | Aciona automaticamente o lutungcode quando PRs são abertos, sincronizados ou reabertos. Útil para revisões automatizadas.                |
+| `schedule`                    | Cron baseado em agendamento                         | Execute o lutungcode em um cronograma. Requer entrada de `prompt`. A saída vai para logs e PRs (sem problema para comentar).             |
+| `workflow_dispatch`           | Acionamento manual pela interface do GitHub         | Acione o lutungcode sob demanda através da aba Ações. Requer entrada de `prompt`. A saída vai para logs e PRs.                           |
 
 ### Exemplo de Agendamento
 
-Execute o opencode em um cronograma para realizar tarefas automatizadas:
+Execute o lutungcode em um cronograma para realizar tarefas automatizadas:
 
-```yaml title=".github/workflows/opencode-scheduled.yml"
-name: Scheduled OpenCode Task
+```yaml title=".github/workflows/lutungcode-scheduled.yml"
+name: Scheduled LutungCode Task
 
 on:
   schedule:
     - cron: "0 9 * * 1" # Every Monday at 9am UTC
 
 jobs:
-  opencode:
+  lutungcode:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -137,8 +137,8 @@ jobs:
         with:
           persist-credentials: false
 
-       - name: Run OpenCode
-         uses: anomalyco/opencode/github@latest
+       - name: Run LutungCode
+         uses: anomalyco/lutungcode/github@latest
          env:
            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
          with:
@@ -148,7 +148,7 @@ jobs:
              Se encontrar problemas que valham a pena resolver, abra um issue para rastreá-los.
 ```
 
-Para eventos agendados, a entrada `prompt` é **obrigatória** uma vez que não há comentário para extrair instruções. Fluxos de trabalho agendados são executados sem um contexto de usuário para verificação de permissões, então o fluxo de trabalho deve conceder `contents: write` e `pull-requests: write` se você espera que o opencode crie branches ou PRs.
+Para eventos agendados, a entrada `prompt` é **obrigatória** uma vez que não há comentário para extrair instruções. Fluxos de trabalho agendados são executados sem um contexto de usuário para verificação de permissões, então o fluxo de trabalho deve conceder `contents: write` e `pull-requests: write` se você espera que o lutungcode crie branches ou PRs.
 
 ---
 
@@ -156,8 +156,8 @@ Para eventos agendados, a entrada `prompt` é **obrigatória** uma vez que não 
 
 Revise automaticamente PRs quando forem abertos ou atualizados:
 
-```yaml title=".github/workflows/opencode-review.yml"
-name: opencode-review
+```yaml title=".github/workflows/lutungcode-review.yml"
+name: lutungcode-review
 
 on:
   pull_request:
@@ -175,7 +175,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-       - uses: anomalyco/opencode/github@latest
+       - uses: anomalyco/lutungcode/github@latest
          env:
            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -189,7 +189,7 @@ jobs:
              - Sugira melhorias
 ```
 
-Para eventos de `pull_request`, se nenhum `prompt` for fornecido, o opencode padrão será revisar o pull request.
+Para eventos de `pull_request`, se nenhum `prompt` for fornecido, o lutungcode padrão será revisar o pull request.
 
 ---
 
@@ -197,7 +197,7 @@ Para eventos de `pull_request`, se nenhum `prompt` for fornecido, o opencode pad
 
 Triagem automática de novos problemas. Este exemplo filtra contas com mais de 30 dias para reduzir spam:
 
-```yaml title=".github/workflows/opencode-triage.yml"
+```yaml title=".github/workflows/lutungcode-triage.yml"
 name: Issue Triage
 
 on:
@@ -231,7 +231,7 @@ jobs:
         with:
           persist-credentials: false
 
-       - uses: anomalyco/opencode/github@latest
+       - uses: anomalyco/lutungcode/github@latest
          if: steps.check.outputs.result == 'true'
          env:
            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -250,10 +250,10 @@ Para eventos de `issues`, a entrada `prompt` é **obrigatória** uma vez que nã
 
 ## Prompts Personalizados
 
-Substitua o prompt padrão para personalizar o comportamento do opencode para seu fluxo de trabalho.
+Substitua o prompt padrão para personalizar o comportamento do lutungcode para seu fluxo de trabalho.
 
-```yaml title=".github/workflows/opencode.yml"
-- uses: anomalyco/opencode/github@latest
+```yaml title=".github/workflows/lutungcode.yml"
+- uses: anomalyco/lutungcode/github@latest
   with:
     model: anthropic/claude-sonnet-4-5
     prompt: |
@@ -269,27 +269,27 @@ Isso é útil para impor critérios de revisão específicos, padrões de codifi
 
 ## Exemplos
 
-Aqui estão alguns exemplos de como você pode usar o opencode no GitHub.
+Aqui estão alguns exemplos de como você pode usar o lutungcode no GitHub.
 
 - **Explicar um problema**
 
   Adicione este comentário em um problema do GitHub.
 
   ```
-  /opencode explain this issue
+  /lutungcode explain this issue
   ```
 
-  O opencode lerá toda a conversa, incluindo todos os comentários, e responderá com uma explicação clara.
+  O lutungcode lerá toda a conversa, incluindo todos os comentários, e responderá com uma explicação clara.
 
 - **Corrigir um problema**
 
   Em um problema do GitHub, diga:
 
   ```
-  /opencode fix this
+  /lutungcode fix this
   ```
 
-  E o opencode criará um novo branch, implementará as alterações e abrirá um PR com as mudanças.
+  E o lutungcode criará um novo branch, implementará as alterações e abrirá um PR com as mudanças.
 
 - **Revisar PRs e fazer alterações**
 
@@ -299,18 +299,18 @@ Aqui estão alguns exemplos de como você pode usar o opencode no GitHub.
   Delete the attachment from S3 when the note is removed /oc
   ```
 
-  O opencode implementará a alteração solicitada e a confirmará no mesmo PR.
+  O lutungcode implementará a alteração solicitada e a confirmará no mesmo PR.
 
 - **Revisar linhas de código específicas**
 
-  Deixe um comentário diretamente nas linhas de código na aba "Files" do PR. O opencode detecta automaticamente o arquivo, os números das linhas e o contexto do diff para fornecer respostas precisas.
+  Deixe um comentário diretamente nas linhas de código na aba "Files" do PR. O lutungcode detecta automaticamente o arquivo, os números das linhas e o contexto do diff para fornecer respostas precisas.
 
   ```
   [Comentário em linhas específicas na aba Files]
   /oc add error handling here
   ```
 
-  Ao comentar sobre linhas específicas, o opencode recebe:
+  Ao comentar sobre linhas específicas, o lutungcode recebe:
   - O arquivo exato sendo revisado
   - As linhas específicas de código
   - O contexto do diff ao redor

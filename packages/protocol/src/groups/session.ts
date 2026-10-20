@@ -1,12 +1,12 @@
-import { SessionMessage } from "@opencode/schema/session-message"
-import { SessionInbox } from "@opencode/schema/session-inbox"
-import { PromptInput } from "@opencode/schema/prompt-input"
-import { Session } from "@opencode/schema/session"
-import { SessionStats } from "@opencode/schema/session-stats"
-import { InstructionEntry } from "@opencode/schema/instruction-entry"
-import { Project } from "@opencode/schema/project"
-import { DateTimeUtcFromMillis, NonNegativeInt, PositiveInt } from "@opencode/schema/schema"
-import { Event } from "@opencode/schema/event"
+import { SessionMessage } from "@lutungcode/schema/session-message"
+import { SessionInbox } from "@lutungcode/schema/session-inbox"
+import { PromptInput } from "@lutungcode/schema/prompt-input"
+import { Session } from "@lutungcode/schema/session"
+import { SessionStats } from "@lutungcode/schema/session-stats"
+import { InstructionEntry } from "@lutungcode/schema/instruction-entry"
+import { Project } from "@lutungcode/schema/project"
+import { DateTimeUtcFromMillis, NonNegativeInt, PositiveInt } from "@lutungcode/schema/schema"
+import { Event } from "@lutungcode/schema/event"
 import { Context, Schema, SchemaGetter, Struct } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/http-api"
 import {
@@ -26,15 +26,15 @@ import {
   SkillNotFoundError,
   UnknownError,
 } from "../errors.js"
-import { Agent } from "@opencode/schema/agent"
-import { Skill } from "@opencode/schema/skill"
-import { Model } from "@opencode/schema/model"
-import { Permission } from "@opencode/schema/permission"
-import { Location } from "@opencode/schema/location"
-import { SessionEvent } from "@opencode/schema/session-event"
-import { EventLog } from "@opencode/schema/event-log"
-import { FileDiff } from "@opencode/schema/file-diff"
-import { Form } from "@opencode/schema/form"
+import { Agent } from "@lutungcode/schema/agent"
+import { Skill } from "@lutungcode/schema/skill"
+import { Model } from "@lutungcode/schema/model"
+import { Permission } from "@lutungcode/schema/permission"
+import { Location } from "@lutungcode/schema/location"
+import { SessionEvent } from "@lutungcode/schema/session-event"
+import { EventLog } from "@lutungcode/schema/event-log"
+import { FileDiff } from "@lutungcode/schema/file-diff"
+import { Form } from "@lutungcode/schema/form"
 import { PublicSessionMessage } from "./message.js"
 
 const SessionActive = Schema.Struct({
@@ -200,7 +200,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           identifier: "session.active",
           summary: "List active sessions",
           description:
-            "Retrieve foreground Session drains currently owned by this OpenCode process. Sessions absent from the result are inactive.",
+            "Retrieve foreground Session drains currently owned by this LutungCode process. Sessions absent from the result are inactive.",
         }),
       ),
     )
@@ -672,7 +672,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
         query: { resume: BooleanFromString.pipe(Schema.optional) },
         success: Schema.Struct({
           interrupted: Schema.Boolean.annotate({
-            description: "Whether an active execution owned by this OpenCode process was interrupted.",
+            description: "Whether an active execution owned by this LutungCode process was interrupted.",
           }),
         }).annotate({ identifier: "SessionInterruptResponse" }),
         error: SessionNotFoundError,
@@ -683,7 +683,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
             identifier: "session.interrupt",
             summary: "Interrupt session execution",
             description:
-              "Interrupt active execution owned by this OpenCode process. Returns interrupted=true when an active execution was interrupted and false for the idle no-op. When resume=true, execution resumes pending steering input and next-in-line control items (manual compaction, moves) while queued prompts remain parked.",
+              "Interrupt active execution owned by this LutungCode process. Returns interrupted=true when an active execution was interrupted and false for the idle no-op. When resume=true, execution resumes pending steering input and next-in-line control items (manual compaction, moves) while queued prompts remain parked.",
           }),
         ),
     )

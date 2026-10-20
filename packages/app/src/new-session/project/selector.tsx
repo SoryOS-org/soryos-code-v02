@@ -9,14 +9,14 @@ import {
   type ComponentProps,
 } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Menu } from "@opencode/ui/menu"
-import { Icon } from "@opencode/ui/icon"
+import { Menu } from "@lutungcode/ui/menu"
+import { Icon } from "@lutungcode/ui/icon"
 import {
   displayName,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
-} from "@opencode/ui/project-avatar"
+} from "@lutungcode/ui/project-avatar"
 import { useLanguage } from "@/runtime/i18n/language"
 import { pathKey } from "@/workspaces/path-key"
 import { handleDocumentSearchKeydown } from "@/shell/commands/search-keydown"

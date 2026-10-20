@@ -1,3 +1,4 @@
+import { endpoints } from "../packages/util/src/identity"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import path from "node:path"
@@ -12,6 +13,11 @@ type Artifact = {
 
 export namespace UpdateArtifact {
   export async function publish(artifact: Artifact) {
+    if (!endpoints.updateBase) {
+      if (process.env.GITHUB_ACTIONS === "true") throw new Error("LutungCode update endpoint is not configured")
+      console.log("skipped update artifact publication; update endpoint is not configured")
+      return
+    }
     if (process.env.GITHUB_ACTIONS !== "true") {
       console.log("skipped update artifact publication outside GitHub Actions")
       return
@@ -21,7 +27,7 @@ export namespace UpdateArtifact {
     if (!requestURL || !requestToken) throw new Error("GitHub Actions OIDC is unavailable")
 
     const url = new URL(requestURL)
-    url.searchParams.set("audience", "https://update.opencode.ai")
+    url.searchParams.set("audience", new URL(endpoints.updateBase).origin)
     const tokenResponse = await fetch(url, { headers: { Authorization: `Bearer ${requestToken}` } })
     if (!tokenResponse.ok) throw new Error(`Failed to request GitHub OIDC token: ${tokenResponse.status}`)
     const token: unknown = await tokenResponse.json()
@@ -29,7 +35,7 @@ export namespace UpdateArtifact {
       throw new Error("GitHub OIDC response did not include a token")
 
     for (const attempt of [0, 1, 2]) {
-      const response = await fetch("https://opencode.ai/update/api/publish", {
+      const response = await fetch(`${endpoints.updateBase}/publish`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token.value}`,
@@ -50,10 +56,11 @@ export namespace UpdateArtifact {
   }
 
   export async function upload(input: { version: string; files: string[]; dryRun?: boolean }) {
+    if (!endpoints.domain) throw new Error("LutungCode file endpoint is not configured")
     const { PutObjectCommand, S3Client } = await import("@aws-sdk/client-s3")
     const client = input.dryRun ? undefined : new S3Client(await credentials())
     const prefix = `bin/${input.version}/`
-    const base = `https://opencode.ai/files/bin/${encodeURIComponent(input.version)}/`
+    const base = `${endpoints.domain.replace(/\/$/, "")}/files/bin/${encodeURIComponent(input.version)}/`
     try {
       return Object.fromEntries(
         await Promise.all(
@@ -68,7 +75,7 @@ export namespace UpdateArtifact {
             if (client) {
               await client.send(
                 new PutObjectCommand({
-                  Bucket: "opencode-production-files",
+                  Bucket: "lutungcode-production-files",
                   Key: `${prefix}${name}`,
                   Body: createReadStream(filepath),
                   ContentLength: file.size,

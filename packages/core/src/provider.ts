@@ -1,19 +1,19 @@
 export * as Provider from "./provider.js"
 
 import { Context, Effect, Layer, Option, Schema, Stream, Struct } from "effect"
-import { Provider } from "@opencode/schema/provider"
-import { Model } from "@opencode/schema/model"
-import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { HttpTimeout, type ProviderPackageDefinition } from "@opencode/ai"
-import { isRecord } from "@opencode/ai/utils/record"
-import { Npm } from "@opencode/util/npm"
+import { Provider } from "@lutungcode/schema/provider"
+import { Model } from "@lutungcode/schema/model"
+import { makeLocationNode } from "@lutungcode/util/effect/app-node"
+import { HttpTimeout, type ProviderPackageDefinition } from "@lutungcode/ai"
+import { isRecord } from "@lutungcode/ai/utils/record"
+import { Npm } from "@lutungcode/util/npm"
 import type { DeepMutable } from "./schema.js"
-import { importModule, resolveModule } from "@opencode/util/runtime-import"
+import { importModule, resolveModule } from "@lutungcode/util/runtime-import"
 import { Bus } from "./bus.js"
 import { Integration } from "./integration.js"
 import { State } from "./state.js"
 import { IntegrationConnection } from "./integration/connection.js"
-import { Credential } from "@opencode/schema/credential"
+import { Credential } from "@lutungcode/schema/credential"
 import { Location } from "./location.js"
 import { freeze } from "immer"
 import { AISDKNative } from "./aisdk-native.js"
@@ -28,8 +28,6 @@ export function packageName(value: string): string
 export function packageName(value: undefined): undefined
 export function packageName(value: string | undefined): string | undefined
 export function packageName(value: string | undefined) {
-  // Native provider entrypoints can persist in user configuration across the npm scope migration.
-  if (value?.startsWith("@opencode-ai/ai/")) return value.replace("@opencode-ai/", "@opencode/")
   if (value === undefined || !isAISDK(value)) return value
   return value.slice(AISDK_PREFIX.length)
 }
@@ -46,112 +44,112 @@ export type ProviderPackage = ProviderPackageDefinition
 
 const packages = new Map<string, Promise<unknown>>()
 const builtins = new Map<string, () => Promise<unknown>>([
-  ["@opencode/ai/providers/alibaba", () => import("@opencode/ai/providers/alibaba")],
-  ["@opencode/ai/providers/alibaba/chat", () => import("@opencode/ai/providers/alibaba/chat")],
-  ["@opencode/ai/providers/alibaba/messages", () => import("@opencode/ai/providers/alibaba/messages")],
-  ["@opencode/ai/providers/alibaba/responses", () => import("@opencode/ai/providers/alibaba/responses")],
-  ["@opencode/ai/providers/amazon-bedrock", () => import("@opencode/ai/providers/amazon-bedrock")],
-  ["@opencode/ai/providers/amazon-bedrock/mantle", () => import("@opencode/ai/providers/amazon-bedrock/mantle")],
+  ["@lutungcode/ai/providers/alibaba", () => import("@lutungcode/ai/providers/alibaba")],
+  ["@lutungcode/ai/providers/alibaba/chat", () => import("@lutungcode/ai/providers/alibaba/chat")],
+  ["@lutungcode/ai/providers/alibaba/messages", () => import("@lutungcode/ai/providers/alibaba/messages")],
+  ["@lutungcode/ai/providers/alibaba/responses", () => import("@lutungcode/ai/providers/alibaba/responses")],
+  ["@lutungcode/ai/providers/amazon-bedrock", () => import("@lutungcode/ai/providers/amazon-bedrock")],
+  ["@lutungcode/ai/providers/amazon-bedrock/mantle", () => import("@lutungcode/ai/providers/amazon-bedrock/mantle")],
   [
-    "@opencode/ai/providers/amazon-bedrock/mantle/chat",
-    () => import("@opencode/ai/providers/amazon-bedrock/mantle/chat"),
+    "@lutungcode/ai/providers/amazon-bedrock/mantle/chat",
+    () => import("@lutungcode/ai/providers/amazon-bedrock/mantle/chat"),
   ],
   [
-    "@opencode/ai/providers/amazon-bedrock/mantle/messages",
-    () => import("@opencode/ai/providers/amazon-bedrock/mantle/messages"),
+    "@lutungcode/ai/providers/amazon-bedrock/mantle/messages",
+    () => import("@lutungcode/ai/providers/amazon-bedrock/mantle/messages"),
   ],
   [
-    "@opencode/ai/providers/amazon-bedrock/mantle/responses",
-    () => import("@opencode/ai/providers/amazon-bedrock/mantle/responses"),
+    "@lutungcode/ai/providers/amazon-bedrock/mantle/responses",
+    () => import("@lutungcode/ai/providers/amazon-bedrock/mantle/responses"),
   ],
-  ["@opencode/ai/providers/amazon-bedrock-mantle", () => import("@opencode/ai/providers/amazon-bedrock-mantle")],
-  ["@opencode/ai/providers/anthropic", () => import("@opencode/ai/providers/anthropic")],
-  ["@opencode/ai/providers/anthropic-compatible", () => import("@opencode/ai/providers/anthropic-compatible")],
-  ["@opencode/ai/providers/azure", () => import("@opencode/ai/providers/azure")],
-  ["@opencode/ai/providers/azure/chat", () => import("@opencode/ai/providers/azure/chat")],
-  ["@opencode/ai/providers/azure/responses", () => import("@opencode/ai/providers/azure/responses")],
-  ["@opencode/ai/providers/baseten", () => import("@opencode/ai/providers/baseten")],
-  ["@opencode/ai/providers/cerebras", () => import("@opencode/ai/providers/cerebras")],
-  ["@opencode/ai/providers/cloudflare-ai-gateway", () => import("@opencode/ai/providers/cloudflare-ai-gateway")],
-  ["@opencode/ai/providers/cloudflare-workers-ai", () => import("@opencode/ai/providers/cloudflare-workers-ai")],
-  ["@opencode/ai/providers/cohere", () => import("@opencode/ai/providers/cohere")],
-  ["@opencode/ai/providers/cohere/chat", () => import("@opencode/ai/providers/cohere/chat")],
-  ["@opencode/ai/providers/deepinfra", () => import("@opencode/ai/providers/deepinfra")],
-  ["@opencode/ai/providers/deepseek", () => import("@opencode/ai/providers/deepseek")],
-  ["@opencode/ai/providers/digitalocean", () => import("@opencode/ai/providers/digitalocean")],
-  ["@opencode/ai/providers/fireworks", () => import("@opencode/ai/providers/fireworks")],
-  ["@opencode/ai/providers/google", () => import("@opencode/ai/providers/google")],
-  ["@opencode/ai/providers/google/interactions", () => import("@opencode/ai/providers/google/interactions")],
-  ["@opencode/ai/providers/google-vertex", () => import("@opencode/ai/providers/google-vertex")],
-  ["@opencode/ai/providers/google-vertex/chat", () => import("@opencode/ai/providers/google-vertex/chat")],
-  ["@opencode/ai/providers/google-vertex/gemini", () => import("@opencode/ai/providers/google-vertex/gemini")],
+  ["@lutungcode/ai/providers/amazon-bedrock-mantle", () => import("@lutungcode/ai/providers/amazon-bedrock-mantle")],
+  ["@lutungcode/ai/providers/anthropic", () => import("@lutungcode/ai/providers/anthropic")],
+  ["@lutungcode/ai/providers/anthropic-compatible", () => import("@lutungcode/ai/providers/anthropic-compatible")],
+  ["@lutungcode/ai/providers/azure", () => import("@lutungcode/ai/providers/azure")],
+  ["@lutungcode/ai/providers/azure/chat", () => import("@lutungcode/ai/providers/azure/chat")],
+  ["@lutungcode/ai/providers/azure/responses", () => import("@lutungcode/ai/providers/azure/responses")],
+  ["@lutungcode/ai/providers/baseten", () => import("@lutungcode/ai/providers/baseten")],
+  ["@lutungcode/ai/providers/cerebras", () => import("@lutungcode/ai/providers/cerebras")],
+  ["@lutungcode/ai/providers/cloudflare-ai-gateway", () => import("@lutungcode/ai/providers/cloudflare-ai-gateway")],
+  ["@lutungcode/ai/providers/cloudflare-workers-ai", () => import("@lutungcode/ai/providers/cloudflare-workers-ai")],
+  ["@lutungcode/ai/providers/cohere", () => import("@lutungcode/ai/providers/cohere")],
+  ["@lutungcode/ai/providers/cohere/chat", () => import("@lutungcode/ai/providers/cohere/chat")],
+  ["@lutungcode/ai/providers/deepinfra", () => import("@lutungcode/ai/providers/deepinfra")],
+  ["@lutungcode/ai/providers/deepseek", () => import("@lutungcode/ai/providers/deepseek")],
+  ["@lutungcode/ai/providers/digitalocean", () => import("@lutungcode/ai/providers/digitalocean")],
+  ["@lutungcode/ai/providers/fireworks", () => import("@lutungcode/ai/providers/fireworks")],
+  ["@lutungcode/ai/providers/google", () => import("@lutungcode/ai/providers/google")],
+  ["@lutungcode/ai/providers/google/interactions", () => import("@lutungcode/ai/providers/google/interactions")],
+  ["@lutungcode/ai/providers/google-vertex", () => import("@lutungcode/ai/providers/google-vertex")],
+  ["@lutungcode/ai/providers/google-vertex/chat", () => import("@lutungcode/ai/providers/google-vertex/chat")],
+  ["@lutungcode/ai/providers/google-vertex/gemini", () => import("@lutungcode/ai/providers/google-vertex/gemini")],
   [
-    "@opencode/ai/providers/google-vertex/interactions",
-    () => import("@opencode/ai/providers/google-vertex/interactions"),
+    "@lutungcode/ai/providers/google-vertex/interactions",
+    () => import("@lutungcode/ai/providers/google-vertex/interactions"),
   ],
-  ["@opencode/ai/providers/google-vertex/messages", () => import("@opencode/ai/providers/google-vertex/messages")],
-  ["@opencode/ai/providers/google-vertex/mistral", () => import("@opencode/ai/providers/google-vertex/mistral")],
-  ["@opencode/ai/providers/google-vertex/responses", () => import("@opencode/ai/providers/google-vertex/responses")],
-  ["@opencode/ai/providers/google-vertex-chat", () => import("@opencode/ai/providers/google-vertex-chat")],
+  ["@lutungcode/ai/providers/google-vertex/messages", () => import("@lutungcode/ai/providers/google-vertex/messages")],
+  ["@lutungcode/ai/providers/google-vertex/mistral", () => import("@lutungcode/ai/providers/google-vertex/mistral")],
+  ["@lutungcode/ai/providers/google-vertex/responses", () => import("@lutungcode/ai/providers/google-vertex/responses")],
+  ["@lutungcode/ai/providers/google-vertex-chat", () => import("@lutungcode/ai/providers/google-vertex-chat")],
   [
-    "@opencode/ai/providers/google-vertex-interactions",
-    () => import("@opencode/ai/providers/google-vertex-interactions"),
+    "@lutungcode/ai/providers/google-vertex-interactions",
+    () => import("@lutungcode/ai/providers/google-vertex-interactions"),
   ],
-  ["@opencode/ai/providers/google-vertex-messages", () => import("@opencode/ai/providers/google-vertex-messages")],
-  ["@opencode/ai/providers/google-vertex-mistral", () => import("@opencode/ai/providers/google-vertex-mistral")],
-  ["@opencode/ai/providers/google-vertex-responses", () => import("@opencode/ai/providers/google-vertex-responses")],
-  ["@opencode/ai/providers/groq", () => import("@opencode/ai/providers/groq")],
-  ["@opencode/ai/providers/meta", () => import("@opencode/ai/providers/meta")],
-  ["@opencode/ai/providers/meta/chat", () => import("@opencode/ai/providers/meta/chat")],
-  ["@opencode/ai/providers/meta/messages", () => import("@opencode/ai/providers/meta/messages")],
-  ["@opencode/ai/providers/meta/responses", () => import("@opencode/ai/providers/meta/responses")],
-  ["@opencode/ai/providers/minimax", () => import("@opencode/ai/providers/minimax")],
-  ["@opencode/ai/providers/minimax/chat", () => import("@opencode/ai/providers/minimax/chat")],
-  ["@opencode/ai/providers/minimax/messages", () => import("@opencode/ai/providers/minimax/messages")],
-  ["@opencode/ai/providers/minimax/responses", () => import("@opencode/ai/providers/minimax/responses")],
-  ["@opencode/ai/providers/mistral", () => import("@opencode/ai/providers/mistral")],
-  ["@opencode/ai/providers/moonshot", () => import("@opencode/ai/providers/moonshot")],
-  ["@opencode/ai/providers/moonshot/chat", () => import("@opencode/ai/providers/moonshot/chat")],
-  ["@opencode/ai/providers/moonshot/messages", () => import("@opencode/ai/providers/moonshot/messages")],
-  ["@opencode/ai/providers/moonshot/responses", () => import("@opencode/ai/providers/moonshot/responses")],
-  ["@opencode/ai/providers/openai", () => import("@opencode/ai/providers/openai")],
-  ["@opencode/ai/providers/openai/chat", () => import("@opencode/ai/providers/openai/chat")],
-  ["@opencode/ai/providers/openai/responses", () => import("@opencode/ai/providers/openai/responses")],
-  ["@opencode/ai/providers/openai-compatible", () => import("@opencode/ai/providers/openai-compatible")],
+  ["@lutungcode/ai/providers/google-vertex-messages", () => import("@lutungcode/ai/providers/google-vertex-messages")],
+  ["@lutungcode/ai/providers/google-vertex-mistral", () => import("@lutungcode/ai/providers/google-vertex-mistral")],
+  ["@lutungcode/ai/providers/google-vertex-responses", () => import("@lutungcode/ai/providers/google-vertex-responses")],
+  ["@lutungcode/ai/providers/groq", () => import("@lutungcode/ai/providers/groq")],
+  ["@lutungcode/ai/providers/meta", () => import("@lutungcode/ai/providers/meta")],
+  ["@lutungcode/ai/providers/meta/chat", () => import("@lutungcode/ai/providers/meta/chat")],
+  ["@lutungcode/ai/providers/meta/messages", () => import("@lutungcode/ai/providers/meta/messages")],
+  ["@lutungcode/ai/providers/meta/responses", () => import("@lutungcode/ai/providers/meta/responses")],
+  ["@lutungcode/ai/providers/minimax", () => import("@lutungcode/ai/providers/minimax")],
+  ["@lutungcode/ai/providers/minimax/chat", () => import("@lutungcode/ai/providers/minimax/chat")],
+  ["@lutungcode/ai/providers/minimax/messages", () => import("@lutungcode/ai/providers/minimax/messages")],
+  ["@lutungcode/ai/providers/minimax/responses", () => import("@lutungcode/ai/providers/minimax/responses")],
+  ["@lutungcode/ai/providers/mistral", () => import("@lutungcode/ai/providers/mistral")],
+  ["@lutungcode/ai/providers/moonshot", () => import("@lutungcode/ai/providers/moonshot")],
+  ["@lutungcode/ai/providers/moonshot/chat", () => import("@lutungcode/ai/providers/moonshot/chat")],
+  ["@lutungcode/ai/providers/moonshot/messages", () => import("@lutungcode/ai/providers/moonshot/messages")],
+  ["@lutungcode/ai/providers/moonshot/responses", () => import("@lutungcode/ai/providers/moonshot/responses")],
+  ["@lutungcode/ai/providers/openai", () => import("@lutungcode/ai/providers/openai")],
+  ["@lutungcode/ai/providers/openai/chat", () => import("@lutungcode/ai/providers/openai/chat")],
+  ["@lutungcode/ai/providers/openai/responses", () => import("@lutungcode/ai/providers/openai/responses")],
+  ["@lutungcode/ai/providers/openai-compatible", () => import("@lutungcode/ai/providers/openai-compatible")],
   [
-    "@opencode/ai/providers/openai-compatible/responses",
-    () => import("@opencode/ai/providers/openai-compatible/responses"),
-  ],
-  [
-    "@opencode/ai/providers/openai-compatible-responses",
-    () => import("@opencode/ai/providers/openai-compatible-responses"),
-  ],
-  ["@opencode/ai/providers/openrouter", () => import("@opencode/ai/providers/openrouter")],
-  ["@opencode/ai/providers/togetherai", () => import("@opencode/ai/providers/togetherai")],
-  ["@opencode/ai/providers/venice", () => import("@opencode/ai/providers/venice")],
-  ["@opencode/ai/providers/vercel-ai-gateway", () => import("@opencode/ai/providers/vercel-ai-gateway")],
-  ["@opencode/ai/providers/vercel-ai-gateway/chat", () => import("@opencode/ai/providers/vercel-ai-gateway/chat")],
-  [
-    "@opencode/ai/providers/vercel-ai-gateway/messages",
-    () => import("@opencode/ai/providers/vercel-ai-gateway/messages"),
+    "@lutungcode/ai/providers/openai-compatible/responses",
+    () => import("@lutungcode/ai/providers/openai-compatible/responses"),
   ],
   [
-    "@opencode/ai/providers/vercel-ai-gateway/responses",
-    () => import("@opencode/ai/providers/vercel-ai-gateway/responses"),
+    "@lutungcode/ai/providers/openai-compatible-responses",
+    () => import("@lutungcode/ai/providers/openai-compatible-responses"),
   ],
-  ["@opencode/ai/providers/xai", () => import("@opencode/ai/providers/xai")],
-  ["@opencode/ai/providers/zai", () => import("@opencode/ai/providers/zai")],
-  ["@opencode/ai/providers/zai/chat", () => import("@opencode/ai/providers/zai/chat")],
-  ["@opencode/ai/providers/zai-coding-plan", () => import("@opencode/ai/providers/zai-coding-plan")],
-  ["@opencode/ai/providers/zai-coding-plan/chat", () => import("@opencode/ai/providers/zai-coding-plan/chat")],
-  ["@opencode/ai/providers/zai-coding-plan/messages", () => import("@opencode/ai/providers/zai-coding-plan/messages")],
+  ["@lutungcode/ai/providers/openrouter", () => import("@lutungcode/ai/providers/openrouter")],
+  ["@lutungcode/ai/providers/togetherai", () => import("@lutungcode/ai/providers/togetherai")],
+  ["@lutungcode/ai/providers/venice", () => import("@lutungcode/ai/providers/venice")],
+  ["@lutungcode/ai/providers/vercel-ai-gateway", () => import("@lutungcode/ai/providers/vercel-ai-gateway")],
+  ["@lutungcode/ai/providers/vercel-ai-gateway/chat", () => import("@lutungcode/ai/providers/vercel-ai-gateway/chat")],
   [
-    "@opencode/ai/providers/zai-coding-plan/responses",
-    () => import("@opencode/ai/providers/zai-coding-plan/responses"),
+    "@lutungcode/ai/providers/vercel-ai-gateway/messages",
+    () => import("@lutungcode/ai/providers/vercel-ai-gateway/messages"),
+  ],
+  [
+    "@lutungcode/ai/providers/vercel-ai-gateway/responses",
+    () => import("@lutungcode/ai/providers/vercel-ai-gateway/responses"),
+  ],
+  ["@lutungcode/ai/providers/xai", () => import("@lutungcode/ai/providers/xai")],
+  ["@lutungcode/ai/providers/zai", () => import("@lutungcode/ai/providers/zai")],
+  ["@lutungcode/ai/providers/zai/chat", () => import("@lutungcode/ai/providers/zai/chat")],
+  ["@lutungcode/ai/providers/zai-coding-plan", () => import("@lutungcode/ai/providers/zai-coding-plan")],
+  ["@lutungcode/ai/providers/zai-coding-plan/chat", () => import("@lutungcode/ai/providers/zai-coding-plan/chat")],
+  ["@lutungcode/ai/providers/zai-coding-plan/messages", () => import("@lutungcode/ai/providers/zai-coding-plan/messages")],
+  [
+    "@lutungcode/ai/providers/zai-coding-plan/responses",
+    () => import("@lutungcode/ai/providers/zai-coding-plan/responses"),
   ],
 ])
 
-/** Native `@opencode/ai/providers/*` entrypoints bundled with Core and loadable by name from config. */
+/** Native `@lutungcode/ai/providers/*` entrypoints bundled with Core and loadable by name from config. */
 export const builtinPackages: ReadonlySet<string> = new Set(builtins.keys())
 
 export const loadPackage = Effect.fn("Provider.loadPackage")(function* (input: string, npm?: Npm.Interface) {
@@ -159,7 +157,7 @@ export const loadPackage = Effect.fn("Provider.loadPackage")(function* (input: s
   const builtin = builtins.get(specifier)
   if (builtin) return yield* importPackage(specifier, specifier, builtin)
   const resolved = yield* Effect.sync(() => {
-    if (specifier.startsWith("file://") || specifier.startsWith("@opencode/ai/")) return specifier
+    if (specifier.startsWith("file://") || specifier.startsWith("@lutungcode/ai/")) return specifier
     try {
       return import.meta.resolve(specifier)
     } catch {
@@ -183,7 +181,7 @@ export const loadPackage = Effect.fn("Provider.loadPackage")(function* (input: s
   return yield* importPackage(specifier, entrypoint)
 })
 
-/** opencode settings consumed in Core; native packages never receive them. */
+/** lutungcode settings consumed in Core; native packages never receive them. */
 const CORE_KEYS = ["chunkTimeout", "compaction", "encoding", "fetch", "headerTimeout", "timeout", "transport"] as const
 const PROVIDER_ONLY_KEYS = ["chunkTimeout", "headerTimeout", "timeout", "transport"] as const
 
@@ -280,7 +278,7 @@ export type Info = Provider.Info
 
 export type MutableInfo = DeepMutable<Info>
 
-export { Event } from "@opencode/schema/provider"
+export { Event } from "@lutungcode/schema/provider"
 
 /** Provider metadata owns its drafts; model definitions remain immutable inputs. */
 export type Definition = {
@@ -320,7 +318,7 @@ export interface Interface extends State.Transformable<Editor> {
   readonly snapshot: () => Effect.Effect<Snapshot>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
+export class Service extends Context.Service<Service, Interface>()("@lutungcode/Provider") {}
 
 // Every location references the same index for a shared immutable definition array.
 const definitions = new WeakMap<readonly Model.Info[], Map<ID, ReadonlyMap<Model.ID, Model.Info>>>()

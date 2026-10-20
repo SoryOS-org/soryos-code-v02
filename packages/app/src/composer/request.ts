@@ -1,4 +1,4 @@
-import { encodeFilePath, getFilename } from "@opencode/util/path"
+import { encodeFilePath, getFilename } from "@lutungcode/util/path"
 import type { FileSelection } from "@/workspaces/files/model"
 import type {
   AgentPart,

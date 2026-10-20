@@ -14,7 +14,7 @@ export const dict = {
   "nav.home": "Головна",
   "nav.openMenu": "Відкрити меню",
   "nav.getStartedFree": "Почати безкоштовно",
-  "nav.logoAlt": "OpenCode",
+  "nav.logoAlt": "LutungCode",
 
   "nav.context.copyLogo": "Копіювати логотип як SVG",
   "nav.context.copyWordmark": "Копіювати знак як SVG",
@@ -37,14 +37,14 @@ export const dict = {
   "email.success": "Майже готово! Перевірте пошту та підтвердьте адресу",
   "email.error": "Не вдалося оформити підписку. Спробуйте ще раз.",
 
-  "notFound.title": "Не знайдено | opencode",
+  "notFound.title": "Не знайдено | lutungcode",
   "notFound.heading": "404 — Сторінку не знайдено",
   "notFound.home": "Головна",
   "notFound.docs": "Документація",
   "notFound.github": "GitHub",
   "notFound.discord": "Discord",
-  "notFound.logoLightAlt": "світлий логотип opencode",
-  "notFound.logoDarkAlt": "темний логотип opencode",
+  "notFound.logoLightAlt": "світлий логотип lutungcode",
+  "notFound.logoDarkAlt": "темний логотип lutungcode",
 
   "common.cancel": "Скасувати",
   "common.contactUs": "Зв'яжіться з нами",
@@ -54,9 +54,9 @@ export const dict = {
   "common.faq": "FAQ",
   "common.learnMore": "Дізнатися більше",
 
-  "app.meta.description": "OpenCode — відкритий агент для програмування.",
+  "app.meta.description": "LutungCode — відкритий агент для програмування.",
 
-  "home.title": "OpenCode | Відкритий AI-агент для кодування",
+  "home.title": "LutungCode | Відкритий AI-агент для кодування",
 
   "home.banner.badge": "Нове",
 
@@ -66,8 +66,8 @@ export const dict = {
 
   "home.install.ariaLabel": "Параметри встановлення",
 
-  "home.what.title": "Що таке OpenCode?",
-  "home.what.body": "OpenCode — це відкритий агент, який допомагає писати код у терміналі, IDE або на десктопі.",
+  "home.what.title": "Що таке LutungCode?",
+  "home.what.body": "LutungCode — це відкритий агент, який допомагає писати код у терміналі, IDE або на десктопі.",
   "home.what.lsp.title": "LSP увімкнено",
   "home.what.lsp.body": "Автоматично завантажує потрібні LSP для LLM",
   "home.what.multiSession.title": "Багатосесійність",
@@ -86,50 +86,50 @@ export const dict = {
 
   "home.growth.title": "Відкритий AI-агент для кодування",
   "home.growth.body":
-    "З понад <strong>{{stars}}</strong> зірками на GitHub, <strong>{{contributors}}</strong> учасниками та понад <strong>{{commits}}</strong> комітами, OpenCode використовують понад <strong>{{monthlyUsers}}</strong> розробників щомісяця.",
+    "З понад <strong>{{stars}}</strong> зірками на GitHub, <strong>{{contributors}}</strong> учасниками та понад <strong>{{commits}}</strong> комітами, LutungCode використовують понад <strong>{{monthlyUsers}}</strong> розробників щомісяця.",
   "home.growth.githubStars": "Зірки GitHub",
   "home.growth.contributors": "Учасники",
   "home.growth.monthlyDevs": "Розробників на місяць",
 
   "home.privacy.title": "Створено для конфіденційності",
   "home.privacy.body":
-    "OpenCode не зберігає ваш код або контекстні дані, тому може працювати в середовищах з чутливими даними.",
+    "LutungCode не зберігає ваш код або контекстні дані, тому може працювати в середовищах з чутливими даними.",
   "home.privacy.learnMore": "Дізнатися більше про",
   "home.privacy.link": "конфіденційність",
 
-  "home.faq.q1": "Що таке OpenCode?",
+  "home.faq.q1": "Що таке LutungCode?",
   "home.faq.a1":
-    "OpenCode — це відкритий агент, який допомагає писати та запускати код з будь-якою AI-моделлю. Доступний як термінальний інтерфейс, десктопний застосунок або розширення IDE.",
-  "home.faq.q2": "Як почати користуватися OpenCode?",
+    "LutungCode — це відкритий агент, який допомагає писати та запускати код з будь-якою AI-моделлю. Доступний як термінальний інтерфейс, десктопний застосунок або розширення IDE.",
+  "home.faq.q2": "Як почати користуватися LutungCode?",
   "home.faq.a2.before": "Найпростіший спосіб почати — прочитати",
   "home.faq.a2.link": "вступ",
-  "home.faq.q3": "Чи потрібні додаткові AI-підписки для використання OpenCode?",
+  "home.faq.q3": "Чи потрібні додаткові AI-підписки для використання LutungCode?",
   "home.faq.a3.p1":
-    "Не обов'язково, OpenCode має набір безкоштовних моделей, які можна використовувати без реєстрації.",
+    "Не обов'язково, LutungCode має набір безкоштовних моделей, які можна використовувати без реєстрації.",
   "home.faq.a3.p2.beforeZen":
     "Крім цього, ви можете використовувати будь-які популярні моделі, створивши обліковий запис",
   "home.faq.a3.p2.afterZen": ".",
   "home.faq.a3.p3":
-    "Хоча ми рекомендуємо Zen, OpenCode також працює з усіма популярними провайдерами, такими як OpenAI, Anthropic, xAI тощо.",
+    "Хоча ми рекомендуємо Zen, LutungCode також працює з усіма популярними провайдерами, такими як OpenAI, Anthropic, xAI тощо.",
   "home.faq.a3.p4.beforeLocal": "Ви навіть можете підключити свої",
   "home.faq.a3.p4.localLink": "локальні моделі",
-  "home.faq.q4": "Чи можу я використовувати свої наявні AI-підписки з OpenCode?",
+  "home.faq.q4": "Чи можу я використовувати свої наявні AI-підписки з LutungCode?",
   "home.faq.a4.p1":
-    "Так, OpenCode підтримує підписки всіх основних провайдерів. Ви можете використовувати Claude Pro/Max, ChatGPT Plus/Pro або GitHub Copilot.",
-  "home.faq.q5": "Чи можна використовувати OpenCode лише в терміналі?",
-  "home.faq.a5.beforeDesktop": "Вже ні! OpenCode тепер доступний як застосунок для",
+    "Так, LutungCode підтримує підписки всіх основних провайдерів. Ви можете використовувати Claude Pro/Max, ChatGPT Plus/Pro або GitHub Copilot.",
+  "home.faq.q5": "Чи можна використовувати LutungCode лише в терміналі?",
+  "home.faq.a5.beforeDesktop": "Вже ні! LutungCode тепер доступний як застосунок для",
   "home.faq.a5.desktop": "десктопа",
   "home.faq.a5.and": "та",
   "home.faq.a5.web": "вебу",
-  "home.faq.q6": "Скільки коштує OpenCode?",
+  "home.faq.q6": "Скільки коштує LutungCode?",
   "home.faq.a6":
-    "OpenCode є 100% безкоштовним. Він також має набір безкоштовних моделей. Додаткові витрати можливі, якщо ви підключите іншого провайдера.",
+    "LutungCode є 100% безкоштовним. Він також має набір безкоштовних моделей. Додаткові витрати можливі, якщо ви підключите іншого провайдера.",
   "home.faq.q7": "А як щодо даних та конфіденційності?",
   "home.faq.a7.p1": "Ваші дані зберігаються лише тоді, коли ви використовуєте безкоштовні моделі.",
   "home.faq.a7.p2.beforeModels": "Дізнайтеся більше про",
   "home.faq.a7.p2.modelsLink": "наші моделі",
-  "home.faq.q8": "Чи є OpenCode відкритим?",
-  "home.faq.a8.p1": "Так, OpenCode повністю відкритий. Вихідний код доступний публічно на",
+  "home.faq.q8": "Чи є LutungCode відкритим?",
+  "home.faq.a8.p1": "Так, LutungCode повністю відкритий. Вихідний код доступний публічно на",
   "home.faq.a8.p2": "під ліцензією",
   "home.faq.a8.mitLicense": "MIT License",
   "home.faq.a8.p3":
@@ -137,22 +137,22 @@ export const dict = {
 
   "home.zenCta.title": "Отримайте доступ до надійних оптимізованих моделей для агентів кодування",
   "home.zenCta.body":
-    "Zen дає доступ до добірки AI-моделей, які OpenCode протестував спеціально для агентів кодування. Не турбуйтеся про нестабільну якість — використовуйте перевірені моделі.",
+    "Zen дає доступ до добірки AI-моделей, які LutungCode протестував спеціально для агентів кодування. Не турбуйтеся про нестабільну якість — використовуйте перевірені моделі.",
   "home.zenCta.link": "Дізнатися про Zen",
 
-  "zen.title": "OpenCode Zen | Добірка надійних оптимізованих моделей для агентів кодування",
+  "zen.title": "LutungCode Zen | Добірка надійних оптимізованих моделей для агентів кодування",
   "zen.hero.title": "Надійні оптимізовані моделі для агентів кодування",
   "zen.hero.body":
-    "Zen дає доступ до добірки AI-моделей, які OpenCode протестував спеціально для агентів кодування. Не турбуйтеся про нестабільну якість — використовуйте перевірені моделі.",
+    "Zen дає доступ до добірки AI-моделей, які LutungCode протестував спеціально для агентів кодування. Не турбуйтеся про нестабільну якість — використовуйте перевірені моделі.",
 
-  "zen.faq.q1": "Що таке OpenCode Zen?",
-  "zen.faq.a1": "Zen — це добірка AI-моделей, протестованих для агентів кодування, створена командою OpenCode.",
+  "zen.faq.q1": "Що таке LutungCode Zen?",
+  "zen.faq.a1": "Zen — це добірка AI-моделей, протестованих для агентів кодування, створена командою LutungCode.",
   "zen.faq.q2": "Чому Zen точніший?",
   "zen.faq.a2":
     "Zen надає лише моделі, спеціально протестовані для агентів кодування. Ви ж не використовуєте масло ніж для стейка — не використовуйте погані моделі для кодування.",
   "zen.faq.q3": "Чи Zen дешевший?",
   "zen.faq.a3":
-    "Zen не є прибутковим. Zen передає вам вартість від провайдерів моделей. Чим вище використання Zen, тим кращі ціни OpenCode може узгодити та передати вам.",
+    "Zen не є прибутковим. Zen передає вам вартість від провайдерів моделей. Чим вище використання Zen, тим кращі ціни LutungCode може узгодити та передати вам.",
   "zen.faq.q4": "Скільки коштує Zen?",
   "zen.faq.a4.p1.beforePricing": "Zen",
   "zen.faq.a4.p1.pricingLink": "стягує плату за запит",
@@ -160,7 +160,7 @@ export const dict = {
   "zen.faq.a4.p2.beforeAccount": "Загальна вартість залежить від використання. Ви можете встановити місячні ліміти в",
   "zen.faq.a4.p2.accountLink": "обліковому записі",
   "zen.faq.a4.p3":
-    "Щоб покрити витрати, OpenCode додає лише невелику комісію за обробку платежу в розмірі $1.23 за кожне поповнення балансу $20.",
+    "Щоб покрити витрати, LutungCode додає лише невелику комісію за обробку платежу в розмірі $1.23 за кожне поповнення балансу $20.",
   "zen.faq.q5": "А як щодо даних та конфіденційності?",
   "zen.faq.a5.beforeExceptions":
     "Усі моделі Zen розміщені в США. Провайдери дотримуються політики нульового зберігання та не використовують ваші дані для навчання моделей, за",
@@ -171,7 +171,7 @@ export const dict = {
   "zen.faq.a7": "Так, ви можете вимкнути оплату в будь-який час і використовувати залишок.",
   "zen.faq.q8": "Чи можна використовувати Zen з іншими агентами кодування?",
   "zen.faq.a8":
-    "Хоча Zen чудово працює з OpenCode, ви можете використовувати Zen з будь-яким агентом. Дотримуйтесь інструкцій з налаштування у вашому агенті.",
+    "Хоча Zen чудово працює з LutungCode, ви можете використовувати Zen з будь-яким агентом. Дотримуйтесь інструкцій з налаштування у вашому агенті.",
   "zen.faq.q9": "Чи можу я отримати повернення коштів?",
   "zen.faq.a9":
     "Ви можете претендувати на повернення, якщо кошти було списано протягом останніх 14 днів і ви не використали кошти, отримані внаслідок цієї покупки. {{contact}}, щоб подати запит на повернення.",
@@ -183,13 +183,13 @@ export const dict = {
   "zen.problem.title": "Яку проблему вирішує Zen?",
   "zen.problem.body":
     "Доступно багато моделей, але лише деякі добре працюють з агентами кодування. Більшість провайдерів налаштовують їх по-різному з різними результатами.",
-  "zen.problem.subtitle": "Ми вирішуємо це для всіх, а не лише для користувачів OpenCode.",
+  "zen.problem.subtitle": "Ми вирішуємо це для всіх, а не лише для користувачів LutungCode.",
   "zen.problem.item1": "Тестування вибраних моделей та консультації з їхніми командами",
   "zen.problem.item2": "Співпраця з провайдерами для забезпечення правильної доставки",
   "zen.problem.item3": "Бенчмаркінг усіх комбінацій моделей та провайдерів, які ми рекомендуємо",
   "zen.how.title": "Як працює Zen",
   "zen.how.body":
-    "Хоча ми пропонуємо використовувати Zen з OpenCode, ви можете використовувати Zen з будь-яким агентом.",
+    "Хоча ми пропонуємо використовувати Zen з LutungCode, ви можете використовувати Zen з будь-яким агентом.",
   "zen.how.step1.title": "Зареєструйтеся та додайте $20 балансу",
   "zen.how.step1.beforeLink": "дотримуйтесь",
   "zen.how.step1.link": "інструкцій з налаштування",
@@ -204,7 +204,7 @@ export const dict = {
   "zen.privacy.exceptionsLink": "такими винятками",
 
   "go.promo.minimaxM31FlashFree": "MiniMax M3.1 Flash Free уже доступна в Go безкоштовно протягом обмеженого часу.",
-  "go.title": "OpenCode Go | Недорогі моделі кодування для всіх",
+  "go.title": "LutungCode Go | Недорогі моделі кодування для всіх",
   "go.meta.description":
     "Go коштує $10/місяць, зі щедрими лімітами використання та надійним доступом до провідних моделей для кодування.",
   "go.hero.title": "Недорогі моделі кодування для всіх",
@@ -240,13 +240,13 @@ export const dict = {
 
   "go.problem.title": "Яку проблему вирішує Go?",
   "go.problem.body":
-    "Ми зосереджені на тому, щоб зробити досвід OpenCode доступним для якомога більшої кількості людей. OpenCode Go — це недорога підписка за $10/місяць. Вона надає щедрі ліміти та надійний доступ до найкращих моделей з відкритим кодом.",
+    "Ми зосереджені на тому, щоб зробити досвід LutungCode доступним для якомога більшої кількості людей. LutungCode Go — це недорога підписка за $10/місяць. Вона надає щедрі ліміти та надійний доступ до найкращих моделей з відкритим кодом.",
   "go.problem.item1": "Недорога підписка",
   "go.problem.item2": "Щедрі ліміти та надійний доступ",
   "go.problem.item3": "Створено для якомога більшої кількості програмістів",
   "go.problem.item4": "Добірка моделей, протестованих для агентного кодування",
   "go.how.title": "Як працює Go",
-  "go.how.body": "Go коштує $10/місяць. Використовуйте з OpenCode або будь-яким агентом.",
+  "go.how.body": "Go коштує $10/місяць. Використовуйте з LutungCode або будь-яким агентом.",
   "go.how.step1.title": "Створіть обліковий запис",
   "go.how.step1.beforeLink": "дотримуйтесь",
   "go.how.step1.link": "інструкцій з налаштування",
@@ -255,7 +255,7 @@ export const dict = {
   "go.how.step2.afterLink": "із щедрими лімітами",
   "go.how.step3.title": "Почніть кодувати",
   "go.how.step3.body": "з надійним доступом до моделей з відкритим кодом",
-  "go.faq.q1": "Що таке OpenCode Go?",
+  "go.faq.q1": "Що таке LutungCode Go?",
   "go.faq.a1":
     "Go — це недорога підписка, яка надає надійний доступ до найкращих моделей з відкритим кодом для агентного кодування.",
   "go.faq.q2": "Які моделі включає Go?",
@@ -304,12 +304,12 @@ export const dict = {
   "go.faq.a10":
     "Ви можете претендувати на повернення, якщо кошти було списано протягом останніх 14 днів і ви не використали ліміт Go протягом цього розрахункового періоду. {{contact}}, щоб подати запит на повернення.",
 
-  "download.title": "OpenCode | Завантажити",
-  "download.meta.description": "Завантажте OpenCode для macOS, Windows та Linux",
-  "download.section.terminal": "Термінал OpenCode",
-  "download.section.desktop": "Десктоп OpenCode",
-  "download.section.extensions": "Розширення OpenCode",
-  "download.section.integrations": "Інтеграції OpenCode",
+  "download.title": "LutungCode | Завантажити",
+  "download.meta.description": "Завантажте LutungCode для macOS, Windows та Linux",
+  "download.section.terminal": "Термінал LutungCode",
+  "download.section.desktop": "Десктоп LutungCode",
+  "download.section.extensions": "Розширення LutungCode",
+  "download.section.integrations": "Інтеграції LutungCode",
   "download.action.download": "Завантажити",
   "download.action.install": "Встановити",
 
@@ -325,18 +325,18 @@ export const dict = {
   "download.faq.a3.localLink": "локальними моделями",
   "download.faq.a3.afterLocal.beforeZen": "безкоштовно. Хоча ми рекомендуємо",
   "download.faq.a3.afterZen":
-    ", OpenCode працює з усіма популярними провайдерами, такими як OpenAI, Anthropic, xAI тощо.",
+    ", LutungCode працює з усіма популярними провайдерами, такими як OpenAI, Anthropic, xAI тощо.",
 
-  "download.faq.a5.p1": "OpenCode є 100% безкоштовним.",
+  "download.faq.a5.p1": "LutungCode є 100% безкоштовним.",
   "download.faq.a5.p2.beforeZen":
     "Будь-які додаткові витрати будуть з вашої підписки у провайдера моделі. Ми рекомендуємо",
   "download.faq.a5.p2.afterZen": ".",
 
-  "enterprise.title": "OpenCode | Enterprise-рішення для вашої організації",
-  "enterprise.meta.description": "Зв'яжіться з OpenCode для Enterprise-рішень",
+  "enterprise.title": "LutungCode | Enterprise-рішення для вашої організації",
+  "enterprise.meta.description": "Зв'яжіться з LutungCode для Enterprise-рішень",
   "enterprise.hero.title": "Ваш код належить вам",
   "enterprise.hero.body1":
-    "OpenCode працює безпечно всередині вашої організації без зберігання даних, ліцензійних обмежень. Почніть пробний період із командою, потім розгорніть через SSO та внутрішній AI-шлюз.",
+    "LutungCode працює безпечно всередині вашої організації без зберігання даних, ліцензійних обмежень. Почніть пробний період із командою, потім розгорніть через SSO та внутрішній AI-шлюз.",
   "enterprise.hero.body2": "Дайте знати, чим ми можемо допомогти.",
   "enterprise.form.name.label": "Повне ім'я",
   "enterprise.form.name.placeholder": "Джеф Безос",
@@ -367,29 +367,29 @@ export const dict = {
   "enterprise.form.error.invalidInferenceSpend": "Виберіть допустимий діапазон витрат на інференс.",
   "enterprise.form.error.internalServer": "Внутрішня помилка сервера.",
   "enterprise.faq.title": "FAQ",
-  "enterprise.faq.q1": "Що таке OpenCode Enterprise?",
+  "enterprise.faq.q1": "Що таке LutungCode Enterprise?",
   "enterprise.faq.a1":
-    "OpenCode Enterprise для організацій, які хочуть гарантувати, що код і дані ніколи не залишають їхню інфраструктуру.",
-  "enterprise.faq.q2": "Як почати з OpenCode Enterprise?",
+    "LutungCode Enterprise для організацій, які хочуть гарантувати, що код і дані ніколи не залишають їхню інфраструктуру.",
+  "enterprise.faq.q2": "Як почати з LutungCode Enterprise?",
   "enterprise.faq.a2":
-    "Почніть із внутрішнього тестування з командою. OpenCode за замовчуванням не зберігає код. Потім зв'яжіться з нами для обговорення цін.",
+    "Почніть із внутрішнього тестування з командою. LutungCode за замовчуванням не зберігає код. Потім зв'яжіться з нами для обговорення цін.",
   "enterprise.faq.q3": "Як працює ціноутворення enterprise?",
   "enterprise.faq.a3":
     "Ми пропонуємо ціну за робоче місце. Якщо у вас власний LLM-шлюз, ми не стягуємо плату за токени.",
-  "enterprise.faq.q4": "Чи безпечні мої дані з OpenCode Enterprise?",
+  "enterprise.faq.q4": "Чи безпечні мої дані з LutungCode Enterprise?",
   "enterprise.faq.a4":
-    "Так. OpenCode не зберігає ваш код або контекст. Вся обробка відбувається локально або через прямі API-виклики.",
+    "Так. LutungCode не зберігає ваш код або контекст. Вся обробка відбувається локально або через прямі API-виклики.",
 
-  "brand.title": "OpenCode | Бренд",
-  "brand.meta.description": "Рекомендації щодо бренду OpenCode",
+  "brand.title": "LutungCode | Бренд",
+  "brand.meta.description": "Рекомендації щодо бренду LutungCode",
   "brand.heading": "Рекомендації щодо бренду",
-  "brand.subtitle": "Ресурси та матеріали для роботи з брендом OpenCode.",
+  "brand.subtitle": "Ресурси та матеріали для роботи з брендом LutungCode.",
   "brand.downloadAll": "Завантажити всі матеріали",
 
-  "changelog.title": "OpenCode | Журнал змін",
-  "changelog.meta.description": "Нотатки про випуски та журнал змін OpenCode",
+  "changelog.title": "LutungCode | Журнал змін",
+  "changelog.meta.description": "Нотатки про випуски та журнал змін LutungCode",
   "changelog.hero.title": "Журнал змін",
-  "changelog.hero.subtitle": "Нові оновлення та покращення OpenCode",
+  "changelog.hero.subtitle": "Нові оновлення та покращення LutungCode",
   "changelog.empty": "Записів у журналі змін не знайдено.",
   "changelog.viewJson": "Переглянути JSON",
 }

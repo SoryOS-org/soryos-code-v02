@@ -1,17 +1,17 @@
 <p align="center">
-  <a href="https://opencode.ai">
+  <a href="https://lutungcode.ai">
     <picture>
       <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="LutungCode logo">
     </picture>
   </a>
 </p>
 <p align="center">The open source AI coding agent.</p>
 <p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/@opencode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@opencode/cli?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
+  <a href="https://lutungcode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://www.npmjs.com/package/@lutungcode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@lutungcode/cli?style=flat-square" /></a>
+  <a href="https://github.com/anomalyco/lutungcode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/lutungcode/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
 <p align="center">
@@ -39,63 +39,34 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+[![LutungCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://lutungcode.ai)
 
 ---
 
 ### Installation
 
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/v2/install | bash
-
-# Package managers
-npm i -g @opencode/cli@latest      # or bun/pnpm/yarn
-brew install anomalyco/tap/opencode-v2 # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-beta              # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run github:anomalyco/opencode  # Nix
-```
-
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
-
-### Desktop App (BETA)
-
-OpenCode is also available as a desktop application. Download it from [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-win-x64.exe`     |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+Hosted downloads, package registries, and update checks stay disabled until their endpoints are configured. Install a local binary with:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
+./install --binary /path/to/lutungcode
 ```
-
-#### Installation Directory
-
-The install script respects the following priority order for the installation path:
-
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
 
 ```bash
 # Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/v2/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/v2/install | bash
+LUTUNGCODE_INSTALL_DIR=/usr/local/bin ./install --binary /path/to/lutungcode
+XDG_BIN_DIR=$HOME/.local/bin ./install --binary /path/to/lutungcode
 ```
+
+The install script respects the following priority order for the installation path:
+
+1. `$LUTUNGCODE_INSTALL_DIR` - Custom installation directory
+2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
+3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
+4. `$HOME/.lutungcode/bin` - Default fallback
 
 ### Agents
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+LutungCode includes two built-in agents you can switch between with the `Tab` key.
 
 - **build** - Default, full-access agent for development work
 - **plan** - Read-only agent for analysis and code exploration
@@ -106,20 +77,20 @@ OpenCode includes two built-in agents you can switch between with the `Tab` key.
 Also included is a **general** subagent for complex searches and multistep tasks.
 This is used internally and can be invoked using `@general` in messages.
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+Learn more about [agents](https://lutungcode.ai/docs/agents).
 
 ### Documentation
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+For more info on how to configure LutungCode, [**head over to our docs**](https://lutungcode.ai/docs).
 
 ### Contributing
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+If you're interested in contributing to LutungCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
-### Building on OpenCode
+### Building on LutungCode
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+If you are working on a project that's related to LutungCode and is using "lutungcode" as part of its name, for example "lutungcode-dashboard" or "lutungcode-mobile", please add a note to your README to clarify that it is not built by the LutungCode team and is not affiliated with us in any way.
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+**Join our community** [Discord](https://discord.gg/lutungcode) | [X.com](https://x.com/lutungcode)

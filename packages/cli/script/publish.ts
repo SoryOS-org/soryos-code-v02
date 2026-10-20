@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 import { $ } from "bun"
 import pkg from "../package.json"
-import { Script } from "@opencode/script"
+import { Script } from "@lutungcode/script"
+import { endpoints } from "@lutungcode/util/identity"
 import { fileURLToPath } from "url"
 import { existsSync } from "fs"
 import { chmod, rm, utimes } from "node:fs/promises"
@@ -9,7 +10,7 @@ import path from "node:path"
 import { UpdateArtifact } from "../../../script/update-artifact"
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
-const root = path.resolve(process.env.OPENCODE_CLI_DIST ?? path.join(dir, "dist"))
+const root = path.resolve(process.env.LUTUNGCODE_CLI_DIST ?? path.join(dir, "dist"))
 process.chdir(dir)
 const dryRun = process.argv.includes("--dry-run")
 
@@ -68,11 +69,13 @@ async function publishDistribution(input: {
           [input.command]: `./bin/${input.command}.exe`,
           ...(input.legacyCommand ? { [input.legacyCommand]: `./bin/${input.command}.exe` } : {}),
         },
-        ...(input.command !== input.binary ? { opencodeSourceBinary: input.binary } : {}),
+        ...(input.command !== input.binary ? { lutungcodeSourceBinary: input.binary } : {}),
         scripts: { postinstall: "node ./postinstall.mjs" },
         version,
         license: pkg.license,
-        repository: { type: "git", url: "git+https://github.com/anomalyco/opencode.git" },
+        ...(endpoints.githubRepository
+          ? { repository: { type: "git", url: `git+https://github.com/${endpoints.githubRepository}.git` } }
+          : {}),
         os: ["darwin", "linux", "win32"],
         cpu: ["arm64", "x64"],
         optionalDependencies: binaries,
@@ -84,7 +87,7 @@ async function publishDistribution(input: {
 
   await Promise.all(
     Object.entries(binaries).map(([name, version]) =>
-      publish(`${input.root}/${name.replace("@opencode/", "")}`, name, version),
+      publish(`${input.root}/${name.replace("@lutungcode/", "")}`, name, version),
     ),
   )
   await publish(`${input.root}/${input.name}`, input.name, version)
@@ -93,7 +96,7 @@ async function publishDistribution(input: {
     files: await Promise.all(
       Object.keys(binaries).map((name) =>
         archive(
-          path.join(input.root, name.replace("@opencode/", ""), "bin"),
+          path.join(input.root, name.replace("@lutungcode/", ""), "bin"),
           name.slice(input.packagePrefix.length),
           input.binary,
           input.root,
@@ -105,7 +108,7 @@ async function publishDistribution(input: {
   const artifact = {
     channel: Script.channel,
     name: input.artifact,
-    distribution: "opencode",
+    distribution: "lutungcode",
     version,
     metadata: { files },
   }
@@ -126,32 +129,35 @@ async function publishDistribution(input: {
 await publishDistribution({
   root,
   name: pkg.name,
-  command: "opencode",
-  legacyCommand: "opencode2",
-  binary: "opencode",
-  packagePrefix: "@opencode/cli-",
+  command: "lutungcode",
+  binary: "lutungcode",
+  packagePrefix: "@lutungcode/cli-",
   artifact: "cli",
 })
 if (Script.channel !== "latest" && existsSync(path.join(root, "node"))) {
   await publishDistribution({
     root: path.join(root, "node"),
-    name: "@opencode/cli-node",
-    command: "opencode2-node",
-    binary: "opencode2-node",
-    packagePrefix: "@opencode/cli-node-",
+    name: "@lutungcode/cli-node",
+    command: "lutungcode",
+    binary: "lutungcode",
+    packagePrefix: "@lutungcode/cli-node-",
     artifact: "cli-node",
   })
 }
 
 if (Script.channel === "latest" && Script.release && !dryRun) {
-  await $`docker buildx build --platform linux/amd64,linux/arm64 --tag ghcr.io/anomalyco/opencode:${Script.version} --push .`
+  if (!endpoints.containerRepository) throw new Error("LutungCode container repository is not configured")
+  await $`docker buildx build --platform linux/amd64,linux/arm64 --tag ${endpoints.containerRepository}:${Script.version} --push .`
 }
 
 if ((Script.channel === "beta" || Script.channel === "latest") && Script.release) {
-  await $`bun ./script/publish-aur.ts ${dryRun ? ["--dry-run"] : []}`.env({ ...process.env, OPENCODE_CLI_DIST: root })
+  if (!endpoints.homebrewFormula || !endpoints.aurPackage) {
+    throw new Error("LutungCode package listings are not configured")
+  }
+  await $`bun ./script/publish-aur.ts ${dryRun ? ["--dry-run"] : []}`.env({ ...process.env, LUTUNGCODE_CLI_DIST: root })
   await $`bun ./script/publish-homebrew.ts ${dryRun ? ["--dry-run"] : []}`.env({
     ...process.env,
-    OPENCODE_CLI_DIST: root,
+    LUTUNGCODE_CLI_DIST: root,
   })
 }
 

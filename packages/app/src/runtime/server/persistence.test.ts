@@ -72,22 +72,22 @@ describe("server persistence schema", () => {
   })
 
   test("moves canonical project buckets without changing server keys or unrelated scopes", () => {
-    const schema = serverSchema(() => "https://opencode.example.com")
+    const schema = serverSchema(() => "https://lutungcode.example.com")
 
     const state = Schema.decodeUnknownSync(schema)({
-      list: ["https://opencode.example.com"],
-      hidden: { "https://opencode.example.com": true },
+      list: ["https://lutungcode.example.com"],
+      hidden: { "https://lutungcode.example.com": true },
       projects: {
         local: [{ worktree: "/local", expanded: false }],
-        "https://opencode.example.com": [
+        "https://lutungcode.example.com": [
           { worktree: "/local", expanded: true },
           { worktree: "/remote", expanded: true },
           { worktree: "/remote", expanded: false },
         ],
         other: [{ worktree: "/other", expanded: true }],
       },
-      lastProject: { local: "/local", "https://opencode.example.com": "/remote", other: "/other" },
-      recentlyClosed: { local: ["/closed"], "https://opencode.example.com": ["/old-closed"] },
+      lastProject: { local: "/local", "https://lutungcode.example.com": "/remote", other: "/other" },
+      recentlyClosed: { local: ["/closed"], "https://lutungcode.example.com": ["/old-closed"] },
     })
 
     expect(state.projects).toEqual({
@@ -98,9 +98,9 @@ describe("server persistence schema", () => {
       other: [{ worktree: "/other", expanded: true }],
     })
     expect(state.lastProject).toEqual({ local: "/local", other: "/other" })
-    expect(state.list[0]?.http.url).toBe("https://opencode.example.com")
-    expect(state.hidden).toEqual({ "https://opencode.example.com": true })
-    expect(state.recentlyClosed).toEqual({ local: ["/closed"], "https://opencode.example.com": ["/old-closed"] })
+    expect(state.list[0]?.http.url).toBe("https://lutungcode.example.com")
+    expect(state.hidden).toEqual({ "https://lutungcode.example.com": true })
+    expect(state.recentlyClosed).toEqual({ local: ["/closed"], "https://lutungcode.example.com": ["/old-closed"] })
     expect(Schema.encodeSync(schema)(state)).toEqual(state)
     expect(Schema.decodeUnknownSync(schema)(state)).toEqual(state)
   })

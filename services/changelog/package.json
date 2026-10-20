@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode/changelog",
+  "name": "@lutungcode/changelog",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,35 +1,35 @@
 ---
 title: "Web Search"
-description: "Hosted web search for OpenCode through Console."
+description: "Hosted web search for LutungCode through Console."
 ---
 
-Console provides hosted web search to connected OpenCode v2 users. A workspace owner or admin enables it once for the workspace, without giving members a separate search provider key.
+Console provides hosted web search to connected LutungCode v2 users. A workspace owner or admin enables it once for the workspace, without giving members a separate search provider key.
 
 Each successful search costs **$0.01** and counts toward the workspace balance and member spending limits.
 
 ## Enable
 
-1. Sign in to the [Console](https://opencode.ai/console) as a workspace owner or admin.
+1. Sign in to the [Console](https://lutungcode.ai/console) as a workspace owner or admin.
 2. Open **Settings** > **General**.
 3. Turn on **Hosted web search**.
 
-Each member then connects OpenCode to the workspace with `/connect`.
+Each member then connects LutungCode to the workspace with `/connect`.
 
 ```text
 /connect
 ```
 
-OpenCode loads **OpenCode Web Search** from the workspace's managed configuration. Members do not need to set `websearch.provider` or add a provider API key.
+LutungCode loads **LutungCode Web Search** from the workspace's managed configuration. Members do not need to set `websearch.provider` or add a provider API key.
 
 ## Search
 
-Ask OpenCode for current information in a prompt. Searches run from OpenCode rather than from an interactive page in Console.
+Ask LutungCode for current information in a prompt. Searches run from LutungCode rather than from an interactive page in Console.
 
 ```text
 Find the latest Bun release and summarize the changes with source links.
 ```
 
-The hosted provider searches the public web and returns up to eight results. OpenCode uses the results to answer the prompt and cite sources.
+The hosted provider searches the public web and returns up to eight results. LutungCode uses the results to answer the prompt and cite sources.
 
 See the [Websearch guide](/websearch) to configure permissions or disable the tool.
 

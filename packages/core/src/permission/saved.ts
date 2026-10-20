@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm"
 import { Cause, Context, DateTime, Effect, Layer, Schema } from "effect"
 import { isSqlError } from "effect/sql/SqlError"
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core/errors"
-import { Project } from "@opencode/schema/project"
+import { Project } from "@lutungcode/schema/project"
 import { Database } from "../database/database.js"
-import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { makeGlobalNode } from "@lutungcode/util/effect/app-node"
 import { PermissionTable } from "./sql.js"
-import { PermissionSaved } from "@opencode/schema/permission-saved"
+import { PermissionSaved } from "@lutungcode/schema/permission-saved"
 
 export const ID = PermissionSaved.ID
 export type ID = typeof ID.Type
@@ -52,7 +52,7 @@ export interface Interface {
   readonly remove: (id: ID) => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/PermissionSaved") {}
+export class Service extends Context.Service<Service, Interface>()("@lutungcode/PermissionSaved") {}
 
 const layer = Layer.effect(
   Service,

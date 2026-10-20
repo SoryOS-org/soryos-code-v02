@@ -24,6 +24,6 @@ dist-ssr
 *.sw?
 out/
 
-resources/opencode-cli*
+resources/lutungcode-cli*
 resources/icons
 resources/*.metainfo.xml

@@ -1,5 +1,5 @@
-@import "@opencode/ui/text-input.css";
-@import "@opencode/ui/button.css";
+@import "@lutungcode/ui/text-input.css";
+@import "@lutungcode/ui/button.css";
 
 [data-component="tabs-v2"][data-variant="settings"] {
   height: 100%;

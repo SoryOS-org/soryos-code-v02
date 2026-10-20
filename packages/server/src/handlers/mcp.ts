@@ -1,5 +1,5 @@
-import { Mcp } from "@opencode/core/mcp/index"
-import { McpServerNotFoundError } from "@opencode/protocol/errors"
+import { Mcp } from "@lutungcode/core/mcp/index"
+import { McpServerNotFoundError } from "@lutungcode/protocol/errors"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { Api } from "../api"

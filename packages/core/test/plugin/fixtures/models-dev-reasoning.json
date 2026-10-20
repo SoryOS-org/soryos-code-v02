@@ -113,10 +113,10 @@
       }
     }
   },
-  "opencode-go": {
-    "id": "opencode-go",
-    "name": "OpenCode Go",
-    "env": ["OPENCODE_API_KEY"],
+  "lutungcode-go": {
+    "id": "lutungcode-go",
+    "name": "LutungCode Go",
+    "env": ["LUTUNGCODE_API_KEY"],
     "npm": "@ai-sdk/openai-compatible",
     "models": {
       "minimax-m3": {

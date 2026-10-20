@@ -1,11 +1,11 @@
 export * as SessionErrors from "./error.js"
 
 import { Schema } from "effect"
-import { Agent } from "@opencode/schema/agent"
-import { Skill } from "@opencode/schema/skill"
+import { Agent } from "@lutungcode/schema/agent"
+import { Skill } from "@lutungcode/schema/skill"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
-import { SessionError } from "@opencode/schema/session-error"
+import { SessionError } from "@lutungcode/schema/session-error"
 
 export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Session.NotFoundError", {
   sessionID: SessionSchema.ID,

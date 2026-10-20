@@ -427,10 +427,10 @@ const stateFamilies = {
 } satisfies Record<string, (direction: StateDiagramDirection, profile: LabelProfile) => string>
 
 export const deploymentArchitectureSource = `flowchart LR
-    Client[OpenCode client]
+    Client[LutungCode client]
 
     subgraph CF[Cloudflare]
-      DNS[opencode.ai]
+      DNS[lutungcode.ai]
       Web[Console frontend Worker]
       Proxy[Console API proxy Worker]
       Infer[inference-next Worker]

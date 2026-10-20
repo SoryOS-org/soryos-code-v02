@@ -1,6 +1,6 @@
-import type { OpenCode } from "./client.js"
+import type { LutungCode } from "./client.js"
 
-type Client = ReturnType<typeof OpenCode.make>
+type Client = ReturnType<typeof LutungCode.make>
 
 export type { RpcApi, RpcCallOptions, RpcClient, RpcEventPayload } from "./rpc.js"
 

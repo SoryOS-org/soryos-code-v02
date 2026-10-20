@@ -2,7 +2,7 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
 import { HttpClientRequest } from "effect/http"
 import { Evaluation, EvaluationClient } from "../src/experimental.js"
-import { OpenCode, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
+import { LutungCode, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
 import { it } from "./lib/effect.js"
 import { dynamicResponse } from "./lib/http.js"
 
@@ -116,9 +116,9 @@ describe("experimental Evaluation", () => {
     ),
   )
 
-  it.effect("configures the OpenCode System One endpoint", () =>
+  it.effect("configures the LutungCode System One endpoint", () =>
     Evaluation.run({
-      model: OpenCode.configure({ apiKey: "opencode-key", baseURL: "https://opencode.test/v1" }).experimental.evaluation(
+      model: LutungCode.configure({ apiKey: "lutungcode-key", baseURL: "https://lutungcode.test/v1" }).experimental.evaluation(
         "jev-1.13",
       ),
       state: "hello",
@@ -128,7 +128,7 @@ describe("experimental Evaluation", () => {
         Effect.sync(() => {
           expect(response.answers.greeting.probability).toBe(0.99)
           expect(response.usage?.providerMetadata).toEqual({
-            opencode: { input_tokens: 10, output_tokens: 2 },
+            lutungcode: { input_tokens: 10, output_tokens: 2 },
           })
         }),
       ),
@@ -136,8 +136,8 @@ describe("experimental Evaluation", () => {
         EvaluationClient.layer.pipe(
           Layer.provide(
             dynamicResponse((input) => {
-              expect(input.request.url).toBe("https://opencode.test/v1/systemone")
-              expect(input.request.headers.authorization).toBe("Bearer opencode-key")
+              expect(input.request.url).toBe("https://lutungcode.test/v1/systemone")
+              expect(input.request.headers.authorization).toBe("Bearer lutungcode-key")
               return Effect.succeed(
                 input.respond(
                   JSON.stringify({

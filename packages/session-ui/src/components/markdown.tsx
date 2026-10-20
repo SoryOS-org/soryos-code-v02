@@ -1,5 +1,5 @@
-import { useI18n } from "@opencode/ui/context/i18n"
-import { checksum } from "@opencode/util/encode"
+import { useI18n } from "@lutungcode/ui/context/i18n"
+import { checksum } from "@lutungcode/util/encode"
 import {
   type ComponentProps,
   createEffect,
@@ -11,9 +11,9 @@ import {
   splitProps,
 } from "solid-js"
 import { isServer, render } from "solid-js/web"
-import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
-import { Tooltip } from "@opencode/ui/tooltip"
+import { Icon } from "@lutungcode/ui/icon"
+import { IconButton } from "@lutungcode/ui/icon-button"
+import { Tooltip } from "@lutungcode/ui/tooltip"
 import { canReusePendingBlock, completedProjection } from "./markdown-projection"
 import type { Block, Projection } from "./markdown-stream"
 import {
@@ -1029,7 +1029,7 @@ function updateCodeBlock(
   wrapper.setAttribute("data-component", "markdown-code")
   applyCodeMetadata(wrapper, block.language)
   const pre = document.createElement("pre")
-  pre.className = "shiki OpenCode"
+  pre.className = "shiki LutungCode"
   const codeElement = document.createElement("code")
   codeElement.className = `language-${block.language}`
   ;[...block.stable, ...block.unstable].map(createTokenSpan).forEach((span) => codeElement.appendChild(span))

@@ -1,5 +1,5 @@
 import { createMiddleware } from "@solidjs/start/middleware"
-import { Resource } from "@opencode/console-resource"
+import { Resource } from "@lutungcode/console-resource"
 import { LOCALE_HEADER, cookie, fromPathname, strip } from "~/lib/language"
 import { sanitizeServerActionRequest } from "~/lib/server-action"
 

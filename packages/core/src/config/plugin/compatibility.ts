@@ -1,7 +1,7 @@
 export * as ConfigCompatibilityPlugin from "./compatibility.js"
 
-import { define } from "@opencode/plugin/effect/plugin"
-import { FSUtil } from "@opencode/util/fs-util"
+import { define } from "@lutungcode/plugin/effect/plugin"
+import { FSUtil } from "@lutungcode/util/fs-util"
 import path from "path"
 import { Effect, FiberMap, PubSub, Semaphore, Stream } from "effect"
 import { Config } from "../../config.js"
@@ -11,7 +11,7 @@ import { SkillFile } from "./skill-file.js"
 import { SkillScan } from "./skill-scan.js"
 
 export const Plugin = define({
-  id: "opencode.config.compatibility",
+  id: "lutungcode.config.compatibility",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service

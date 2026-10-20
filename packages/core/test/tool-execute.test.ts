@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
-import { CodeModeTool } from "@opencode/core/codemode/tool"
-import { Tool } from "@opencode/core/tool"
-import { execute } from "@opencode/core/tool/runtime"
-import { Agent } from "@opencode/schema/agent"
-import { Session } from "@opencode/schema/session"
-import { SessionMessage } from "@opencode/schema/session-message"
-import type { Info } from "@opencode/schema/tool"
+import { CodeModeTool } from "@lutungcode/core/codemode/tool"
+import { Tool } from "@lutungcode/core/tool"
+import { execute } from "@lutungcode/core/tool/runtime"
+import { Agent } from "@lutungcode/schema/agent"
+import { Session } from "@lutungcode/schema/session"
+import { SessionMessage } from "@lutungcode/schema/session-message"
+import type { Info } from "@lutungcode/schema/tool"
 import { Effect, Schema } from "effect"
 
 const context = {

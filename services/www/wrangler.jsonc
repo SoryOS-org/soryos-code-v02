@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "opencode-www",
+  "name": "lutungcode-www",
   "compatibility_date": "2026-07-25",
   "workers_dev": false,
   "preview_urls": false,
@@ -15,20 +15,20 @@
   },
   "env": {
     "dev": {
-      "name": "opencode-www-dev",
+      "name": "lutungcode-www-dev",
       "routes": [
         {
-          "pattern": "dev.opencode.ai/v2*",
-          "zone_name": "opencode.ai",
+          "pattern": "dev.lutungcode.ai/v2*",
+          "zone_name": "lutungcode.ai",
         },
       ],
     },
     "production": {
-      "name": "opencode-www-production",
+      "name": "lutungcode-www-production",
       "routes": [
         {
-          "pattern": "opencode.ai/v2*",
-          "zone_name": "opencode.ai",
+          "pattern": "lutungcode.ai/v2*",
+          "zone_name": "lutungcode.ai",
         },
       ],
     },

@@ -34,7 +34,7 @@ const identifier = /^[a-zA-Z0-9._-]{1,64}$/
 const version = /^[a-zA-Z0-9.+_-]{1,128}$/
 const select =
   "SELECT channel, name, distribution, version, metadata, active, minimum, time_created, time_updated FROM artifact"
-const audience = "https://update.opencode.ai"
+const audience = "https://update.lutungcode.ai"
 const githubKeys = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"))
 // Clients poll every lookup path, and querying D1 on each request overloaded it.
 // Cache the caller-independent reads per isolate; caller-specific selection still runs per request.
@@ -46,7 +46,7 @@ export default {
     const url = new URL(request.url)
     // The legacy hostname only exposes /admin, covered by its existing Access policy.
     const prefix =
-      url.hostname !== "update.opencode.ai" && (url.pathname === "/update" || url.pathname.startsWith("/update/"))
+      url.hostname !== "update.lutungcode.ai" && (url.pathname === "/update" || url.pathname.startsWith("/update/"))
         ? "/update"
         : ""
     const pathname = url.pathname.slice(prefix.length) || "/"
@@ -68,7 +68,7 @@ export default {
       ]).catch(() => console.error("Failed to send update request event to the data lake")),
     )
 
-    if (pathname === "/") return json({ service: "opencode-update" })
+    if (pathname === "/") return json({ service: "lutungcode-update" })
     if (pathname === "/admin" && request.method === "GET") return admin(request, env, prefix)
     if (pathname === "/admin/activate" && request.method === "POST") return markArtifact(request, env, "active", prefix)
     if (pathname === "/admin/minimum" && request.method === "POST") return markArtifact(request, env, "minimum", prefix)
@@ -91,7 +91,7 @@ export default {
 
 async function lookup(request: Request, env: Env, url: URL, path: string[]) {
   const resolved = resolveChannel(path[0])
-  const agent = request.headers.get("User-Agent")?.match(/^opencode\/(?:([^/]+)\/([^/]+)\/cli|(.*))$/)
+  const agent = request.headers.get("User-Agent")?.match(/^lutungcode\/(?:([^/]+)\/([^/]+)\/cli|(.*))$/)
   const current = url.searchParams.get("current") ?? agent?.[2] ?? agent?.[3]
   const source = agent?.[1] ?? current?.match(/^v?0\.0\.0-(.+)-\d+(?:\.\d+)?(?:\+.*)?$/)?.[1]
   const caller = source === undefined || resolveChannel(source) === resolved ? current : undefined
@@ -354,7 +354,7 @@ async function admin(request: Request, env: Env, prefix: string) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OpenCode Update</title>
+  <title>LutungCode Update</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat.cdn.min.css">
   <style>
     body { min-height: 100vh; background: var(--background); }
@@ -578,12 +578,17 @@ type GitHubClaims = JWTPayload & {
   actor: string
 }
 
+const releaseRepository = ""
+const releaseRepositoryId = ""
+const releaseOwnerId = ""
+
 export function validGitHubClaims(claims: JWTPayload): claims is GitHubClaims {
-  if (claims.repository !== "anomalyco/opencode") return false
-  if (claims.repository_id !== "975734319") return false
-  if (claims.repository_owner_id !== "66570915") return false
+  if (!releaseRepository || !releaseRepositoryId || !releaseOwnerId) return false
+  if (claims.repository !== releaseRepository) return false
+  if (claims.repository_id !== releaseRepositoryId) return false
+  if (claims.repository_owner_id !== releaseOwnerId) return false
   if (typeof claims.workflow_ref !== "string" || typeof claims.ref !== "string") return false
-  if (claims.workflow_ref !== `anomalyco/opencode/.github/workflows/publish.yml@${claims.ref}`) return false
+  if (claims.workflow_ref !== `${releaseRepository}/.github/workflows/publish.yml@${claims.ref}`) return false
   if (!channelsForRef(claims.ref).length) return false
   return [claims.sha, claims.run_id, claims.run_attempt, claims.actor].every((value) => typeof value === "string")
 }

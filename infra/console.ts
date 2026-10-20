@@ -3,7 +3,7 @@ import { EMAILOCTOPUS_API_KEY } from "./app"
 
 // Preview stages have no new Console or inference deployment to forward to.
 const migrationDomain =
-  $app.stage === "production" ? "opencode.ai" : $app.stage === "dev" ? "dev.opencode.ai" : undefined
+  $app.stage === "production" ? "lutungcode.ai" : $app.stage === "dev" ? "dev.lutungcode.ai" : undefined
 const consoleMigration = new sst.Linkable("ConsoleMigration", {
   properties: {
     consoleUrl: migrationDomain ? `https://${migrationDomain}/console` : "",
@@ -22,7 +22,7 @@ new sst.cloudflare.Bucket("ZenDataNew")
 const AWS_SES_ACCESS_KEY_ID = new sst.Secret("AWS_SES_ACCESS_KEY_ID")
 const AWS_SES_SECRET_ACCESS_KEY = new sst.Secret("AWS_SES_SECRET_ACCESS_KEY")
 const ENTERPRISE_SALES_INBOX_EMAIL = new sst.Secret("ENTERPRISE_SALES_INBOX_EMAIL")
-// OpenCode API key for Jev spam scoring of enterprise form submissions.
+// LutungCode API key for Jev spam scoring of enterprise form submissions.
 const ENTERPRISE_SPAM_API_KEY = new sst.Secret("ENTERPRISE_SPAM_API_KEY")
 
 const SALESFORCE_CLIENT_ID = new sst.Secret("SALESFORCE_CLIENT_ID")
@@ -67,7 +67,7 @@ new sst.cloudflare.x.SolidStart("Console", {
           if (migrationDomain)
             args.bindings = $resolve(args.bindings).apply((bindings) => [
               ...(bindings ?? []),
-              { type: "service", name: "INFERENCE", service: `opencode-inference-${$app.stage}` },
+              { type: "service", name: "INFERENCE", service: `lutungcode-inference-${$app.stage}` },
             ])
         },
       },

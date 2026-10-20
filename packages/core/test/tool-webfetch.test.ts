@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test"
 import { Duration, Effect, Fiber, Layer, Schema } from "effect"
 import * as TestClock from "effect/testing/TestClock"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { LayerNode } from "@opencode/util/effect/layer-node"
-import { LayerNodePlatform } from "@opencode/util/effect/app-node-platform"
-import { Permission } from "@opencode/core/permission"
-import { Session } from "@opencode/core/session"
-import { Tool } from "@opencode/core/tool"
-import { WebFetchTool } from "@opencode/core/tool/plugin/webfetch"
-import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { Image } from "@opencode/core/image"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
+import { LayerNodePlatform } from "@lutungcode/util/effect/app-node-platform"
+import { Permission } from "@lutungcode/core/permission"
+import { Session } from "@lutungcode/core/session"
+import { Tool } from "@lutungcode/core/tool"
+import { WebFetchTool } from "@lutungcode/core/tool/plugin/webfetch"
+import { makeLocationNode } from "@lutungcode/util/effect/app-node"
+import { Image } from "@lutungcode/core/image"
 import { testEffect } from "./lib/effect"
 import { imagePassthrough } from "./lib/image"
 import { permissionLayer } from "./lib/permission"
@@ -24,7 +24,7 @@ const webFetchToolNode = makeLocationNode({
 
 const sessionID = Session.ID.make("ses_webfetch_test")
 const webFetchUserAgent =
-  "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OpenCode-User/1.0; +https://opencode.ai"
+  "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; LutungCode-User/1.0; +https://lutungcode.ai"
 const requests: Array<{ readonly url: string; readonly headers: Record<string, string> }> = []
 const assertions: Permission.AssertInput[] = []
 let respond = (_request: HttpClientRequest.HttpClientRequest) =>
@@ -625,7 +625,7 @@ describe("WebFetchTool registration", () => {
       })
       expect(requests).toHaveLength(2)
       expect(requests[0]?.headers["user-agent"]).toBe(webFetchUserAgent)
-      expect(requests[1]?.headers["user-agent"]).toBe("opencode")
+      expect(requests[1]?.headers["user-agent"]).toBe("lutungcode")
     }),
   )
 

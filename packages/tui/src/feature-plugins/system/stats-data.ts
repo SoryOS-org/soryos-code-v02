@@ -1,5 +1,5 @@
-import type { SessionStatsInfo } from "@opencode/client"
-import { TokenUsage } from "@opencode/schema/token-usage"
+import type { SessionStatsInfo } from "@lutungcode/client"
+import { TokenUsage } from "@lutungcode/schema/token-usage"
 
 export function statsMetrics(stats: SessionStatsInfo) {
   return [

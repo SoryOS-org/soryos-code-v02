@@ -12,24 +12,24 @@ import {
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { useData } from "../context"
-import { useDialog } from "@opencode/ui/context/dialog"
-import { useI18n } from "@opencode/ui/context/i18n"
+import { useDialog } from "@lutungcode/ui/context/dialog"
+import { useI18n } from "@lutungcode/ui/context/i18n"
 import { Markdown } from "../components/markdown"
-import { ImagePreview } from "@opencode/ui/image-preview"
-import { getFilename } from "@opencode/util/path"
+import { ImagePreview } from "@lutungcode/ui/image-preview"
+import { getFilename } from "@lutungcode/util/path"
 import { AttachmentCard } from "./attachment-card"
 import { CommentCard } from "./comment-card"
 import { TimelineSeparator } from "../components/timeline-separator"
-import { Tooltip } from "@opencode/ui/tooltip"
-import { IconButton } from "@opencode/ui/icon-button"
-import { Menu } from "@opencode/ui/menu"
-import { Icon } from "@opencode/ui/icon"
-import { Button } from "@opencode/ui/button"
-import { TextReveal } from "@opencode/ui/text-reveal"
-import { TextShimmer } from "@opencode/ui/text-shimmer"
+import { Tooltip } from "@lutungcode/ui/tooltip"
+import { IconButton } from "@lutungcode/ui/icon-button"
+import { Menu } from "@lutungcode/ui/menu"
+import { Icon } from "@lutungcode/ui/icon"
+import { Button } from "@lutungcode/ui/button"
+import { TextReveal } from "@lutungcode/ui/text-reveal"
+import { TextShimmer } from "@lutungcode/ui/text-shimmer"
 import { BasicTool } from "../components/basic-tool"
 import { reasoningHeading } from "../timeline/projection"
-import { Card } from "@opencode/ui/card"
+import { Card } from "@lutungcode/ui/card"
 import type {
   PromptAgentAttachment,
   PromptFileAttachment,
@@ -37,7 +37,7 @@ import type {
   SessionMessageAssistantReasoning,
   SessionMessageCompaction,
   SessionMessageUser,
-} from "@opencode/client/promise"
+} from "@lutungcode/client/promise"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 import { attached, typeLabel } from "../components/message-file"
 

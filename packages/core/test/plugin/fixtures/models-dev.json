@@ -11,9 +11,9 @@
     "env": [],
     "models": {}
   },
-  "opencode": {
-    "id": "opencode",
-    "name": "OpenCode",
+  "lutungcode": {
+    "id": "lutungcode",
+    "name": "LutungCode",
     "env": [],
     "npm": "@ai-sdk/openai-compatible",
     "models": {
@@ -27,7 +27,7 @@
         "temperature": false,
         "tool_call": true,
         "limit": { "context": 400000, "output": 128000 },
-        "provider": { "npm": "@ai-sdk/openai", "api": "https://console.opencode.ai/inference/openai/v1" }
+        "provider": { "npm": "@ai-sdk/openai", "api": "https://console.lutungcode.ai/inference/openai/v1" }
       }
     }
   }

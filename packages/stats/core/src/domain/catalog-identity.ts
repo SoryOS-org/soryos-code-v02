@@ -1,7 +1,7 @@
 import { statModel } from "./model-normalization"
 
-const CATALOG_URL = "https://models.opencode.ai/catalog.json"
-const STATS_PROVIDERS = ["opencode", "opencode-go"] as const
+const CATALOG_URL = "https://models.lutungcode.ai/catalog.json"
+const STATS_PROVIDERS = ["lutungcode", "lutungcode-go"] as const
 const cache: { value?: CatalogIdentity; expiresAt?: number } = {}
 
 export type CatalogIdentity = {
@@ -55,7 +55,7 @@ export function catalogIdentity(value: unknown): CatalogIdentity {
       })
     })
   })
-  if (offerings.size === 0) throw new Error("Model catalog has no canonical OpenCode offerings")
+  if (offerings.size === 0) throw new Error("Model catalog has no canonical LutungCode offerings")
 
   return {
     offerings,

@@ -98,7 +98,7 @@ describe("OpenAI Chat route", () => {
       )
       const azure = yield* compileRequest(
         LLM.request({
-          model: Azure.configure({ baseURL: "https://opencode-test.openai.azure.com/openai/", apiKey: "test" }).chat(
+          model: Azure.configure({ baseURL: "https://lutungcode-test.openai.azure.com/openai/", apiKey: "test" }).chat(
             "gpt-4o-mini",
           ),
           prompt: "Hello",
@@ -425,7 +425,7 @@ describe("OpenAI Chat route", () => {
     LLMClient.generate(
       LLMRequest.update(request, {
         model: Azure.configure({
-          baseURL: "https://opencode-test.openai.azure.com/openai/",
+          baseURL: "https://lutungcode-test.openai.azure.com/openai/",
           apiKey: "azure-key",
           headers: { authorization: "Bearer stale" },
         }).chat("gpt-4o-mini"),
@@ -435,7 +435,7 @@ describe("OpenAI Chat route", () => {
         dynamicResponse((input) =>
           Effect.gen(function* () {
             const web = yield* HttpClientRequest.toWeb(input.request).pipe(Effect.orDie)
-            expect(web.url).toBe("https://opencode-test.openai.azure.com/openai/v1/chat/completions?api-version=v1")
+            expect(web.url).toBe("https://lutungcode-test.openai.azure.com/openai/v1/chat/completions?api-version=v1")
             expect(web.headers.get("api-key")).toBe("azure-key")
             expect(web.headers.get("authorization")).toBeNull()
             return input.respond(sseEvents(deltaChunk({}, "stop")), {
@@ -564,7 +564,7 @@ describe("OpenAI Chat route", () => {
       const id = `call_${"a".repeat(48)}`
       const models = [
         model,
-        Azure.configure({ baseURL: "https://opencode-test.openai.azure.com/openai/", apiKey: "test" }).chat("gpt-4o"),
+        Azure.configure({ baseURL: "https://lutungcode-test.openai.azure.com/openai/", apiKey: "test" }).chat("gpt-4o"),
       ]
 
       yield* Effect.forEach(models, (selected) =>

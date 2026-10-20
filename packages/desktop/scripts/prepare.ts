@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { Script } from "@opencode/script"
+import { Script } from "@lutungcode/script"
 
 await import("./prebuild")
 

@@ -2,24 +2,24 @@
 title: "Config"
 ---
 
-Create `opencode.jsonc` in your project to configure OpenCode. Add the schema for editor validation, then set only the options you need.
+Create `lutungcode.jsonc` in your project to configure LutungCode. Add the schema for editor validation, then set only the options you need.
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://lutungcode.ai/config.json",
   "model": "anthropic/claude-sonnet-4-5",
 }
 ```
 
-You can also ask OpenCode to update this file for you.
+You can also ask LutungCode to update this file for you.
 
 ## Format
 
-OpenCode supports JSON and JSONC. Use JSONC when you want comments or trailing commas.
+LutungCode supports JSON and JSONC. Use JSONC when you want comments or trailing commas.
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://lutungcode.ai/config.json",
   // Use this model by default.
   "model": "anthropic/claude-sonnet-4-5",
 }
@@ -31,29 +31,29 @@ Put managed, machine-wide settings in the system configuration directory:
 
 | Platform | Directory                               |
 | -------- | --------------------------------------- |
-| macOS    | `/Library/Application Support/opencode` |
-| Linux    | `/etc/opencode`                         |
-| Windows  | `%ProgramData%\opencode`                |
+| macOS    | `/Library/Application Support/lutungcode` |
+| Linux    | `/etc/lutungcode`                         |
+| Windows  | `%ProgramData%\lutungcode`                |
 
 The system directory works like the global directory. Besides
-`opencode.json(c)`, it loads `agents/`, `commands/`, `skills/`, and `plugins/`
+`lutungcode.json(c)`, it loads `agents/`, `commands/`, `skills/`, and `plugins/`
 for every user on the machine:
 
 ```text
-/etc/opencode/
-├── opencode.json
+/etc/lutungcode/
+├── lutungcode.json
 ├── agents/review.md
 ├── commands/release.md
 └── skills/deploy/SKILL.md
 ```
 
-On macOS, OpenCode also reads managed preferences that MDM tools deploy for the
-`ai.opencode.managed` domain. A user-specific profile replaces the
+On macOS, LutungCode also reads managed preferences that MDM tools deploy for the
+`ai.lutungcode.managed` domain. A user-specific profile replaces the
 machine-wide one:
 
 ```text
-/Library/Managed Preferences/<user>/ai.opencode.managed.plist
-/Library/Managed Preferences/ai.opencode.managed.plist
+/Library/Managed Preferences/<user>/ai.lutungcode.managed.plist
+/Library/Managed Preferences/ai.lutungcode.managed.plist
 ```
 
 Managed settings have the highest precedence, so users and projects cannot
@@ -65,42 +65,42 @@ configuration to enforce restrictions.
 Put user settings for every project in the global configuration:
 
 ```text
-~/.config/opencode/opencode.json(c)
+~/.config/lutungcode/lutungcode.json(c)
 ```
 
 Put project settings in either of these files:
 
 ```text
-/home/user/projects/my-app/opencode.json(c)
-/home/user/projects/my-app/.opencode/opencode.json(c)
+/home/user/projects/my-app/lutungcode.json(c)
+/home/user/projects/my-app/.lutungcode/lutungcode.json(c)
 ```
 
-OpenCode searches from the current directory to the filesystem root. It first
-merges direct `opencode.json(c)` files from the farthest directory to the
-closest, then merges files inside `.opencode` directories in the same order.
-This means every discovered `.opencode` config overrides every direct config.
+LutungCode searches from the current directory to the filesystem root. It first
+merges direct `lutungcode.json(c)` files from the farthest directory to the
+closest, then merges files inside `.lutungcode` directories in the same order.
+This means every discovered `.lutungcode` config overrides every direct config.
 Use one form throughout a directory tree unless you need that behavior.
 
-For example, start OpenCode from `/home/user/projects/acme/packages/web`:
+For example, start LutungCode from `/home/user/projects/acme/packages/web`:
 
 ```text
-/etc/opencode/opencode.json
-~/.config/opencode/opencode.json
+/etc/lutungcode/lutungcode.json
+~/.config/lutungcode/lutungcode.json
 
 /home/user/projects/acme/
-├── opencode.json
+├── lutungcode.json
 └── packages/
     └── web/
-        ├── opencode.json
+        ├── lutungcode.json
         └── src/
 ```
 
-OpenCode applies these files from lowest to highest precedence:
+LutungCode applies these files from lowest to highest precedence:
 
-1. `~/.config/opencode/opencode.json`
-2. `/home/user/projects/acme/opencode.json`
-3. `/home/user/projects/acme/packages/web/opencode.json`
-4. `/etc/opencode/opencode.json`
+1. `~/.config/lutungcode/lutungcode.json`
+2. `/home/user/projects/acme/lutungcode.json`
+3. `/home/user/projects/acme/packages/web/lutungcode.json`
+4. `/etc/lutungcode/lutungcode.json`
 
 The package config overrides matching settings from the repository config,
 which overrides the global config. The system config overrides all of them.
@@ -110,15 +110,15 @@ policies outrank all of them.
 
 ## Schema
 
-The complete OpenCode configuration schema is available at
-[opencode.ai/config.json](https://opencode.ai/config.json).
+The complete LutungCode configuration schema is available at
+[lutungcode.ai/config.json](https://lutungcode.ai/config.json).
 
 Add the `$schema` field to your configuration file to enable validation and
 autocomplete in editors that support JSON Schema:
 
-```json title="opencode.json"
+```json title="lutungcode.json"
 {
-  "$schema": "https://opencode.ai/config.json"
+  "$schema": "https://lutungcode.ai/config.json"
 }
 ```
 
@@ -178,7 +178,7 @@ Project-level values are ignored.
 
 ### Username
 
-Set a username. OpenCode accepts this field but does not display it in
+Set a username. LutungCode accepts this field but does not display it in
 conversations.
 
 ```jsonc
@@ -317,7 +317,7 @@ Set the maximum number of lines and bytes retained from a tool result.
 
 ### Search
 
-Choose how OpenCode searches the web. Use `"random"` to select an available
+Choose how LutungCode searches the web. Use `"random"` to select an available
 provider automatically.
 
 ```jsonc
@@ -426,7 +426,7 @@ Set `todo` to `true` to give agents a `todowrite` tool for tracking multi-step w
 
 ### Skills
 
-Add directories or URLs that OpenCode should search for agent skills.
+Add directories or URLs that LutungCode should search for agent skills.
 
 ```jsonc
 {
@@ -434,7 +434,7 @@ Add directories or URLs that OpenCode should search for agent skills.
 }
 ```
 
-See the [skills guide](/skills) for skill structure and automatic discovery under `.opencode/skills/`.
+See the [skills guide](/skills) for skill structure and automatic discovery under `.lutungcode/skills/`.
 
 ### Commands
 
@@ -455,7 +455,7 @@ See the [commands guide](/commands) for arguments, models, agents, and file-base
 
 ### Instructions
 
-Declare additional instruction files, globs, or HTTP(S) URLs. OpenCode loads
+Declare additional instruction files, globs, or HTTP(S) URLs. LutungCode loads
 them alongside discovered `AGENTS.md` files.
 
 ```jsonc
@@ -490,7 +490,7 @@ See the [references guide](/references) for shorthand, visibility, and path reso
 
 ### Worktrees
 
-Set the parent directory for new local worktrees. OpenCode appends the requested or generated worktree name.
+Set the parent directory for new local worktrees. LutungCode appends the requested or generated worktree name.
 
 ```jsonc
 {
@@ -530,7 +530,7 @@ accepts options.
 ```jsonc
 {
   "plugins": [
-    "opencode-example-plugin",
+    "lutungcode-example-plugin",
     {
       "package": "./plugins/local",
       "options": {
@@ -579,10 +579,10 @@ You can use variable substitution in your config files to reference environment 
 
 Use `{env:VARIABLE_NAME}` to substitute environment variables:
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
-  "model": "{env:OPENCODE_MODEL}",
+  "$schema": "https://lutungcode.ai/config.json",
+  "model": "{env:LUTUNGCODE_MODEL}",
   "providers": {
     "anthropic": {
       "settings": {
@@ -599,9 +599,9 @@ If the environment variable is not set, it will be replaced with an empty string
 
 Use `{file:path/to/file}` to substitute the contents of a file:
 
-```jsonc title="opencode.jsonc"
+```jsonc title="lutungcode.jsonc"
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://lutungcode.ai/config.json",
   "providers": {
     "openai": {
       "settings": {

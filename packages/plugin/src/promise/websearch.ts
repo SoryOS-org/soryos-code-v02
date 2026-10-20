@@ -1,5 +1,5 @@
-import type { WebSearch } from "@opencode/schema/websearch"
-import type { WebSearchApi } from "@opencode/client/promise/api"
+import type { WebSearch } from "@lutungcode/schema/websearch"
+import type { WebSearchApi } from "@lutungcode/client/promise/api"
 import type { Transform } from "./registration.js"
 
 export interface WebSearchDefinition {

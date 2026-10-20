@@ -4,7 +4,7 @@ import { SalesforceCliError, salesforceCliResponse } from "./salesforce-cli-resp
 import { handleConsoleSignup } from "../src/lib/console-signup"
 import { consoleAccountSchema } from "../src/lib/console-account"
 
-const org = process.env.SF_TARGET_ORG || "opencode"
+const org = process.env.SF_TARGET_ORG || "lutungcode"
 const crmToken = process.env.CONSOLE_CRM_TOKEN
 if (!crmToken) throw new Error("Set CONSOLE_CRM_TOKEN to the shared local Console CRM token")
 const accountUrl = process.env.CONSOLE_CRM_LOOKUP_URL || "http://localhost:3100/console/api/internal/console-account"

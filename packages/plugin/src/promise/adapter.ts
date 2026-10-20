@@ -1,6 +1,6 @@
-import { Tool } from "@opencode/schema/tool"
-import type { Rpc } from "@opencode/schema/rpc"
-import type { RpcCallOptions, RpcEventPayload } from "@opencode/client/promise/api"
+import { Tool } from "@lutungcode/schema/tool"
+import type { Rpc } from "@lutungcode/schema/rpc"
+import type { RpcCallOptions, RpcEventPayload } from "@lutungcode/client/promise/api"
 import { Effect, Schema, SchemaAST, Stream } from "effect"
 import type { Scope } from "effect"
 import { HttpApiEndpoint, HttpApiSchema } from "effect/http-api"
@@ -220,8 +220,8 @@ export function fromPromise(plugin: Plugin) {
     id: plugin.id,
     effect: (host) =>
       Effect.gen(function* () {
-        const [{ ClientApi }, { OpenCodeEvent }] = yield* Effect.promise(() =>
-          Promise.all([import("@opencode/protocol/client"), import("@opencode/protocol/groups/event")]),
+        const [{ ClientApi }, { LutungCodeEvent }] = yield* Effect.promise(() =>
+          Promise.all([import("@lutungcode/protocol/client"), import("@lutungcode/protocol/groups/event")]),
         )
         const AgentEndpoints = ClientApi.groups["server.agent"].endpoints
         const CommandEndpoints = ClientApi.groups["server.command"].endpoints
@@ -331,7 +331,7 @@ export function fromPromise(plugin: Plugin) {
             subscribe: (options) =>
               streams(
                 host.event.subscribe().pipe(
-                  Stream.mapEffect((event) => Schema.encodeUnknownEffect(OpenCodeEvent)(event)),
+                  Stream.mapEffect((event) => Schema.encodeUnknownEffect(LutungCodeEvent)(event)),
                   Stream.map((event) => event as unknown as PromiseEvent),
                 ),
                 options,

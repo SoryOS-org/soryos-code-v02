@@ -2,16 +2,16 @@ import type {
   EventSubscribeOutput,
   FormInfo,
   LocationRef,
-  OpenCodeClient,
+  LutungCodeClient,
   PermissionRequest,
   SessionMessageAssistantTool,
   SessionMessageInfo,
   SessionMessageUser,
   SessionInboxInfo,
-} from "@opencode/client/promise"
-import { ClientError } from "@opencode/client/promise"
-import { Event } from "@opencode/schema/event"
-import { SessionMessage } from "@opencode/schema/session-message"
+} from "@lutungcode/client/promise"
+import { ClientError } from "@lutungcode/client/promise"
+import { Event } from "@lutungcode/schema/event"
+import { SessionMessage } from "@lutungcode/schema/session-message"
 import { blockerStatus, pickBlockerView } from "./session-data"
 import { writeSessionOutput } from "./stream"
 import { createFragmentReconciler, fragmentRef, type FragmentReconciler } from "./stream-v2.fragment"
@@ -41,9 +41,9 @@ type Trace = {
 }
 
 type StreamInput = {
-  sdk: OpenCodeClient
-  reconnect?: (signal: AbortSignal) => Promise<OpenCodeClient>
-  onClient?: (sdk: OpenCodeClient) => void
+  sdk: LutungCodeClient
+  reconnect?: (signal: AbortSignal) => Promise<LutungCodeClient>
+  onClient?: (sdk: LutungCodeClient) => void
   readTextFile?: (url: string) => Promise<string>
   location?: LocationRef
   sessionID: string
@@ -111,7 +111,7 @@ type RunV2Event = EventSubscribeOutput
 type PromptFilePart = Extract<RunPromptPart, { type: "file" }>
 
 type Attempt = {
-  client: OpenCodeClient
+  client: LutungCodeClient
   signal: AbortSignal
   generation: number
 }
@@ -450,7 +450,7 @@ function compactionError(messageID: string, text: string): StreamCommit {
 
 async function resolveSelectedModel(
   input: StreamInput,
-  sdk: OpenCodeClient,
+  sdk: LutungCodeClient,
   next: Pick<SessionTurnInput, "model" | "variant" | "signal">,
 ) {
   if (next.model) return { providerID: next.model.providerID, id: next.model.modelID, variant: next.variant }
@@ -482,7 +482,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   let sdk = input.sdk
   let generation = 0
   let activeAttempt: Attempt | undefined
-  let settlementClient: OpenCodeClient | undefined
+  let settlementClient: LutungCodeClient | undefined
   input.signal?.addEventListener("abort", () => controller.abort(), { once: true })
   const state: State = {
     permissions: [],
@@ -899,7 +899,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
     }
   }
 
-  const projectedMessages = async (client: OpenCodeClient, signal: AbortSignal) =>
+  const projectedMessages = async (client: LutungCodeClient, signal: AbortSignal) =>
     (
       await client.message.list(
         { sessionID: input.sessionID, limit: input.replayLimit ?? 200, order: "desc" },
@@ -907,7 +907,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
       )
     ).data.toReversed()
 
-  const waitForSession = async (initial: OpenCodeClient) => {
+  const waitForSession = async (initial: LutungCodeClient) => {
     let client = initial
     while (true) {
       try {
@@ -925,7 +925,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
     }
   }
 
-  const settleSession = async (initial: OpenCodeClient) => {
+  const settleSession = async (initial: LutungCodeClient) => {
     const client = await waitForSession(initial)
     for (const message of await projectedMessages(client, controller.signal)) renderMessage(message, true)
     paintIdle(blockerStatus(state.view))
@@ -933,7 +933,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   }
 
   const resolvePermissionSources = async (
-    client: OpenCodeClient,
+    client: LutungCodeClient,
     permissions: PermissionRequest[],
     attempt: Attempt,
   ) => {
@@ -1619,7 +1619,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   const runTurnWait = async (
     next: SessionTurnInput,
     messageID: string,
-    client: OpenCodeClient,
+    client: LutungCodeClient,
     send: () => Promise<SessionInboxInfo | void>,
     onAdmitted?: () => void,
   ) => {
@@ -1746,7 +1746,7 @@ export async function createSessionTransport(input: StreamInput): Promise<Sessio
   let queuedResizeReplay: SessionResizeReplayInput | undefined
   let closing: Promise<void> | undefined
 
-  const admitPrompt = async (next: SessionTurnInput, client: OpenCodeClient, delivery: RunDelivery) => {
+  const admitPrompt = async (next: SessionTurnInput, client: LutungCodeClient, delivery: RunDelivery) => {
     const messageID = next.prompt.messageID
     if (!messageID) throw new Error("Prompt message ID is required")
     const command = next.prompt.command

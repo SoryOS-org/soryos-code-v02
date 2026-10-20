@@ -1,16 +1,16 @@
 import { describe, expect } from "bun:test"
-import { Document, Event, Info, type Entry } from "@opencode/schema/config"
-import { ConfigPolicy } from "@opencode/schema/config/policy"
-import { Permission } from "@opencode/schema/permission"
-import { Config } from "@opencode/core/config"
-import { ConfigPolicyPlugin } from "@opencode/core/config/plugin/policy"
-import { Bus } from "@opencode/core/bus"
-import { ManagedPolicy } from "@opencode/core/managed-policy"
-import { Plugin } from "@opencode/core/plugin"
-import { PluginHooks } from "@opencode/core/plugin/hooks"
-import { PluginHost } from "@opencode/core/plugin/host"
-import { Provider } from "@opencode/core/provider"
-import { Session } from "@opencode/core/session"
+import { Document, Event, Info, type Entry } from "@lutungcode/schema/config"
+import { ConfigPolicy } from "@lutungcode/schema/config/policy"
+import { Permission } from "@lutungcode/schema/permission"
+import { Config } from "@lutungcode/core/config"
+import { ConfigPolicyPlugin } from "@lutungcode/core/config/plugin/policy"
+import { Bus } from "@lutungcode/core/bus"
+import { ManagedPolicy } from "@lutungcode/core/managed-policy"
+import { Plugin } from "@lutungcode/core/plugin"
+import { PluginHooks } from "@lutungcode/core/plugin/hooks"
+import { PluginHost } from "@lutungcode/core/plugin/host"
+import { Provider } from "@lutungcode/core/provider"
+import { Session } from "@lutungcode/core/session"
 import { Effect, Schema } from "effect"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "../plugin/fixture"
@@ -170,14 +170,14 @@ describe("ConfigPolicyPlugin.Plugin", () => {
       yield* catalog.transform((catalog) => {
         catalog.update(Provider.ID.openai, () => {})
         catalog.update(Provider.ID.anthropic, () => {})
-        catalog.update(Provider.ID.opencode, () => {})
+        catalog.update(Provider.ID.lutungcode, () => {})
       })
-      yield* managed.set({ statements: [provider("deny", "*"), provider("allow", "opencode")] })
+      yield* managed.set({ statements: [provider("deny", "*"), provider("allow", "lutungcode")] })
       yield* addPlugin([document(provider("allow", "anthropic"))])
 
       expect(yield* catalog.get(Provider.ID.anthropic)).toBeUndefined()
       expect(yield* catalog.get(Provider.ID.openai)).toBeUndefined()
-      expect(yield* catalog.get(Provider.ID.opencode)).toBeDefined()
+      expect(yield* catalog.get(Provider.ID.lutungcode)).toBeDefined()
     }),
   )
 

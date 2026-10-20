@@ -1,3 +1,3 @@
-# @opencode/core
+# @lutungcode/core
 
-Core runtime services for OpenCode.
+Core runtime services for LutungCode.

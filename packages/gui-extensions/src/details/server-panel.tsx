@@ -1,10 +1,10 @@
 import { Popover } from "@kobalte/core/popover"
-import type { PluginInfo } from "@opencode/client"
-import { Icon } from "@opencode/ui/icon"
-import { Switch } from "@opencode/ui/switch"
-import { showToast } from "@opencode/ui/toast"
-import { Tooltip } from "@opencode/ui/tooltip"
-import { getDirectory } from "@opencode/util/path"
+import type { PluginInfo } from "@lutungcode/client"
+import { Icon } from "@lutungcode/ui/icon"
+import { Switch } from "@lutungcode/ui/switch"
+import { showToast } from "@lutungcode/ui/toast"
+import { Tooltip } from "@lutungcode/ui/tooltip"
+import { getDirectory } from "@lutungcode/util/path"
 import { useMutation } from "@tanstack/solid-query"
 import {
   children,

@@ -1,8 +1,8 @@
 export * as ConfigMigration from "./migrate"
 
-import { TuiConfigV1 } from "@opencode/tui/config/v1"
-import { TuiKeybind } from "@opencode/tui/config/v1/keybind"
-import { Definitions } from "@opencode/tui/config/keybind"
+import { TuiConfigV1 } from "@lutungcode/tui/config/v1"
+import { TuiKeybind } from "@lutungcode/tui/config/v1/keybind"
+import { Definitions } from "@lutungcode/tui/config/keybind"
 import { Effect, FileSystem, Option, Schema } from "effect"
 import { randomUUID } from "crypto"
 import { applyEdits, createScanner, modify, parse, parseTree, type Node, type ParseError } from "jsonc-parser"
@@ -102,7 +102,7 @@ export const run = Effect.fn("cli.config.migrate")(function* (input: {
   const kv = yield* readJson(path.join(input.state, "kv.json"))
   const values = migrateV1(legacy, kv ?? {})
   if (!Object.keys(values).length) return
-  const migrated = { $schema: SchemaURL, ...values }
+  const migrated = { ...(SchemaURL ? { $schema: SchemaURL } : {}), ...values }
 
   const result = yield* persist(JSON.stringify(migrated, null, 2) + "\n", migrated)
   if (result.cause === undefined)

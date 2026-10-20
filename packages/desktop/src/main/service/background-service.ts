@@ -13,7 +13,7 @@ export interface Interface {
   readonly reconnect: Effect.Effect<SidecarCredentials.Data>
 }
 
-export class Service extends Context.Service<Service, Interface>()("opencode/desktop/BackgroundService") {}
+export class Service extends Context.Service<Service, Interface>()("lutungcode/desktop/BackgroundService") {}
 
 export const layer = Layer.effect(
   Service,
@@ -34,20 +34,20 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const path = yield* Path.Path
   const desktopCli = yield* DesktopCli.Service
   const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem | Path.Path>())
-  const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
+  const isolated = !app.isPackaged && process.env.LUTUNGCODE_DESKTOP_ISOLATED_SERVER === "1"
   const cli = yield* desktopCli.resolve
   const version = mode === "initial" ? cli.version : undefined
 
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
-  const client = yield* Effect.promise(() => import("@opencode/client/service"))
+  const client = yield* Effect.promise(() => import("@lutungcode/client/service"))
 
   const ensure = () =>
     client.Service.ensure({
       file:
-        process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
+        process.env.LUTUNGCODE_DESKTOP_SERVER_CHANNEL === "local"
           ? path.join(
               process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"),
-              "opencode",
+              "lutungcode",
               "service-local.json",
             )
           : undefined,

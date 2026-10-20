@@ -1,33 +1,33 @@
 import { expect, test } from "bun:test"
-import { GenerationOptions, LLMClient, LLMEvent, LanguageModel, ToolDefinition, type LLMRequest } from "@opencode/ai"
-import { OpenAIChat } from "@opencode/ai/protocols"
-import { Database } from "@opencode/core/database/database"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { llmClient } from "@opencode/core/effect/app-node-platform"
-import { LayerNode } from "@opencode/util/effect/layer-node"
-import { Bus } from "@opencode/core/bus"
-import { EventTable } from "@opencode/core/event/sql"
-import { SessionCompaction } from "@opencode/core/session/compaction"
-import type { SessionContext } from "@opencode/core/session/context"
-import { SessionEvent } from "@opencode/core/session/event"
-import { SessionMessage } from "@opencode/core/session/message"
-import { SessionModelRequest } from "@opencode/core/session/model-request"
-import { PluginHooks } from "@opencode/core/plugin/hooks"
-import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionRunnerModel } from "@opencode/core/session/runner/model"
-import { SessionTable } from "@opencode/core/session/sql"
-import { SessionStore } from "@opencode/core/session/store"
-import { Session } from "@opencode/core/session"
-import { Location } from "@opencode/core/location"
-import { Project } from "@opencode/core/project"
-import { ProjectTable } from "@opencode/core/project/sql"
-import { App } from "@opencode/core/app"
-import { Agent } from "@opencode/core/agent"
-import { Provider } from "@opencode/core/provider"
-import { AbsolutePath } from "@opencode/core/schema"
-import { Money } from "@opencode/schema/money"
-import { Skill } from "@opencode/schema/skill"
-import { Shell } from "@opencode/schema/shell"
+import { GenerationOptions, LLMClient, LLMEvent, LanguageModel, ToolDefinition, type LLMRequest } from "@lutungcode/ai"
+import { OpenAIChat } from "@lutungcode/ai/protocols"
+import { Database } from "@lutungcode/core/database/database"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { llmClient } from "@lutungcode/core/effect/app-node-platform"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
+import { Bus } from "@lutungcode/core/bus"
+import { EventTable } from "@lutungcode/core/event/sql"
+import { SessionCompaction } from "@lutungcode/core/session/compaction"
+import type { SessionContext } from "@lutungcode/core/session/context"
+import { SessionEvent } from "@lutungcode/core/session/event"
+import { SessionMessage } from "@lutungcode/core/session/message"
+import { SessionModelRequest } from "@lutungcode/core/session/model-request"
+import { PluginHooks } from "@lutungcode/core/plugin/hooks"
+import { SessionProjector } from "@lutungcode/core/session/projector"
+import { SessionRunnerModel } from "@lutungcode/core/session/runner/model"
+import { SessionTable } from "@lutungcode/core/session/sql"
+import { SessionStore } from "@lutungcode/core/session/store"
+import { Session } from "@lutungcode/core/session"
+import { Location } from "@lutungcode/core/location"
+import { Project } from "@lutungcode/core/project"
+import { ProjectTable } from "@lutungcode/core/project/sql"
+import { App } from "@lutungcode/core/app"
+import { Agent } from "@lutungcode/core/agent"
+import { Provider } from "@lutungcode/core/provider"
+import { AbsolutePath } from "@lutungcode/core/schema"
+import { Money } from "@lutungcode/schema/money"
+import { Skill } from "@lutungcode/schema/skill"
+import { Shell } from "@lutungcode/schema/shell"
 import { DateTime, Effect, Fiber, Layer, Schema, Stream } from "effect"
 import { asc, eq } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
@@ -450,15 +450,15 @@ it.effect("manual compaction summarizes short context instead of no-op", () =>
     expect(requests).toHaveLength(1)
     expect(requests[0]?.promptCacheKey).toBe(parentID)
     expect(requests[0]?.http?.headers).toEqual({
-      "x-opencode-session-id": session.id,
-      "x-opencode-parent-session-id": parentID,
+      "x-lutungcode-session-id": session.id,
+      "x-lutungcode-parent-session-id": parentID,
       "x-session-affinity": parentID,
       "X-Session-Id": parentID,
       "x-parent-session-id": parentID,
       "User-Agent": App.useragent(App.make()),
-      "x-opencode-project": Project.ID.global,
-      "x-opencode-session": parentID,
-      "x-opencode-client": "opencode",
+      "x-lutungcode-project": Project.ID.global,
+      "x-lutungcode-session": parentID,
+      "x-lutungcode-client": "lutungcode",
     })
     expect(requests[0]?.generation).toEqual(GenerationOptions.make({ maxTokens: 30_000 }))
     expect(JSON.stringify(requests[0]?.messages)).toContain("Manual compaction should include this short conversation.")

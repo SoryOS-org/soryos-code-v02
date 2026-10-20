@@ -2,15 +2,15 @@ import { expect, test } from "bun:test"
 import { EmbeddedTerminalRenderable } from "@opentui/core"
 import { createTestRenderer } from "@opentui/core/testing"
 import { Effect, FileSystem } from "effect"
-import { Global } from "@opencode/util/global"
-import { SimulationRenderer } from "@opencode/simulation/frontend/renderer"
+import { Global } from "@lutungcode/util/global"
+import { SimulationRenderer } from "@lutungcode/simulation/frontend/renderer"
 import path from "node:path"
 import { Writable } from "node:stream"
 import { createEventStream, createFetch, directory, json } from "./fixture/tui-client"
 import { tmpdir } from "./fixture/fixture"
 import { createAppFixture } from "./fixture/app"
 import { waitForHighlightedFrame } from "./fixture/frame"
-import type { PluginInfo } from "@opencode/client"
+import type { PluginInfo } from "@lutungcode/client"
 
 test.each([100, 44])("Ctrl-O is immediate, dismissible, and prunes cached deletions at width %s", async (width) => {
   await using state = await tmpdir()
@@ -253,7 +253,7 @@ test("SIGHUP clears title and disposes scoped resources once", async () => {
   })
   const setTitle = setup.renderer.setTerminalTitle.bind(setup.renderer)
   setup.renderer.setTerminalTitle = (title) => {
-    if (title === "OpenCode") started()
+    if (title === "LutungCode") started()
     setTitle(title)
   }
   const listeners = new Set(process.listeners("SIGHUP"))
@@ -366,7 +366,7 @@ test("session lifecycle updates the terminal title and prints the epilogue after
     await task
 
     expect(stdout).toContain("Renamed session")
-    expect(stdout).toContain("opencode -s dummy")
+    expect(stdout).toContain("lutungcode -s dummy")
     expect(promptRequests).toBe(0)
   } finally {
     process.stdout.write = originalWrite
@@ -454,7 +454,7 @@ test("session title generated while an untitled session is loading remains visib
 
     const generated = titles.lastIndexOf("OC | Generated title")
     expect(generated).toBeGreaterThan(-1)
-    expect(titles.slice(generated + 1)).not.toContain("OpenCode")
+    expect(titles.slice(generated + 1)).not.toContain("LutungCode")
     setup.renderer.destroy()
     await task
   } finally {
@@ -1248,7 +1248,7 @@ test("new session inherits the active session model", async () => {
 
 test("keeps the prompt display stable while a new location catalog loads", async () => {
   const source = process.cwd()
-  const target = path.join(path.parse(source).root, "opencode-target")
+  const target = path.join(path.parse(source).root, "lutungcode-target")
   const locationCatalog = Promise.withResolvers<void>()
   const catalog = Promise.withResolvers<void>()
   const providerCatalog = Promise.withResolvers<void>()
@@ -1355,7 +1355,7 @@ test("keeps the prompt display stable while a new location catalog loads", async
 
 test("configured app binding opens settings", async () => {
   await using setup = await createAppFixture({
-    config: { animations: false, keybinds: { "opencode.settings": "f6" } },
+    config: { animations: false, keybinds: { "lutungcode.settings": "f6" } },
   })
   await setup.ready
   await setup.waitForFrame((frame) => frame.includes("commands"))

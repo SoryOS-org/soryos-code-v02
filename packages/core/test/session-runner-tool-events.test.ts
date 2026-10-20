@@ -1,27 +1,27 @@
 import { expect, test } from "bun:test"
 import { Cause, Deferred, Effect, Exit, Fiber, Schema } from "effect"
 import { eq } from "drizzle-orm"
-import { LLMEvent } from "@opencode/ai"
-import { Money } from "@opencode/schema/money"
-import { Bus } from "@opencode/core/bus"
-import { Database } from "@opencode/core/database/database"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { EventTable } from "@opencode/core/event/sql"
-import { Event } from "@opencode/schema/event"
-import { Agent } from "@opencode/core/agent"
-import { SessionEvent } from "@opencode/core/session/event"
-import { SessionMessage } from "@opencode/core/session/message"
-import { Session } from "@opencode/core/session"
-import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionMessageTable, SessionTable } from "@opencode/core/session/sql"
-import { Project } from "@opencode/core/project"
-import { ProjectTable } from "@opencode/core/project/sql"
-import { Model } from "@opencode/core/model"
-import { Provider } from "@opencode/core/provider"
-import { AbsolutePath, RelativePath } from "@opencode/core/schema"
-import { Snapshot } from "@opencode/core/snapshot"
-import { createLLMEventPublisher } from "@opencode/core/session/runner/publish-llm-event"
-import { LayerNode } from "@opencode/util/effect/layer-node"
+import { LLMEvent } from "@lutungcode/ai"
+import { Money } from "@lutungcode/schema/money"
+import { Bus } from "@lutungcode/core/bus"
+import { Database } from "@lutungcode/core/database/database"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { EventTable } from "@lutungcode/core/event/sql"
+import { Event } from "@lutungcode/schema/event"
+import { Agent } from "@lutungcode/core/agent"
+import { SessionEvent } from "@lutungcode/core/session/event"
+import { SessionMessage } from "@lutungcode/core/session/message"
+import { Session } from "@lutungcode/core/session"
+import { SessionProjector } from "@lutungcode/core/session/projector"
+import { SessionMessageTable, SessionTable } from "@lutungcode/core/session/sql"
+import { Project } from "@lutungcode/core/project"
+import { ProjectTable } from "@lutungcode/core/project/sql"
+import { Model } from "@lutungcode/core/model"
+import { Provider } from "@lutungcode/core/provider"
+import { AbsolutePath, RelativePath } from "@lutungcode/core/schema"
+import { Snapshot } from "@lutungcode/core/snapshot"
+import { createLLMEventPublisher } from "@lutungcode/core/session/runner/publish-llm-event"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
 import { it, testEffect } from "./lib/effect"
 import { TestClock } from "effect/testing"
 
@@ -61,7 +61,7 @@ const capture = (
       agent: Agent.ID.make("build"),
       model: {
         id: Model.ID.make("model"),
-        providerID: Provider.ID.opencode,
+        providerID: Provider.ID.lutungcode,
       },
       providerMetadataKey,
       pendingSnapshot: options?.pendingSnapshot,
@@ -167,7 +167,7 @@ testEffect(
         sessionID,
         assistantMessageID,
         agent: Agent.defaultID,
-        model: { id: Model.ID.make("test-model"), providerID: Provider.ID.opencode },
+        model: { id: Model.ID.make("test-model"), providerID: Provider.ID.lutungcode },
         providerMetadataKey: "openai",
         started: 0,
       },

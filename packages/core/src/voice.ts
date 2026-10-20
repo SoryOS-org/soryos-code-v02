@@ -1,14 +1,14 @@
 export * as Voice from "./voice.js"
 
-import { type AIError } from "@opencode/ai"
+import { type AIError } from "@lutungcode/ai"
 import {
   Realtime,
   type RealtimeSession,
   type RealtimeTransport,
   type RealtimeTransportInput,
-} from "@opencode/ai/experimental"
-import { RequestExecutor } from "@opencode/ai/route"
-import { makeLocationNode } from "@opencode/util/effect/app-node"
+} from "@lutungcode/ai/experimental"
+import { RequestExecutor } from "@lutungcode/ai/route"
+import { makeLocationNode } from "@lutungcode/util/effect/app-node"
 import { Context, Effect, Layer, Redacted, Schema } from "effect"
 import { requestExecutor } from "./effect/app-node-platform.js"
 import { Integration } from "./integration.js"
@@ -34,7 +34,7 @@ export interface Interface {
   readonly session: (input: SessionInput) => Effect.Effect<RealtimeTransport, Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@opencode/Voice") {}
+export class Service extends Context.Service<Service, Interface>()("@lutungcode/Voice") {}
 
 export const layer = Layer.effect(
   Service,

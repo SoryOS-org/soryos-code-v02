@@ -1,6 +1,6 @@
-import type { VcsApi } from "@opencode/client/promise/api"
-import type { FileDiff } from "@opencode/schema/file-diff"
-import type { Vcs } from "@opencode/schema/vcs"
+import type { VcsApi } from "@lutungcode/client/promise/api"
+import type { FileDiff } from "@lutungcode/schema/file-diff"
+import type { Vcs } from "@lutungcode/schema/vcs"
 import type { Transform } from "./registration.js"
 
 export interface VcsScope {

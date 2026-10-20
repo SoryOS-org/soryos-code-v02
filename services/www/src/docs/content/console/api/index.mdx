@@ -1,13 +1,13 @@
 ---
 title: "API Overview"
-description: "Authenticate with the OpenCode Console API using personal API keys, service account keys, or user tokens."
+description: "Authenticate with the LutungCode Console API using personal API keys, service account keys, or user tokens."
 ---
 
 The Console API lets integrations read workspace configuration and manage budgets. Paths are relative
 to the Console base URL.
 
 ```bash
-export CONSOLE_URL="https://opencode.ai/console"
+export CONSOLE_URL="https://lutungcode.ai/console"
 export SERVICE_API_KEY="oc_sk_..."
 
 curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
@@ -16,8 +16,8 @@ curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
 
 | API                                 | Endpoints                                  |
 | ----------------------------------- | ------------------------------------------ |
-| [Inference](/console/api/inference) | `https://opencode.ai/inference/...`        |
-| [Providers](/console/api/providers) | `https://opencode.ai/inference/custom/...` |
+| [Inference](/console/api/inference) | `https://lutungcode.ai/inference/...`        |
+| [Providers](/console/api/providers) | `https://lutungcode.ai/inference/custom/...` |
 | [Budgets](/console/api/budgets)     | `/api/v1/budgets/members`                  |
 | [Config](#workspace-config)         | `GET /api/v2/config`                       |
 
@@ -94,7 +94,7 @@ header. A different `x-org-id` returns `403`.
 
 ## Device flow
 
-OpenCode signs in with the OAuth device authorization grant (RFC 8628). Other CLIs can use the same flow.
+LutungCode signs in with the OAuth device authorization grant (RFC 8628). Other CLIs can use the same flow.
 
 1. Request a device code. Send `supports_org_scope=true` to bind the token to a workspace.
 
@@ -108,7 +108,7 @@ OpenCode signs in with the OAuth device authorization grant (RFC 8628). Other CL
    `interval` (5 seconds).
 
 2. Open `verification_uri_complete` in a browser. It is a path such as `/console/device?user_code=...`, relative to
-   `https://opencode.ai`. The person signs in, picks a workspace, and approves.
+   `https://lutungcode.ai`. The person signs in, picks a workspace, and approves.
 
 3. Poll for the token every `interval` seconds with the same `client_id`.
 
@@ -135,8 +135,8 @@ Each refresh token can be used once. Reusing an old refresh token revokes the wh
 
 ## Workspace config
 
-`GET /api/v2/config` returns the providers and models available to the workspace in the OpenCode V2
-[config](/config) format. OpenCode loads it after `/connect`.
+`GET /api/v2/config` returns the providers and models available to the workspace in the LutungCode V2
+[config](/config) format. LutungCode loads it after `/connect`.
 
 ```bash
 curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
@@ -146,15 +146,15 @@ curl --fail-with-body "${CONSOLE_URL}/api/v2/config" \
 ```json
 {
   "providers": {
-    "opencode": {
-      "name": "OpenCode",
-      "env": ["OPENCODE_CONSOLE_TOKEN"],
+    "lutungcode": {
+      "name": "LutungCode",
+      "env": ["LUTUNGCODE_CONSOLE_TOKEN"],
       "package": "aisdk:@ai-sdk/openai-compatible",
       "settings": {
-        "baseURL": "https://opencode.ai/inference/openai/v1",
-        "apiKey": "{env:OPENCODE_CONSOLE_TOKEN}"
+        "baseURL": "https://lutungcode.ai/inference/openai/v1",
+        "apiKey": "{env:LUTUNGCODE_CONSOLE_TOKEN}"
       },
-      "headers": { "x-opencode-org-id": "org_..." },
+      "headers": { "x-lutungcode-org-id": "org_..." },
       "models": {
         "kimi-k2.6": { "name": "Kimi K2.6" }
       }

@@ -1,16 +1,20 @@
 #!/usr/bin/env bun
-import { Script } from "@opencode/script"
+import { Script } from "@lutungcode/script"
+import { endpoints } from "@lutungcode/util/identity"
 import { $ } from "bun"
 import { mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { UpdateArtifact } from "../../../script/update-artifact"
 
+if (!endpoints.aurPackage || !endpoints.githubRepository) {
+  throw new Error("LutungCode package listings are not configured")
+}
 if (Script.channel !== "beta" && Script.channel !== "latest") {
   throw new Error("AUR publishing requires the beta or latest channel")
 }
-const name = "opencode-beta"
-const command = "opencode"
+const name = "lutungcode-beta"
+const command = "lutungcode"
 const valid =
   Script.channel === "beta"
     ? /^\d+\.\d+\.\d+-beta[.-]\d+(?:\.\d+)?$/.test(Script.version)
@@ -18,14 +22,11 @@ const valid =
 if (!valid) throw new Error(`Expected a ${Script.channel} release version`)
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
-const root = path.resolve(process.env.OPENCODE_CLI_DIST ?? path.join(dir, "dist"))
+const root = path.resolve(process.env.LUTUNGCODE_CLI_DIST ?? path.join(dir, "dist"))
 const outdir = path.join(root, `aur-${name}`)
 const dryRun = process.argv.includes("--dry-run")
 const pkgver = Script.version.replaceAll("-", ".")
 const license = Bun.file(path.join(dir, "..", "..", "LICENSE"))
-const shim = `#!/bin/sh
-exec "$(dirname "$0")/opencode" "$@"
-`
 
 await rm(outdir, { recursive: true, force: true })
 await mkdir(path.dirname(outdir), { recursive: true })
@@ -52,7 +53,6 @@ const sources = await Promise.all(
 )
 
 await Bun.write(path.join(outdir, "LICENSE"), license)
-await Bun.write(path.join(outdir, "opencode2"), shim)
 await Bun.write(
   path.join(outdir, "PKGBUILD"),
   [
@@ -60,22 +60,21 @@ await Bun.write(
     `pkgname=${name}`,
     `pkgver=${pkgver}`,
     "pkgrel=1",
-    "pkgdesc='OpenCode beta - the AI coding agent for the terminal'",
-    "url='https://github.com/anomalyco/opencode'",
+    "pkgdesc='LutungCode beta - the AI coding agent for the terminal'",
+    `url='https://github.com/${endpoints.githubRepository}'`,
     "arch=('x86_64' 'aarch64')",
     "license=('MIT')",
     "depends=('glibc' 'gcc-libs' 'ripgrep')",
-    `provides=('${command}' 'opencode2')`,
-    `conflicts=('${command}' 'opencode2')`,
+    `provides=('${command}')`,
+    `conflicts=('${command}')`,
     // Stripping a compiled Bun executable can damage its embedded application.
     "options=('!strip' '!debug')",
-    "source=('LICENSE' 'opencode2')",
-    `sha256sums=('${new Bun.CryptoHasher("sha256").update(await license.arrayBuffer()).digest("hex")}' '${new Bun.CryptoHasher("sha256").update(shim).digest("hex")}')`,
+    "source=('LICENSE')",
+    `sha256sums=('${new Bun.CryptoHasher("sha256").update(await license.arrayBuffer()).digest("hex")}')`,
     ...sources,
     "",
     "package() {",
-    `  install -Dm755 "$srcdir/package/bin/opencode" "$pkgdir/usr/bin/${command}"`,
-    '  install -Dm755 "$srcdir/opencode2" "$pkgdir/usr/bin/opencode2"',
+    `  install -Dm755 "$srcdir/package/bin/lutungcode" "$pkgdir/usr/bin/${command}"`,
     '  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"',
     "}",
     "",
@@ -85,7 +84,7 @@ await Bun.write(path.join(outdir, ".SRCINFO"), await $`makepkg --printsrcinfo`.c
 console.log(`Prepared ${name} ${pkgver} in ${outdir}`)
 if (dryRun) process.exit(0)
 
-await $`git add PKGBUILD .SRCINFO LICENSE opencode2`.cwd(outdir)
+await $`git add PKGBUILD .SRCINFO LICENSE`.cwd(outdir)
 if ((await $`git diff --cached --quiet`.cwd(outdir).nothrow()).exitCode !== 0) {
   await $`git commit -m ${`chore: update ${name} to ${pkgver}`}`.cwd(outdir)
   await $`git push origin master`.cwd(outdir)

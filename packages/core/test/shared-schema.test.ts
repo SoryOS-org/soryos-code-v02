@@ -1,32 +1,32 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
-import { Agent } from "@opencode/core/agent"
-import { Session } from "@opencode/core/session"
-import { SessionStore } from "@opencode/core/session/store"
-import { Location } from "@opencode/schema/location"
-import { Model } from "@opencode/schema/model"
-import { Provider } from "@opencode/schema/provider"
-import { Project } from "@opencode/schema/project"
-import { Worktree } from "@opencode/schema/worktree"
-import { Prompt } from "@opencode/schema/prompt"
-import { SessionInbox } from "@opencode/schema/session-inbox"
-import { SessionMessage } from "@opencode/schema/session-message"
-import { Workspace } from "@opencode/schema/workspace"
-import { Command } from "@opencode/schema/command"
-import { Connection } from "@opencode/schema/connection"
-import { Credential } from "@opencode/schema/credential"
-import { FileSystem } from "@opencode/schema/filesystem"
-import { Integration } from "@opencode/schema/integration"
-import { LLM } from "@opencode/schema/llm"
-import { Permission } from "@opencode/schema/permission"
-import { Pty } from "@opencode/schema/pty"
-import { Reference } from "@opencode/schema/reference"
-import { Skill } from "@opencode/schema/skill"
-import { AbsolutePath, optional, statics } from "@opencode/schema/schema"
+import { Agent } from "@lutungcode/core/agent"
+import { Session } from "@lutungcode/core/session"
+import { SessionStore } from "@lutungcode/core/session/store"
+import { Location } from "@lutungcode/schema/location"
+import { Model } from "@lutungcode/schema/model"
+import { Provider } from "@lutungcode/schema/provider"
+import { Project } from "@lutungcode/schema/project"
+import { Worktree } from "@lutungcode/schema/worktree"
+import { Prompt } from "@lutungcode/schema/prompt"
+import { SessionInbox } from "@lutungcode/schema/session-inbox"
+import { SessionMessage } from "@lutungcode/schema/session-message"
+import { Workspace } from "@lutungcode/schema/workspace"
+import { Command } from "@lutungcode/schema/command"
+import { Connection } from "@lutungcode/schema/connection"
+import { Credential } from "@lutungcode/schema/credential"
+import { FileSystem } from "@lutungcode/schema/filesystem"
+import { Integration } from "@lutungcode/schema/integration"
+import { LLM } from "@lutungcode/schema/llm"
+import { Permission } from "@lutungcode/schema/permission"
+import { Pty } from "@lutungcode/schema/pty"
+import { Reference } from "@lutungcode/schema/reference"
+import { Skill } from "@lutungcode/schema/skill"
+import { AbsolutePath, optional, statics } from "@lutungcode/schema/schema"
 
 test("Core reuses the canonical shared schemas", async () => {
-  const schemaAgent = await import("@opencode/schema/agent")
-  const schemaSession = await import("@opencode/schema/session")
+  const schemaAgent = await import("@lutungcode/schema/agent")
+  const schemaSession = await import("@lutungcode/schema/session")
   const [
     coreCommand,
     coreConnection,
@@ -48,25 +48,25 @@ test("Core reuses the canonical shared schemas", async () => {
     coreSchema,
     coreWorkspace,
   ] = await Promise.all([
-    import("@opencode/core/command"),
-    import("@opencode/core/integration/connection"),
-    import("@opencode/core/credential"),
-    import("@opencode/core/filesystem"),
-    import("@opencode/core/integration"),
-    import("@opencode/core/location"),
-    import("@opencode/ai"),
-    import("@opencode/core/model"),
-    import("@opencode/core/permission"),
-    import("@opencode/core/worktree"),
-    import("@opencode/core/pty"),
-    import("@opencode/core/project/schema"),
-    import("@opencode/core/provider"),
-    import("@opencode/core/reference"),
-    import("@opencode/core/session/inbox"),
-    import("@opencode/core/session/message"),
-    import("@opencode/core/skill"),
-    import("@opencode/core/schema"),
-    import("@opencode/core/workspace"),
+    import("@lutungcode/core/command"),
+    import("@lutungcode/core/integration/connection"),
+    import("@lutungcode/core/credential"),
+    import("@lutungcode/core/filesystem"),
+    import("@lutungcode/core/integration"),
+    import("@lutungcode/core/location"),
+    import("@lutungcode/ai"),
+    import("@lutungcode/core/model"),
+    import("@lutungcode/core/permission"),
+    import("@lutungcode/core/worktree"),
+    import("@lutungcode/core/pty"),
+    import("@lutungcode/core/project/schema"),
+    import("@lutungcode/core/provider"),
+    import("@lutungcode/core/reference"),
+    import("@lutungcode/core/session/inbox"),
+    import("@lutungcode/core/session/message"),
+    import("@lutungcode/core/skill"),
+    import("@lutungcode/core/schema"),
+    import("@lutungcode/core/workspace"),
   ])
 
   const schemas = [

@@ -3,7 +3,7 @@ title: "Harnesses"
 description: "Use Console and Go models from other coding agents and AI apps."
 ---
 
-Console works with coding agents other than OpenCode. Point a harness at the Console gateway with an API key, and usage
+Console works with coding agents other than LutungCode. Point a harness at the Console gateway with an API key, and usage
 is billed to your workspace like any other request.
 
 | Harness                                       | Pay-as-you-go | Go        | Models                    | MCP |
@@ -19,7 +19,7 @@ is billed to your workspace like any other request.
 Harnesses authenticate with a Console API key. The quickest option is a
 [personal API key](/console/api#personal-api-keys), which calls models as you.
 
-1. Open **Account** from the account menu in the [Console](https://opencode.ai/console).
+1. Open **Account** from the account menu in the [Console](https://lutungcode.ai/console).
 2. Under **Personal API keys**, click **Add API key**.
 3. Choose the workspace, name the key, and click **Create**.
 4. Copy the key. It is shown only once.
@@ -40,8 +40,8 @@ Pay-as-you-go and Go are served from different base URLs. Use the one that match
 
 | Plan          | Base URL                           |
 | ------------- | ---------------------------------- |
-| Pay-as-you-go | `https://opencode.ai/inference`    |
-| Go            | `https://opencode.ai/inference/go` |
+| Pay-as-you-go | `https://lutungcode.ai/inference`    |
+| Go            | `https://lutungcode.ai/inference/go` |
 
 Append the path for the API your harness speaks.
 
@@ -53,7 +53,7 @@ Append the path for the API your harness speaks.
 | Gemini                  | `/google/v1beta/models/<model>:generateContent` |
 
 ```text
-https://opencode.ai/inference/go/openai/v1/chat/completions
+https://lutungcode.ai/inference/go/openai/v1/chat/completions
 ```
 
 ## Choose an API
@@ -78,7 +78,7 @@ Send a stable session ID with every request so Console can route a conversation 
 cache. Go [requires it](/console/go#where-can-i-use-it).
 
 ```text
-x-opencode-session: ses_...
+x-lutungcode-session: ses_...
 ```
 
 Console also recognizes the native session headers sent by Claude Code, Codex, Hermes, and Pi, so they need no extra
@@ -90,7 +90,7 @@ Harnesses with MCP support can manage your workspace through the Console MCP ser
 registration, so you sign in from the browser instead of pasting a key.
 
 ```text
-https://opencode.ai/console/mcp
+https://lutungcode.ai/console/mcp
 ```
 
 Each harness page shows how to add it.

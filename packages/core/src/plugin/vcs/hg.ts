@@ -3,11 +3,11 @@ export * as VcsHgPlugin from "./hg.js"
 import path from "path"
 import { Effect } from "effect"
 import { ChildProcess } from "effect/process"
-import { define } from "@opencode/plugin/effect/plugin"
-import { FileDiff } from "@opencode/schema/file-diff"
-import { FileStatus, Info, Mode } from "@opencode/schema/vcs"
-import { FSUtil } from "@opencode/util/fs-util"
-import { AppProcess } from "@opencode/util/process"
+import { define } from "@lutungcode/plugin/effect/plugin"
+import { FileDiff } from "@lutungcode/schema/file-diff"
+import { FileStatus, Info, Mode } from "@lutungcode/schema/vcs"
+import { FSUtil } from "@lutungcode/util/fs-util"
+import { AppProcess } from "@lutungcode/util/process"
 import { Location } from "../../location.js"
 import type { Adapter, DiffOptions } from "../../vcs.js"
 import { DiffError } from "../../vcs.js"
@@ -23,7 +23,7 @@ import {
 } from "../../vcs/patch.js"
 
 export const Plugin = define({
-  id: "opencode.vcs.hg",
+  id: "lutungcode.vcs.hg",
   effect: Effect.fn("VcsHgPlugin")(function* (ctx) {
     const location = yield* Location.Service
     // Markerless locations need this definition to initialize their first repository.

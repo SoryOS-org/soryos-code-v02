@@ -2,12 +2,12 @@ import type { ElectronNative } from "../preload/types"
 
 declare global {
   interface ImportMetaEnv {
-    readonly OPENCODE_TEST_ONBOARDING: boolean
+    readonly LUTUNGCODE_TEST_ONBOARDING: boolean
   }
 
   interface Window {
     electron: ElectronNative
-    __OPENCODE__?: {
+    __LUTUNGCODE__?: {
       deepLinks?: string[]
     }
   }

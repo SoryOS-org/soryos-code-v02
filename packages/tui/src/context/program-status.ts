@@ -7,7 +7,7 @@ export type PendingSession = { id: string; title?: string } & (
   | { state: "working" }
 )
 
-const APP = "opencode"
+const APP = "lutungcode"
 const ROOT = ""
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()

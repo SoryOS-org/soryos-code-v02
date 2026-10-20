@@ -2,21 +2,21 @@ import { expect } from "bun:test"
 import { cp } from "node:fs/promises"
 import path from "node:path"
 import { Brand, Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schedule, Schema, Scope, Stream } from "effect"
-import { Agent } from "@opencode/schema/agent"
-import { Session } from "@opencode/schema/session"
-import { SessionMessage } from "@opencode/schema/session-message"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { Watcher } from "@opencode/core/filesystem/watcher"
-import { Plugin } from "@opencode/core/plugin"
-import { ManagedPolicy } from "@opencode/core/managed-policy"
-import { PluginModule } from "@opencode/core/plugin/module"
-import { Rpc } from "@opencode/core/rpc"
-import { Tool } from "@opencode/core/tool"
-import { execute } from "@opencode/core/tool/runtime"
-import { Global } from "@opencode/util/global"
-import { Npm } from "@opencode/util/npm"
-import { createForeignPackageFilter, ensurePluginRuntime } from "@opencode/plugin/runtime"
-import { createLoader, discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
+import { Agent } from "@lutungcode/schema/agent"
+import { Session } from "@lutungcode/schema/session"
+import { SessionMessage } from "@lutungcode/schema/session-message"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { Watcher } from "@lutungcode/core/filesystem/watcher"
+import { Plugin } from "@lutungcode/core/plugin"
+import { ManagedPolicy } from "@lutungcode/core/managed-policy"
+import { PluginModule } from "@lutungcode/core/plugin/module"
+import { Rpc } from "@lutungcode/core/rpc"
+import { Tool } from "@lutungcode/core/tool"
+import { execute } from "@lutungcode/core/tool/runtime"
+import { Global } from "@lutungcode/util/global"
+import { Npm } from "@lutungcode/util/npm"
+import { createForeignPackageFilter, ensurePluginRuntime } from "@lutungcode/plugin/runtime"
+import { createLoader, discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@lutungcode/plugin/runtime-modules"
 import { tempGlobalLayer } from "../fixture/global"
 import { tmpdirScoped } from "../fixture/tmpdir"
 import { testEffect } from "../lib/effect"
@@ -106,7 +106,7 @@ it.live("interrupts pending watcher setup when the loader scope closes during mo
   }),
 )
 
-it.live("loads plugins and their transitive dependencies against the host's Effect and @opencode/plugin instances", () =>
+it.live("loads plugins and their transitive dependencies against the host's Effect and @lutungcode/plugin instances", () =>
   Effect.gen(function* () {
     const directory = yield* tmpdirScoped()
     const pluginDir = path.join(directory.path, "plugin")
@@ -153,12 +153,12 @@ export const depToolInput = Schema.Struct({
   code: Schema.Trim.check(Schema.isPattern(/^v[0-9]+$/)),
 })
 export const depCaptured = { Effect, Schema, some }`,
-        "node_modules/@opencode/plugin/package.json":
-          '{"name":"@opencode/plugin","type":"module","exports":{"./effect":"./effect.js","./rpc":"./rpc.js"}}',
-        "node_modules/@opencode/plugin/effect.js": "export const Plugin = { define: (p) => p }",
-        "node_modules/@opencode/plugin/rpc.js": "export const Rpc = { define: (d) => d }",
-        "index.ts": `import { Plugin } from "@opencode/plugin/effect"
-import { Rpc } from "@opencode/plugin/rpc"
+        "node_modules/@lutungcode/plugin/package.json":
+          '{"name":"@lutungcode/plugin","type":"module","exports":{"./effect":"./effect.js","./rpc":"./rpc.js"}}',
+        "node_modules/@lutungcode/plugin/effect.js": "export const Plugin = { define: (p) => p }",
+        "node_modules/@lutungcode/plugin/rpc.js": "export const Rpc = { define: (d) => d }",
+        "index.ts": `import { Plugin } from "@lutungcode/plugin/effect"
+import { Rpc } from "@lutungcode/plugin/rpc"
 import { Effect, Schema } from "effect"
 import { some } from "effect/Option"
 import { nominal } from "effect/Brand"
@@ -324,8 +324,8 @@ it.live("discovers exported specifiers from the resolved tree even when dist/ ex
 
     yield* Effect.promise(() =>
       writeFiles(directory.path, {
-        "consumer/node_modules/@opencode/plugin/package.json": JSON.stringify({
-          name: "@opencode/plugin",
+        "consumer/node_modules/@lutungcode/plugin/package.json": JSON.stringify({
+          name: "@lutungcode/plugin",
           type: "module",
           exports: {
             ".": "./src/promise/index.ts",
@@ -333,22 +333,22 @@ it.live("discovers exported specifiers from the resolved tree even when dist/ ex
             "./effect/*": "./src/effect/*.ts",
           },
         }),
-        "consumer/node_modules/@opencode/plugin/src/promise/index.ts": "export const root = 'src'",
-        "consumer/node_modules/@opencode/plugin/src/effect/index.ts": "export * as plugin from './plugin.ts'",
-        "consumer/node_modules/@opencode/plugin/src/effect/plugin.ts": "export const leaf = 'src'",
-        "consumer/node_modules/@opencode/plugin/src/unexported.ts": "export const secret = true",
-        "consumer/node_modules/@opencode/plugin/dist/promise/index.js": "export const root = 'dist'",
-        "consumer/node_modules/@opencode/plugin/dist/effect/index.js": "export const index = 'dist'",
-        "consumer/node_modules/@opencode/plugin/dist/effect/plugin.js": "export const leaf = 'dist'",
+        "consumer/node_modules/@lutungcode/plugin/src/promise/index.ts": "export const root = 'src'",
+        "consumer/node_modules/@lutungcode/plugin/src/effect/index.ts": "export * as plugin from './plugin.ts'",
+        "consumer/node_modules/@lutungcode/plugin/src/effect/plugin.ts": "export const leaf = 'src'",
+        "consumer/node_modules/@lutungcode/plugin/src/unexported.ts": "export const secret = true",
+        "consumer/node_modules/@lutungcode/plugin/dist/promise/index.js": "export const root = 'dist'",
+        "consumer/node_modules/@lutungcode/plugin/dist/effect/index.js": "export const index = 'dist'",
+        "consumer/node_modules/@lutungcode/plugin/dist/effect/plugin.js": "export const leaf = 'dist'",
         "async-mod.ts": "await new Promise((r) => setTimeout(r, 20)); export const nonce = Math.random()",
       }),
     )
 
-    const discovered = discoverPluginRuntimeSpecifiers(consumerDir, ["@opencode/plugin"])
-    expect(discovered.get("@opencode/plugin")?.replaceAll("\\", "/")).toEndWith("src/promise/index.ts")
-    expect(discovered.get("@opencode/plugin/effect")?.replaceAll("\\", "/")).toEndWith("src/effect/index.ts")
-    expect(discovered.get("@opencode/plugin/effect/plugin")?.replaceAll("\\", "/")).toEndWith("src/effect/plugin.ts")
-    expect(discovered.has("@opencode/plugin/unexported")).toBe(false)
+    const discovered = discoverPluginRuntimeSpecifiers(consumerDir, ["@lutungcode/plugin"])
+    expect(discovered.get("@lutungcode/plugin")?.replaceAll("\\", "/")).toEndWith("src/promise/index.ts")
+    expect(discovered.get("@lutungcode/plugin/effect")?.replaceAll("\\", "/")).toEndWith("src/effect/index.ts")
+    expect(discovered.get("@lutungcode/plugin/effect/plugin")?.replaceAll("\\", "/")).toEndWith("src/effect/plugin.ts")
+    expect(discovered.has("@lutungcode/plugin/unexported")).toBe(false)
 
     const hostDiscovered = discoverPluginRuntimeSpecifiers()
     expect(hostDiscovered.has("effect/schema/SchemaJITCompiler")).toBe(true)
@@ -375,16 +375,16 @@ it.live("discovers exported specifiers from the resolved tree even when dist/ ex
     expect(res1).toBe(res2)
 
     const winFilter = createForeignPackageFilter([
-      "C:\\runner\\_work\\opencode\\node_modules\\.bun\\effect@4.0.0-rc.112\\node_modules\\effect",
+      "C:\\runner\\_work\\lutungcode\\node_modules\\.bun\\effect@4.0.0-rc.112\\node_modules\\effect",
     ])
     expect(
       winFilter.test(
-        "C:\\runner\\_work\\opencode\\node_modules\\.bun\\effect@4.0.0-rc.112\\node_modules\\effect\\dist\\index.js",
+        "C:\\runner\\_work\\lutungcode\\node_modules\\.bun\\effect@4.0.0-rc.112\\node_modules\\effect\\dist\\index.js",
       ),
     ).toBe(false)
     expect(
       winFilter.test(
-        "C:/runner/_work/opencode/node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/index.js",
+        "C:/runner/_work/lutungcode/node_modules/.bun/effect@4.0.0-rc.112/node_modules/effect/dist/index.js",
       ),
     ).toBe(false)
     expect(winFilter.test("C:\\Users\\plugin\\node_modules\\effect\\dist\\index.js")).toBe(true)

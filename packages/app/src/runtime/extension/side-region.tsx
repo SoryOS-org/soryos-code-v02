@@ -6,21 +6,21 @@ import { isSortable } from "@dnd-kit/solid/sortable"
 import { Accessibility, AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/dom"
 import { RestrictToHorizontalAxis } from "@dnd-kit/abstract/modifiers"
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
-import { Tabs } from "@opencode/ui/tabs"
-import { IconButton } from "@opencode/ui/icon-button"
-import { Icon } from "@opencode/ui/icon"
-import { ResizeHandle } from "@opencode/ui/resize-handle"
-import { Mark } from "@opencode/ui/logo"
-import { Keybind } from "@opencode/ui/keybind"
-import { Tooltip } from "@opencode/ui/tooltip"
-import { Menu } from "@opencode/ui/menu"
+import { Tabs } from "@lutungcode/ui/tabs"
+import { IconButton } from "@lutungcode/ui/icon-button"
+import { Icon } from "@lutungcode/ui/icon"
+import { ResizeHandle } from "@lutungcode/ui/resize-handle"
+import { Mark } from "@lutungcode/ui/logo"
+import { Keybind } from "@lutungcode/ui/keybind"
+import { Tooltip } from "@lutungcode/ui/tooltip"
+import { Menu } from "@lutungcode/ui/menu"
 import {
   MenuItem,
   type MountedSession,
   type SessionScreen,
   type PanelSidebar,
   type SessionPanelMenuItem,
-} from "@opencode/gui-extensions/sdk"
+} from "@lutungcode/gui-extensions/sdk"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useLayout } from "@/shell/state/layout"

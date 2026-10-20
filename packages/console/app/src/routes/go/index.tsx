@@ -62,7 +62,7 @@ const models = [
 ] as const
 
 export default function Home() {
-  const subscribeUrl = "https://opencode.ai/console/go"
+  const subscribeUrl = "https://lutungcode.ai/console/go"
   const i18n = useI18n()
   const [searchParams] = useSearchParams()
   return (

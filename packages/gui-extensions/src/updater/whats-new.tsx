@@ -1,11 +1,11 @@
 import { createSignal, Index, Show } from "solid-js"
 import { Effect, Option, Predicate, Schema } from "effect"
-import { Button } from "@opencode/ui/button"
-import { Dialog } from "@opencode/ui/dialog"
+import { Button } from "@lutungcode/ui/button"
+import { Dialog } from "@lutungcode/ui/dialog"
 import { useExtension, type DialogHandle, type SetupContext } from "../sdk"
 import type definition from "./index"
 
-const CHANGELOG_URL = "https://opencode.ai/changelog.json"
+const CHANGELOG_URL = "https://lutungcode.ai/changelog.json"
 
 type Highlight = {
   title: string

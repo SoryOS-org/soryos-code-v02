@@ -1,11 +1,11 @@
 export * as ConfigCommandPlugin from "./command.js"
 
-import { define } from "@opencode/plugin/effect/plugin"
-import { Info, type Entry } from "@opencode/schema/config"
-import { ConfigCommand } from "@opencode/schema/config/command"
-import { Model } from "@opencode/schema/model"
-import { Provider } from "@opencode/schema/provider"
-import { AppProcess } from "@opencode/util/process"
+import { define } from "@lutungcode/plugin/effect/plugin"
+import { Info, type Entry } from "@lutungcode/schema/config"
+import { ConfigCommand } from "@lutungcode/schema/config/command"
+import { Model } from "@lutungcode/schema/model"
+import { Provider } from "@lutungcode/schema/provider"
+import { AppProcess } from "@lutungcode/util/process"
 import path from "path"
 import { Effect, Option, PubSub, Schema, Stream } from "effect"
 import { ChildProcess } from "effect/process"
@@ -15,13 +15,13 @@ import { Location } from "../../location.js"
 import { Session } from "../../session.js"
 import { SubagentJob } from "../../session/subagent-job.js"
 import { ShellSelect } from "../../shell/select.js"
-import { FSUtil } from "@opencode/util/fs-util"
+import { FSUtil } from "@lutungcode/util/fs-util"
 import { ConfigMarkdown } from "../markdown.js"
 
 const decodeCommand = Schema.decodeUnknownOption(ConfigCommand.Info)
 
 export const Plugin = define({
-  id: "opencode.config.command",
+  id: "lutungcode.config.command",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service

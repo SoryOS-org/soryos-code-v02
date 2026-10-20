@@ -1,6 +1,6 @@
-import type { IntegrationOAuthMethodRegistration } from "@opencode/plugin/effect/integration"
-import type { Context } from "@opencode/plugin/effect/plugin"
-import { define } from "@opencode/plugin/effect/plugin"
+import type { IntegrationOAuthMethodRegistration } from "@lutungcode/plugin/effect/integration"
+import type { Context } from "@lutungcode/plugin/effect/plugin"
+import { define } from "@lutungcode/plugin/effect/plugin"
 // import { Deferred, Duration, Effect, Option, Schema, Semaphore, Stream } from "effect"
 import { Deferred, Effect, Option, Schema, Semaphore, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
@@ -19,7 +19,7 @@ import { configuredSettings } from "./configured.js"
 
 // First-time sign-in registers a user-owned client; OpenAI returns its issued client ID on the callback.
 const registrationClientID = "dynamic_agent_client"
-const agentName = "OpenCode"
+const agentName = "LutungCode"
 const issuer = "https://auth.openai.com"
 const tokenURL = `${issuer}/api/accounts/oauth/token`
 const resource = "https://api.openai.com/v1"
@@ -207,7 +207,7 @@ function listen(server: Server) {
 }
 
 export const ChatGPTPlugin = define({
-  id: "opencode.provider.chatgpt",
+  id: "lutungcode.provider.chatgpt",
   effect: Effect.fn(function* (ctx) {
     const bus = yield* Bus.Service
     const credentials = yield* Credential.Service
@@ -440,7 +440,7 @@ function deriveModel(remote: RemoteModel, previous: Model.Info): Model.Info {
   return {
     ...previous,
     name: previous.id === previous.modelID ? remote.display_name : previous.name,
-    package: previous.package ?? "@opencode/ai/providers/openai",
+    package: previous.package ?? "@lutungcode/ai/providers/openai",
     capabilities: {
       ...previous.capabilities,
       input: remote.input_modalities.filter((modality) => modality === "text" || modality === "image"),

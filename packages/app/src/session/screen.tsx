@@ -11,8 +11,8 @@ import {
   type Accessor,
 } from "solid-js"
 import { createStore } from "solid-js/store"
-import { ResizeHandle } from "@opencode/ui/resize-handle"
-import { Slot, type BackgroundTask, type MountedSession, type SessionScreen } from "@opencode/gui-extensions/sdk"
+import { ResizeHandle } from "@lutungcode/ui/resize-handle"
+import { Slot, type BackgroundTask, type MountedSession, type SessionScreen } from "@lutungcode/gui-extensions/sdk"
 import { MessageTimeline } from "@/session/timeline/message-timeline"
 import { ComposerDropzone } from "@/composer/dropzone"
 import { useSettings } from "@/settings/model"

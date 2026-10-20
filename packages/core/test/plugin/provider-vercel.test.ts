@@ -1,11 +1,11 @@
-import { AISDK } from "@opencode/core/aisdk"
+import { AISDK } from "@lutungcode/core/aisdk"
 import { describe, expect } from "bun:test"
 import { Effect } from "effect"
-import { Model } from "@opencode/core/model"
-import { Plugin } from "@opencode/core/plugin"
-import { PluginHost } from "@opencode/core/plugin/host"
-import { VercelPlugin } from "@opencode/core/plugin/provider/vercel"
-import { Provider } from "@opencode/core/provider"
+import { Model } from "@lutungcode/core/model"
+import { Plugin } from "@lutungcode/core/plugin"
+import { PluginHost } from "@lutungcode/core/plugin/host"
+import { VercelPlugin } from "@lutungcode/core/plugin/provider/vercel"
+import { Provider } from "@lutungcode/core/provider"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "./fixture"
 
@@ -30,8 +30,8 @@ describe("VercelPlugin", () => {
       yield* addPlugin()
       expect((yield* catalog.get(Provider.ID.make("vercel")))?.headers).toEqual({
         Existing: "1",
-        "http-referer": "https://opencode.ai/",
-        "x-title": "opencode",
+        "http-referer": "https://lutungcode.ai/",
+        "x-title": "lutungcode",
       })
     }),
   )

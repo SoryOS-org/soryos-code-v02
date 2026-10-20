@@ -1,12 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode/server",
+  "name": "@lutungcode/server",
   "version": "2.0.32",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anomalyco/opencode.git",
+    "url": "git+https://github.com/anomalyco/lutungcode.git",
     "directory": "packages/server"
   },
   "publishConfig": {
@@ -27,17 +27,17 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@effect/platform-node-shared": "catalog:",
-    "@opencode/core": "workspace:*",
-    "@opencode/protocol": "workspace:*",
-    "@opencode/schema": "workspace:*",
-    "@opencode/simulation": "workspace:*",
-    "@opencode/util": "workspace:*",
+    "@lutungcode/core": "workspace:*",
+    "@lutungcode/protocol": "workspace:*",
+    "@lutungcode/schema": "workspace:*",
+    "@lutungcode/simulation": "workspace:*",
+    "@lutungcode/util": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@opencode-ai/pty": "0.3.1",
-    "@opencode/client": "workspace:*",
-    "@opencode/plugin": "workspace:*",
+    "@lutungcode/client": "workspace:*",
+    "@lutungcode/plugin": "workspace:*",
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",
     "@typescript/native": "catalog:",

@@ -8,32 +8,32 @@ import {
   SystemPart,
   TransportError,
   type LLMRequest,
-} from "@opencode/ai"
-import { OpenAIChat } from "@opencode/ai/protocols"
-import { Agent } from "@opencode/core/agent"
-import { Database } from "@opencode/core/database/database"
-import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { llmClient } from "@opencode/core/effect/app-node-platform"
-import { LayerNode } from "@opencode/util/effect/layer-node"
-import { Bus } from "@opencode/core/bus"
-import { SessionEvent } from "@opencode/core/session/event"
-import { SessionMessage } from "@opencode/core/session/message"
-import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionRunnerModel } from "@opencode/core/session/runner/model"
-import { SessionTable } from "@opencode/core/session/sql"
-import { SessionStore } from "@opencode/core/session/store"
-import { SessionTitle } from "@opencode/core/session/title"
-import { PluginHooks } from "@opencode/core/plugin/hooks"
-import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
-import { Location } from "@opencode/core/location"
-import { Session } from "@opencode/core/session"
-import { Project } from "@opencode/core/project"
-import { ProjectTable } from "@opencode/core/project/sql"
-import { App } from "@opencode/core/app"
-import { Model } from "@opencode/core/model"
-import { Provider } from "@opencode/core/provider"
-import { AbsolutePath } from "@opencode/core/schema"
-import { Money } from "@opencode/schema/money"
+} from "@lutungcode/ai"
+import { OpenAIChat } from "@lutungcode/ai/protocols"
+import { Agent } from "@lutungcode/core/agent"
+import { Database } from "@lutungcode/core/database/database"
+import { AppNodeBuilder } from "@lutungcode/core/effect/app-node-builder"
+import { llmClient } from "@lutungcode/core/effect/app-node-platform"
+import { LayerNode } from "@lutungcode/util/effect/layer-node"
+import { Bus } from "@lutungcode/core/bus"
+import { SessionEvent } from "@lutungcode/core/session/event"
+import { SessionMessage } from "@lutungcode/core/session/message"
+import { SessionProjector } from "@lutungcode/core/session/projector"
+import { SessionRunnerModel } from "@lutungcode/core/session/runner/model"
+import { SessionTable } from "@lutungcode/core/session/sql"
+import { SessionStore } from "@lutungcode/core/session/store"
+import { SessionTitle } from "@lutungcode/core/session/title"
+import { PluginHooks } from "@lutungcode/core/plugin/hooks"
+import { PluginSupervisor } from "@lutungcode/core/plugin/supervisor"
+import { Location } from "@lutungcode/core/location"
+import { Session } from "@lutungcode/core/session"
+import { Project } from "@lutungcode/core/project"
+import { ProjectTable } from "@lutungcode/core/project/sql"
+import { App } from "@lutungcode/core/app"
+import { Model } from "@lutungcode/core/model"
+import { Provider } from "@lutungcode/core/provider"
+import { AbsolutePath } from "@lutungcode/core/schema"
+import { Money } from "@lutungcode/schema/money"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { testEffect } from "./lib/effect"
 
@@ -211,13 +211,13 @@ it.effect("generates a title from the sole user message and renames the session"
 
     expect(requests).toHaveLength(1)
     expect(requests[0]?.http?.headers).toEqual({
-      "x-opencode-session-id": sessionID,
+      "x-lutungcode-session-id": sessionID,
       "x-session-affinity": sessionID,
       "X-Session-Id": sessionID,
       "User-Agent": App.useragent(App.make()),
-      "x-opencode-project": Project.ID.global,
-      "x-opencode-session": sessionID,
-      "x-opencode-client": "opencode",
+      "x-lutungcode-project": Project.ID.global,
+      "x-lutungcode-session": sessionID,
+      "x-lutungcode-client": "lutungcode",
     })
     expect(requests[0]?.promptCacheKey).toBe(sessionID)
     expect(requests[0]?.tools).toEqual([])
