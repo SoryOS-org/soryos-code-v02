@@ -70,7 +70,14 @@ import { directoryRecentValue } from "../../prompt/directory-completion"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
-import { Harness, executeHarness, routeTask, type HarnessTraceEvent, type RouteDecision } from "../../ecode-router"
+import {
+  Harness,
+  executeHarness,
+  routeTask,
+  withHarnessMemory,
+  type HarnessTraceEvent,
+  type RouteDecision,
+} from "../../ecode-router"
 
 export type PromptProps = {
   sessionID?: string
@@ -1320,6 +1327,7 @@ export function Prompt(props: PromptProps) {
     }
     history.append(entry)
     if (usesLocalHarness) {
+      const harnessPrompt = withHarnessMemory(inputText, data.session.message.list(target))
       move.startSubmit()
       toast.show({
         title: selectedHarness === Harness.Router ? "Router selected a coding harness" : "Coding harness selected",
@@ -1362,11 +1370,11 @@ export function Prompt(props: PromptProps) {
             resume: false,
           })
         }
-        let result = await executeHarness(used, inputText, directory, publishTrace)
+        let result = await executeHarness(used, harnessPrompt, directory, publishTrace)
         if (selectedHarness === Harness.Router && result.exitCode !== 0 && used.harness !== Harness.Codex) {
           used = { harness: Harness.Codex, model: "gpt-5.6-sol" }
           await publishTrace({ type: "status", text: "Falling back to Codex CLI · gpt-5.6-sol" })
-          result = await executeHarness(used, inputText, directory, publishTrace)
+          result = await executeHarness(used, harnessPrompt, directory, publishTrace)
         }
         const output = result.stdout || result.stderr || `Harness exited with code ${result.exitCode}`
         await client.api.session.synthetic({

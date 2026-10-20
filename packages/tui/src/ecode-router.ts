@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import type { SessionMessageInfo } from "@opencode/client"
 
 export const Harness = {
   Router: "router",
@@ -24,6 +25,10 @@ export type HarnessTraceEvent =
   | { type: "file"; text: string }
   | { type: "message"; text: string }
   | { type: "error"; text: string }
+
+const HARNESS_MEMORY_CHARS = 24_000
+const HARNESS_MEMORY_TURNS = 12
+const HARNESS_MEMORY_TURN_CHARS = 8_000
 
 export const harnessOptions = [
   { id: Harness.Router, title: "Router", description: "Automatically choose the best coding harness" },
@@ -60,6 +65,56 @@ export function routeTask(prompt: string): RouteDecision {
 
 export function routeHarness(prompt: string): LocalHarness {
   return routeTask(prompt).harness
+}
+
+/**
+ * Local coding CLIs do not share ecode's provider session. Give every invocation a
+ * compact, harness-neutral transcript so a router switch still continues the same task.
+ * Command traces are deliberately excluded: they are UI observability, not conversation.
+ */
+export function withHarnessMemory(prompt: string, messages: readonly SessionMessageInfo[]) {
+  const turns = messages.flatMap((message) => {
+    if (message.type === "user") return message.text.trim() ? [`User: ${message.text.trim()}`] : []
+    if (message.type === "assistant") {
+      const text = message.content
+        .flatMap((part) => (part.type === "text" ? [part.text.trim()] : []))
+        .filter(Boolean)
+        .join("\n\n")
+      return text ? [`Assistant (ecode): ${text}`] : []
+    }
+    if (message.type !== "synthetic") return []
+    const source = message.metadata?.source
+    if (source === "harness-user") return message.text.trim() ? [`User: ${message.text.trim()}`] : []
+    if (source !== "harness") return []
+    const harness = stringValue(message.metadata?.harness)
+    const actor =
+      harness === Harness.ClaudeCode ? "Claude Code" : harness === Harness.OpenCode ? "OpenCode CLI" : "Codex CLI"
+    return message.text.trim() ? [`Assistant (${actor}): ${message.text.trim()}`] : []
+  })
+  if (!turns.length) return prompt
+
+  const selected: string[] = []
+  let remaining = HARNESS_MEMORY_CHARS
+  for (const turn of turns.slice(-HARNESS_MEMORY_TURNS).reverse()) {
+    if (remaining <= 0) break
+    const compact = turn.length <= HARNESS_MEMORY_TURN_CHARS ? turn : `${turn.slice(0, HARNESS_MEMORY_TURN_CHARS)}\n…`
+    if (compact.length > remaining && selected.length > 0) break
+    selected.push(compact.slice(0, remaining))
+    remaining -= compact.length
+  }
+  selected.reverse()
+  return [
+    "Continue the existing ecode coding session. Use the prior conversation for context and preserve decisions already made.",
+    "Do not claim that context is missing when the answer is present below. Inspect the current repository state before changing files.",
+    "",
+    "<ecode_session_history>",
+    selected.join("\n\n"),
+    "</ecode_session_history>",
+    "",
+    "<current_request>",
+    prompt,
+    "</current_request>",
+  ].join("\n")
 }
 
 export function harnessInvocation(

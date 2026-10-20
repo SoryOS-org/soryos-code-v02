@@ -385,7 +385,13 @@ export function reduceSessionRows(
       rows.push({
         entry: { type: "message", messageID: message.id },
         path: messagePath(message, verbosity),
-        closesPrevious: !pending.has(message.id),
+        // Routed harness messages intentionally remain non-resuming inbox items. A terminal
+        // result still closes the preceding trace group even though it is not promoted yet.
+        closesPrevious:
+          (message.type === "synthetic" &&
+            message.metadata?.source === "harness" &&
+            (message.metadata.state === "completed" || message.metadata.state === "error")) ||
+          !pending.has(message.id),
       })
       return rows
     }

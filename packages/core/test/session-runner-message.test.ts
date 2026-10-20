@@ -52,6 +52,30 @@ describe("toLLMMessages", () => {
     ])
   })
 
+  test("shares final harness answers but omits harness command traces", () => {
+    const trace = SessionMessage.Synthetic.make({
+      id: id("harness-trace"),
+      type: "synthetic",
+      text: "$ bun test\nlarge command output",
+      metadata: { source: "harness-trace", event: "command" },
+      time: { created },
+    })
+    const answer = SessionMessage.Synthetic.make({
+      id: id("harness-answer"),
+      type: "synthetic",
+      text: "The failing test is fixed.",
+      metadata: { source: "harness", harness: "codex", state: "completed" },
+      time: { created },
+    })
+    expect(toLLMMessages([trace, answer], model)).toEqual([
+      Message.make({
+        id: answer.id,
+        role: "user",
+        content: "A previous external coding agent responded:\n\nThe failing test is fixed.",
+      }),
+    ])
+  })
+
   test("omits empty assistant turns", () => {
     const assistant = (value: string, content: SessionMessage.Assistant["content"]) =>
       SessionMessage.Assistant.make({

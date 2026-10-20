@@ -148,9 +148,18 @@ test("consecutive harness traces collapse beneath one Working group", () => {
     harnessTrace("status", "status"),
     harnessTrace("thought", "reasoning"),
     harnessTrace("command", "command"),
-    { type: "synthetic", id: "result", text: "Done", description: "Done", metadata: { source: "harness" }, time: { created: 2 } },
+    {
+      type: "synthetic",
+      id: "result",
+      text: "Done",
+      description: "Done",
+      metadata: { source: "harness", state: "completed" },
+      time: { created: 2 },
+    },
   ]
-  const rows = reduceSessionRows(messages)
+  // Harness UI messages use resume:false, so they remain inbox inputs until a native
+  // provider turn eventually promotes them. The terminal result must still close Working.
+  const rows = reduceSessionRows(messages, new Set(messages.map((message) => message.id)))
   expect(rows.map((row) => (row.type === "group" ? `${row.kind}:${row.size}` : row.type))).toEqual([
     "message",
     "harness:3",

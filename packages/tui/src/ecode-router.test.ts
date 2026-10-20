@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { Harness, harnessCommand, harnessInvocation, parseHarnessEvent, routeHarness, routeTask } from "./ecode-router"
+import type { SessionMessageInfo } from "@opencode/client"
+import {
+  Harness,
+  harnessCommand,
+  harnessInvocation,
+  parseHarnessEvent,
+  routeHarness,
+  routeTask,
+  withHarnessMemory,
+} from "./ecode-router"
 
 describe("ecode router", () => {
   test("routes simple questions to Codex with Sol", () => {
@@ -35,6 +44,40 @@ describe("ecode router", () => {
       "gpt-5.6-sol",
       "What does this project do?",
     ])
+  })
+
+  test("shares prior user and final harness turns without command traces", () => {
+    const messages: SessionMessageInfo[] = [
+      {
+        type: "synthetic",
+        id: "user-1",
+        text: "Fix the stuck Working indicator",
+        description: "Fix the stuck Working indicator",
+        metadata: { source: "harness-user" },
+        time: { created: 1 },
+      },
+      {
+        type: "synthetic",
+        id: "trace-1",
+        text: "$ git diff\nvery large trace",
+        description: "$ git diff\nvery large trace",
+        metadata: { source: "harness-trace", event: "command" },
+        time: { created: 2 },
+      },
+      {
+        type: "synthetic",
+        id: "answer-1",
+        text: "The fix is ready; the remaining step is to install it.",
+        description: "The fix is ready; the remaining step is to install it.",
+        metadata: { source: "harness", harness: "codex", state: "completed" },
+        time: { created: 3 },
+      },
+    ]
+    const prompt = withHarnessMemory("Make the change", messages)
+    expect(prompt).toContain("User: Fix the stuck Working indicator")
+    expect(prompt).toContain("Assistant (Codex CLI): The fix is ready")
+    expect(prompt).toContain("<current_request>\nMake the change\n</current_request>")
+    expect(prompt).not.toContain("very large trace")
   })
 
   test("quotes executable paths containing spaces", () => {

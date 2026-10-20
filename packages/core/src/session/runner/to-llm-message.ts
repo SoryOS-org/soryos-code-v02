@@ -285,6 +285,17 @@ function toLLMMessage(message: SessionMessage.Info, model: Model.Ref, providerMe
         }),
       ]
     case "synthetic":
+      // Harness traces can contain megabytes of command output and are only transcript
+      // observability. Final harness answers remain useful shared memory for native agents.
+      if (message.metadata?.source === "harness-trace") return []
+      if (message.metadata?.source === "harness")
+        return [
+          Message.make({
+            id: message.id,
+            role: "user",
+            content: `A previous external coding agent responded:\n\n${message.text}`,
+          }),
+        ]
       return [Message.make({ id: message.id, role: "user", content: message.text })]
     case "skill":
       return [Message.make({ id: message.id, role: "user", content: message.text, metadata: message.metadata })]
