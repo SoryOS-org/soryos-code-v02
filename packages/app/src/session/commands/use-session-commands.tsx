@@ -17,7 +17,7 @@ import type { SessionModel } from "@/session/model"
 import type { SessionRevert } from "@/session/revert"
 import { useExtensionScoped } from "@/runtime/extension/commands"
 import type { Region } from "@/runtime/extension/panels"
-import { createSideFocus } from "@/runtime/extension/closed-tabs"
+import { createSideFocus, sideTabNumbers } from "@/runtime/extension/closed-tabs"
 
 type SessionCommandSource = {
   identity: SessionModel["identity"]
@@ -214,8 +214,10 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const selectAdjacentSideTab = (offset: -1 | 1) => {
     const key = adjacentTabKey(actions.region.keys(), actions.region.active(), offset)
 
-    if (!key) return
+    if (key) selectSideTab(key)
+  }
 
+  const selectSideTab = (key: string) => {
     actions.region.select(key)
 
     const panel = document.getElementById("review-panel")
@@ -428,6 +430,9 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
           when: (event) => sideFocused(event.target),
           onSelect: () => selectAdjacentSideTab(1),
         }),
+      ...(actions.session.layout.view().side.opened()
+        ? sideTabNumbers({ keys: actions.region.keys, select: selectSideTab, when: inSide }).map(fileCommand)
+        : []),
     ].filter((v) => !!v)
   }
 

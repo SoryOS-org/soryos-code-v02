@@ -599,6 +599,7 @@ type RegionHost = {
     active(): string | undefined
     toggle(): void
     entry(key: string): { readonly tab: PanelTab; readonly extension: string; readonly provider: Panel } | undefined
+    select(key: string): void
     close(key: string): void
     reopen(): void
   }
@@ -613,6 +614,9 @@ type RegionHost = {
     newSession: () => void
     reopenSession: () => void
     reopenSide: () => void
+    switchSession: () => void
+    /** The side region, for its numbered tab shortcuts. */
+    side: () => { keys: () => readonly string[]; select: (key: string) => void } | undefined
     /** The shortcut the browser's + menu item shows, as the host formats it; empty when it shows none. */
     shortcut: (shortcut: Accessor<string>) => void
   }>
@@ -638,6 +642,7 @@ type RegionFixtureState = {
   /** How many browser tabs the pane asked main to open. */
   opens: number
   reopens: number
+  switches: number
   /** The page main reports, blank or loaded. */
   blank: boolean
   /** Native browser tab close requests, by tab id. */
@@ -674,6 +679,7 @@ export function mountBrowserRegion(input: RegionHost) {
       sessions: 0,
       opens: 0,
       reopens: 0,
+      switches: 0,
       blank: false,
       closes: [],
       inspects: [],
@@ -1051,6 +1057,8 @@ export function mountBrowserRegion(input: RegionHost) {
               newSession={() => setStore("sessions", (count) => count + 1)}
               reopenSession={() => setStore("reopens", (count) => count + 1)}
               reopenSide={() => sideRegion()?.reopen()}
+              switchSession={() => setStore("switches", (count) => count + 1)}
+              side={sideRegion}
               shortcut={(next) => setShortcut(() => next)}
             />
             <h1 style={{ "font-size": "24px", "margin-bottom": "16px" }}>Restored side strip</h1>
@@ -1091,6 +1099,7 @@ export function mountBrowserRegion(input: RegionHost) {
             <p data-testid="new-sessions">{store.sessions}</p>
             <p data-testid="browser-opens">{store.opens}</p>
             <p data-testid="session-reopens">{store.reopens}</p>
+            <p data-testid="session-switches">{store.switches}</p>
             <p data-testid="add-shortcut">{shortcut()() || "none"}</p>
             <p data-testid="browser-closes">{JSON.stringify(store.closes)}</p>
             <p data-testid="browser-inspects">{JSON.stringify(store.inspects)}</p>
