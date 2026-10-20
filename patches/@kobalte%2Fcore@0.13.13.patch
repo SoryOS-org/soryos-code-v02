@@ -1,9 +1,3 @@
-diff --git a/node_modules/@kobalte/core/.bun-tag-18e03a8591dab1bf b/.bun-tag-18e03a8591dab1bf
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@kobalte/core/.bun-tag-6d093967f84c87a7 b/.bun-tag-6d093967f84c87a7
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/dist/chunk/3ARTUDH2.jsx b/dist/chunk/3ARTUDH2.jsx
 index 4a2cfa59cfd0adec119e46de043c590af12ceb60..7ebd96af343c10e20d43b0cf6602603c1e177d4a 100644
 --- a/dist/chunk/3ARTUDH2.jsx
