@@ -93,7 +93,7 @@ export default function Layout(props: ParentProps) {
               </div>
               <Show when={preferences.appearance.sidebarOpen()}>
                 <ResizeHandle
-                  class="-end-2"
+                  class="-end-1"
                   direction="horizontal"
                   size={state.tabsWidth}
                   min={140}

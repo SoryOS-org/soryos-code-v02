@@ -474,6 +474,7 @@ function SessionScreenContent(props: {
           >
             <div onPointerDown={() => screen.size.start()}>
               <ResizeHandle
+                class="-top-1"
                 direction="vertical"
                 edge="start"
                 size={session.layout.view().bottom.height()}
