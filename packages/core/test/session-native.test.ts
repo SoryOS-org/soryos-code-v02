@@ -344,14 +344,18 @@ it.effect("falls back to an earlier compatible native or local checkpoint", () =
   }),
 )
 
-it.effect("rejects malformed persisted native windows instead of silently dropping them", () =>
+it.effect("skips a malformed native window and replays the history before it", () =>
   Effect.gen(function* () {
     const s = yield* setup
+    yield* s.prompt("before")
     yield* s.compact({ messages: [{ role: "invalid", content: [] }] })
-    expect(yield* SessionHistory.load(s.db, sessionID, target).pipe(Effect.flip)).toMatchObject({
-      _tag: "Session.MessageDecodeError",
-    })
+    yield* s.prompt("after")
+    const history = yield* SessionHistory.load(s.db, sessionID, target)
+    expect(toLLMMessages(history, model.ref).map((message) => message.content)).toEqual([
+      [Message.text("before")],
+      [Message.text("after")],
+    ])
     const store = yield* SessionStore.Service
-    expect(yield* store.context(sessionID).pipe(Effect.flip)).toMatchObject({ _tag: "Session.MessageDecodeError" })
+    expect((yield* store.context(sessionID)).map((message) => message.type)).toEqual(["compaction", "user"])
   }),
 )

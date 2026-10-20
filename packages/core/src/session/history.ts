@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, lt, or, sql } from "drizzle-orm"
 import { Message } from "@opencode/ai"
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import type { Model } from "@opencode/schema/model"
 import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { Database } from "../database/database.js"
@@ -32,17 +32,23 @@ export const isNativeCompaction = (
 
 /** A native compaction's window: canonical AI messages, stored as JSON. */
 export const NativeWindow = Schema.toCodecJson(Schema.Array(Message))
+const decodesWindow = (messages: unknown) => Option.isSome(Schema.decodeUnknownOption(NativeWindow)(messages))
 
-// Like other native data, a window only replays on the model that made it.
+// Like other native data, a window only replays on the model that made it. One that no longer decodes, for example
+// a malformed one from a compaction hook, is skipped the same way instead of failing the session.
 const replayable = (message: SessionMessage.Info, boundary: Boundary) =>
   !isNativeCompaction(message) ||
   boundary === "latest" ||
-  (boundary !== "local" && message.model?.providerID === boundary.providerID && message.model.id === boundary.id)
+  (boundary !== "local" &&
+    message.model?.providerID === boundary.providerID &&
+    message.model.id === boundary.id &&
+    decodesWindow(message.native.messages))
 
 export const latestCompaction = Effect.fnUntraced(function* (
   db: DatabaseService,
   sessionID: SessionSchema.ID,
   boundary: Boundary,
+  before?: number,
 ) {
   return yield* db
     .select({ seq: SessionMessageTable.seq })
@@ -52,6 +58,7 @@ export const latestCompaction = Effect.fnUntraced(function* (
         eq(SessionMessageTable.session_id, sessionID),
         eq(SessionMessageTable.type, "compaction"),
         sql`json_extract(${SessionMessageTable.data}, '$.status') = 'completed'`,
+        before === undefined ? undefined : lt(SessionMessageTable.seq, before),
         boundary === "latest"
           ? undefined
           : or(
@@ -83,9 +90,6 @@ export const decodeMessageRowSync = (row: typeof SessionMessageTable.$inferSelec
 
 export const decodeMessageRow = (row: typeof SessionMessageTable.$inferSelect) =>
   decode(rowInput(row)).pipe(
-    Effect.tap((message) =>
-      isNativeCompaction(message) ? Schema.decodeUnknownEffect(NativeWindow)(message.native.messages) : Effect.void,
-    ),
     Effect.mapError(
       () =>
         new MessageDecodeError({
@@ -99,8 +103,12 @@ const messageEntries = Effect.fnUntraced(function* (
   db: DatabaseService,
   sessionID: SessionSchema.ID,
   boundary: Boundary,
-) {
-  const compaction = yield* latestCompaction(db, sessionID, boundary)
+  before?: number,
+): Effect.fn.Return<
+  ReadonlyArray<{ readonly seq: number; readonly message: SessionMessage.Info }>,
+  MessageDecodeError
+> {
+  const compaction = yield* latestCompaction(db, sessionID, boundary, before)
   const rows = yield* db
     .select()
     .from(SessionMessageTable)
@@ -116,6 +124,10 @@ const messageEntries = Effect.fnUntraced(function* (
   const decoded = yield* Effect.forEach(rows, (row) =>
     decodeMessageRow(row).pipe(Effect.map((message) => ({ seq: row.seq, message }))),
   )
+  // A window that cannot replay leaves nothing to start from, so read from the compaction before it.
+  const start = decoded[0]
+  if (compaction && start && !replayable(start.message, boundary))
+    return yield* messageEntries(db, sessionID, boundary, compaction.seq)
   const entries = compaction ? yield* withRecentText(db, sessionID, decoded) : decoded
   // Re-expansion may cross a native checkpoint whose completion already advanced the instruction
   // epoch: the baseline supersedes the chronological updates before it. Forks seed their baseline
