@@ -68,11 +68,20 @@ export function DetailsHeader(props: {
   )
 }
 
+/** Every mounted details menu, so a shortcut finds the one on screen. */
+const menus = new Set<{ trigger: () => HTMLButtonElement | undefined; toggle: () => void }>()
+
 function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onOpenChange: (open: boolean) => void }>) {
   const ctx = useExtension()
   const keybinds = ctx.keybinds
 
   // Cached timelines remain mounted; only the visible details own the command. It leaves with this component.
+  // A shortcut opens the menu without its trigger, so the trigger is named as the anchor.
+  let trigger: HTMLButtonElement | undefined
+  const self = { trigger: () => trigger, toggle: () => props.onOpenChange(!props.open) }
+  menus.add(self)
+  onCleanup(() => menus.delete(self))
+
   ctx.add(Command, (): Command | undefined =>
     props.active
       ? {
@@ -81,7 +90,8 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
           group: ctx.t("command.category.view"),
           section: "session",
           bind: "mod+shift+y",
-          run: () => props.onOpenChange(!props.open),
+          // A detached timeline can stay active, so the shortcut toggles the menu whose trigger is on screen.
+          run: () => [...menus].find((menu) => menu.trigger()?.isConnected)?.toggle(),
         }
       : undefined,
   )
@@ -89,7 +99,14 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
   const keybind = () => [...keybinds.keybind(`${ctx.id}.toggle`)]
 
   return (
-    <Menu placement="bottom-end" gutter={4} modal={false} open={props.open} onOpenChange={props.onOpenChange}>
+    <Menu
+      placement="bottom-end"
+      gutter={4}
+      modal={false}
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+      getAnchorRect={() => trigger?.getBoundingClientRect()}
+    >
       <Tooltip
         placement="bottom"
         value={
@@ -102,6 +119,7 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
         }
       >
         <Menu.Trigger
+          ref={trigger}
           as={IconButton}
           icon={<Icon name="outline-dots" />}
           variant="ghost-muted"

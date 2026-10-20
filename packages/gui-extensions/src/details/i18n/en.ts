@@ -1,7 +1,7 @@
 export default {
   title: "Session details",
-  tooltip: "Summary",
-  "command.toggle": "Toggle summary",
+  tooltip: "Session details",
+  "command.toggle": "Toggle session details",
   noBranch: "No branch",
   "move.title": "Move to worktree",
   "move.menu": "Move session to",

@@ -17,7 +17,6 @@ for (const direction of ["ltr", "rtl"] as const) {
     })
     await page.goto(sessionHref(fixture.targetID))
     const header = page.locator("[data-session-title]")
-    const more = header.getByRole("button", { name: "More options", exact: true })
     const project = header.locator('[data-slot="session-location-trigger"]')
     const review = page.getByRole("button", { name: "Toggle review", exact: true })
     const details = header.getByRole("button", { name: "Session details", exact: true })
@@ -25,6 +24,7 @@ for (const direction of ["ltr", "rtl"] as const) {
     await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
     await expect(review).toBeVisible()
     await expect(details).toBeVisible()
+    await expect(header.getByRole("button", { name: "More options", exact: true })).toHaveCount(0)
     await expect(page.locator('[data-slot="titlebar-v2"]').getByRole("button", { name: "Status" })).toHaveCount(0)
     const titleBounds = await header.getByRole("heading").boundingBox()
     expect(titleBounds).not.toBeNull()
@@ -40,25 +40,23 @@ for (const direction of ["ltr", "rtl"] as const) {
       await expect(header.locator('[data-slot="session-title-child"]')).toHaveCSS("padding-right", "4px")
       await expect
         .poll(async () => {
-          const [icon, title, menu, sidebar, summary] = await Promise.all(
-            [project, header.locator('[data-slot="session-title-child"]'), more, review, details].map((control) =>
+          const [icon, title, sidebar, summary] = await Promise.all(
+            [project, header.locator('[data-slot="session-title-child"]'), review, details].map((control) =>
               control.boundingBox(),
             ),
           )
 
-          if (!icon || !title || !menu || !sidebar || !summary || !titleBounds) return false
+          if (!icon || !title || !sidebar || !summary || !titleBounds) return false
 
           if (Math.abs(title.y - titleBounds.y) > 0.5 || Math.abs(title.height - titleBounds.height) > 0.5) return false
 
           return direction === "ltr"
             ? title.x > icon.x + icon.width &&
-                Math.abs(menu.x - title.x - title.width - 2) <= 0.5 &&
-                menu.x + menu.width <= summary.x &&
+                title.x + title.width <= summary.x &&
                 summary.x + summary.width <= sidebar.x
             : icon.x > title.x + title.width &&
-                Math.abs(title.x - menu.x - menu.width - 2) <= 0.5 &&
-                sidebar.x + sidebar.width <= summary.x &&
-                summary.x + summary.width <= menu.x
+                summary.x + summary.width <= title.x &&
+                sidebar.x + sidebar.width <= summary.x
         })
         .toBe(true)
     }
@@ -66,27 +64,22 @@ for (const direction of ["ltr", "rtl"] as const) {
     await header.getByRole("textbox").press("Escape")
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
 
+    // The header stays one row at every width.
     for (const width of [900, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await expect
         .poll(async () => {
-          const [location, title, menu, summary, sidebar] = await Promise.all(
-            [project, header.getByRole("heading"), more, details, review].map((control) => control.boundingBox()),
+          const [location, title, summary, sidebar] = await Promise.all(
+            [project, header.getByRole("heading"), details, review].map((control) => control.boundingBox()),
           )
 
-          if (!location || !title || !menu || !summary || !sidebar) return false
-          const gap = direction === "ltr" ? menu.x - title.x - title.width : title.x - menu.x - menu.width
-
-          const aligned =
-            Math.abs(menu.y + menu.height / 2 - summary.y - summary.height / 2) <= 0.5 &&
-            Math.abs(menu.y + menu.height / 2 - sidebar.y - sidebar.height / 2) <= 0.5
+          if (!location || !title || !summary || !sidebar) return false
+          const middle = (box: { y: number; height: number }) => box.y + box.height / 2
 
           return (
-            Math.abs(gap - 2) <= 0.5 &&
-            aligned &&
-            (width === 900
-              ? Math.abs(location.y - menu.y - menu.height - 8) <= 0.5
-              : Math.abs(location.y + location.height / 2 - menu.y - menu.height / 2) <= 0.5)
+            Math.abs(middle(location) - middle(title)) <= 0.5 &&
+            Math.abs(middle(summary) - middle(sidebar)) <= 0.5 &&
+            Math.abs(summary.height - sidebar.height) <= 0.5
           )
         })
         .toBe(true)
@@ -102,68 +95,26 @@ for (const direction of ["ltr", "rtl"] as const) {
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "false")
 
-    await more.click()
-    const options = page.getByRole("menu")
-    await expect(options.getByRole("menuitem")).toHaveText(["Rename", "Export…", "Delete…"])
+    await details.click()
+    const menu = page.getByRole("menu", { name: "Session details", exact: true })
+    await expect(menu.getByRole("menuitem", { name: "Export…", exact: true })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "Delete…", exact: true })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "Plugins", exact: true })).toBeVisible()
+    await expect(menu.getByRole("menuitem", { name: "Server status", exact: true })).toHaveCount(0)
 
     if (direction === "ltr") {
       await expect
         .poll(async () => {
-          const [button, menu] = await Promise.all([
-            header.getByRole("button", { name: "More options", exact: true, includeHidden: true }).boundingBox(),
-            options.boundingBox(),
-          ])
+          const [button, card] = await Promise.all([details.boundingBox(), menu.boundingBox()])
 
-          return button && menu ? Math.abs(button.x - menu.x) : Infinity
+          return button && card ? Math.abs(button.x + button.width - card.x - card.width) : Infinity
         })
         .toBeLessThanOrEqual(1)
     }
 
-    await expect
-      .poll(() =>
-        options.evaluate((element) => {
-          const menu = element.getBoundingClientRect()
-          const rtl = getComputedStyle(element).direction === "rtl"
-
-          return Math.min(
-            ...Array.from(element.querySelectorAll('[data-slot="menu-v2-item-content"]'), (label) => {
-              const range = document.createRange()
-              range.selectNodeContents(label)
-              const text = range.getBoundingClientRect()
-
-              return rtl ? text.left - menu.left : menu.right - text.right
-            }),
-          )
-        }),
-      )
-      .toBeCloseTo(32, 0)
-    await expect
-      .poll(() =>
-        options.evaluate((element) => {
-          const menu = element.getBoundingClientRect()
-          const divider = element.querySelector('[data-slot="menu-v2-separator"]')?.getBoundingClientRect()
-          const rows = Array.from(element.querySelectorAll('[role="menuitem"]'), (row) => row.getBoundingClientRect())
-
-          return (
-            !!divider &&
-            Math.abs(divider.left - menu.left) <= 0.5 &&
-            Math.abs(divider.right - menu.right) <= 0.5 &&
-            rows.every(
-              (row) => Math.abs(row.left - menu.left - 2) <= 0.5 && Math.abs(menu.right - row.right - 2) <= 0.5,
-            )
-          )
-        }),
-      )
-      .toBe(true)
-    await expect(page.getByRole("menuitem", { name: "Server status", exact: true })).toHaveCount(0)
     await page.keyboard.press("Escape")
-    await details.click()
-    const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-    const mcp = summary.getByRole("button", { name: "MCP", exact: true })
-    await expect(mcp).toBeVisible()
-    await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
-    await page.keyboard.press("Escape")
-    await expect(mcp).toBeHidden()
+    await expect(menu).toBeHidden()
   })
 }
 

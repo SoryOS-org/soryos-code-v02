@@ -106,12 +106,18 @@ export default function SessionDetailsPanel(props: DetailsPanelProps) {
           </Menu.Item>
         </Show>
         <Menu.Separator />
-        <SessionServerPanel
-          session={props.session}
-          directory={props.session.directory}
-          shown={props.shown !== false}
-          sub
-        />
+        <Menu.Group>
+          {/* With several servers, the extensions name the session's server. */}
+          <Show when={ctx.servers.list().length > 1}>
+            <Menu.GroupLabel>{props.session.server.name}</Menu.GroupLabel>
+          </Show>
+          <SessionServerPanel
+            session={props.session}
+            directory={props.session.directory}
+            shown={props.shown !== false}
+            sub
+          />
+        </Menu.Group>
       </>
     )
 

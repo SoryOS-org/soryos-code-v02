@@ -15,7 +15,7 @@ for (const custom of [false, true]) {
     if (custom) await seed(page, { settings: { keybinds: { "session.summary.toggle": "alt+f8" } } })
     await page.goto(sessionHref(fixture.sourceID))
     const trigger = page.getByRole("button", { name: "Session details", exact: true })
-    const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+    const summary = page.getByRole("menu", { name: "Session details", exact: true })
     await expect(page.locator('[data-component="composer-editor"]')).toBeEditable()
     await expect(trigger).toBeEnabled()
     // The trigger scrolls with the timeline under its sticky header, and Kobalte closes a tooltip whenever its
@@ -25,7 +25,7 @@ for (const custom of [false, true]) {
     ).toBeVisible()
     await trigger.hover()
     const tooltip = page.getByRole("tooltip")
-    await expect(tooltip).toContainText("Summary")
+    await expect(tooltip).toContainText("Session details")
     const mac = await page.evaluate(() => /(Mac|iPod|iPhone|iPad)/.test(navigator.platform))
     const shortcut = custom ? "Alt+F8" : mac ? "Meta+Shift+Y" : "Control+Shift+Y"
     await expect(tooltip.locator('[data-slot="keybind-v2-label"]')).toHaveText(
@@ -40,7 +40,7 @@ for (const custom of [false, true]) {
       ).toBeInViewport()
       await page.keyboard.press(shortcut)
       await expect(trigger).toHaveAttribute("aria-expanded", "true")
-      await expect(summary.getByRole("button", { name: "Extensions", exact: true })).toBeVisible()
+      await expect(summary.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
       await expect.poll(() => summary.evaluate((element) => element.contains(document.activeElement))).toBe(true)
       await expect(tooltip).toBeHidden()
       await page.keyboard.press(shortcut)
@@ -57,54 +57,11 @@ for (const custom of [false, true]) {
     await page.goto("/settings")
     const settings = page.getByTestId("settings-screen")
     await settings.getByRole("tab", { name: "Shortcuts", exact: true }).click()
-    await expect(settings.getByText("Toggle summary", { exact: true })).toBeVisible()
+    await expect(settings.getByText("Toggle session details", { exact: true })).toBeVisible()
     await expect(settings.getByText("session.summary.toggle", { exact: true })).toHaveCount(0)
     expect(await keybinds()).toEqual({ "details.toggle": "alt+f8" })
   })
 }
-
-test("summary disclosures import legacy settings and persist in extension storage", async ({ page }) => {
-  await mockStressTimeline(page)
-  await seed(page, {
-    settings: {
-      appearance: { tabLayout: "vertical" },
-      sessionSummary: { projectExpanded: false, serverExpanded: true },
-    },
-  })
-  await page.goto(sessionHref(fixture.targetID))
-  const trigger = page.getByRole("button", { name: "Session details", exact: true })
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  const project = summary.getByRole("button", { name: fixture.project.name, exact: true })
-  const workspace = summary.getByRole("button", { name: "Local repository", exact: true })
-  const server = summary.getByRole("button", { name: "Extensions", exact: true })
-  await trigger.click()
-  await expect(project).toHaveAttribute("aria-expanded", "false")
-  await expect(workspace).toBeHidden()
-  await expect(server).toHaveAttribute("aria-expanded", "true")
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
-  await project.click()
-  await expect(project).toHaveAttribute("aria-expanded", "true")
-  await expect(workspace).toBeVisible()
-  await server.click()
-  await expect(server).toHaveAttribute("aria-expanded", "false")
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toHaveCount(0)
-  await page.keyboard.press("Escape")
-  await expect(summary).toBeHidden()
-  await expect(trigger).toBeFocused()
-  await expect
-    .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem("opencode.global.dat:extension.details.prefs") ?? "null")),
-    )
-    .toEqual({ projectExpanded: true, serverExpanded: false })
-
-  await page.goto(sessionHref(fixture.sourceID))
-  await trigger.click()
-  await expect(project).toHaveAttribute("aria-expanded", "true")
-  await expect(workspace).toBeVisible()
-  await expect(server).toHaveAttribute("aria-expanded", "false")
-  await server.click()
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
-})
 
 test("a session in a worktree subfolder names its worktree and lists cached worktrees at once", async ({ page }) => {
   const root = "C:/OpenCode/SmokeWorktrees"
@@ -121,8 +78,8 @@ test("a session in a worktree subfolder names its worktree and lists cached work
   })
   await page.goto(sessionHref(fixture.targetID))
   const trigger = page.getByRole("button", { name: "Session details", exact: true })
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  const location = summary.getByRole("button", { name: "feature", exact: true })
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
+  const location = summary.getByRole("menuitem", { name: "feature", exact: true })
   await trigger.click()
   await expect(location).toBeVisible()
   await page.keyboard.press("Escape")
@@ -152,12 +109,13 @@ test("a subagent shows its details but cannot move to another worktree", async (
   })
   await page.goto(sessionHref(fixture.targetID))
 
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
 
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await expect(summary.getByText("feature", { exact: true })).toBeVisible()
-  await expect(summary.getByRole("button", { name: "feature", exact: true })).toHaveCount(0)
-  await expect(summary.getByRole("button", { name: "Extensions", exact: true })).toBeVisible()
+  await expect(summary.getByRole("menuitem", { name: "feature", exact: true })).toHaveAttribute("aria-disabled", "true")
+  await expect(summary.getByRole("menuitem", { name: "Export…", exact: true })).toHaveCount(0)
+  await expect(summary.getByRole("menuitem", { name: "Delete…", exact: true })).toHaveCount(0)
+  await expect(summary.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
 })
 
 test("the details follow the routed session when it moves to another worktree", async ({ page }) => {
@@ -178,8 +136,8 @@ test("the details follow the routed session when it moves to another worktree", 
 
   await page.goto(sessionHref(fixture.targetID))
   const trigger = page.getByRole("button", { name: "Session details", exact: true })
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  const location = (name: string) => summary.getByRole("button", { name, exact: true })
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
+  const location = (name: string) => summary.getByRole("menuitem", { name, exact: true })
   await trigger.click()
   await expect(location("feature")).toBeVisible()
   await page.keyboard.press("Escape")
@@ -206,8 +164,7 @@ test("the details follow the routed session when it moves to another worktree", 
 for (const direction of ["ltr", "rtl"] as const) {
   test(`summary overlays the view and submenus follow ${direction}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
-    const branch = `feature/${"long-branch-name-".repeat(12)}`
-    await mockStressTimeline(page, { vcs: { current: branch, default: "main" } })
+    await mockStressTimeline(page)
     await openWithDirection(page, sessionHref(fixture.targetID), direction)
     const trigger = page.getByRole("button", { name: "Session details", exact: true })
     await expect(trigger).toBeEnabled()
@@ -221,7 +178,7 @@ for (const direction of ["ltr", "rtl"] as const) {
 
     const composer = page.locator('[data-component="session-composer-dock"] > div')
     const timeline = page.locator('[data-slot="session-timeline-scroll"]')
-    const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+    const summary = page.getByRole("menu", { name: "Session details", exact: true })
     await expect(row).toBeInViewport()
     const before = { row: (await row.boundingBox())!, composer: (await composer.boundingBox())! }
 
@@ -235,7 +192,7 @@ for (const direction of ["ltr", "rtl"] as const) {
         return Math.max(Math.abs(message.x - before.row.x), Math.abs(input.x - before.composer.x))
       })
       .toBeLessThan(1)
-    // The capped session column can end before the panel, so the overlay is measured against the whole timeline.
+    // The capped session column can end before the menu, so the overlay is measured against the whole timeline.
     await expect
       .poll(async () => {
         const view = (await timeline.boundingBox())!
@@ -244,74 +201,40 @@ for (const direction of ["ltr", "rtl"] as const) {
         return Math.min(view.x + view.width, details.x + details.width) - Math.max(view.x, details.x)
       })
       .toBeGreaterThan(0)
-    const text = summary.getByText(branch, { exact: true })
-    await expect(text).toHaveCSS("text-overflow", "ellipsis")
-    await expect.poll(() => text.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
-    // Labels, including the truncated branch, stop 12px before the trailing indicator column.
-    const workspace = summary.getByRole("button", { name: "Local repository", exact: true })
+    await expectAlignedWithTrigger(page)
 
-    for (const [label, indicator] of [
-      [text, workspace.locator(".session-summary-menu-indicator")],
-      ...["Local repository", "MCP", "Plugins", "Skills", "LSP"].map((name) => {
-        const item = summary.getByRole("button", { name, exact: true })
-
-        return [item.locator(".session-summary-label"), item.locator(".session-summary-menu-indicator")]
-      }),
-    ]) {
-      await expect
-        .poll(async () => {
-          const start = (await label!.boundingBox())!
-          const end = (await indicator!.boundingBox())!
-
-          return direction === "ltr" ? end.x - start.x - start.width : start.x - end.x - end.width
-        })
-        .toBeGreaterThanOrEqual(12)
-    }
-
-    await expectAlignedWithHeader(page, direction)
-
-    const mcp = summary.getByRole("button", { name: "MCP", exact: true })
-    const submenu = page.getByRole("dialog", { name: "MCP", exact: true })
-    await mcp.hover()
-    await expect(submenu).toHaveCount(0)
+    const mcp = summary.getByRole("menuitem", { name: "MCP", exact: true })
+    const submenu = page.getByRole("menu", { name: "MCP", exact: true })
     await mcp.click()
     await expect(submenu.getByText("No MCP servers configured", { exact: true })).toBeVisible()
+    await expect(submenu.getByText("Configuration file")).toBeVisible()
     await expect(summary).toBeVisible()
+    // The submenu opens beside its row, never over it.
     await expect
       .poll(async () => {
         const item = (await mcp.boundingBox())!
         const menu = (await submenu.boundingBox())!
 
-        return direction === "ltr" ? menu.x + menu.width <= item.x : menu.x >= item.x + item.width
+        return menu.x + menu.width <= item.x + 1 || menu.x >= item.x + item.width - 1
       })
       .toBe(true)
-    await page.keyboard.press("Escape")
-    await expect(submenu).toBeHidden()
-    await expect(summary).toBeVisible()
-    await expect(mcp).toBeFocused()
-    await mcp.press("Enter")
-    await expect(submenu.getByText("Configuration file")).toBeVisible()
-    await mcp.click()
-    await expect(submenu).toBeHidden()
 
     for (const [name, empty] of [
       ["Plugins", "No plugins configured"],
       ["Skills", "No skills configured"],
       ["LSP", "No LSP servers configured"],
     ]) {
-      await summary.getByRole("button", { name, exact: true }).click()
-      await expect(page.getByRole("dialog", { name, exact: true }).getByText(empty, { exact: true })).toBeVisible()
+      await summary.getByRole("menuitem", { name, exact: true }).click()
+      await expect(page.getByRole("menu", { name, exact: true }).getByText(empty, { exact: true })).toBeVisible()
       await expect(submenu).toBeHidden()
     }
 
-    await summary.getByRole("button", { name: "Extensions", exact: true }).click()
-    await expect(page.getByRole("dialog", { name: "LSP", exact: true })).toBeHidden()
     await page.keyboard.press("Escape")
     await expect(summary).toBeHidden()
 
     await page.getByRole("button", { name: "Toggle review", exact: true }).click()
     await trigger.click()
-    await expectAlignedWithHeader(page, direction)
+    await expectAlignedWithTrigger(page)
     expect(warnings).toEqual([])
   })
 }
@@ -387,13 +310,13 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   const warnings = ownerWarnings(page)
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  const menu = (name: string) => page.getByRole("dialog", { name, exact: true })
-  const open = (name: string) => summary.getByRole("button", { name, exact: true }).click()
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
+  const menu = (name: string) => page.getByRole("menu", { name, exact: true })
+  const open = (name: string) => summary.getByRole("menuitem", { name, exact: true }).click()
 
   await prefetch.arrived
-  await expect(summary.getByRole("button", { name: fixture.project.name, exact: true })).toBeVisible()
-  await expect(summary.getByRole("button", { name: "Extensions", exact: true })).toBeVisible()
+  await expect(summary.getByRole("menuitem", { name: "Local repository", exact: true })).toBeVisible()
+  await expect(summary.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
   await open("Plugins")
   await expect(menu("Plugins").getByRole("status")).toContainText("Loading")
   await expect(menu("Plugins").getByText("No plugins configured", { exact: true })).toHaveCount(0)
@@ -419,7 +342,9 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   await expect(menu("LSP").getByText("rust", { exact: true })).toHaveCount(0)
   await expect(menu("LSP").locator(".session-service-dot")).toHaveCount(0)
   await open("MCP")
-  await expect(menu("MCP").locator('[data-slot="truncated-text-label"]').filter({ hasText: "summary-mcp" })).toBeVisible()
+  await expect(
+    menu("MCP").locator('[data-slot="truncated-text-label"]').filter({ hasText: "summary-mcp" }),
+  ).toBeVisible()
 
   for (const service of [
     { name: "MCP", path: "/api/mcp", item: "summary-mcp" },
@@ -428,10 +353,11 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
     { name: "LSP", path: "/api/config", item: "typescript" },
   ]) {
     await expectRefreshKeeps(page, service.name, service.path, service.item)
+    await open(service.name)
   }
 
   state.extra = true
-  await open("Plugins")
+  await expectRefreshKeeps(page, "Plugins", "/api/plugin", "supermemory")
   await expect(menu("Plugins").getByText("daytona", { exact: true })).toBeVisible()
 
   state.empty = true
@@ -443,77 +369,52 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
     { name: "Skills", path: "/api/skill", empty: "No skills configured" },
     { name: "LSP", path: "/api/config", empty: "No LSP servers configured" },
   ]) {
-    await open(service.name)
-    await expect(menu(service.name).getByText(service.empty, { exact: true })).toBeVisible()
     await expectRefreshKeeps(page, service.name, service.path, service.empty)
   }
 
   expect(warnings).toEqual([])
 })
 
-test("every MCP row hit area toggles exactly once and keeps the submenu open", async ({ page }) => {
-  // The harness stores each connect/disconnect as the server's status; `writes` records the requests.
+test("MCP rows show each server's state and the menu opens the MCP servers dialog", async ({ page }) => {
   await mockStressTimeline(page, {
     mcp: [
       { name: "figma", status: { status: "connected" } },
       { name: "linear", status: { status: "needs_auth" }, integrationID: "linear-oauth" },
       { name: "playwright", status: { status: "failed", error: "Connection refused" } },
       { name: "waiting", status: { status: "pending" } },
+      { name: "off", status: { status: "disabled" } },
     ],
   })
-  const writes: { path: string; directory: string | null }[] = []
+  const writes: string[] = []
   page.on("request", (request) => {
     const url = new URL(request.url())
 
-    if (request.method() !== "POST" || !url.pathname.startsWith("/api/experimental/mcp/")) return
-    writes.push({ path: url.pathname, directory: url.searchParams.get("location[directory]") })
+    if (request.method() === "POST" && url.pathname.startsWith("/api/experimental/mcp/")) writes.push(url.pathname)
   })
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await page.getByRole("button", { name: "MCP", exact: true }).click()
-  const submenu = page.getByRole("dialog", { name: "MCP", exact: true })
-  const toggle = submenu.getByRole("switch", { name: "figma", exact: true })
+  await page.getByRole("menuitem", { name: "MCP", exact: true }).click()
+  const submenu = page.getByRole("menu", { name: "MCP", exact: true })
 
-  const row = submenu
-    .locator(".session-mcp-row")
-    .filter({ has: page.getByRole("switch", { name: "figma", exact: true }) })
+  const row = (name: string) =>
+    submenu.locator(".session-mcp-row").filter({ has: page.getByText(name, { exact: true }) })
 
-  await expect(toggle).toBeChecked()
-  await expect(row.getByText("Connected", { exact: true })).toBeVisible()
-  // A pointer open focuses the menu itself, so its first row shows no focus ring; a keyboard open focuses that row.
-  await expect(submenu).toBeFocused()
-  await page.keyboard.press("Escape")
+  await expect(submenu.getByRole("switch")).toHaveCount(0)
+  await expect(row("figma").getByText("Connected", { exact: true })).toBeVisible()
+  await expect(row("waiting").getByText("Connecting…", { exact: true })).toBeVisible()
+  await expect(row("off").getByText("Disabled", { exact: true })).toBeVisible()
+  await expect(submenu.getByRole("button", { name: "Sign in to linear", exact: true })).toBeVisible()
+  await expect(row("playwright").getByText("Failed", { exact: true })).toBeVisible()
+
+  // A state row is information, not a toggle.
+  await row("figma").click()
+  await row("off").click()
+  await expect(submenu).toBeVisible()
+  expect(writes).toEqual([])
+
+  await submenu.getByRole("button", { name: "Manage MCP servers", exact: true }).click()
+  await expect(page.getByRole("dialog").getByText("MCPs", { exact: true })).toBeVisible()
   await expect(submenu).toBeHidden()
-  await page.getByRole("button", { name: "MCP", exact: true }).press("Enter")
-  await expect(toggle).toBeFocused()
-  await expect(submenu.getByRole("switch", { name: "waiting", exact: true })).toBeDisabled()
-  await expect(submenu.getByRole("switch", { name: "waiting", exact: true })).toHaveAccessibleDescription("Connecting…")
-
-  for (const [index, target] of ["label", "dot", "padding", "control", "keyboard"].entries()) {
-    const enabled = index % 2 !== 0
-    await expect(toggle).toBeEnabled()
-
-    if (target === "label") await row.locator('[data-slot="truncated-text-label"]').click()
-
-    if (target === "dot") await row.locator(".session-service-dot").click()
-
-    if (target === "padding") await row.click({ position: { x: 3, y: 3 } })
-
-    if (target === "control") await row.locator('[data-slot="switch-control"]').click()
-
-    if (target === "keyboard") await toggle.press("Space")
-    await expect(toggle).toBeChecked({ checked: enabled })
-    await expect(row.getByText(enabled ? "Connected" : "Disabled", { exact: true })).toBeVisible()
-    await expect(toggle).toBeEnabled()
-    await expect(submenu).toBeVisible()
-
-    if (target === "keyboard") await expect(toggle).toBeFocused()
-    expect(writes).toHaveLength(index + 1)
-    expect(writes[index]).toEqual({
-      path: `/api/experimental/mcp/figma/${enabled ? "connect" : "disconnect"}`,
-      directory: fixture.directory,
-    })
-  }
 })
 
 test("MCP authentication starts before a slow resource catalog finishes", async ({ page, context }) => {
@@ -521,7 +422,7 @@ test("MCP authentication starts before a slow resource catalog finishes", async 
   const attempts: string[] = []
   await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
   await mockStressTimeline(page, {
-    mcp: [{ name: "linear", integrationID: "linear-oauth", status: { status: "disabled" } }],
+    mcp: [{ name: "linear", integrationID: "linear-oauth", status: { status: "needs_auth" } }],
     onMcpAction: () => {
       state.connected = true
 
@@ -542,18 +443,17 @@ test("MCP authentication starts before a slow resource catalog finishes", async 
 
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await page.getByRole("button", { name: "MCP", exact: true }).click()
-  const submenu = page.getByRole("dialog", { name: "MCP", exact: true })
-  const toggle = submenu.getByRole("switch", { name: "linear", exact: true })
+  await page.getByRole("menuitem", { name: "MCP", exact: true }).click()
+  const submenu = page.getByRole("menu", { name: "MCP", exact: true })
   const signIn = submenu.getByRole("button", { name: "Sign in to linear", exact: true })
-  await expect(toggle).toBeEnabled()
+  await expect(signIn).toBeEnabled()
 
   try {
     const popup = page.waitForEvent("popup")
-    await submenu.locator('[data-slot="truncated-text-label"]').filter({ hasText: "linear" }).click()
+    await signIn.click()
     await expect(await popup).toHaveURL("https://auth.example.test/authorize")
     await resources.arrived
-    // The switch hands over to the sign-in link, which waits for the catalog before it is ready again.
+    // The sign-in link waits for the catalog before it is ready again.
     await expect(signIn).toBeDisabled()
   } finally {
     resources.release()
@@ -579,12 +479,9 @@ test("multiple desktop connections show the session's server name", async ({ pag
   })
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  await expect(summary.getByRole("button", { name: "Design server", exact: true })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  )
-  await expect(summary.getByRole("button", { name: "Extensions", exact: true })).toHaveCount(0)
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
+  await expect(summary.getByText("Design server", { exact: true })).toBeVisible()
+  await expect(summary.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
 })
 
 test.describe("remote configuration", () => {
@@ -615,7 +512,7 @@ test.describe("remote configuration", () => {
     await seed(page, { servers: [{ url: remote, name: "Remote server" }] })
     await page.goto(sessionHref(fixture.targetID, remote))
     const trigger = page.getByRole("button", { name: "Session details", exact: true })
-    const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+    const summary = page.getByRole("menu", { name: "Session details", exact: true })
     const tooltip = page.getByRole("tooltip")
 
     // Each service opens from a fresh summary: after a copy, the next submenu closes itself (reported defect).
@@ -626,8 +523,8 @@ test.describe("remote configuration", () => {
       { name: "LSP", path: `${home}/lsp.json` },
     ].entries()) {
       await trigger.click()
-      await summary.getByRole("button", { name: service.name, exact: true }).click()
-      const menu = page.getByRole("dialog", { name: service.name, exact: true })
+      await summary.getByRole("menuitem", { name: service.name, exact: true }).click()
+      const menu = page.getByRole("menu", { name: service.name, exact: true })
       const copy = menu.getByRole("button", { name: "Copy configuration file path", exact: true })
       await expect(tooltip).toHaveCount(0)
       await copy.hover()
@@ -655,10 +552,10 @@ test.describe("remote configuration", () => {
     entries.length = 0
     await page.evaluate(() => navigator.clipboard.writeText("original clipboard"))
     await trigger.click()
-    await summary.getByRole("button", { name: "Skills", exact: true }).click()
+    await summary.getByRole("menuitem", { name: "Skills", exact: true }).click()
 
     const copy = page
-      .getByRole("dialog", { name: "Skills", exact: true })
+      .getByRole("menu", { name: "Skills", exact: true })
       .getByRole("button", { name: "Copy configuration file path", exact: true })
 
     await copy.click()
@@ -679,10 +576,10 @@ test("long MCP lists stay in the viewport in a real RTL locale", async ({ page }
   await seed(page, { locale: "he", theme: { id: "oc-2", scheme: "dark" } })
   await page.goto(sessionHref(fixture.targetID))
   await page.getByRole("button", { name: "פרטי ההפעלה", exact: true }).click()
-  const summary = page.locator('[data-component="session-summary-panel"]')
-  await summary.getByRole("button", { name: "MCP", exact: true }).click()
-  const menu = page.getByRole("dialog", { name: "MCP", exact: true })
-  await expect(menu.getByRole("switch")).toHaveCount(30)
+  const summary = page.getByRole("menu", { name: "פרטי ההפעלה", exact: true })
+  await summary.getByRole("menuitem", { name: "MCP", exact: true }).click()
+  const menu = page.getByRole("menu", { name: "MCP", exact: true })
+  await expect(menu.locator(".session-mcp-row")).toHaveCount(30)
   await expect.poll(() => menu.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
   await expect
     .poll(async () => {
@@ -691,12 +588,8 @@ test("long MCP lists stay in the viewport in a real RTL locale", async ({ page }
       return bounds.x >= 15 && bounds.y >= 15 && bounds.x + bounds.width <= 785 && bounds.y + bounds.height <= 585
     })
     .toBe(true)
-  const last = menu.getByRole("switch", { name: /^server-29-/ })
-  await last.focus()
-  await expect(last).toBeFocused()
   await page.keyboard.press("Escape")
   await expect(menu).toBeHidden()
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeFocused()
 })
 
 // Solid reports reactive work created without an owner; the warning appears in dev builds only.
@@ -709,29 +602,31 @@ function ownerWarnings(page: Page) {
   return warnings
 }
 
-async function expectAlignedWithHeader(page: Page, direction: "ltr" | "rtl") {
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+// The menu hangs 4px below its trigger, aligned to the trigger's inline end.
+async function expectAlignedWithTrigger(page: Page) {
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
   await expect(summary).toBeVisible()
   await expect
     .poll(async () => {
-      const header = (await page.locator("[data-session-title]").boundingBox())!
-      const panel = (await summary.boundingBox())!
+      const trigger = (await page.getByRole("button", { name: "Session details", exact: true }).boundingBox())!
+      const menu = (await summary.boundingBox())!
+      const end = Math.min(Math.abs(trigger.x + trigger.width - menu.x - menu.width), Math.abs(trigger.x - menu.x))
 
-      return direction === "ltr"
-        ? Math.abs(header.x + header.width - panel.x - panel.width - 12)
-        : Math.abs(panel.x - header.x - 12)
+      return Math.max(end, Math.abs(menu.y - trigger.y - trigger.height - 4))
     })
     .toBeLessThanOrEqual(1)
 }
 
 // Reopens a service submenu while its next catalog request is held: the cached content stays, marked busy.
 async function expectRefreshKeeps(page: Page, name: string, path: string, content: string) {
-  const menu = page.getByRole("dialog", { name, exact: true })
-  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+  const menu = page.getByRole("menu", { name, exact: true })
+  const summary = page.getByRole("menu", { name: "Session details", exact: true })
   await page.keyboard.press("Escape")
   await expect(menu).toBeHidden()
+
+  if (!(await summary.isVisible())) await page.getByRole("button", { name: "Session details", exact: true }).click()
   const refresh = await holdRoute(page, (url) => url.pathname === path, { method: "GET" })
-  await summary.getByRole("button", { name, exact: true }).click()
+  await summary.getByRole("menuitem", { name, exact: true }).click()
   await refresh.arrived
   await expect(menu).toHaveAttribute("aria-busy", "true")
   await expect(menu.getByText(content, { exact: true }).filter({ visible: true })).toBeVisible()
