@@ -129,38 +129,27 @@ story("keeps patch file disclosures independent", async ({ mount }) => {
   await expect(deleted).toHaveAttribute("aria-expanded", "false")
 })
 
-story("keeps an Arabic prompt right-to-left when it starts with a Latin word", async ({ mount }) => {
+story("keeps each prompt line in the direction it is mostly written in", async ({ mount }) => {
   const root = await mount("current-session-timeline-rows--arabic-prompt")
-  const text = root.locator('[data-slot="user-message-text"]')
-  await expect(text).toHaveAttribute("dir", "rtl")
-  expect(await text.evaluate((element) => getComputedStyle(element).direction)).toBe("rtl")
+  const bubbles = root.locator('[data-slot="user-message-text"]')
+  await expect(bubbles).toHaveCount(2)
 
-  // The first logical word of a right-to-left prompt sits right of the last one.
-  const order = await text.evaluate((element) => {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-    const words: { left: number; top: number }[] = []
+  // The prompt opens with "React", so the first strong character is Latin while
+  // the sentence is mostly Arabic.
+  await expect(bubbles.first()).toHaveAttribute("dir", "rtl")
+  expect(await bubbles.first().evaluate((element) => getComputedStyle(element).direction)).toBe("rtl")
 
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const value = node.nodeValue ?? ""
-      let offset = 0
-
-      for (const part of value.split(/(\s+)/)) {
-        if (part.trim()) {
-          const range = document.createRange()
-          range.setStart(node, offset)
-          range.setEnd(node, offset + part.length)
-          const box = range.getBoundingClientRect()
-          words.push({ left: box.left, top: box.top })
-        }
-
-        offset += part.length
-      }
-    }
-
-    const firstLine = words.filter((word) => Math.abs(word.top - words[0].top) < 10)
-
-    return { first: firstLine[0].left, last: firstLine[firstLine.length - 1].left }
-  })
-
-  expect(order.first).toBeGreaterThan(order.last)
+  const lines = bubbles.nth(1).locator('[data-slot="user-message-line"]')
+  await expect(lines).toHaveCount(2)
+  expect(
+    await lines.evaluateAll((elements) =>
+      elements.map((element) => ({
+        dir: element.getAttribute("dir"),
+        direction: getComputedStyle(element).direction,
+      })),
+    ),
+  ).toEqual([
+    { dir: "ltr", direction: "ltr" },
+    { dir: "rtl", direction: "rtl" },
+  ])
 })

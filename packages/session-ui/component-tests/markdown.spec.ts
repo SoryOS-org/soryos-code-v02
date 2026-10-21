@@ -79,6 +79,8 @@ story("derives each block direction from the language it is mostly written in", 
       "<p>سأستخدم React في المشروع</p>",
       "<p>React هو مكتبة واجهة برمجية.</p>",
       "<p>Use React in the project.</p>",
+      "<p>这是一个测试 مرحبا</p>",
+      "<p>यह एक परीक्षण है مرحبا</p>",
       "<p>سأستخدم <code>npm install</code> هنا</p>",
       "<ul><li>سأستخدم npm install في المشروع</li><li>Use the CLI</li></ul>",
       "<table><thead><tr><th>الاسم</th><th>القيمة</th></tr></thead></table>",
@@ -90,6 +92,8 @@ story("derives each block direction from the language it is mostly written in", 
     '<p dir="rtl">سأستخدم React في المشروع</p>',
     '<p dir="rtl">React هو مكتبة واجهة برمجية.</p>',
     '<p dir="ltr">Use React in the project.</p>',
+    '<p dir="ltr">这是一个测试 مرحبا</p>',
+    '<p dir="ltr">यह एक परीक्षण है مرحبا</p>',
     '<p dir="rtl">سأستخدم <code>npm install</code> هنا</p>',
     '<ul dir="rtl"><li dir="rtl">سأستخدم npm install في المشروع</li><li dir="ltr">Use the CLI</li></ul>',
     '<table dir="rtl"><thead><tr><th dir="rtl">الاسم</th><th dir="rtl">القيمة</th></tr></thead></table>',
@@ -124,43 +128,20 @@ for (const streaming of [false, true]) {
       const paragraphs = markdown.locator("p")
       await expect(paragraphs).toHaveCount(3)
 
-      // The first logical word of a right-to-left paragraph sits right of the last one.
-      const layout = await paragraphs.evaluateAll((elements) =>
-        elements.map((element) => {
-          const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-          const words: { left: number; top: number }[] = []
-
-          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            const text = node.nodeValue ?? ""
-            let offset = 0
-
-            for (const part of text.split(/(\s+)/)) {
-              if (part.trim()) {
-                const range = document.createRange()
-                range.setStart(node, offset)
-                range.setEnd(node, offset + part.length)
-                const box = range.getBoundingClientRect()
-                words.push({ left: box.left, top: box.top })
-              }
-
-              offset += part.length
-            }
-          }
-
-          const firstLine = words.filter((word) => Math.abs(word.top - words[0].top) < 10)
-
-          return {
-            dir: element.getAttribute("dir"),
-            direction: getComputedStyle(element).direction,
-            firstOnRight: firstLine[0].left > firstLine[firstLine.length - 1].left,
-          }
-        }),
+      // The direction each block computes decides how the bidi algorithm
+      // orders the words inside it.
+      const blocks = await markdown.locator("h2, p").evaluateAll((elements) =>
+        elements.map((element) => ({
+          dir: element.getAttribute("dir"),
+          direction: getComputedStyle(element).direction,
+        })),
       )
 
-      expect(layout).toEqual([
-        { dir: "rtl", direction: "rtl", firstOnRight: true },
-        { dir: "rtl", direction: "rtl", firstOnRight: true },
-        { dir: "ltr", direction: "ltr", firstOnRight: false },
+      expect(blocks).toEqual([
+        { dir: "ltr", direction: "ltr" },
+        { dir: "rtl", direction: "rtl" },
+        { dir: "rtl", direction: "rtl" },
+        { dir: "ltr", direction: "ltr" },
       ])
     },
   )

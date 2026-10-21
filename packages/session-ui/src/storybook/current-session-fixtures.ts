@@ -1112,6 +1112,7 @@ export const arabicPromptDocument = document([
     completed: 92_500,
     content: [{ type: "text", text: "تمام. سأشرح الخطوات بالترتيب." }],
   }),
+  user("msg_user_multiline", "Fix the login bug please\nمرحبا كيف حالك؟ سأراجع الكود الآن.", 93_000),
 ])
 
 export const attachmentsAndCommentsPresentation = {

@@ -184,6 +184,10 @@
       transition: none;
     }
 
+    [data-slot="user-message-line"] {
+      unicode-bidi: isolate;
+    }
+
     [data-highlight="file"],
     [data-highlight="agent"] {
       color: inherit;
