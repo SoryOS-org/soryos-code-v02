@@ -43,6 +43,21 @@ test("home commands do not wait for session search", async ({ page }) => {
   release.resolve()
 })
 
+test("finds a setting and opens Settings with its row in view and highlighted", async ({ page }) => {
+  await openPaletteWorkspace(page)
+  await page.keyboard.press("Control+K")
+  const dialog = page.getByRole("dialog")
+  const input = dialog.getByRole("combobox")
+  await expect(input).toBeFocused()
+  await input.fill("theme")
+  await expect(dialog.getByRole("option", { name: /^Theme/ })).toHaveAttribute("aria-selected", "true")
+  await input.press("Enter")
+  await expect(page).toHaveURL("/settings?tab=appearance")
+  const row = page.getByTestId("settings-screen").locator('[data-search-target="row"]')
+  await expect(row).toContainText("Theme")
+  await expect(row).toBeInViewport()
+})
+
 test("lists recent sessions before a query is entered", async ({ page }) => {
   const { dialog } = await openCommandPalette(page, true)
   const session = dialog.getByRole("option", { name: /Palette fixture session/ })

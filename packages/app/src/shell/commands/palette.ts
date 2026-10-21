@@ -18,11 +18,13 @@ import { projectForSession } from "@/shell/layout/helpers"
 import { useExtensionHost } from "@/runtime/extension/host"
 import { useExtensionAttachment } from "@/runtime/extension/host-apis"
 import { looksLikeSessionID } from "@/session/search"
+import { createSettingsPaletteEntries } from "@/settings/palette"
+import type { SettingsSearchResult } from "@/settings/search-results"
 import { matchesCommandPaletteEntry } from "./search"
 
 export type CommandPaletteEntry = {
   id: string
-  type: "command" | "file" | "session"
+  type: "command" | "file" | "session" | "setting"
   title: string
   description?: string
   keywords?: string
@@ -36,6 +38,9 @@ export type CommandPaletteEntry = {
   project?: LocalProject
   archived?: number
   updated?: number
+  setting?: SettingsSearchResult
+  /** A setting whose title starts with the query lists before commands and sessions. */
+  strong?: boolean
 }
 
 const ENTRY_LIMIT = 5
@@ -90,6 +95,7 @@ export function createCommandPaletteModel(props: { filesOnly?: () => boolean; on
   const appTabs = useTabs()
   const extensions = useExtensionAttachment()
   const openFile = createCommandPaletteFileOpener(props.onOpenFile)
+  const settings = createSettingsPaletteEntries()
   const state: PaletteHighlight = { cleanup: undefined, committed: false }
   const filesOnly = () => props.filesOnly?.() ?? false
 
@@ -191,6 +197,8 @@ export function createCommandPaletteModel(props: { filesOnly?: () => boolean; on
       return
     }
 
+    if (item.type === "setting") return settings.select(item)
+
     if (!item.path) return
     openFile(item.path)
   }
@@ -208,6 +216,7 @@ export function createCommandPaletteModel(props: { filesOnly?: () => boolean; on
     recentFileEntries,
     rootFileEntries,
     sessions,
+    settings,
     highlight,
     select,
     close: () => dialog.close(),

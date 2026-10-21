@@ -97,6 +97,7 @@ export const dict = {
   "palette.group.commands": "Commands",
   "palette.group.files": "Files",
   "palette.group.recentSessions": "Recent sessions",
+  "palette.group.settings": "Settings",
   "palette.session.location": "{{project}} · {{server}}",
 
   "dialog.provider.search.placeholder": "Search providers",

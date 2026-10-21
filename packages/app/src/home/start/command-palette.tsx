@@ -12,6 +12,7 @@ import {
   type PaletteHighlight,
 } from "@/shell/commands/palette"
 import { CommandPaletteView, matchesCommandPaletteEntry } from "@/shell/commands/dialog"
+import { createSettingsPaletteEntries } from "@/settings/palette"
 
 export function HomeCommandPalette(props: {
   server: ServerConnection.Any
@@ -23,6 +24,7 @@ export function HomeCommandPalette(props: {
   const language = useLanguage()
   const server = global.ensureServerCtx(props.server)
   const state: PaletteHighlight = { cleanup: undefined, committed: false }
+  const settings = createSettingsPaletteEntries()
 
   const commandEntries = createMemo(() => {
     const category = language.t("palette.group.commands")
@@ -62,6 +64,8 @@ export function HomeCommandPalette(props: {
     }
 
     if (item.type === "session") props.onSelectSession(item)
+
+    if (item.type === "setting") settings.select(item)
   }
 
   const items = (query: string) => {
@@ -70,6 +74,7 @@ export function HomeCommandPalette(props: {
     return [
       ...commandEntries().filter((entry) => matchesCommandPaletteEntry(entry, query)),
       ...sessions.items(query),
+      ...settings.items(query),
     ]
   }
 
