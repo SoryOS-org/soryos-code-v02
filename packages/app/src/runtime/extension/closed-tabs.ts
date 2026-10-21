@@ -62,8 +62,12 @@ export function createClosedTabs(store: ClosedTabsStore = memoryStore()) {
 
 export type ClosedTabs = ReturnType<typeof createClosedTabs>
 
-/** How a closing tab lists, or nothing when its panel says it cannot come back. Transient tabs list only when asked. */
+/**
+ * How a closing tab lists, or nothing when it is not a file or its panel says it cannot come back. Only file tabs
+ * list; transient ones only when asked.
+ */
 export function closedEntry(key: string, panel: Panel, input: PanelProps): Omit<ClosedSideTab, "closed"> | undefined {
+  if (!input.tab.file) return
   const info = panel.closed?.(input)
 
   if (info === false) return

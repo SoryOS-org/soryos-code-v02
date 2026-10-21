@@ -363,13 +363,10 @@ test("context closes the side region only when its button opened it", async ({ p
     .click()
   await expect(context).toHaveAttribute("aria-selected", "true")
   await expect(newTab).toHaveCount(0)
-  // The New tab view now lists the closed Review under "Recently closed" too; reopening it brings back the same tab.
+  // "Recently closed" lists only files, so the closed Review is offered again by its launcher alone.
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
-  await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toContainText("Review")
-  await panel
-    .getByRole("region", { name: "Recently closed", exact: true })
-    .getByRole("button", { name: /^Review/ })
-    .click()
+  await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toHaveCount(0)
+  await panel.getByRole("button", { name: /^Review/ }).click()
   await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
   await context.click()
   await contextButton.click()
@@ -1264,10 +1261,9 @@ test("names a single change source and keeps the review header rows at 48px", as
   await expect(region).toHaveAttribute("aria-expanded", "false")
   await region.click()
   await expect(panel.getByRole("tab")).toHaveCount(0)
-  // Its launchers, then the closed Review under "Recently closed".
-  const closed = panel.getByRole("region", { name: "Recently closed", exact: true })
-  await expect(panel.getByRole("button", { name: /^Review/ }).first()).toBeVisible()
-  await expect(closed.getByRole("button", { name: /^Review/ })).toBeVisible()
+  // Only its launchers: "Recently closed" lists files, not the closed Review.
+  await expect(panel.getByRole("button", { name: /^Review/ })).toBeVisible()
+  await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toHaveCount(0)
 })
 
 for (const direction of ["ltr", "rtl"] as const) {

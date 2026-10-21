@@ -150,8 +150,6 @@ const setup: Setup<typeof Review> = (ctx) => {
       kind: "tab",
     },
     list: (input) => (!layout.narrow() && input.session.project ? [tab] : []),
-    // Lists as "Review" rather than the tab's change count.
-    closed: () => ({ title: ctx.t("tab.title"), icon: "review" }),
     render: (props) => {
       const frame = usePanel()
 
