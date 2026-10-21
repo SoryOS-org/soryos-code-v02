@@ -94,7 +94,7 @@ test("a settings page survives refresh", async ({ page }) => {
   await expect(page).toHaveURL("/settings?tab=appearance")
 })
 
-test("the experimental turn navigator defaults on and can be disabled persistently", async ({ page }) => {
+test("the experimental turn navigator defaults off and can be enabled persistently", async ({ page }) => {
   const id = "ses_navigator_settings"
   const messages: SessionMessageInfo[] = Array.from({ length: 60 }, (_, index) => ({
     id: `msg_navigator_${String(index).padStart(4, "0")}`,
@@ -115,37 +115,33 @@ test("the experimental turn navigator defaults on and can be disabled persistent
     pageMessages: pageMessagesFrom({ [id]: messages }),
   })
   const navigator = page.locator('[data-component="session-turn-navigator"]')
-  await expect(navigator.locator("[data-turn]")).toHaveCount(60)
-  expect(indexes).toHaveLength(1)
-
-  await page.keyboard.press("Control+,")
-  const settings = page.getByTestId("settings-screen")
-  await settings.getByRole("tab", { name: "Experimental", exact: true }).click()
-  await expect(settings.getByRole("heading", { name: "Experimental", exact: true })).toBeVisible()
-  const toggle = settings.getByRole("switch", { name: "Turn navigator", exact: true })
-  await expect(toggle).toBeChecked()
-  await toggle.press("Space")
-  await expect(toggle).not.toBeChecked()
-  await settings.getByRole("button", { name: "Back to app", exact: true }).click()
-  await expect(navigator).toHaveCount(0)
-
-  await expect
-    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.showTurnNavigator))
-    .toBe(false)
   await page.clock.install()
   await page.reload()
   await expect(page.locator('[data-component="composer-editor"]')).toBeEditable()
   await expect(page.locator("#message-msg_navigator_0059")).toBeVisible()
   await page.clock.fastForward(1500)
   await expect(navigator).toHaveCount(0)
-  expect(indexes).toHaveLength(1)
+  expect(indexes).toHaveLength(0)
 
   await page.keyboard.press("Control+,")
+  const settings = page.getByTestId("settings-screen")
   await settings.getByRole("tab", { name: "Experimental", exact: true }).click()
+  await expect(settings.getByRole("heading", { name: "Experimental", exact: true })).toBeVisible()
+  const toggle = settings.getByRole("switch", { name: "Turn navigator", exact: true })
   await expect(toggle).not.toBeChecked()
   await toggle.press("Space")
   await expect(toggle).toBeChecked()
   await settings.getByRole("button", { name: "Back to app", exact: true }).click()
+  await page.clock.fastForward(1500)
+  await expect(navigator.locator("[data-turn]")).toHaveCount(60)
+  expect(indexes).toHaveLength(1)
+
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.showTurnNavigator))
+    .toBe(true)
+  await page.reload()
+  await expect(page.locator("#message-msg_navigator_0059")).toBeVisible()
+  await page.clock.fastForward(1500)
   await expect(navigator.locator("[data-turn]")).toHaveCount(60)
   expect(indexes).toHaveLength(2)
 })

@@ -290,7 +290,7 @@ export const defaultSettings: Settings = {
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
     showTurnDiffs: false,
-    showTurnNavigator: true,
+    showTurnNavigator: false,
     backgroundActivity: "left",
     generatedUI: true,
     mobileTitlebarPosition: "top",

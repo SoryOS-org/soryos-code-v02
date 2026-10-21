@@ -110,6 +110,7 @@ test.describe("timeline history", () => {
     await setupTimeline(page, {
       sessionMessages: messages,
       pageMessages: pageMessagesFrom({ [sessionID]: messages }),
+      settings: { showTurnNavigator: true },
       inbox: [
         {
           id: "msg_99999_queued_user",
@@ -234,7 +235,11 @@ test.describe("timeline history", () => {
       }),
     ]).flat()
 
-    await setupTimeline(page, { sessionMessages: messages, pageMessages: pageMessagesFrom({ [sessionID]: messages }) })
+    await setupTimeline(page, {
+      sessionMessages: messages,
+      pageMessages: pageMessagesFrom({ [sessionID]: messages }),
+      settings: { showTurnNavigator: true },
+    })
     const navigator = page.locator('[data-component="session-turn-navigator"]')
     const turns = navigator.locator("[data-turn]")
     const preview = navigator.locator('[data-slot="session-turn-navigator-preview"]')
