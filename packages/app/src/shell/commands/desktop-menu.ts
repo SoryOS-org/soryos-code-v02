@@ -97,14 +97,8 @@ export const DESKTOP_MENU: DesktopMenu[] = [
       {
         type: "item",
         labelKey: "desktop.menu.newSession",
-        command: "session.new",
-        accelerator: { macos: "Shift+Cmd+S" },
-      },
-      {
-        type: "item",
-        labelKey: "desktop.menu.openProject",
-        command: "project.open",
-        accelerator: { macos: "Cmd+O" },
+        command: "tab.new",
+        accelerator: { macos: "Cmd+N" },
       },
       {
         type: "item",
@@ -183,7 +177,12 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     id: "view",
     labelKey: "desktop.menu.view",
     items: [
-      { type: "item", labelKey: "desktop.menu.toggleSidebar", command: "sidebar.toggle" },
+      {
+        type: "item",
+        labelKey: "desktop.menu.toggleSidebar",
+        command: "sidebar.toggle",
+        accelerator: { macos: "Shift+Cmd+B" },
+      },
       {
         type: "item",
         labelKey: "desktop.menu.toggleTerminal",
@@ -247,19 +246,6 @@ export const DESKTOP_MENU: DesktopMenu[] = [
         labelKey: "desktop.menu.nextSession",
         command: "session.next",
         accelerator: { macos: "Option+Down" },
-      },
-      { type: "separator" },
-      {
-        type: "item",
-        labelKey: "desktop.menu.previousProject",
-        command: "project.previous",
-        accelerator: { macos: "Cmd+Option+Up" },
-      },
-      {
-        type: "item",
-        labelKey: "desktop.menu.nextProject",
-        command: "project.next",
-        accelerator: { macos: "Cmd+Option+Down" },
       },
     ],
   },

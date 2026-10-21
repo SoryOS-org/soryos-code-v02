@@ -319,7 +319,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     sessionCommand({
       id: "session.new",
       title: language.t("command.session.new"),
-      keybind: "mod+shift+s",
       slash: "new",
       onSelect: (source) => command.trigger("tab.new", source),
     }),
