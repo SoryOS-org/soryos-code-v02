@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
 import { InvalidRequestError, LocationNotFoundError, ServiceUnavailableError } from "../errors.js"
 
 export const VoiceTransportType = Schema.Literals(["webrtc", "websocket"]).annotate({
@@ -11,6 +11,8 @@ export const VoiceModel = Schema.Struct({
   provider: Schema.String,
   transports: Schema.Array(VoiceTransportType),
   available: Schema.Boolean,
+  /** The integration whose connection starts its sessions: the provider's stored key, or `opencode` when the connected OpenCode Console hosts it. */
+  integration: Schema.optional(Schema.String),
 }).annotate({ identifier: "VoiceModel" })
 
 export const VoiceWebRTCTransportInput = Schema.Struct({
@@ -74,6 +76,8 @@ export const VoiceGroup = HttpApiGroup.make("server.voice")
       success: Schema.Struct({
         data: Schema.Struct({
           transport: VoiceTransport,
+          /** A hosted session's ID, for `voice.instructions`. */
+          session: Schema.optional(Schema.Struct({ id: Schema.String })),
         }),
       }).annotate({ identifier: "VoiceSessionResponse" }),
       error: [InvalidRequestError, ServiceUnavailableError, LocationNotFoundError],
@@ -82,7 +86,22 @@ export const VoiceGroup = HttpApiGroup.make("server.voice")
         identifier: "experimental.voice.session",
         summary: "Create voice session",
         description:
-          "Create a server-brokered voice session using the server's configured provider credentials and return the WebRTC SDP answer or WebSocket ephemeral token.",
+          "Create a server-brokered voice session using the server's configured provider credentials, or the connected OpenCode Console when it hosts the model, and return the WebRTC SDP answer or WebSocket ephemeral token.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.post("voice.instructions", "/api/experimental/voice/session/:sessionID/instructions", {
+      params: { sessionID: Schema.String },
+      payload: Schema.Struct({ instructions: Schema.String }),
+      success: HttpApiSchema.NoContent,
+      error: [InvalidRequestError, ServiceUnavailableError, LocationNotFoundError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "experimental.voice.instructions",
+        summary: "Replace voice session instructions",
+        description:
+          "Replace the backend instructions of a running session the connected OpenCode Console hosts, whose data channel can't change them.",
       }),
     ),
   )
