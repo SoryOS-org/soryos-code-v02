@@ -116,6 +116,13 @@ describe("ConfigNormalize", () => {
     expect(Duration.toMillis(info.warming.duration ?? Duration.zero)).toBe(1_800_000)
   })
 
+  test("keeps session retention durations", () => {
+    const result = normalized({ session_retention: "30 days" })
+    expect(result.encoded.session_retention).toBe("2592000000 millis")
+    const info = Schema.decodeUnknownSync(Info)(result.encoded)
+    expect(Duration.toMillis(info.session_retention ?? Duration.zero)).toBe(2_592_000_000)
+  })
+
   test("preserves arbitrary JSON-round-tripped native configuration", () => {
     const result = Effect.runSync(
       Arbitrary.checkEffect(

@@ -14448,6 +14448,9 @@
               }
             ]
           },
+          "session_retention": {
+            "type": "string"
+          },
           "providers": {
             "type": "object",
             "additionalProperties": {

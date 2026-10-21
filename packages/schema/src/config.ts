@@ -109,6 +109,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   warming: ConfigWarming.Warming.pipe(optional).annotate({
     description: "Keep recently active sessions warm with transient model requests (default: false)",
   }),
+  session_retention: Schema.DurationFromString.pipe(optional).annotate({
+    description:
+      'Delete sessions whose last activity is older than this duration, such as "30 days". Read from global config only. Unset keeps sessions forever',
+  }),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(optional),
   experimental: ConfigExperimental.Info.pipe(optional),
 }) {}
