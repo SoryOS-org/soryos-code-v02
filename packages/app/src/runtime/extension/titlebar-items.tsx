@@ -1,4 +1,5 @@
 import { createMemo, For, Show } from "solid-js"
+import { syncSpinPhase } from "@opencode/ui/hooks"
 import { Icon } from "@opencode/ui/icon"
 import { TitlebarItem } from "@opencode/gui-extensions/sdk"
 import { useExtensionHost } from "./host"
@@ -70,7 +71,10 @@ function TitlebarItemButton(props: { item: TitlebarItem; vertical?: boolean }) {
           class="flex shrink-0 items-center justify-center"
           classList={{ "size-7": props.vertical, "size-5": !props.vertical }}
         >
-          <Show when={!props.item.busy} fallback={<span data-slot="titlebar-update-loader" aria-hidden="true" />}>
+          <Show
+            when={!props.item.busy}
+            fallback={<span ref={syncSpinPhase} data-slot="titlebar-update-loader" aria-hidden="true" />}
+          >
             <Show
               when={props.item.icon}
               fallback={

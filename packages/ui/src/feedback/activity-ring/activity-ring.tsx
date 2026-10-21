@@ -1,4 +1,5 @@
 import { splitProps, type ComponentProps } from "solid-js"
+import { syncSpinPhase } from "../../hooks/spin-phase"
 import "./activity-ring.css"
 
 // An open arc in constant rotation, matching the iOS drawer's busy ring.
@@ -8,6 +9,7 @@ export function ActivityRing(props: ComponentProps<"svg">) {
   return (
     <svg
       {...rest}
+      ref={syncSpinPhase}
       class={local.class}
       classList={local.classList}
       width={local.width ?? 14}

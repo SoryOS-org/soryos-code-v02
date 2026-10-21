@@ -1,4 +1,5 @@
 import { ComponentProps, For } from "solid-js"
+import { syncSpinPhase } from "../hooks/spin-phase"
 
 const outerIndices = new Set([1, 2, 4, 7, 8, 11, 13, 14])
 
@@ -22,6 +23,7 @@ export function Spinner(props: {
   return (
     <svg
       {...props}
+      ref={syncSpinPhase}
       viewBox="0 0 15 15"
       data-component="spinner"
       classList={{
