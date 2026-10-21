@@ -1,54 +1,46 @@
 export * as SessionExpiry from "./expiry.js"
 
+import path from "path"
 import { and, asc, isNull, lt } from "drizzle-orm"
-import { Clock, Duration, Effect, Layer, Schedule } from "effect"
-import type { Document } from "@opencode/schema/config"
+import { parse, type ParseError } from "jsonc-parser"
+import { Clock, Duration, Effect, Layer, Option, Schedule, Schema } from "effect"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
-import { AppProcess } from "@opencode/util/process"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import { AbsolutePath } from "../schema.js"
-import { Bus } from "../bus.js"
-import { Config } from "../config.js"
-import { Credential } from "../credential.js"
 import { Database } from "../database/database.js"
-import { Watcher } from "../filesystem/watcher.js"
 import { Job } from "../job.js"
-import { Location } from "../location.js"
-import { Project } from "../project.js"
 import { Session } from "../session.js"
-import { WellKnown } from "../wellknown.js"
 import { SessionExecution } from "./execution.js"
 import { SessionTable } from "./sql.js"
 
 const SWEEP_INTERVAL = Duration.hours(1)
 
-/** Reads `storage.sessions` from global, system, and managed config. Project config never applies. */
+const decodeSessions = Schema.decodeUnknownOption(Schema.DurationFromString)
+
+/** Projects `storage.sessions` from one global config file, like the CLI updater's `update` policy. */
+export function decodeMaxAge(text: string) {
+  const errors: ParseError[] = []
+  const input: unknown = parse(text, errors, { allowTrailingComma: true })
+  if (errors.length || typeof input !== "object" || input === null || !("storage" in input)) return
+  const storage = input.storage
+  if (typeof storage !== "object" || storage === null || !("sessions" in storage)) return
+  return Option.getOrUndefined(decodeSessions(storage.sessions))
+}
+
+/**
+ * Reads `storage.sessions` from the global config directory only. Project config is never read,
+ * so a project cannot delete another project's Sessions. Later files win, as with `update`.
+ */
 export const configured = Effect.fn("SessionExpiry.configured")(function* () {
   const global = yield* Global.Service
-  const directory = AbsolutePath.make(global.config)
-  // A Location standing on the global config directory loads global config without walking a project tree.
-  return yield* Effect.gen(function* () {
-    const config = yield* Config.Service
-    const entries = yield* config.entries()
-    return entries.findLast(
-      (entry): entry is Document => entry.type === "document" && entry.info.storage?.sessions !== undefined,
-    )?.info.storage?.sessions
-  }).pipe(
-    Effect.provide(
-      Config.layer({ project: false, claude: false }).pipe(
-        Layer.provide(
-          Layer.succeed(
-            Location.Service,
-            Location.Service.of({
-              directory,
-              project: { id: Project.ID.global, directory, canonical: directory },
-            }),
-          ),
-        ),
-      ),
+  const fs = yield* FSUtil.Service
+  const values = yield* Effect.forEach(["config.json", "opencode.json", "opencode.jsonc"], (name) =>
+    fs.readFileStringSafe(path.join(global.config, name)).pipe(
+      Effect.map((text) => (text === undefined ? undefined : decodeMaxAge(text))),
+      Effect.orElseSucceed(() => undefined),
     ),
   )
+  return values.findLast((value) => value !== undefined)
 })
 
 /**
@@ -111,17 +103,5 @@ export const node = makeGlobalNode({
       Effect.forkScoped,
     ),
   ),
-  deps: [
-    AppProcess.node,
-    Bus.node,
-    Credential.node,
-    Database.node,
-    FSUtil.node,
-    Global.node,
-    Job.node,
-    Session.node,
-    SessionExecution.node,
-    Watcher.node,
-    WellKnown.node,
-  ],
+  deps: [Database.node, FSUtil.node, Global.node, Job.node, Session.node, SessionExecution.node],
 })

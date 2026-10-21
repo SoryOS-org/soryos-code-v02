@@ -7,8 +7,6 @@ import { eq } from "drizzle-orm"
 import { Bus } from "@opencode/core/bus"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
-import { Watcher } from "@opencode/core/filesystem/watcher"
-import { Credential } from "@opencode/core/credential"
 import { Job } from "@opencode/core/job"
 import { Location } from "@opencode/core/location"
 import { Project } from "@opencode/core/project"
@@ -19,12 +17,9 @@ import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionExpiry } from "@opencode/core/session/expiry"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
-import { WellKnown } from "@opencode/core/wellknown"
 import { Global } from "@opencode/util/global"
 import { FSUtil } from "@opencode/util/fs-util"
-import { AppProcess } from "@opencode/util/process"
 import { LayerNode } from "@opencode/util/effect/layer-node"
-import { emptyCredentialNode, emptyWellknownNode } from "./fixture/config-nodes"
 import { testEffect } from "./lib/effect"
 import { globalProjectNode } from "./lib/project"
 
@@ -42,19 +37,12 @@ const it = testEffect(
       SessionExecution.node,
       Job.node,
       Global.node,
-      Watcher.node,
-      Credential.node,
-      WellKnown.node,
       FSUtil.node,
-      AppProcess.node,
     ]),
     [
       Project.node.replace(globalProjectNode),
       SessionExecution.node.replace(SessionExecution.noopLayer),
       Global.node.replace(Global.layerWith({ config: globalDirectory, home: path.join(globalDirectory, "home") })),
-      Credential.node.replace(emptyCredentialNode),
-      WellKnown.node.replace(emptyWellknownNode),
-      Watcher.node.replace(Watcher.testLayer),
     ],
   ),
 )
@@ -121,6 +109,15 @@ describe("SessionExpiry", () => {
       fs.writeFileSync(file, JSON.stringify({ storage: { sessions: "30 days" } }))
       expect(Duration.toMillis((yield* SessionExpiry.configured())!)).toBe(Duration.toMillis(Duration.days(30)))
       fs.rmSync(file)
+    }),
+  )
+
+  it.effect("decodes storage.sessions from JSONC and ignores invalid values", () =>
+    Effect.sync(() => {
+      expect(Duration.toMillis(SessionExpiry.decodeMaxAge('{ "storage": { "sessions": "7 days", }, }')!)).toBe(7 * day)
+      expect(SessionExpiry.decodeMaxAge('{ "storage": {} }')).toBeUndefined()
+      expect(SessionExpiry.decodeMaxAge('{ "storage": { "sessions": "soon" } }')).toBeUndefined()
+      expect(SessionExpiry.decodeMaxAge("{ broken")).toBeUndefined()
     }),
   )
 })
