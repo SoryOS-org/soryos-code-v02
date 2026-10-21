@@ -16,6 +16,9 @@ import { parseSlashCommand } from "./client-slash-command"
 
 const submitting = new WeakSet<object>()
 
+// The model each session was last switched to from this client, by session ID.
+const switched = new Map<string, string>()
+
 type ComposerSubmission = {
   id: SessionMessage.ID
   mode: "normal" | "shell"
@@ -500,11 +503,23 @@ async function applySelection(
 
     await beforeModel?.()
 
-    // The server deduplicates unchanged selections; cached SSE state may still be behind an earlier switch.
+    // Skip an unchanged model so a send never waits on that request. An agent switch or a revert can move the
+    // model, and cached SSE state may lag this client's earlier switch, which must also match.
+    const model = `${selection.model.providerID}/${selection.model.modelID}/${selection.variant ?? ""}`
+    const saved = current?.model && `${current.model.providerID}/${current.model.id}/${current.model.variant ?? ""}`
+
+    if (
+      current?.agent === selection.agent &&
+      !current.revert &&
+      saved === model &&
+      (switched.get(session.id) ?? model) === model
+    )
+      return
     await session.api.switchModel({
       sessionID: session.id,
       model: { id: selection.model.modelID, providerID: selection.model.providerID, variant: selection.variant },
     })
+    switched.set(session.id, model)
   } catch (error) {
     cancel?.()
     throw error

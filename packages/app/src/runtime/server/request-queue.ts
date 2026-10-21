@@ -1,4 +1,6 @@
-type Entry = { method: string; url: string; at: number; slow: boolean }
+type Entry = { method: string; url: string; at: number; slow: boolean; write: boolean }
+
+type Described = { method: string; url: string; ms: number }
 
 // Chromium allows six connections per origin. The event stream holds one for the life of the
 // connection and health probes use their own fetch, so the app's API calls stay below that or
@@ -40,7 +42,7 @@ export function createRequestQueue(input: {
   stallMs?: number
   headersTimeoutMs?: number
   setupHeadersTimeoutMs?: number
-  log?: (message: string, data: Record<string, unknown>) => void
+  log?: (message: string, data: { limit: number; inflight: Described[]; queued: Described[] }) => void
   now?: () => number
 }) {
   const limit = input.limit ?? requestQueueLimit
@@ -57,7 +59,7 @@ export function createRequestQueue(input: {
   let warned = -Infinity
   let watcher: ReturnType<typeof setTimeout> | undefined
 
-  const describe = (entry: Entry) => ({ method: entry.method, url: entry.url, ms: now() - entry.at })
+  const describe = (entry: Entry): Described => ({ method: entry.method, url: entry.url, ms: now() - entry.at })
 
   // Debug exports include the console, so list what the server is busy with while requests wait.
   const watch = () => {
@@ -111,7 +113,9 @@ export function createRequestQueue(input: {
         resolve()
       }
 
-      waiting.push({ entry, start })
+      // Writes are user actions such as sending a prompt; they never wait behind queued background reads.
+      const index = entry.write ? waiting.findIndex((item) => !item.entry.write) : -1
+      waiting.splice(index === -1 ? waiting.length : index, 0, { entry, start })
       watcher ??= setTimeout(watch, stallMs)
     })
   }
@@ -123,7 +127,15 @@ export function createRequestQueue(input: {
 
       // The event stream is long-lived; never count it against the request budget.
       if (pathname === "/api/event") return base(request)
-      const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname) }
+
+      const entry = {
+        method: request.method,
+        url: request.url,
+        at: now(),
+        slow: isSlowRequest(pathname),
+        write: request.method !== "GET",
+      }
+
       const queued = acquire(entry)
 
       if (queued) await queued

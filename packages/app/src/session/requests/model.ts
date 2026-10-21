@@ -28,13 +28,21 @@ export function createSessionRequestModel() {
       () => undefined,
     )
   })
-  createEffect(() => {
-    const id = params.id
 
-    if (!id || serverSDK.connection.status() !== "connected") return
-    void Promise.all(
-      sessionTreeIDs(data.session.list(), id).map((sessionID) => data.session.form.sync(sessionID)),
-    ).catch(() => undefined)
+  // Only a running Session can hold a pending form, and events keep loaded forms current. Comparing by value
+  // keeps every session update in a large subagent tree from re-requesting forms.
+  const formSessions = createMemo(
+    () =>
+      sessionTreeIDs(data.session.list(), params.id).filter(
+        (id) => id === params.id || data.session.status(id) === "running",
+      ),
+    [],
+    { equals: (a, b) => a.join() === b.join() },
+  )
+
+  createEffect(() => {
+    if (serverSDK.connection.status() !== "connected") return
+    void Promise.all(formSessions().map((sessionID) => data.session.form.sync(sessionID))).catch(() => undefined)
   })
 
   const formRequest = createMemo((): FormInfo | undefined => {

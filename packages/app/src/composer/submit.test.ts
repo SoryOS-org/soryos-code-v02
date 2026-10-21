@@ -214,10 +214,10 @@ describe("Composer submission", () => {
       current: { agent: "plan", model: { id: "old", providerID: "old" } },
       calls: ["admit", "switch-agent", "switch-model", "send"],
     },
-    // The model still commits: cached session state may lag behind an earlier switch.
+    // An unchanged selection sends without a model request to wait on.
     {
       current: { agent: "build", model: { providerID: "provider-1", id: "model-1", variant: "balanced" } },
-      calls: ["admit", "switch-model", "send"],
+      calls: ["admit", "send"],
     },
     // A prompt commits a staged revert, which would delete the model switch made after its boundary. The revert
     // settles before admission, whose row it would also delete.
