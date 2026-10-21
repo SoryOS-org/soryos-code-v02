@@ -93,9 +93,9 @@ export function NewSessionView(props: {
               }}
             />
             <div class="mt-8 flex flex-col gap-3">
-              <div data-slot="new-session-composer">
+              <div data-slot="new-session-composer" class="flex flex-col gap-1">
                 <div class="relative z-10">
-                  <Composer model={props.composer} borderUnderlay={!!props.project.selected()} />
+                  <Composer model={props.composer} />
                 </div>
                 <Show when={props.project.selected()}>
                   {(project) => (
@@ -267,7 +267,7 @@ function NewSessionLocation(props: {
   }
 
   return (
-    <div class="relative z-0 -mt-3 flex min-h-12 min-w-0 items-center gap-3 rounded-xl bg-v2-background-bg-base px-1.5 pt-3 shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)] text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px]">
+    <div class="relative flex min-h-9 min-w-0 items-center gap-3 ps-2 pe-1.5 text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px]">
       <div class="flex min-w-0 max-w-full flex-wrap items-center gap-1 py-1.5">
         <Tooltip
           appearance={props.onboarding ? "large" : undefined}
