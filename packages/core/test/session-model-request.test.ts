@@ -24,35 +24,6 @@ describe("SessionModelRequest.unsupportedParts", () => {
     ])
   })
 
-  test("replaces stored tool files whose media type no route accepts", () => {
-    const messages = unsupportedParts(
-      [
-        Message.tool(
-          ToolResultPart.make({
-            id: "call_1",
-            name: "attach_get",
-            result: {
-              type: "content",
-              value: [{ type: "file", uri: "data:text/x-patch;base64,aGVsbG8=", mime: "text/x-patch" }],
-            },
-          }),
-        ),
-      ],
-      capabilities(["text", "image", "pdf"]),
-    )
-
-    expect(messages[0]?.content[0]).toMatchObject({
-      result: {
-        value: [
-          {
-            type: "text",
-            text: "ERROR: Cannot read attachment (text/x-patch is not a supported attachment type). Inform the user.",
-          },
-        ],
-      },
-    })
-  })
-
   test("replaces unsupported media nested in tool results", () => {
     const messages = unsupportedParts(
       [

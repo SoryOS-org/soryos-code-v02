@@ -136,9 +136,7 @@ const unsupportedMedia = (
   provider: string | undefined,
 ) => {
   const modality = mimeToModality(mime)
-  // Most routes reject other media types, and stored history would resend them on every turn.
-  if (!modality)
-    return `ERROR: Cannot read ${name ? `"${name}"` : "attachment"} (${mime} is not a supported attachment type). Inform the user.`
+  if (!modality) return
   const unsupported = !capabilities.input.some((item) => item.startsWith(modality))
     ? modality
     : provider === "xai" && modality === "image" && !XAI_IMAGE_MIMES.has(mime.toLowerCase())
