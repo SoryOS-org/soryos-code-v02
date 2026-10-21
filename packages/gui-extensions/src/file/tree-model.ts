@@ -3,9 +3,13 @@ import type { FileNode } from "../sdk"
 
 export type TreeGitStatus = "added" | "deleted" | "modified" | "ignored"
 
+export const FILE_TREE_ROW_HEIGHT = 28
+
 export type AllowedTreeInput = ReturnType<typeof buildAllowedTreeInput>
 
 export function normalizeFileTreeV2Path(value: string) {
+  if (!value.includes("\\") && !value.startsWith("/") && !value.endsWith("/") && !value.includes("//")) return value
+
   return value
     .replaceAll("\\", "/")
     .replace(/^\/+|\/+$/g, "")
@@ -29,7 +33,7 @@ export function buildAllowedTreeInput(paths: readonly string[]) {
   const seenDirs = new Set<string>()
 
   for (const raw of paths) {
-    const isDir = raw.replaceAll("\\", "/").endsWith("/")
+    const isDir = raw.endsWith("/") || raw.endsWith("\\")
     const normalized = normalizeFileTreeV2Path(raw)
 
     if (!normalized) continue
@@ -55,7 +59,8 @@ export function buildAllowedTreeInput(paths: readonly string[]) {
 
     if (files.has(normalized)) continue
     files.add(normalized)
-    originalByPath.set(normalized, raw)
+
+    if (raw !== normalized) originalByPath.set(normalized, raw)
     list.push(normalized)
   }
 

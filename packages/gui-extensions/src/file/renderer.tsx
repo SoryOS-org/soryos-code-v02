@@ -249,6 +249,7 @@ const setup: Setup<typeof File> = (ctx) => {
 
   onCleanup(
     onIdle(() => {
+      void import("./pierre-tree")
       void FileBrowser.preload()
       void Tree.preload()
       void List.preload()

@@ -68,7 +68,7 @@ file-tree-container.opencode-pierre-file-tree {
   margin-inline-end: 12px;
 }
 
-[data-component="file-tree-v2"] [data-slot="file-tree-v2-row"]:hover {
+[data-component="file-tree-v2"] [data-slot="file-tree-v2-row"]:is(:hover, [data-item-context-hover="true"]) {
   --file-tree-v2-row-overlay: var(--v2-overlay-simple-overlay-hover);
 
   background-color: var(--v2-overlay-simple-overlay-hover);
@@ -85,8 +85,102 @@ file-tree-container.opencode-pierre-file-tree {
   background-color: var(--v2-overlay-simple-overlay-pressed);
 }
 
-[data-component="file-tree-v2"] .filetree-icon--mono {
+[data-component="file-tree-v2"] [data-slot="file-tree-v2-row"] > svg[data-icon-token] {
   color: var(--v2-icon-icon-muted);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="astro"], [data-icon-token="database"], [data-icon-token="vite"]) {
+  color: light-dark(#a631be, #d568ea);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="babel"], [data-icon-token="browserslist"], [data-icon-token="javascript"]) {
+  color: light-dark(#d5a910, #ffd452);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="bash"], [data-icon-token="markdown"], [data-icon-token="svgo"], [data-icon-token="vue"]) {
+  color: light-dark(#199f43, #5ecc71);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is(
+    [data-icon-token="biome"],
+    [data-icon-token="c"],
+    [data-icon-token="cpp"],
+    [data-icon-token="docker"],
+    [data-icon-token="python"],
+    [data-icon-token="typescript"],
+    [data-icon-token="vscode"],
+    [data-icon-token="webpack"]
+  ) {
+  color: light-dark(#1a85d4, #69b1ff);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is(
+    [data-icon-token="bootstrap"],
+    [data-icon-token="css"],
+    [data-icon-token="eslint"],
+    [data-icon-token="terraform"],
+    [data-icon-token="wasm"]
+  ) {
+  color: light-dark(#693acf, #9d6afb);
+}
+
+[data-component="file-tree-v2"] [data-slot="file-tree-v2-row"][data-selected] > svg[data-icon-token="bun"] {
+  color: light-dark(#594c5b, #79697b);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is(
+    [data-icon-token="claude"],
+    [data-icon-token="html"],
+    [data-icon-token="json"],
+    [data-icon-token="rust"],
+    [data-icon-token="svg"],
+    [data-icon-token="swift"],
+    [data-icon-token="zig"],
+    [data-icon-token="zip"]
+  ) {
+  color: light-dark(#d47628, #ffa359);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="go"], [data-icon-token="react"], [data-icon-token="tailwind"]) {
+  color: light-dark(#1ca1c7, #68cdf2);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="graphql"], [data-icon-token="image"], [data-icon-token="sass"]) {
+  color: light-dark(#d32a61, #ff678d);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is([data-icon-token="mcp"], [data-icon-token="prettier"], [data-icon-token="table"]) {
+  color: light-dark(#17a5af, #64d1db);
+}
+
+[data-component="file-tree-v2"]
+  [data-slot="file-tree-v2-row"][data-selected]
+  > svg:is(
+    [data-icon-token="npm"],
+    [data-icon-token="postcss"],
+    [data-icon-token="ruby"],
+    [data-icon-token="svelte"],
+    [data-icon-token="yml"]
+  ) {
+  color: light-dark(#d52c36, #ff6762);
 }
 
 /* Every row ends in the change letter or a blank end that sticks inside the pane while long rows

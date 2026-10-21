@@ -1,6 +1,3 @@
-diff --git a/node_modules/@pierre/trees/.bun-tag-dff156bf7ab17e6 b/.bun-tag-dff156bf7ab17e6
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/dist/model/FileTreeController.js b/dist/model/FileTreeController.js
 index efa8b6a2fd70e0d1f1dec1d90ee87268c72f56c4..8979be3c9549e650b017ace5be2e84c2af3f163f 100644
 --- a/dist/model/FileTreeController.js
@@ -42,13 +39,14 @@ index 5b0fdd5a3b483439ae256795f3dad5a32182ab78..84ba867b12003fb57602c19234c26238
    row: FileTreeVisibleRow;
    subtreeEndIndex: number;
 diff --git a/dist/model/publicTypes.d.ts b/dist/model/publicTypes.d.ts
-index 7c851604626d34fcb838cd0381abfccfcc7728cf..b4c4a9e8f087d0c03a4a1d62ef81777cbea11832 100644
+index 7c851604626d34fcb838cd0381abfccfcc7728cf..4e93d2072d3550af080bc98a36e293b05c1a6a10 100644
 --- a/dist/model/publicTypes.d.ts
 +++ b/dist/model/publicTypes.d.ts
-@@ -170,6 +170,10 @@ type FileTreeOptionSurface = FileTreeRenderOptions & {
+@@ -170,6 +170,11 @@ type FileTreeOptionSurface = FileTreeRenderOptions & {
    gitStatus?: readonly GitStatusEntry[];
    id?: string;
    icons?: FileTreeIcons;
++  middleTruncate?: boolean;
 +  onExpansionChange?: (change: {
 +    expanded: boolean;
 +    path: FileTreePublicId;
@@ -57,7 +55,7 @@ index 7c851604626d34fcb838cd0381abfccfcc7728cf..b4c4a9e8f087d0c03a4a1d62ef81777c
    renderRowDecoration?: FileTreeRowDecorationRenderer;
    search?: boolean;
 diff --git a/dist/render/FileTree.js b/dist/render/FileTree.js
-index 305714319d9d988bfc025ecaaca662562a3a0ff7..2e0bd4200d2cb293e0ea238895457553a575c0ac 100644
+index 305714319d9d988bfc025ecaaca662562a3a0ff7..8ab6a7b9b7734b1fa2e17c96743eeb013d4d838c 100644
 --- a/dist/render/FileTree.js
 +++ b/dist/render/FileTree.js
 @@ -62,6 +62,7 @@ var FileTree = class {
@@ -78,7 +76,7 @@ index 305714319d9d988bfc025ecaaca662562a3a0ff7..2e0bd4200d2cb293e0ea238895457553
  	#wroteHostDensityFactor = false;
  	constructor(options) {
 -		const { composition, density, fileTreeSearchMode, gitStatus, id, initialSearchQuery, icons, itemHeight, onSearchChange, onSelectionChange, overscan, renderRowDecoration, renaming, search, searchBlurBehavior, searchFakeFocus, stickyFolders, unsafeCSS, initialVisibleRowCount, ...controllerOptions } = options;
-+		const { composition, density, fileTreeSearchMode, gitStatus, id, initialSearchQuery, icons, itemHeight, onExpansionChange, onSearchChange, onSelectionChange, overscan, renderRowDecoration, renaming, search, searchBlurBehavior, searchFakeFocus, stickyFolders, unsafeCSS, initialVisibleRowCount, ...controllerOptions } = options;
++		const { composition, density, fileTreeSearchMode, gitStatus, id, initialSearchQuery, icons, itemHeight, middleTruncate, onExpansionChange, onSearchChange, onSelectionChange, overscan, renderRowDecoration, renaming, search, searchBlurBehavior, searchFakeFocus, stickyFolders, unsafeCSS, initialVisibleRowCount, ...controllerOptions } = options;
  		this.#composition = composition;
  		this.#id = createClientId(id);
  		this.#gitStatusState = resolveFileTreeGitStatusState(gitStatus);
@@ -88,7 +86,15 @@ index 305714319d9d988bfc025ecaaca662562a3a0ff7..2e0bd4200d2cb293e0ea238895457553
  		this.#onSelectionChange = onSelectionChange;
  		this.#renderRowDecoration = renderRowDecoration;
  		this.#renamingEnabled = renaming != null && renaming !== false;
-@@ -113,6 +116,10 @@ var FileTree = class {
+@@ -98,6 +101,7 @@ var FileTree = class {
+ 		this.#density = resolveFileTreeDensity(density, itemHeight);
+ 		this.#viewOptions = {
+ 			itemHeight: this.#density.itemHeight,
++			middleTruncate,
+ 			overscan,
+ 			stickyFolders,
+ 			initialVisibleRowCount
+@@ -113,6 +117,10 @@ var FileTree = class {
  		this.#selectionSubscription = this.#onSelectionChange == null ? null : this.subscribe(() => {
  			this.#emitSelectionChange();
  		});
@@ -99,7 +105,7 @@ index 305714319d9d988bfc025ecaaca662562a3a0ff7..2e0bd4200d2cb293e0ea238895457553
  	}
  	unmount() {
  		if (this.#wrapper != null) {
-@@ -132,6 +139,8 @@ var FileTree = class {
+@@ -132,6 +140,8 @@ var FileTree = class {
  		this.unmount();
  		this.#selectionSubscription?.();
  		this.#selectionSubscription = null;
@@ -108,20 +114,73 @@ index 305714319d9d988bfc025ecaaca662562a3a0ff7..2e0bd4200d2cb293e0ea238895457553
  		this.#controller.destroy();
  	}
  	getFileTreeContainer() {
+@@ -296,6 +306,7 @@ var FileTree = class {
+ 				itemHeight: this.#viewOptions.itemHeight
+ 			}),
+ 			itemHeight: this.#viewOptions.itemHeight,
++			middleTruncate: this.#viewOptions.middleTruncate,
+ 			overscan: this.#viewOptions.overscan,
+ 			stickyFolders: this.#viewOptions.stickyFolders
+ 		};
 diff --git a/dist/render/FileTreeView.js b/dist/render/FileTreeView.js
-index 7d3b818c43a7621ab9170da32b180232ed3c9472..6b9910f77c2cf5ae0e563715543bffe7d6568007 100644
+index 7d3b818c43a7621ab9170da32b180232ed3c9472..0a9a88135f89e4a5c4448964ef08dc8de26b0447 100644
 --- a/dist/render/FileTreeView.js
 +++ b/dist/render/FileTreeView.js
-@@ -376,11 +376,7 @@ function renderFileTreeRowContent(row, resolveIcon, { actionLaneEnabled = false,
+@@ -360,7 +360,7 @@ function focusFirstMenuElement(menuElement) {
+ 		"[tabindex]:not([tabindex=\"-1\"])"
+ 	].join(", ")) ?? menuElement);
+ }
+-function renderFileTreeRowContent(row, resolveIcon, { actionLaneEnabled = false, customDecoration = null, decorationLaneEnabled = false, dragTargetFlattenedSegmentPath = null, gitDecoration = null, gitLaneActive = false, renameInput = null, showDecorativeActionAffordance = false } = {}) {
++function renderFileTreeRowContent(row, resolveIcon, { actionLaneEnabled = false, customDecoration = null, decorationLaneEnabled = false, dragTargetFlattenedSegmentPath = null, gitDecoration = null, gitLaneActive = false, middleTruncate = true, renameInput = null, showDecorativeActionAffordance = false } = {}) {
+ 	const targetPath = getFileTreeRowPath(row);
+ 	return /* @__PURE__ */ jsxs(Fragment, { children: [
+ 		row.depth > 0 ? /* @__PURE__ */ jsx("div", {
+@@ -376,11 +376,12 @@ function renderFileTreeRowContent(row, resolveIcon, { actionLaneEnabled = false,
  		}),
  		/* @__PURE__ */ jsx("div", {
  			"data-item-section": "content",
 -			children: row.isFlattened ? formatFlattenedSegments(row, renameInput, dragTargetFlattenedSegmentPath) : renameInput ?? /* @__PURE__ */ jsx(MiddleTruncate, {
--				minimumLength: 5,
--				split: "extension",
--				children: row.name
++			title: middleTruncate ? void 0 : row.name,
++			children: row.isFlattened ? formatFlattenedSegments(row, renameInput, dragTargetFlattenedSegmentPath) : renameInput ?? (middleTruncate ? /* @__PURE__ */ jsx(MiddleTruncate, {
+ 				minimumLength: 5,
+ 				split: "extension",
+ 				children: row.name
 -			})
-+			children: row.isFlattened ? formatFlattenedSegments(row, renameInput, dragTargetFlattenedSegmentPath) : renameInput ?? row.name
++			}) : row.name)
  		}),
  		decorationLaneEnabled ? /* @__PURE__ */ jsx("div", {
  			"data-item-section": "decoration",
+@@ -401,7 +402,7 @@ function renderFileTreeRowContent(row, resolveIcon, { actionLaneEnabled = false,
+ 	] });
+ }
+ function renderStyledRow(frame, row, key, options = {}) {
+-	const { controller, renameView, visualFocusPath, contextHoverPath, draggedPathSet, dragTarget, dragAndDropEnabled, shouldSuppressContextMenu, handleRowDragStart, handleRowDragEnd, handleRowTouchStart, instanceId, itemHeight, gitStatusByPath, ignoredGitDirectories, ignoredInheritanceCache, directoriesWithGitChanges, gitLaneActive, contextMenuEnabled, contextMenuTriggerMode, contextMenuButtonTriggerEnabled, contextMenuButtonVisibility, contextMenuRightClickEnabled, registerRenameInput, registerButton, resolveIcon, renderDecorationForRow, openContextMenuForRow, onRowClick, onKeyDown } = frame;
++	const { controller, renameView, visualFocusPath, contextHoverPath, draggedPathSet, dragTarget, dragAndDropEnabled, shouldSuppressContextMenu, handleRowDragStart, handleRowDragEnd, handleRowTouchStart, instanceId, itemHeight, middleTruncate, gitStatusByPath, ignoredGitDirectories, ignoredInheritanceCache, directoriesWithGitChanges, gitLaneActive, contextMenuEnabled, contextMenuTriggerMode, contextMenuButtonTriggerEnabled, contextMenuButtonVisibility, contextMenuRightClickEnabled, registerRenameInput, registerButton, resolveIcon, renderDecorationForRow, openContextMenuForRow, onRowClick, onKeyDown } = frame;
+ 	const targetPath = getFileTreeRowPath(row);
+ 	const { isParked = false, mode = "flow", style } = options;
+ 	const isSticky = mode === "sticky";
+@@ -433,6 +434,7 @@ function renderStyledRow(frame, row, key, options = {}) {
+ 		dragTargetFlattenedSegmentPath: dragTarget?.flattenedSegmentPath ?? null,
+ 		gitDecoration,
+ 		gitLaneActive,
++		middleTruncate,
+ 		renameInput,
+ 		showDecorativeActionAffordance
+ 	});
+@@ -517,7 +519,7 @@ function renderRangeChildren(frame, range, hiddenRowPaths) {
+ 	if (range.end < range.start) return [];
+ 	return frame.controller.getVisibleRows(range.start, range.end).filter((row) => !hiddenRowPaths.has(getFileTreeRowPath(row))).map((row, slotIndex) => renderStyledRow(frame, row, range.start + slotIndex));
+ }
+-function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDirectories, directoriesWithGitChanges, icons, instanceId, itemHeight = FILE_TREE_DEFAULT_ITEM_HEIGHT, overscan = 10, renamingEnabled = false, renderRowDecoration, searchBlurBehavior = "close", searchEnabled = false, searchFakeFocus = false, slotHost, stickyFolders = false, initialViewportHeight = 420 }) {
++function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDirectories, directoriesWithGitChanges, icons, instanceId, itemHeight = FILE_TREE_DEFAULT_ITEM_HEIGHT, middleTruncate = true, overscan = 10, renamingEnabled = false, renderRowDecoration, searchBlurBehavior = "close", searchEnabled = false, searchFakeFocus = false, slotHost, stickyFolders = false, initialViewportHeight = 420 }) {
+ 	"use no memo";
+ 	const contextMenuAnchorRef = useRef(null);
+ 	const contextMenuTriggerRef = useRef(null);
+@@ -1752,6 +1754,7 @@ function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDire
+ 		ignoredInheritanceCache,
+ 		instanceId,
+ 		itemHeight,
++		middleTruncate,
+ 		onKeyDown: handleTreeKeyDown,
+ 		onRowClick: handleRowClick,
+ 		openContextMenuForRow,

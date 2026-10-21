@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show, type JSX, type ParentProps } from "solid-js"
+import { createMemo, createSignal, For, onCleanup, Show, type JSX, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { AppIcon } from "@opencode/ui/app-icon"
 import { Icon } from "@opencode/ui/icon"
@@ -328,10 +328,31 @@ export function OpenInAppContextMenuV2(
   if (!state) return props.children
   const [open, setOpen] = createSignal(false)
   const [path, setPath] = createSignal("")
+  let hoveredRow: HTMLElement | undefined
+
+  const clearHover = () => {
+    if (!hoveredRow) return
+    delete hoveredRow.dataset.itemContextHover
+    hoveredRow = undefined
+  }
+
+  onCleanup(clearHover)
+
+  const closeMenu = () => {
+    setOpen(false)
+    clearHover()
+  }
 
   return (
     <Show when={state.canOpen()} fallback={props.children}>
-      <Menu.Context modal={false} onOpenChange={setOpen}>
+      <Menu.Context
+        modal={false}
+        onOpenChange={(next) => {
+          setOpen(next)
+
+          if (!next) clearHover()
+        }}
+      >
         <Menu.Context.Trigger
           as="div"
           class="h-full w-full min-w-max flex flex-col min-h-0 flex-1"
@@ -340,14 +361,26 @@ export function OpenInAppContextMenuV2(
           on:contextmenu={{
             capture: true,
             handleEvent(event: MouseEvent) {
+              clearHover()
               const next = props.resolvePath(event)
 
               if (!next) {
-                setOpen(false)
+                closeMenu()
                 event.preventDefault()
                 event.stopPropagation()
 
                 return
+              }
+
+              for (const target of event.composedPath()) {
+                if (
+                  target instanceof HTMLElement &&
+                  (target.dataset.type === "item" || target.dataset.slot === "file-tree-v2-row")
+                ) {
+                  hoveredRow = target
+                  target.dataset.itemContextHover = "true"
+                  break
+                }
               }
 
               setPath(next)
@@ -358,13 +391,7 @@ export function OpenInAppContextMenuV2(
         </Menu.Context.Trigger>
         <Menu.Context.Portal>
           <Menu.Context.Content class="open-in-app-v2-menu">
-            <OpenInAppMenuItemsV2
-              state={state}
-              path={path}
-              reveal
-              selection={false}
-              close={() => setOpen(false)}
-            />
+            <OpenInAppMenuItemsV2 state={state} path={path} reveal selection={false} close={closeMenu} />
           </Menu.Context.Content>
         </Menu.Context.Portal>
       </Menu.Context>

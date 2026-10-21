@@ -1,12 +1,12 @@
+import { createFileTreeIconResolver, getBuiltInSpriteSheet } from "@pierre/trees"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { createVirtualizer, defaultRangeExtractor } from "@tanstack/solid-virtual"
-import { FileIcon } from "@opencode/ui/file-icon"
 import { getDirectory, getFilename } from "@opencode/util/path"
 import type { ChangeKind } from "../review/contract"
 import { createKeyed, useExtension, type MountedSession, type SessionScreen } from "../sdk"
 import { OpenInAppContextMenuV2, useOpenInApp } from "./open-in-app"
 import { resolveOpenInAppPath } from "./path"
-import { kindChange, normalizeFileTreeV2Path } from "./tree-model"
+import { FILE_TREE_ROW_HEIGHT, kindChange, normalizeFileTreeV2Path } from "./tree-model"
 
 const kindLabel = (kind: ChangeKind) => {
   if (kind === "add") return "A"
@@ -73,6 +73,8 @@ export default function SessionFileList(props: {
   const normalized = createMemo(() => props.files.map(normalizeFileTreeV2Path))
   const [root, setRoot] = createSignal<HTMLDivElement>()
   const [focused, setFocused] = createSignal<string>()
+  const iconResolver = createFileTreeIconResolver("complete")
+  const spriteSheet = getBuiltInSpriteSheet("complete") ?? ""
 
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     get count() {
@@ -80,7 +82,7 @@ export default function SessionFileList(props: {
     },
     getScrollElement: () => virtualScrollElement(root()),
     initialRect: { width: 0, height: 600 },
-    estimateSize: () => 28,
+    estimateSize: () => FILE_TREE_ROW_HEIGHT,
     gap: 2,
     overscan: 10,
     get getItemKey() {
@@ -144,10 +146,12 @@ export default function SessionFileList(props: {
         data-total-rows={props.files.length}
         style={{ position: "relative", height: `${virtualizer.getTotalSize()}px` }}
       >
+        <div aria-hidden="true" class="hidden" innerHTML={spriteSheet} />
         <For each={virtualRowKeys()}>
           {(key) => {
             const path = String(key)
             const value = normalizeFileTreeV2Path(path)
+            const icon = () => iconResolver.resolveIcon("file-tree-icon-file", value)
             const selected = () => (highlighted() ? highlighted() === value : active() === value)
             const highlightedRow = () => highlighted() === value
             const kind = () => props.kinds?.get(value)
@@ -183,7 +187,17 @@ export default function SessionFileList(props: {
                       onClick={() => props.onFileClick(path)}
                       onDblClick={() => props.onFileDoubleClick?.(path)}
                     >
-                      <FileIcon node={{ path, type: "file" }} class="size-4 shrink-0" mono={!selected()} />
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 16 16"
+                        width="16"
+                        height="16"
+                        data-icon-name={icon().remappedFrom ?? icon().name}
+                        data-icon-token={icon().token}
+                        class="size-4 shrink-0"
+                      >
+                        <use href={`#${icon().name}`} />
+                      </svg>
                       <span data-slot="file-tree-v2-label" class="flex flex-1 shrink-0 items-center whitespace-nowrap">
                         <Show when={directory()}>
                           {(value) => <span class="text-12-medium text-text-muted shrink-0">{value()}</span>}

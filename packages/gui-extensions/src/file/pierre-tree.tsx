@@ -11,6 +11,7 @@ import {
   buildGitStatusMap,
   buildLiveTreeInput,
   diffGitStatusPatch,
+  FILE_TREE_ROW_HEIGHT,
   normalizeFileTreeV2Path,
   type AllowedTreeInput,
   type TreeGitStatus,
@@ -31,8 +32,21 @@ const TREE_UNSAFE_CSS = `
     --trees-git-deleted-color: var(--v2-state-fg-danger); --trees-git-ignored-color: var(--v2-text-text-faint);
     --trees-padding-inline: 8px; --trees-item-margin-x: 0px;
   }
-  [data-file-tree-virtualized-root="true"] { padding-top: 4px; }
-  [data-file-tree-virtualized-scroll="true"] { padding: 0 8px; overflow-x: hidden; }
+  [data-file-tree-virtualized-root="true"] { padding-block-start: 4px; }
+  [data-file-tree-virtualized-scroll="true"] { padding-block: 0; padding-inline: 8px; overflow-x: hidden; }
+  [data-item-section="spacing"] {
+    margin-left: 0; margin-right: 0;
+    margin-inline-start: calc(var(--trees-spacing-unit) * 0.5 + 1px);
+    margin-inline-end: calc(var(--trees-item-row-gap) * -1);
+  }
+  [data-item-section="spacing-item"] {
+    border-left: none; margin-right: 0;
+    border-inline-start: 1px solid var(--trees-indent-guide-bg);
+    margin-inline-end: var(--trees-item-row-gap);
+  }
+  :host(:dir(rtl)) [data-type="item"][aria-expanded="false"] [data-item-section="icon"] > svg:first-child {
+    transform: translateY(var(--trees-icon-nudge)) rotate(90deg);
+  }
   button[data-type="item"] { box-shadow: none !important; cursor: inherit; font-weight: 500; }
   button[data-type="item"]:hover, button[data-type="item"][data-item-context-hover="true"] {
     background-color: var(--v2-overlay-simple-overlay-hover) !important;
@@ -59,6 +73,22 @@ const TREE_UNSAFE_CSS = `
     font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum" on, "lnum" on;
   }
 `
+
+function sameStringMap(a: ReadonlyMap<string, string> | undefined, b: ReadonlyMap<string, string> | undefined) {
+  if (a === b) return true
+  const sizeA = a?.size ?? 0
+  const sizeB = b?.size ?? 0
+
+  if (sizeA !== sizeB) return false
+
+  if (sizeA === 0) return true
+
+  for (const [key, value] of a ?? []) {
+    if (b?.get(key) !== value) return false
+  }
+
+  return true
+}
 
 function isDirectoryHandle(handle: FileTreeItemHandle | null | undefined): handle is FileTreeDirectoryHandle {
   return Boolean(handle?.isDirectory())
@@ -94,7 +124,21 @@ export default function PierreFileTree(props: {
   const draggable = () => props.draggable ?? true
   const active = () => normalizeFileTreeV2Path(props.active ?? "")
   const expanded = (path: string) => file.tree.state(path)?.expanded ?? false
-  const allowedModel = createMemo(() => (live() ? undefined : buildAllowedTreeInput(props.allowed ?? [])))
+
+  const allowedPaths = createMemo(() => (live() ? undefined : (props.allowed ?? [])), undefined, {
+    equals: (previous, next) =>
+      previous === next ||
+      (previous !== undefined &&
+        next !== undefined &&
+        previous.length === next.length &&
+        previous.every((item, index) => item === next[index])),
+  })
+
+  const allowedModel = createMemo(() => {
+    const paths = allowedPaths()
+
+    return paths ? buildAllowedTreeInput(paths) : undefined
+  })
 
   const liveModel = createMemo(() =>
     live() ? buildLiveTreeInput((path) => file.tree.list(path), expanded) : undefined,
@@ -109,7 +153,9 @@ export default function PierreFileTree(props: {
   let syncingExpansion = false
   let appliedStatus = new Map<string, TreeGitStatus>()
   let renderedAllowed: AllowedTreeInput | undefined
-  let renderedLabels = props.labels
+  let renderedLabels: ReadonlyMap<string, string> | undefined
+  let renderedKinds: ReadonlyMap<string, ChangeKind> | undefined
+  let renderedIgnored: ReadonlySet<string> | undefined
   let renderedRoot = file.root
 
   const originalPath = (rawPath: string) => {
@@ -144,9 +190,10 @@ export default function PierreFileTree(props: {
         ? file.tree.state(dir)?.expanded === true
         : file.tree.state(dir)?.expanded !== false
 
+      if (expand) continue
       const handle = tree.getItem(dir)
 
-      if (!expand && isDirectoryHandle(handle) && handle.isExpanded()) handle.collapse()
+      if (isDirectoryHandle(handle) && handle.isExpanded()) handle.collapse()
     }
 
     syncingExpansion = false
@@ -172,10 +219,15 @@ export default function PierreFileTree(props: {
     const initialGitStatus = Array.from(initialStatus, ([path, status]) => ({ path, status }))
     const initialActive = active()
 
-    for (const item of initialPaths) knownPaths.add(item)
+    if (isLive) {
+      for (const item of initialPaths) knownPaths.add(item)
+    }
+
     appliedStatus = initialStatus
     renderedAllowed = initialAllowed
     renderedLabels = props.labels
+    renderedKinds = props.kinds
+    renderedIgnored = initialLive?.ignoredPaths
     renderedRoot = file.root
 
     tree = new FileTree({
@@ -195,7 +247,8 @@ export default function PierreFileTree(props: {
           }
         : "default",
       icons: "complete",
-      itemHeight: 28,
+      itemHeight: FILE_TREE_ROW_HEIGHT,
+      middleTruncate: false,
       stickyFolders: false,
       gitStatus: initialGitStatus.length > 0 ? initialGitStatus : undefined,
       dragAndDrop: draggable() ? { canDrag: () => true, canDrop: () => false } : false,
@@ -237,21 +290,28 @@ export default function PierreFileTree(props: {
     () => void file.tree.sync(""),
   )
 
-  // Replaces the tree paths when `allowed` or `labels` changes after mount.
+  // Replaces the tree paths when `allowed` changes after mount.
   createKeyed(
-    () => (ready() && !live() ? { model: allowedModel()!, labels: props.labels } : undefined),
-    ({ model, labels }) => {
-      if (!tree || (model === renderedAllowed && labels === renderedLabels)) return
+    () => (ready() && !live() ? allowedModel() : undefined),
+    (model) => {
+      if (!tree || model === renderedAllowed) return
       renderedAllowed = model
-      renderedLabels = labels
-      knownPaths.clear()
-
-      for (const item of model.paths) knownPaths.add(item)
       syncSelection("")
       tree.resetPaths(model.paths)
       applyAllowedCollapsed(model)
       syncSelection(active())
     },
+  )
+
+  // Re-renders visible row decorations when untracked-folder labels change without resetting paths.
+  createKeyed(
+    () => (ready() && !live() ? { labels: props.labels } : undefined),
+    (current) => {
+      if (!tree || !wrapper || sameStringMap(renderedLabels, current.labels)) return
+      renderedLabels = current.labels
+      tree.render({ containerWrapper: wrapper })
+    },
+    { equals: (previous, next) => previous !== undefined && next !== undefined && sameStringMap(previous.labels, next.labels) },
   )
 
   // Incrementally batches newly loaded or unlinked directory entries into the live tree.
@@ -300,18 +360,28 @@ export default function PierreFileTree(props: {
       syncingExpansion = false
       syncSelection(active())
     },
+    { equals: (previous, next) => previous?.root === next?.root && previous?.model === next?.model },
   )
 
   // Incrementally patches git status badges and ignored entries via `applyGitStatusPatch`.
   createKeyed(
     () => (ready() ? { kinds: props.kinds, ignored: liveModel()?.ignoredPaths } : undefined),
     (current) => {
-      if (!tree) return
+      if (!tree || (sameStringMap(current.kinds, renderedKinds) && current.ignored === renderedIgnored)) return
+      renderedKinds = current.kinds
+      renderedIgnored = current.ignored
       const next = buildGitStatusMap(current.kinds, current.ignored)
       const patch = diffGitStatusPatch(appliedStatus, next)
       appliedStatus = next
 
       if (patch.remove.length > 0 || patch.set.length > 0) tree.applyGitStatusPatch(patch)
+    },
+    {
+      equals: (previous, next) =>
+        previous !== undefined &&
+        next !== undefined &&
+        sameStringMap(previous.kinds, next.kinds) &&
+        previous.ignored === next.ignored,
     },
   )
 
@@ -346,8 +416,8 @@ export default function PierreFileTree(props: {
 
         const scrollTop = scroller?.scrollTop ?? 0
         const viewportHeight = scroller?.clientHeight || 600
-        const startIndex = Math.floor(scrollTop / 28)
-        const endIndex = Math.max(startIndex, Math.floor((scrollTop + viewportHeight - 1) / 28))
+        const startIndex = Math.floor(scrollTop / FILE_TREE_ROW_HEIGHT)
+        const endIndex = Math.max(startIndex, Math.floor((scrollTop + viewportHeight - 1) / FILE_TREE_ROW_HEIGHT))
 
         if (tree.getVisibleRows(startIndex, endIndex).some((row) => row.path === current.path)) return
         tree.scrollToPath(current.path, { focus: false, offset: "nearest" })
@@ -372,6 +442,39 @@ export default function PierreFileTree(props: {
         data-component="file-tree-v2"
         data-total-rows={live() ? (liveModel()?.paths.length ?? 0) : (allowedModel()?.total ?? 0)}
         class="group/file-tree-v2"
+        on:keydown={{
+          capture: true,
+          handleEvent(event: KeyboardEvent) {
+            if (!tree || !wrapper?.matches(":dir(rtl)")) return
+
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+
+            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+            event.preventDefault()
+            event.stopPropagation()
+            const focused = tree.getFocusedItem()
+
+            if (!focused) {
+              tree.focusFirstItem()
+
+              return
+            }
+
+            const dir = isDirectoryHandle(focused) ? focused : undefined
+
+            if (event.key === "ArrowLeft") {
+              if (!dir) return
+
+              if (!dir.isExpanded()) dir.expand()
+              else tree.focusNextItem()
+
+              return
+            }
+
+            if (dir?.isExpanded()) dir.collapse()
+            else tree.focusParentItem()
+          },
+        }}
         onClick={(event) => {
           const path = findFileButtonPath(event)
 
