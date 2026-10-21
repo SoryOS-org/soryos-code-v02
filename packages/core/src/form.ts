@@ -343,7 +343,7 @@ function validateField(field: InputField, value: Form.Value): string | undefined
     return
   }
   if (field.type === "multiselect") {
-    if (!Array.isArray(value)) return `Expected string array for form field: ${field.key}`
+    if (!isStringArray(value)) return `Expected string array for form field: ${field.key}`
     if (field.required && value.length === 0) return `Missing required form field: ${field.key}`
     if (field.minItems !== undefined && value.length < field.minItems)
       return `Too few selections for form field: ${field.key}`
@@ -353,6 +353,10 @@ function validateField(field: InputField, value: Form.Value): string | undefined
       return `Invalid option for form field: ${field.key}`
     }
   }
+}
+
+function isStringArray(value: Form.Value): value is ReadonlyArray<string> {
+  return Array.isArray(value) && value.every((item): item is string => typeof item === "string")
 }
 
 function isDate(value: string) {
