@@ -23,6 +23,7 @@ import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
 import { workspaceSelectionDirectories } from "@/workspaces/paths"
 import "@/shell/commands/dialog.css"
+import "@/shell/palette-menu.css"
 import "./dialog.css"
 
 type LocationEntry =
@@ -299,7 +300,7 @@ function NewSessionLocationDialog(props: {
   return (
     <Dialog class="command-palette" size="large">
       <DialogBody class="command-palette-body">
-        <div class="command-palette-search">
+        <div class="palette-menu-search">
           <TextInput
             ref={inputRef}
             value={store.query}
@@ -359,7 +360,7 @@ function NewSessionLocationDialog(props: {
                     <button
                       type="button"
                       id={typeahead.optionID(entry)}
-                      class="command-palette-row"
+                      class="command-palette-row palette-menu-row"
                       role="option"
                       aria-selected={activeEntry()?.id === entry.id}
                       data-active={activeEntry()?.id === entry.id ? "" : undefined}
@@ -386,7 +387,9 @@ function NewSessionLocationDialog(props: {
                           <div class="command-palette-row-main">
                             <Icon name="plus" class="command-palette-row-icon" />
                             <div class="command-palette-row-text">
-                              <span class="command-palette-title">{language.t("session.new.project.add")}</span>
+                              <span class="command-palette-title palette-menu-title">
+                                {language.t("session.new.project.add")}
+                              </span>
                             </div>
                           </div>
                           <Show when={choosesServer()}>
@@ -398,7 +401,7 @@ function NewSessionLocationDialog(props: {
                             <div class="command-palette-row-main">
                               <Icon name={serverIcon(item().server)} class="command-palette-row-icon" />
                               <div class="command-palette-row-text">
-                                <span class="command-palette-title">{item().server.name}</span>
+                                <span class="command-palette-title palette-menu-title">{item().server.name}</span>
                                 <Show when={item().server.hint}>
                                   {(hint) => <span class="command-palette-description">{hint()}</span>}
                                 </Show>
@@ -466,7 +469,7 @@ function ProjectRow(props: { project: PromptProject; path: string; onDrill?: () 
         />
         <div class="command-palette-row-text">
           <span class="new-session-location-name">
-            <span class="command-palette-title">{displayName(props.project)}</span>
+            <span class="command-palette-title palette-menu-title">{displayName(props.project)}</span>
             <ServerTag server={props.project.server} />
           </span>
           <span class="command-palette-description" dir="ltr">
@@ -533,7 +536,7 @@ function WorkspaceRow(props: { title: string; value: string; description: string
           classList={{ "!text-v2-icon-icon-accent": props.value !== "main" && props.value !== "create" }}
         />
         <div class="command-palette-row-text">
-          <span class="command-palette-title">{props.title}</span>
+          <span class="command-palette-title palette-menu-title">{props.title}</span>
           <span class="command-palette-description" dir="ltr">
             {props.description}
           </span>

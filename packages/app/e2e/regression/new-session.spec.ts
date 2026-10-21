@@ -594,6 +594,21 @@ test("the location dialog lists every ready server's projects in one list and ta
   // It opens on the first row, not on the draft's current project (the second row).
   await expect(options.nth(0)).toHaveAttribute("aria-selected", "true")
 
+  // The picker shares the palette's full-width search, compact rows, and single-line titles.
+  await expect(options.nth(0)).toHaveCSS("height", "36px")
+  await expect(options.nth(0)).toHaveCSS("display", "flex")
+  await expect(names.nth(0).locator(".command-palette-title")).toHaveCSS("font-size", "13px")
+  await expect(names.nth(0).locator(".command-palette-title")).toHaveCSS("white-space", "nowrap")
+  await expect(options.nth(0)).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+  await expect
+    .poll(async () => {
+      const field = await dialog.locator('[data-component="text-input-v2"]').boundingBox()
+      const row = await options.nth(0).boundingBox()
+
+      return field && row ? Math.abs(field.width - row.width) : Infinity
+    })
+    .toBeLessThanOrEqual(1)
+
   await search.fill("apollo")
   await expect(names).toHaveText(["opencodeapollo", "sstapollo"])
 
