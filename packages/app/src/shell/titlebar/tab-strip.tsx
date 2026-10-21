@@ -15,14 +15,19 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useCommand } from "@/shell/commands/command"
 import { useTabs } from "@/shell/tabs/tabs"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
-import { ProjectIcon } from "@/shell/layout/project-icon"
 import { createTabComposerState } from "@/composer/persistence"
 import { base64Encode } from "@opencode/util/encode"
 import { showToast } from "@/shell/notifications/toast"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Icon } from "@opencode/ui/icon"
-import { displayName, type ProjectAvatarVariant } from "@opencode/ui/project-avatar"
+import {
+  displayName,
+  getProjectAvatarSource,
+  ProjectAvatar,
+  type ProjectAvatarVariant,
+} from "@opencode/ui/project-avatar"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { useSettings } from "@/settings/model"
 import { pathKey } from "@/workspaces/path-key"
 import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
@@ -724,27 +729,27 @@ function TabGroupHeader(props: {
   dragging?: boolean
   onToggle: () => void
 }) {
-  return (
+  const header = (
     <button
       type="button"
       data-component="titlebar-tab-group"
       data-collapsed={props.collapsed || undefined}
-      data-project-variant={props.group.variant}
       aria-expanded={!props.collapsed}
+      aria-label={props.group.title}
       class={`
         flex min-w-0 shrink-0 items-center gap-1 rounded-[6px] border-0 bg-transparent text-start
-        [font-weight:440] focus-visible:outline-none
+        [font-weight:440] transition-[background-color] duration-[120ms] ease-in-out
+        hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
       `}
       classList={{
-        // Horizontal groups read as Edge-style badges: the project color chips
-        // the label, and member tabs carry the same color as an accent strip.
-        "h-7 max-w-32 px-1.5 text-[13px] leading-4": !props.vertical,
+        // Horizontal groups show a one-character badge — the project mark in
+        // the group's color — with the full name on hover; member tabs carry
+        // the same color as an accent strip.
+        "h-7 px-1.5": !props.vertical,
         // Vertical groups stay quiet and compact; sidebar space is precious.
-        "h-5 w-full ps-1.5 pe-1 text-[11px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover":
-          props.vertical,
+        "h-5 w-full ps-1.5 pe-1 text-[11px] leading-4 text-v2-text-text-muted": props.vertical,
         "opacity-60": !!props.dragging,
       }}
-      style={!props.vertical ? { background: "var(--project-avatar-bg)", color: "var(--v2-avatar-fg)" } : undefined}
       onClick={props.onToggle}
     >
       <span class="flex w-3.5 shrink-0 justify-center">
@@ -752,23 +757,41 @@ function TabGroupHeader(props: {
           name="chevron-down"
           size="small"
           aria-hidden="true"
-          classList={{
-            "text-v2-icon-icon-muted": props.vertical,
-            "transition-transform duration-150 ease-in-out": true,
-          }}
+          class="text-v2-icon-icon-muted transition-transform duration-150 ease-in-out"
           style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
         />
       </span>
+      <span aria-hidden="true" class="flex shrink-0">
+        <Show
+          when={props.vertical}
+          fallback={
+            // The badge's name lives on hover; the tooltip cannot wrap the
+            // button itself because its expanded state would suppress it.
+            <Tooltip placement="bottom" value={props.group.title}>
+              <span class="flex">
+                <ProjectAvatar
+                  fallback={props.group.project ? displayName(props.group.project) : props.group.title}
+                  src={getProjectAvatarSource(props.group.project?.id, props.group.project?.icon)}
+                  variant={props.group.variant ?? "gray"}
+                />
+              </span>
+            </Tooltip>
+          }
+        >
+          <ProjectAvatar
+            fallback={props.group.project ? displayName(props.group.project) : props.group.title}
+            src={getProjectAvatarSource(props.group.project?.id, props.group.project?.icon)}
+            variant={props.group.variant ?? "gray"}
+          />
+        </Show>
+      </span>
       <Show when={props.vertical}>
-        {/* Vertical headers carry the project icon; horizontal badges use the
-            project color alone, Edge-style, so the chip stays compact. */}
-        <span aria-hidden="true" class="flex shrink-0">
-          <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
-        </span>
+        <span class="min-w-0 truncate">{props.group.title}</span>
       </Show>
-      <span class="min-w-0 truncate">{props.group.title}</span>
     </button>
   )
+
+  return header
 }
 
 function useTabShortcut(index: () => number, onSelect: () => void) {

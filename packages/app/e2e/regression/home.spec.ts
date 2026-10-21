@@ -140,7 +140,6 @@ test("the sessions list groups by project on demand and keeps the choice", async
   await expect(smokeRow).toBeVisible()
   await expect(smokeRow.locator('[data-component="home-session-project-name"]')).toBeVisible()
   await expect(projectGroup(fixture.project.name!)).toHaveCount(0)
-
   const grouping = page.getByRole("button", { name: "Group by project" })
   await expect(grouping).toHaveAttribute("aria-pressed", "false")
   await grouping.click()
@@ -151,6 +150,8 @@ test("the sessions list groups by project on demand and keeps the choice", async
   await expect(smokeGroup).toBeVisible()
   expect((await secondGroup.boundingBox())!.y).toBeLessThan((await smokeGroup.boundingBox())!.y)
   await expect(smokeRow.locator('[data-component="home-session-project-name"]')).toBeHidden()
+  // Headers stay compact: sidebar-grade rows, clearly shorter than session rows.
+  await expect(smokeGroup).toHaveCSS("height", "20px")
 
   // Collapsing a group hides its rows while other groups stay expanded.
   await smokeGroup.click()

@@ -258,12 +258,11 @@ for (const row of [{ tabLayout: "horizontal", width: 1440 }, { tabLayout: "verti
       await expect(slot(hrefs.a).locator('[data-component="project-avatar-v2"]')).toHaveCount(0)
       await expect(tabsHeader).toHaveCSS("height", "20px")
     } else {
-      // Horizontal groups badge with the project color; members carry it as
-      // an accent strip.
-      await expect(tabsHeader).toHaveAttribute(
-        "data-project-variant",
-        /^(orange|yellow|cyan|green|red|pink|blue|purple)$/,
-      )
+      // Horizontal groups show a one-character project badge with the name
+      // on hover; members carry the group color as an accent strip.
+      await expect(tabsHeader.locator('[data-component="project-avatar-v2"]')).toHaveCount(1)
+      await tabsHeader.locator('[data-component="project-avatar-v2"]').hover()
+      await expect(page.getByRole("tooltip")).toContainText("Tabs")
       await expect(slot(hrefs.a).locator('[data-slot="tab-group-accent"]')).toHaveCount(1)
       await expect(slot(hrefs.draft).locator('[data-slot="tab-group-accent"]')).toHaveCount(1)
     }

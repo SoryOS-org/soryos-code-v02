@@ -38,7 +38,7 @@ function VerticalTabGroupsToggle() {
         variant="ghost-muted"
         size="small"
         class="size-7 shrink-0"
-        icon={<Icon name="folder" size="large" class="text-v2-icon-icon-muted" />}
+        icon={<Icon name="folder" class="text-v2-icon-icon-muted" />}
         aria-label={label()}
         aria-pressed={grouped()}
         onClick={() => settings.appearance.setTabGroups(grouped() ? "off" : "project")}

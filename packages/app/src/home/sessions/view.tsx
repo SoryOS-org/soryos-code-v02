@@ -190,7 +190,7 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
                       />
                     </Show>
                     <div
-                      class={`flex min-w-0 flex-col gap-px pt-2 md:pt-4 ${index === props.groups.length - 1 ? "" : "mb-6"}`}
+                      class={`flex min-w-0 flex-col gap-px pt-1 ${index === props.groups.length - 1 ? "" : "mb-2"}`}
                     >
                       {/* Rows key by session ID: session.sync replaces the
                           stored session object wholesale, so reference-keyed
@@ -413,7 +413,7 @@ function HomeSessionSearch(
                 variant="ghost-muted"
                 size="small"
                 class="relative z-20 shrink-0"
-                icon={<Icon name="folder" size="large" class="text-v2-icon-icon-muted" />}
+                icon={<Icon name="folder" class="text-v2-icon-icon-muted" />}
                 aria-label={groupingLabel()}
                 aria-pressed={props.groupedByProject}
                 onClick={props.onToggleGrouping}
@@ -544,7 +544,7 @@ function HomeSessionProjectGroupHeader(props: {
     <div
       ref={props.onSetRef}
       class={`
-        sticky top-[68px] flex h-7 min-w-0 items-center bg-v2-background-bg-base
+        sticky top-[68px] flex h-5 min-w-0 items-center bg-v2-background-bg-base
         ps-1.5 md:ps-3 md:top-[84px] lg:top-[108px]
       `}
       classList={{ "home-session-group-header z-[5]": !!props.elevated, "z-10": !props.elevated }}
@@ -555,7 +555,7 @@ function HomeSessionProjectGroupHeader(props: {
         data-collapsed={props.collapsed || undefined}
         aria-expanded={!props.collapsed}
         class={`
-          flex h-7 min-w-0 max-w-full items-center rounded-[6px] border-0 bg-transparent
+          flex h-5 min-w-0 max-w-full items-center rounded-[6px] border-0 bg-transparent
           pe-2 text-start transition-[background-color] duration-[120ms] ease-in-out
           hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
         `}
@@ -574,7 +574,9 @@ function HomeSessionProjectGroupHeader(props: {
           <span aria-hidden="true" class="flex shrink-0">
             <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
           </span>
-          <span class={`${HOME_SECTION_LABEL} min-w-0 overflow-hidden text-ellipsis whitespace-nowrap`}>
+          <span
+            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 text-v2-text-text-muted [font-weight:440]"
+          >
             {props.group.title}
           </span>
         </span>
