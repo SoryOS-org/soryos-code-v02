@@ -104,6 +104,75 @@ test("the Home shortcut focuses session search, and the Home button leaves focus
   await expect(search).not.toBeFocused()
 })
 
+test("the sessions list groups by project on demand and keeps the choice", async ({ page }) => {
+  const secondDirectory = "C:/OpenCode/SecondProject"
+  const secondSession = {
+    id: "ses_smoke_second",
+    slug: "second",
+    projectID: "proj_second",
+    directory: secondDirectory,
+    title: "Second project session",
+    version: "dev",
+    time: { created: 1700000003000, updated: 1700000003000 },
+  }
+
+  await mockStressTimeline(page, {
+    projects: [fixture.project, { ...fixture.project, id: "proj_second", worktree: secondDirectory, name: "second-project" }],
+    sessions: [...fixture.sessions.map((item) => ({ ...item })), secondSession],
+  })
+  await seed(page, {
+    projects: {
+      local: [
+        { worktree: fixture.directory, expanded: true },
+        { worktree: secondDirectory, expanded: true },
+      ],
+    },
+  })
+  await page.goto("/")
+
+  const projectGroup = (name: string) =>
+    page.locator('[data-component="home-session-project-group"]').filter({ hasText: name })
+  const smokeRow = row(page, fixture.expected.sourceTitle)
+  const smokeGroup = projectGroup(fixture.project.name!)
+  const secondGroup = projectGroup("second-project")
+
+  // Date mode: rows carry the project suffix and no project headers exist.
+  await expect(smokeRow).toBeVisible()
+  await expect(smokeRow.locator('[data-component="home-session-project-name"]')).toBeVisible()
+  await expect(projectGroup(fixture.project.name!)).toHaveCount(0)
+  const grouping = page.getByRole("button", { name: "Group by project" })
+  await expect(grouping).toHaveAttribute("aria-pressed", "false")
+  await grouping.click()
+  await expect(page.getByRole("button", { name: "Group by date" })).toHaveAttribute("aria-pressed", "true")
+
+  // Project mode: one header per project, most recently active first, and rows drop the suffix.
+  await expect(secondGroup).toBeVisible()
+  await expect(smokeGroup).toBeVisible()
+  expect((await secondGroup.boundingBox())!.y).toBeLessThan((await smokeGroup.boundingBox())!.y)
+  await expect(smokeRow.locator('[data-component="home-session-project-name"]')).toBeHidden()
+  // Headers stay compact: sidebar-grade rows, clearly shorter than session rows.
+  await expect(smokeGroup).toHaveCSS("height", "20px")
+
+  // Collapsing a group hides its rows while other groups stay expanded.
+  await smokeGroup.click()
+  await expect(smokeGroup).toHaveAttribute("aria-expanded", "false")
+  await expect(secondGroup).toHaveAttribute("aria-expanded", "true")
+  await expect(smokeRow).toBeHidden()
+
+  // Both the grouping mode and the collapsed group survive a reload.
+  await page.reload()
+  await expect(smokeGroup).toHaveAttribute("aria-expanded", "false")
+  await expect(smokeRow).toBeHidden()
+
+  // Expanding brings the rows back, and the toggle returns the date view.
+  await smokeGroup.click()
+  await expect(smokeGroup).toHaveAttribute("aria-expanded", "true")
+  await expect(smokeRow).toBeVisible()
+  await page.getByRole("button", { name: "Group by date" }).click()
+  await expect(smokeGroup).toHaveCount(0)
+  await expect(smokeRow.locator('[data-component="home-session-project-name"]')).toBeVisible()
+})
+
 test("Home shows loaded sessions before the location request resolves", async ({ page }) => {
   const location = await holdRoute(page, (url) => url.pathname === "/api/location")
   await openHome(page)

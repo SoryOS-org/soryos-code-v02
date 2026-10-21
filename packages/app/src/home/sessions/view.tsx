@@ -13,6 +13,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
+import { ProjectIcon } from "@/shell/layout/project-icon"
 import { sessionLabel } from "@/session/title"
 import { shouldOpenSessionInBackground } from "./open"
 import { createAltHold } from "./alt-hold"
@@ -65,6 +66,11 @@ export type HomeSessionsViewProps = {
   searchNoResultsLabel: string
   titleOpacity: (id: HomeSessionGroup["id"]) => number
   isOpenTab: (record: HomeSessionRecord) => boolean
+  groupedByProject: boolean
+  showGroupingToggle: boolean
+  onToggleGrouping: () => void
+  isGroupCollapsed: (id: string) => boolean
+  onToggleGroup: (id: string) => void
   onCreateSession: () => void
   onOpenSession: (session: SessionInfo, options?: OpenSessionOptions) => void
   onArchiveSession: (session: SessionInfo) => Promise<void>
@@ -163,32 +169,48 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
               <Index each={props.groups}>
                 {(group, index) => (
                   <>
-                    <HomeSessionGroupHeader
-                      title={group().title}
-                      titleOpacity={props.titleOpacity(group().id)}
-                      onSetRef={(element) => props.onSetHeader(group().id, element)}
-                      elevated={index === 0}
-                    />
+                    <Show
+                      when={props.groupedByProject}
+                      fallback={
+                        <HomeSessionGroupHeader
+                          title={group().title}
+                          titleOpacity={props.titleOpacity(group().id)}
+                          onSetRef={(element) => props.onSetHeader(group().id, element)}
+                          elevated={index === 0}
+                        />
+                      }
+                    >
+                      <HomeSessionProjectGroupHeader
+                        group={group()}
+                        collapsed={props.isGroupCollapsed(group().id)}
+                        titleOpacity={props.titleOpacity(group().id)}
+                        onSetRef={(element) => props.onSetHeader(group().id, element)}
+                        onToggle={() => props.onToggleGroup(group().id)}
+                        elevated={index === 0}
+                      />
+                    </Show>
                     <div
-                      class={`flex min-w-0 flex-col gap-px pt-2 md:pt-4 ${index === props.groups.length - 1 ? "" : "mb-6"}`}
+                      class={`flex min-w-0 flex-col gap-px pt-1 ${index === props.groups.length - 1 ? "" : "mb-2"}`}
                     >
                       {/* Rows key by session ID: session.sync replaces the
                           stored session object wholesale, so reference-keyed
                           rows would be disposed mid-interaction whenever a
                           sync response lands. */}
-                      <Key each={group().sessions} by={(record) => record.session.id}>
-                        {(record) => (
-                          <HomeSessionRow
-                            {...props}
-                            record={record()}
-                            rowUI={rowUI}
-                            setRowUI={setRowUI}
-                            showLocations={showLocations()}
-                            hoveredSession={hover.sessionID}
-                            onHoverSession={(sessionID) => setHover("sessionID", sessionID)}
-                          />
-                        )}
-                      </Key>
+                      <Show when={!props.groupedByProject || !props.isGroupCollapsed(group().id)}>
+                        <Key each={group().sessions} by={(record) => record.session.id}>
+                          {(record) => (
+                            <HomeSessionRow
+                              {...props}
+                              record={record()}
+                              rowUI={rowUI}
+                              setRowUI={setRowUI}
+                              showLocations={showLocations()}
+                              hoveredSession={hover.sessionID}
+                              onHoverSession={(sessionID) => setHover("sessionID", sessionID)}
+                            />
+                          )}
+                        </Key>
+                      </Show>
                     </div>
                   </>
                 )}
@@ -253,6 +275,10 @@ function HomeSessionSearch(
     onHoverSession: (sessionID: string | undefined) => void
   },
 ) {
+  const groupingLabel = createMemo(() =>
+    props.language.t(props.groupedByProject ? "home.sessions.group.byDate" : "home.sessions.group.byProject"),
+  )
+
   return (
     <div class="w-full">
       <div ref={props.onSetSearchRoot} data-component="home-session-search" class="relative z-30 w-full">
@@ -379,6 +405,21 @@ function HomeSessionSearch(
               }
             }}
           />
+          <Show when={props.showGroupingToggle}>
+            <Tooltip placement="bottom" value={groupingLabel()}>
+              <IconButton
+                type="button"
+                data-action="home-session-grouping-toggle"
+                variant="ghost-muted"
+                size="small"
+                class="relative z-20 shrink-0"
+                icon={<Icon name="folder" class="text-v2-icon-icon-muted" />}
+                aria-label={groupingLabel()}
+                aria-pressed={props.groupedByProject}
+                onClick={props.onToggleGrouping}
+              />
+            </Tooltip>
+          </Show>
           <Show when={props.searchValue}>
             <IconButton
               type="button"
@@ -491,6 +532,59 @@ function HomeSessionGroupHeader(props: {
   )
 }
 
+function HomeSessionProjectGroupHeader(props: {
+  group: HomeSessionGroup
+  collapsed: boolean
+  titleOpacity: number
+  elevated?: boolean
+  onSetRef: (element: HTMLDivElement) => void
+  onToggle: () => void
+}) {
+  return (
+    <div
+      ref={props.onSetRef}
+      class={`
+        sticky top-[68px] flex h-5 min-w-0 items-center bg-v2-background-bg-base
+        ps-1.5 md:ps-3 md:top-[84px] lg:top-[108px]
+      `}
+      classList={{ "home-session-group-header z-[5]": !!props.elevated, "z-10": !props.elevated }}
+    >
+      <button
+        type="button"
+        data-component="home-session-project-group"
+        data-collapsed={props.collapsed || undefined}
+        aria-expanded={!props.collapsed}
+        class={`
+          flex h-5 min-w-0 max-w-full items-center rounded-[6px] border-0 bg-transparent
+          pe-2 text-start transition-[background-color] duration-[120ms] ease-in-out
+          hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
+        `}
+        onClick={props.onToggle}
+      >
+        <span class="flex w-4.5 shrink-0 justify-center">
+          <Icon
+            name="chevron-down"
+            size="small"
+            aria-hidden="true"
+            class="text-v2-icon-icon-muted transition-transform duration-150 ease-in-out"
+            style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
+          />
+        </span>
+        <span class="flex min-w-0 items-center gap-1.5" style={{ opacity: props.titleOpacity }}>
+          <span aria-hidden="true" class="flex shrink-0">
+            <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
+          </span>
+          <span
+            class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 text-v2-text-text-muted [font-weight:440]"
+          >
+            {props.group.title}
+          </span>
+        </span>
+      </button>
+    </div>
+  )
+}
+
 function HomeSessionRow(
   props: HomeSessionsViewProps & {
     record: HomeSessionRecord
@@ -503,7 +597,8 @@ function HomeSessionRow(
 ) {
   const title = createMemo(() => sessionLabel(props.record.session))
   const location = createMemo(() => props.location(props.record))
-  const showProjectName = () => props.showProjectName && props.record.projectName
+  // A group header already names the project, so grouped rows drop the suffix.
+  const showProjectName = () => props.showProjectName && !props.groupedByProject && props.record.projectName
   const sessionID = () => props.record.session.id
   const menu = () => (props.rowUI.menu?.id === sessionID() ? props.rowUI.menu : undefined)
   const editor = () => (props.rowUI.editor?.id === sessionID() ? props.rowUI.editor : undefined)
@@ -598,6 +693,9 @@ function HomeSessionRow(
             class="flex h-10 min-w-0 w-full flex-1 items-center py-3 ps-1.5 pe-3 md:ps-3 md:pe-10"
             classList={{ "gap-1.5": props.desktop, "gap-2": !props.desktop }}
           >
+            <Show when={props.groupedByProject}>
+              <span aria-hidden="true" class="w-4.5 shrink-0" />
+            </Show>
             <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
             <div data-slot="home-session-labels" class="contents">
               <InlineInput
@@ -721,6 +819,9 @@ function HomeSessionRow(
             props.onOpenSession(props.record.session, { background: true })
           }}
         >
+          <Show when={props.groupedByProject}>
+            <span aria-hidden="true" class="w-4.5 shrink-0" />
+          </Show>
           <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
           <div
             data-slot="home-session-labels"
