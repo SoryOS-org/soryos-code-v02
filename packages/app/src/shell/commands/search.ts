@@ -91,7 +91,7 @@ export function createCommandPaletteSearch(props: {
 
     if (!current) return entries
 
-    const order = { command: 0, session: 1, file: 2, setting: 3 }
+    const order = { command: 0, setting: 1, session: 2, file: 3 }
 
     return entries.toSorted(
       (a, b) =>

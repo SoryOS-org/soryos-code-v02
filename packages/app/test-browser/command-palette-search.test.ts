@@ -12,6 +12,13 @@ const copy: CommandPaletteEntry = {
 
 const file: CommandPaletteEntry = { id: "file:copy.txt", type: "file", title: "copy.txt", category: "Files" }
 
+const setting: CommandPaletteEntry = {
+  id: "setting:copy",
+  type: "setting",
+  title: "Copy on select",
+  category: "Settings",
+}
+
 const session: CommandPaletteEntry = {
   id: "session:copy",
   type: "session",
@@ -52,7 +59,7 @@ describe("command palette search", () => {
     expect(signals[2].aborted).toBe(true)
   })
 
-  test("publishes each source independently and drops stale results on a new query", async () => {
+  test("lists settings above sessions and files, publishes each source independently, and drops stale results on a new query", async () => {
     const files = Promise.withResolvers<CommandPaletteEntry[]>()
     const sessions = Promise.withResolvers<CommandPaletteEntry[]>()
     const fileVisible = Promise.withResolvers<void>()
@@ -63,7 +70,7 @@ describe("command palette search", () => {
 
       const search = createCommandPaletteSearch({
         query,
-        items: () => [copy],
+        items: () => [copy, setting],
         sources: [() => sessions.promise, () => files.promise],
       })
 
@@ -76,17 +83,17 @@ describe("command palette search", () => {
       return { search, setQuery, dispose }
     })
 
-    expect(root.search.items()).toEqual([copy])
+    expect(root.search.items()).toEqual([copy, setting])
     files.resolve([file])
     await fileVisible.promise
-    expect(root.search.items()).toEqual([copy, file])
+    expect(root.search.items()).toEqual([copy, setting, file])
     expect(root.search.loading()).toBe(true)
     sessions.resolve([session])
     await sessionVisible.promise
-    expect(root.search.items()).toEqual([copy, session, file])
+    expect(root.search.items()).toEqual([copy, setting, session, file])
     expect(root.search.loading()).toBe(false)
     root.setQuery("new query")
-    expect(root.search.items()).toEqual([copy])
+    expect(root.search.items()).toEqual([copy, setting])
     root.dispose()
   })
 
