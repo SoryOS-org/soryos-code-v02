@@ -17,6 +17,8 @@ import { CollapsedSidebarToggle, paintCollapsedSlots } from "@/shell/sidebar-tog
 import { createPanelMotion, guardClosingFocus, replayPanelToggle } from "@/shell/panel-motion"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
+export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
+
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
   const settings = useSettingsSurface()
@@ -66,10 +68,9 @@ export default function Layout(props: ParentProps) {
     verticalTabs()
       ? [
           {
-            id: "sidebar.toggle",
+            ...sidebarToggleCommand,
             title: language.t("command.sidebar.toggle"),
             category: language.t("command.category.view"),
-            keybind: "mod+shift+b",
             onSelect: toggleSidebar,
           },
         ]

@@ -37,6 +37,12 @@ import { useSettingsDialog } from "@/settings/command"
 import { rootSession } from "@/shell/routes/session"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/extension/titlebar-items"
 
+export const newTabCommand = { id: "tab.new", keybind: "mod+t,mod+n" }
+
+export const goBackCommand = { id: "common.goBack", keybind: "mod+[" }
+
+export const goForwardCommand = { id: "common.goForward", keybind: "mod+]" }
+
 const titlebarHeight = 36
 
 const windowsTitlebarHeight = 44 // Includes the content inset; matches the native Windows overlay.
@@ -141,17 +147,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   command.register(() => [
     {
-      id: "common.goBack",
+      ...goBackCommand,
       title: language.t("common.goBack"),
       category: language.t("command.category.view"),
-      keybind: "mod+[",
       onSelect: back,
     },
     {
-      id: "common.goForward",
+      ...goForwardCommand,
       title: language.t("common.goForward"),
       category: language.t("command.category.view"),
-      keybind: "mod+]",
       onSelect: forward,
     },
   ])
@@ -531,10 +535,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
               return [
                 {
-                  id: "tab.new",
+                  ...newTabCommand,
                   category: "tab",
                   title: language.t("command.session.new"),
-                  keybind: "mod+t,mod+n",
                   hidden: true,
                   onSelect: openNewTab,
                 },

@@ -27,6 +27,10 @@ import { errorMessage } from "@/shell/layout/helpers"
 import { notifySessionTabsRemoved } from "./session-events"
 import type { SessionInfo } from "@opencode/client/promise"
 
+export const previousSessionCommand = { id: "session.previous", keybind: "alt+arrowup" }
+
+export const nextSessionCommand = { id: "session.next", keybind: "alt+arrowdown" }
+
 function SessionTabSlot(props: {
   tab: SessionTab
   id: string
@@ -410,17 +414,15 @@ export function TitlebarTabStrip(props: {
       onSelect: () => selectAdjacentTab(1),
     },
     {
-      id: "session.previous",
+      ...previousSessionCommand,
       category: language.t("command.category.session"),
       title: language.t("command.session.previous"),
-      keybind: "alt+arrowup",
       onSelect: () => selectAdjacentTab(-1),
     },
     {
-      id: "session.next",
+      ...nextSessionCommand,
       category: language.t("command.category.session"),
       title: language.t("command.session.next"),
-      keybind: "alt+arrowdown",
       onSelect: () => selectAdjacentTab(1),
     },
     {

@@ -1,6 +1,7 @@
 import { createMemo, lazy, on, onCleanup, Suspense } from "solid-js"
 import { Command, createKeyed, MenuItem, onIdle, Panel, type MountedSession, type PanelTab, type Setup } from "../sdk"
 import type Terminal from "./index"
+import { terminalToggleCommand } from "./index"
 import { createTerminalModel, type TerminalWorkspace } from "./model"
 import { terminalTab, type LocalPTY } from "./state"
 import { terminalTabLabel } from "./title"
@@ -68,12 +69,11 @@ const setup: Setup<typeof Terminal> = (ctx) => {
   ctx.add(
     Command,
     (): Command => ({
-      id: "toggle",
+      ...terminalToggleCommand,
       title: ctx.t("command.toggle"),
       group: ctx.t("command.category.view"),
       section: "terminal",
       featured: true,
-      bind: "ctrl+`",
       slash: { name: "terminal", after: "open" },
       editable: true,
       enabled: routed(),
