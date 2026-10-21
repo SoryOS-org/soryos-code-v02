@@ -7,6 +7,7 @@ import {
   type SessionComposerRegionViewController,
 } from "@/session/composer/session-composer-region"
 import { SessionActivityChips, type SessionActivityItem } from "@/session/composer/activity-chips"
+import { SettingsProvider } from "@/settings/model"
 import { SubagentBar } from "@/session/composer/subagent-bar"
 import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import type { FormInfo, PermissionRequest, SessionStatus } from "@opencode/client/promise"
@@ -295,20 +296,22 @@ function SessionSurfaceState(props: SessionPreviewProps & { onReset: () => void 
                       </Show>
                     }
                     above={
-                      <SessionActivityChips
-                        subagents={props.activity?.subagents ?? []}
-                        shells={props.activity?.shells ?? []}
-                        onOpen={(item) =>
-                          props.activity?.onOpen
-                            ? props.activity.onOpen(item)
-                            : setState("activity", `Opened ${item.label ?? item.key}`)
-                        }
-                        onStop={(item) =>
-                          props.activity?.onStop
-                            ? props.activity.onStop(item)
-                            : setState("activity", `Stopped ${item.label ?? item.key}`)
-                        }
-                      />
+                      <SettingsProvider>
+                        <SessionActivityChips
+                          subagents={props.activity?.subagents ?? []}
+                          shells={props.activity?.shells ?? []}
+                          onOpen={(item) =>
+                            props.activity?.onOpen
+                              ? props.activity.onOpen(item)
+                              : setState("activity", `Opened ${item.label ?? item.key}`)
+                          }
+                          onStop={(item) =>
+                            props.activity?.onStop
+                              ? props.activity.onStop(item)
+                              : setState("activity", `Stopped ${item.label ?? item.key}`)
+                          }
+                        />
+                      </SettingsProvider>
                     }
                     composer={<Composer model={prompt.controller} borderUnderlay />}
                   />
