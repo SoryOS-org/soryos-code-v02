@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Vrijeme od slanja zahtjeva pružatelju do prvog teksta odgovora.",
   "tps.label": "TPS",
-  "tps.tip": "Izlazni tokeni u sekundi nakon prvog izlaza modela.",
+  "tps.tip":
+    "Izlazni tokeni i tokeni rasuđivanja u sekundi kroz zahtjeve modelu u posljednjem potezu, bez vremena alata.",
   "e2e.label": "E2E",
   "e2e.tip": "Vrijeme od slanja zahtjeva pružatelju do završetka toka odgovora.",
   "nav.label": "NAV",

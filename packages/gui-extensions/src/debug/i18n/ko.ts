@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "공급자 요청 전송부터 첫 답변 텍스트까지 걸린 시간입니다.",
   "tps.label": "TPS",
-  "tps.tip": "모델의 첫 출력 이후 초당 출력 토큰 수입니다.",
+  "tps.tip": "최근 턴의 모델 요청 전체에서 초당 출력 및 추론 토큰 수입니다. 도구 시간은 제외됩니다.",
   "e2e.label": "E2E",
   "e2e.tip": "공급자 요청 전송부터 응답 스트림이 끝날 때까지 걸린 시간입니다.",
   "nav.label": "NAV",

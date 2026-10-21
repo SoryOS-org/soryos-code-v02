@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Provayderga so‘rov yuborilganidan javobning birinchi matnigacha bo‘lgan vaqt.",
   "tps.label": "TPS",
-  "tps.tip": "Modelning birinchi chiqishidan keyingi soniyada chiqish tokenlari soni.",
+  "tps.tip": "Oxirgi navbatdagi model so'rovlari bo'yicha soniyada chiqish va mulohaza tokenlari, vosita vaqtisiz.",
   "e2e.label": "E2E",
   "e2e.tip": "Provayderga so‘rov yuborilganidan javob oqimi tugagunigacha bo‘lgan vaqt.",
   "nav.label": "NAV",

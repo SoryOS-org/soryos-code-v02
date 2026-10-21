@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "A szolgáltatói kérés elküldésétől az első válaszszövegig eltelt idő.",
   "tps.label": "TPS",
-  "tps.tip": "Kimeneti tokenek másodpercenként a modell első kimenete után.",
+  "tps.tip": "Kimeneti és gondolkodási tokenek másodpercenként a legutóbbi kör modellkérésein, az eszközidő nélkül.",
   "e2e.label": "E2E",
   "e2e.tip": "A szolgáltatói kérés elküldésétől a válaszfolyam végéig eltelt idő.",
   "nav.label": "NAV",

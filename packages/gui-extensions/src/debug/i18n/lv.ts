@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Laiks no pieprasījuma nosūtīšanas pakalpojumu sniedzējam līdz pirmajam atbildes tekstam.",
   "tps.label": "TPS",
-  "tps.tip": "Izvades žetoni sekundē pēc pirmās modeļa izvades.",
+  "tps.tip": "Izvades un spriešanas žetoni sekundē pēdējā gājiena modeļa pieprasījumos, neskaitot rīku laiku.",
   "e2e.label": "E2E",
   "e2e.tip": "Laiks no pieprasījuma nosūtīšanas pakalpojumu sniedzējam līdz atbildes straumes beigām.",
   "nav.label": "NAV",

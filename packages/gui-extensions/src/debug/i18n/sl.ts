@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Čas od pošiljanja zahteve ponudniku do prvega besedila odgovora.",
   "tps.label": "TPS",
-  "tps.tip": "Število izhodnih žetonov na sekundo po prvem izhodu modela.",
+  "tps.tip": "Izhodni žetoni in žetoni sklepanja na sekundo v zahtevah za model v zadnji potezi, brez časa orodij.",
   "e2e.label": "E2E",
   "e2e.tip": "Čas od pošiljanja zahteve ponudniku do konca toka odgovora.",
   "nav.label": "NAV",

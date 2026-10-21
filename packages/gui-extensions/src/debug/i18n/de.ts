@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Zeit vom Senden der Anbieteranfrage bis zum ersten Antworttext.",
   "tps.label": "TPS",
-  "tps.tip": "Ausgabetokens pro Sekunde nach der ersten Modellausgabe.",
+  "tps.tip": "Ausgabe- und Reasoning-Tokens pro Sekunde über die Modellanfragen der letzten Runde, ohne Werkzeugzeit.",
   "e2e.label": "E2E",
   "e2e.tip": "Zeit vom Senden der Anbieteranfrage bis zum Ende ihres Antwortstreams.",
   "nav.label": "NAV",

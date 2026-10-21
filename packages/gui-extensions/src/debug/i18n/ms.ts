@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Masa dari penghantaran permintaan penyedia hingga teks jawapan pertama.",
   "tps.label": "TPS",
-  "tps.tip": "Token output sesaat selepas output pertama model.",
+  "tps.tip":
+    "Token output dan penaakulan sesaat merentas permintaan model dalam giliran terakhir, tidak termasuk masa alat.",
   "e2e.label": "E2E",
   "e2e.tip": "Masa dari penghantaran permintaan penyedia hingga strim responsnya tamat.",
   "nav.label": "NAV",

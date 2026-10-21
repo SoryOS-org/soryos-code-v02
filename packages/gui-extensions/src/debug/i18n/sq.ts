@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Koha nga dërgimi i kërkesës te ofruesi deri te teksti i parë i përgjigjes.",
   "tps.label": "TPS",
-  "tps.tip": "Shenjat e daljes për sekondë pas daljes së parë të modelit.",
+  "tps.tip":
+    "Shenjat e daljes dhe të arsyetimit për sekondë në kërkesat ndaj modelit në radhën e fundit, pa kohën e mjeteve.",
   "e2e.label": "E2E",
   "e2e.tip": "Koha nga dërgimi i kërkesës te ofruesi deri në përfundimin e rrjedhës së përgjigjes.",
   "nav.label": "NAV",

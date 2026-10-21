@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Thời gian từ khi gửi yêu cầu đến nhà cung cấp cho đến văn bản trả lời đầu tiên.",
   "tps.label": "TPS",
-  "tps.tip": "Số token đầu ra mỗi giây sau đầu ra đầu tiên của mô hình.",
+  "tps.tip":
+    "Số token đầu ra và suy luận mỗi giây trên các yêu cầu mô hình của lượt gần nhất, không tính thời gian công cụ.",
   "e2e.label": "E2E",
   "e2e.tip": "Thời gian từ khi gửi yêu cầu đến nhà cung cấp cho đến khi luồng phản hồi kết thúc.",
   "nav.label": "NAV",

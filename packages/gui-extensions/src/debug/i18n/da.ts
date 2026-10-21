@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Tid fra afsendelse af udbyderanmodningen til den første svartekst.",
   "tps.label": "TPS",
-  "tps.tip": "Outputtokens pr. sekund efter modellens første output.",
+  "tps.tip":
+    "Output- og ræsonneringstokens pr. sekund på tværs af den seneste turs modelforespørgsler, uden værktøjstid.",
   "e2e.label": "E2E",
   "e2e.tip": "Tid fra afsendelse af udbyderanmodningen, til dens svarstream sluttede.",
   "nav.label": "NAV",

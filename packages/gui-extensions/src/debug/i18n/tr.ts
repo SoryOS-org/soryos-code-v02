@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Sağlayıcı isteğinin gönderilmesinden ilk yanıt metnine kadar geçen süre.",
   "tps.label": "TPS",
-  "tps.tip": "İlk model çıktısından sonra saniye başına çıktı tokenı.",
+  "tps.tip": "Son turun model isteklerinde saniye başına çıktı ve akıl yürütme tokeni, araç süresi hariç.",
   "e2e.label": "E2E",
   "e2e.tip": "Sağlayıcı isteğinin gönderilmesinden yanıt akışının sona ermesine kadar geçen süre.",
   "nav.label": "NAV",

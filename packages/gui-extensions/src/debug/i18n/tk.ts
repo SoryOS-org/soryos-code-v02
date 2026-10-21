@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Hyzmat üpjünçä haýyş iberilenden jogabyň ilkinji tekstine çenli wagt.",
   "tps.label": "TPS",
-  "tps.tip": "Modeliň ilkinji çykyşyndan soň sekuntda çykyş tokenleriniň sany.",
+  "tps.tip":
+    "Soňky nobatyň model haýyşlary boýunça sekuntda çykyş we pikirleniş tokenleri, gural wagty hasaba alynmazdan.",
   "e2e.label": "E2E",
   "e2e.tip": "Hyzmat üpjünçä haýyş iberilenden jogap akymynyň tamamlanmagyna çenli wagt.",
   "nav.label": "NAV",

@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Laikas nuo užklausos išsiuntimo teikėjui iki pirmojo atsakymo teksto.",
   "tps.label": "TPS",
-  "tps.tip": "Išvesties žetonai per sekundę po pirmosios modelio išvesties.",
+  "tps.tip":
+    "Išvesties ir samprotavimo žetonai per sekundę per paskutinio ėjimo modelio užklausas, neįskaitant įrankių laiko.",
   "e2e.label": "E2E",
   "e2e.tip": "Laikas nuo užklausos išsiuntimo teikėjui iki atsakymo srauto pabaigos.",
   "nav.label": "NAV",

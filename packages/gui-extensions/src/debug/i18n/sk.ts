@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Čas od odoslania požiadavky poskytovateľovi po prvý text odpovede.",
   "tps.label": "TPS",
-  "tps.tip": "Počet výstupných tokenov za sekundu po prvom výstupe modelu.",
+  "tps.tip":
+    "Výstupné tokeny a tokeny uvažovania za sekundu naprieč požiadavkami na model v poslednom ťahu, bez času nástrojov.",
   "e2e.label": "E2E",
   "e2e.tip": "Čas od odoslania požiadavky poskytovateľovi po ukončenie prúdu odpovede.",
   "nav.label": "NAV",

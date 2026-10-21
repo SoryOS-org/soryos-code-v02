@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Waktu sejak permintaan dikirim ke penyedia hingga teks jawaban pertama.",
   "tps.label": "TPS",
-  "tps.tip": "Jumlah token keluaran per detik setelah keluaran pertama model.",
+  "tps.tip":
+    "Token keluaran dan penalaran per detik di seluruh permintaan model pada giliran terakhir, tanpa waktu alat.",
   "e2e.label": "E2E",
   "e2e.tip": "Waktu sejak permintaan dikirim ke penyedia hingga aliran responsnya berakhir.",
   "nav.label": "NAV",

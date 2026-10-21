@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Temps entre l’envoi de la requête au fournisseur et le premier texte de réponse.",
   "tps.label": "TPS",
-  "tps.tip": "Jetons de sortie par seconde après la première sortie du modèle.",
+  "tps.tip":
+    "Jetons de sortie et de raisonnement par seconde sur les requêtes au modèle du dernier tour, hors temps des outils.",
   "e2e.label": "E2E",
   "e2e.tip": "Temps entre l’envoi de la requête au fournisseur et la fin du flux de réponse.",
   "nav.label": "NAV",

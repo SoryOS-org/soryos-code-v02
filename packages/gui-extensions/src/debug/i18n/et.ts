@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Aeg pakkujale päringu saatmisest esimese vastusetekstini.",
   "tps.label": "TPS",
-  "tps.tip": "Väljundmärke sekundis pärast mudeli esimest väljundit.",
+  "tps.tip": "Väljund- ja arutlusmärgid sekundis viimase käigu mudelipäringute lõikes, ilma tööriistade ajata.",
   "e2e.label": "E2E",
   "e2e.tip": "Aeg pakkujale päringu saatmisest vastusevoo lõppemiseni.",
   "nav.label": "NAV",

@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Tími frá því að beiðni er send til þjónustuveitu þar til fyrsti svartextinn berst.",
   "tps.label": "TPS",
-  "tps.tip": "Úttakstókar á sekúndu eftir fyrsta úttak líkansins.",
+  "tps.tip": "Úttaks- og rökhugsunartókar á sekúndu í líkansbeiðnum síðustu umferðar, án tíma verkfæra.",
   "e2e.label": "E2E",
   "e2e.tip": "Tími frá því að beiðni er send til þjónustuveitu þar til svarstraumnum lýkur.",
   "nav.label": "NAV",

@@ -10,7 +10,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Time from provider request dispatch to the first answer text.",
   "tps.label": "TPS",
-  "tps.tip": "Output tokens per second after the first model output.",
+  "tps.tip": "Output and reasoning tokens per second across the latest turn's model requests, excluding tool time.",
   "e2e.label": "E2E",
   "e2e.tip": "Time from provider request dispatch until its response stream ended.",
   "nav.label": "NAV",

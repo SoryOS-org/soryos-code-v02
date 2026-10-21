@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Tiempo desde el envío de la solicitud al proveedor hasta el primer texto de respuesta.",
   "tps.label": "TPS",
-  "tps.tip": "Tókenes de salida por segundo después de la primera salida del modelo.",
+  "tps.tip":
+    "Tókenes de salida y de razonamiento por segundo en las solicitudes al modelo del último turno, sin contar el tiempo de las herramientas.",
   "e2e.label": "E2E",
   "e2e.tip": "Tiempo desde el envío de la solicitud al proveedor hasta que finaliza el flujo de respuesta.",
   "nav.label": "NAV",

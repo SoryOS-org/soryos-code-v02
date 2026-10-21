@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Aika palveluntarjoajapyynnön lähettämisestä ensimmäiseen vastaustekstiin.",
   "tps.label": "TPS",
-  "tps.tip": "Tulostokeneita sekunnissa mallin ensimmäisen tulosteen jälkeen.",
+  "tps.tip": "Tuloste- ja päättelytokeneita sekunnissa viimeisimmän vuoron mallipyynnöissä, ilman työkalujen aikaa.",
   "e2e.label": "E2E",
   "e2e.tip": "Aika palveluntarjoajapyynnön lähettämisestä vastausvirran päättymiseen.",
   "nav.label": "NAV",

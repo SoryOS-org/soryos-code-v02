@@ -8,7 +8,8 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Temps des de l’enviament de la sol·licitud al proveïdor fins al primer text de resposta.",
   "tps.label": "TPS",
-  "tps.tip": "Fitxes de sortida per segon després de la primera sortida del model.",
+  "tps.tip":
+    "Fitxes de sortida i de raonament per segon en les peticions al model de l'últim torn, sense comptar el temps de les eines.",
   "e2e.label": "E2E",
   "e2e.tip": "Temps des de l’enviament de la sol·licitud al proveïdor fins que finalitza el flux de resposta.",
   "nav.label": "NAV",

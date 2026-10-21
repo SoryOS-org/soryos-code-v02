@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "從送出提供者要求到首次輸出回答文字所需的時間。",
   "tps.label": "TPS",
-  "tps.tip": "模型首次輸出後每秒產生的輸出權杖數。",
+  "tps.tip": "最近一輪模型請求中每秒的輸出與推理 token 數，不含工具耗時。",
   "e2e.label": "E2E",
   "e2e.tip": "從送出提供者要求到其回應串流結束所需的時間。",
   "nav.label": "NAV",

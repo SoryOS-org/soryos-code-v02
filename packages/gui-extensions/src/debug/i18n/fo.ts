@@ -8,7 +8,7 @@ export default {
   "ttfa.label": "TTFA",
   "ttfa.tip": "Tíð frá tí at fyrispurningurin verður sendur veitaranum, til fyrsti svarteksturin.",
   "tps.label": "TPS",
-  "tps.tip": "Útflutningsmerki um sekundið eftir fyrsta úttakið frá modellinum.",
+  "tps.tip": "Úttaks- og hugsunarmerki um sekundið í seinasta umfarsins fyrispurningum til modellið, uttan amboðstíð.",
   "e2e.label": "E2E",
   "e2e.tip": "Tíð frá tí at fyrispurningurin verður sendur veitaranum, til svarstreymurin endar.",
   "nav.label": "NAV",
