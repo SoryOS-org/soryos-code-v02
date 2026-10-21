@@ -4,11 +4,13 @@ import {
   createEffect,
   createMemo,
   onCleanup,
+  createSignal,
   onMount,
   splitProps,
   Show,
   useContext,
 } from "solid-js"
+import { motionTuning } from "../../motion-tuning"
 import { attachGeneratedAvatar } from "./animation"
 import {
   generateProjectIcon,
@@ -18,6 +20,23 @@ import {
 import "./project-avatar.css"
 
 export { generateProjectIcon, GENERATED_PROJECT_ICON_STYLE, type GeneratedProjectIcon } from "./generated"
+
+const avatarChoice = motionTuning.choice("projectAvatar.style", {
+  label: "Project avatars",
+  group: "Experiments",
+  value: "letters",
+  labels: { letters: "Letters", generated: "Generated" },
+})
+
+const [avatarStyle, setAvatarStyle] = createSignal(avatarChoice())
+
+// A live switch crossfades the avatars through a view transition; nothing else on the page changes.
+motionTuning.subscribe(() => {
+  if (avatarChoice() === avatarStyle()) return
+
+  if (typeof document === "undefined" || !document.startViewTransition) return setAvatarStyle(avatarChoice())
+  document.startViewTransition(() => setAvatarStyle(avatarChoice()))
+})
 
 const segmenter =
   typeof Intl !== "undefined" && "Segmenter" in Intl
@@ -142,7 +161,8 @@ export function ProjectAvatar(props: ProjectAvatarProps) {
     "style",
   ])
 
-  const generated = () => (split.src || split.variant === "outline" ? undefined : split.generated)
+  const generated = () =>
+    split.src || split.variant === "outline" || avatarStyle() === "letters" ? undefined : split.generated
 
   return (
     <div

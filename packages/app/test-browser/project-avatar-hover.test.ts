@@ -25,6 +25,13 @@ Bun.plugin({
 
 const { ProjectAvatar, ProjectIconStoreProvider, generateProjectIcon } = await import("@opencode/ui/project-avatar")
 
+const { motionTuning } = await import("@opencode/ui/motion-tuning")
+
+// Generated avatars are opt-in under Knobs → Experiments.
+motionTuning.list().forEach((knob) => {
+  if (knob.id === "projectAvatar.style") motionTuning.set(knob, "generated")
+})
+
 const getContext = HTMLCanvasElement.prototype.getContext
 
 const requestFrame = window.requestAnimationFrame
