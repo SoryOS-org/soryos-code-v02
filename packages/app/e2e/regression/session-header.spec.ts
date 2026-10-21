@@ -238,6 +238,10 @@ test.describe("location", () => {
             }),
           )
           .toEqual([10, 8])
+        const separator = header.locator('[data-slot="session-title-separator"]')
+        await expect(separator).toBeVisible()
+        await expect(separator).toHaveText("")
+        await expect(separator).toHaveAttribute("aria-hidden", "true")
         const location = header.locator('[data-slot="session-location-trigger"]')
         await location.hover()
         await expect(location).toHaveCSS("padding-inline-start", "4px")
