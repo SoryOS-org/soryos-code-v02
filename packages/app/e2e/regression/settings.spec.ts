@@ -634,6 +634,32 @@ test("the new session shortcut waits for a shortcut recording, then leaves setti
   await expect(page.locator('[data-titlebar-tab][data-active="true"]')).toHaveCount(1)
 })
 
+test("single extension rows stay aligned when switching tabs", async ({ page }) => {
+  const { settings } = await open(page, {
+    mcp: [{ name: "demo-mcp", status: { status: "connected" } }],
+    plugins: [{ id: "demo-plugin", source: { type: "package", target: "demo-plugin" } }],
+    skills: [{ name: "demo-skill", description: "Demo skill", path: "/skills/demo/SKILL.md" }],
+  })
+  await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+  await expect(settings.getByRole("switch", { name: "demo-mcp", exact: true })).toBeChecked()
+  const mcp = settings.getByRole("tabpanel", { name: "MCPs", exact: true }).locator(".settings-extension-row")
+  await expect(mcp).toHaveCount(1)
+  const bounds = await mcp.boundingBox()
+  expect(bounds).not.toBeNull()
+
+  for (const item of [
+    { tab: "Plugins", name: "demo-plugin" },
+    { tab: "Skills", name: "demo-skill" },
+  ]) {
+    await settings.getByRole("tab", { name: item.tab, exact: true }).click()
+    const panel = settings.getByRole("tabpanel", { name: item.tab, exact: true })
+    await expect(panel.getByText(item.name, { exact: true })).toBeVisible()
+    const row = panel.locator(".settings-extension-row")
+    await expect(row).toHaveCount(1)
+    await expect.poll(() => row.boundingBox()).toEqual(bounds)
+  }
+})
+
 test.describe("pages open before slow data", () => {
   test("worktrees", async ({ page }) => {
     const { settings } = await open(page)

@@ -2126,6 +2126,7 @@
 
 .settings-extension-row {
   display: flex;
+  min-height: 56px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -2155,7 +2156,6 @@
 }
 
 .settings-mcp-row {
-  min-height: 56px;
   gap: 16px;
 }
 
