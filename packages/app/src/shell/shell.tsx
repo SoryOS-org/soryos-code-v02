@@ -13,7 +13,8 @@ import { ExtensionServerCover } from "@/runtime/extension/server-shell"
 import { ExtensionSlot } from "@/runtime/extension/render"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { CollapsedSidebarToggle } from "@/shell/sidebar-toggle"
+import { CollapsedSidebarToggle, paintCollapsedSlots } from "@/shell/sidebar-toggle"
+import { createPanelMotion, replayPanelToggle } from "@/shell/panel-motion"
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
@@ -26,12 +27,29 @@ export default function Layout(props: ParentProps) {
   const [state, setState] = createStore<{
     tabsWidth: number
     tabsMount: HTMLElement | undefined
+    tabsAside: HTMLElement | undefined
   }>({
     tabsWidth: 260,
     tabsMount: undefined,
+    tabsAside: undefined,
   })
 
   const verticalTabs = () => preferences.appearance.tabLayout() !== "horizontal" && !mobile()
+
+  const toggleSidebar = () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen())
+
+  const sidebarMotion = createPanelMotion({
+    open: preferences.appearance.sidebarOpen,
+    // The aside's real width moves main's edge with the sidebar's; its contents keep their width, pinned to that edge.
+    paint: (closed) => {
+      const aside = state.tabsAside
+
+      if (aside) aside.style.width = `${state.tabsWidth * (1 - closed)}px`
+      paintCollapsedSlots(closed)
+    },
+  })
+
+  replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
 
   command.register("sidebar", () =>
     verticalTabs()
@@ -41,7 +59,7 @@ export default function Layout(props: ParentProps) {
             title: language.t("command.sidebar.toggle"),
             category: language.t("command.category.view"),
             keybind: "mod+shift+b",
-            onSelect: () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen()),
+            onSelect: toggleSidebar,
           },
         ]
       : [],
@@ -74,14 +92,11 @@ export default function Layout(props: ParentProps) {
               id="vertical-tabs-sidebar"
               data-slot="vertical-tabs-sidebar"
               data-state={preferences.appearance.sidebarOpen() ? "open" : "closed"}
+              ref={(element) => setState("tabsAside", element)}
               class="relative z-10 h-full min-h-0 shrink-0"
-              style={{ width: preferences.appearance.sidebarOpen() ? `${state.tabsWidth}px` : "0px" }}
               inert={!preferences.appearance.sidebarOpen()}
             >
-              <div
-                class="absolute inset-0 overflow-hidden"
-                classList={{ invisible: !preferences.appearance.sidebarOpen() }}
-              >
+              <div class="absolute inset-0 overflow-hidden" classList={{ invisible: !sidebarMotion.present() }}>
                 <div
                   ref={(element) => setState("tabsMount", element)}
                   class="absolute inset-y-0 end-0 contain-strict flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"

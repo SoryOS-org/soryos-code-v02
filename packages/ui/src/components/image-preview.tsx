@@ -3,13 +3,12 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { animate, type AnimationPlaybackControls } from "motion"
 import { createEffect, createMemo, createSignal, on, onCleanup } from "solid-js"
-import { useDialog, useDialogLayer } from "../context/dialog"
+import { useDialogLayer } from "../context/dialog"
 import { useI18n } from "../context/i18n"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { frameLoop, prefersReducedMotion, Spring, type DurationOptions } from "../motion"
-import { motionTuning } from "../motion-tuning"
 import {
   createFlight,
   elementFrame,
@@ -31,27 +30,15 @@ export interface ImagePreviewProps {
 
 const STEP = Math.SQRT2
 
-const group = "Image open"
-
-// One spring carries the open and the close, and the backdrop dims on it too. Snappy is Claude's measured preview; Smooth
-// ships, since opening an image is rare enough to take its time.
-const tuning = motionTuning.spring("imagePreview", {
-  label: "Spring",
-  group,
-  shipped: "smooth",
-  presets: {
-    snappy: FLIGHT_SPRING,
-    smooth: { duration: 0.3, bounce: 0 },
-    calm: { duration: 0.4, bounce: 0 },
-  },
-})
+// One spring carries the open and the close, and the backdrop dims on it too.
+const OPEN_SPRING = { duration: 0.3, bounce: 0 }
 
 // Without a flight (reduced motion, or no thumbnail to fly to), the preview only fades.
 const fade = { duration: 0.15, bounce: 0 }
 
 // How long the dialog stays mounted after a close starts, in milliseconds: the flight lands and hands the image back
 // to the page well within this.
-const exitDuration = () => Math.max(tuning().duration, fade.duration) * 3200
+const exitDuration = Math.max(OPEN_SPRING.duration, fade.duration) * 3200
 
 const CENTER = { x: 0, y: 0 }
 
@@ -139,7 +126,7 @@ export function ImagePreview(props: ImagePreviewProps) {
   const [exit, setExit] = createSignal(0)
 
   const holdExit = () => {
-    setExit(exitDuration())
+    setExit(exitDuration)
     layer?.setExitDuration(exit())
   }
 
@@ -151,7 +138,7 @@ export function ImagePreview(props: ImagePreviewProps) {
     if (stage() !== "pending" || !dialog.isOpen()) return
     const from = prefersReducedMotion() ? undefined : originFrame()
     holdExit()
-    dimTo(1, from ? tuning() : fade)
+    dimTo(1, from ? OPEN_SPRING : fade)
 
     if (!from) {
       plain = true
@@ -163,7 +150,7 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     const flight = createFlight(from)
     const rest = restFrame()
-    flight.to(rest, KICK.open, tuning())
+    flight.to(rest, KICK.open, OPEN_SPRING)
     course = { at: place(fitted()), flight, landed: () => setStage("rest") }
     hideOrigin()
     paint()
@@ -176,7 +163,7 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     if (stage() === "pending") return
     const to = prefersReducedMotion() ? undefined : originFrame()
-    dimTo(0, to ? tuning() : fade)
+    dimTo(0, to ? OPEN_SPRING : fade)
 
     if (!to) {
       plain = true
@@ -190,10 +177,10 @@ export function ImagePreview(props: ImagePreviewProps) {
       course = { at: place(fitted()), flight: createFlight(rest), landed: showOrigin }
     }
 
-    course.flight.to(to, KICK.close, tuning())
+    course.flight.to(to, KICK.close, OPEN_SPRING)
     course.landed = () => {
       showOrigin()
-      veil.omega = (2 * Math.PI) / (tuning().duration * 0.75)
+      veil.omega = (2 * Math.PI) / (OPEN_SPRING.duration * 0.75)
       veil.set(0)
     }
 
@@ -520,91 +507,6 @@ export function ImagePreview(props: ImagePreviewProps) {
     </div>
   )
 }
-
-// Dialogs of the mounted surfaces that can show a preview; the Motion workspace's buttons use the newest.
-const replayers: ReturnType<typeof useDialog>[] = []
-
-let removeReplay: (() => void) | undefined
-
-/**
- * Adds buttons to the Motion workspace's Image open section while any caller is mounted: they open the newest image in
- * view, or a sample thumbnail when there is none, and close the preview, also mid-flight.
- */
-export function replayImagePreview() {
-  const dialog = useDialog()
-  replayers.push(dialog)
-  removeReplay ??= addReplayActions()
-
-  onCleanup(() => {
-    replayers.splice(replayers.indexOf(dialog), 1)
-
-    if (replayers.length > 0) return
-    removeReplay?.()
-    removeReplay = undefined
-  })
-}
-
-function addReplayActions() {
-  const open = () => {
-    const image = [
-      ...document.querySelectorAll<HTMLElement>(
-        '[data-slot="user-message-attachment"][data-type="image"], img[aria-haspopup="dialog"]',
-      ),
-    ]
-      .filter((element) => {
-        const rect = element.getBoundingClientRect()
-
-        return rect.width > 0 && rect.bottom > 0 && rect.top < window.innerHeight
-      })
-      .at(-1)
-
-    if (image) return image.click()
-    const sample = document.createElement("img")
-    sample.src = SAMPLE
-    sample.alt = "Sample image"
-    sample.style.cssText =
-      "position: fixed; left: 24px; bottom: 24px; z-index: 40; width: 160px; height: 100px; object-fit: cover; border-radius: 8px;"
-    document.body.append(sample)
-    replayers.at(-1)?.show(
-      () => <ImagePreview src={SAMPLE} alt={sample.alt} origin={sample} />,
-      () => setTimeout(() => sample.remove(), exitDuration() + 100),
-    )
-  }
-
-  const close = () => {
-    if (document.querySelector('[data-component="image-preview"]')) replayers.at(-1)?.close()
-  }
-
-  const removals = [
-    motionTuning.action({ id: "imagePreview.open", label: "Open", group, run: open }),
-    motionTuning.action({ id: "imagePreview.close", label: "Close", group, run: close }),
-    motionTuning.action({
-      id: "imagePreview.reverse",
-      label: "Open, close mid-flight",
-      group,
-      run: () => {
-        open()
-        const start = performance.now()
-
-        // The flight starts once the image has decoded; close a little way into it.
-        const wait = () => {
-          if (document.querySelector('[data-component="image-preview"][data-stage="flying"]'))
-            return void setTimeout(close, tuning().duration * 350)
-
-          if (performance.now() - start < 2000) requestAnimationFrame(wait)
-        }
-
-        requestAnimationFrame(wait)
-      },
-    }),
-  ]
-
-  return () => removals.forEach((remove) => remove())
-}
-
-const SAMPLE = `data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><defs><linearGradient id="sky" x2="0" y2="1"><stop offset="0" stop-color="#ff8a5b"/><stop offset="1" stop-color="#ffd27a"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#sky)"/><circle cx="1120" cy="360" r="170" fill="#fff4d6"/><path d="M0 1000V720Q400 580 800 720T1600 700V1000Z" fill="#2f7d48"/></svg>',
-)}`
 
 // The part of `origin` the page under `preview` shows: inside its clipping ancestors and the window, and clear of
 // anything drawn over its top or bottom, such as a sticky title bar. Nothing when none of it shows.

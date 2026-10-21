@@ -1,4 +1,4 @@
-import { Show } from "solid-js"
+import { createEffect, onCleanup, Show } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -92,17 +92,45 @@ function useCollapsedSlot() {
 
 const slotClass = "flex shrink-0 justify-end overflow-hidden"
 
+// How far closed the left sidebar is, from 0 to 1. The shell paints it on every frame of the sidebar's motion; the
+// collapsed toggle and the space headers keep for it grow with it, so header contents travel with the sidebar's edge.
+const collapsed = { closed: 0, slots: new Set<() => void>() }
+
+export function paintCollapsedSlots(closed: number) {
+  collapsed.closed = closed
+  collapsed.slots.forEach((paint) => paint())
+}
+
+/** A ref for a slot that is `width` wide while the sidebar is closed. */
+function slotRef(width: () => number) {
+  let slot: HTMLElement | undefined
+
+  const paint = () => {
+    if (slot) slot.style.width = `${width() * collapsed.closed}px`
+  }
+
+  collapsed.slots.add(paint)
+  onCleanup(() => collapsed.slots.delete(paint))
+  createEffect(paint)
+
+  return (element: HTMLElement) => {
+    slot = element
+    paint()
+  }
+}
+
 // Floats over the top of every screen, centered on the session header's 48px row. Appears at the content's start edge
 // when the sidebar closes.
 export function CollapsedSidebarToggle() {
   const slot = useCollapsedSlot()
+  const ref = slotRef(slot.width)
 
   return (
     <Show when={slot.visible()}>
       <div
+        ref={ref}
         data-slot="collapsed-sidebar-toggle"
         class={`absolute top-[calc(var(--shell-top-inset,8px)+10px)] start-[calc(var(--shell-inline-inset,8px)+10px)] z-40 ${slotClass}`}
-        style={{ width: slot.open() ? "0px" : `${slot.width()}px` }}
         inert={slot.open()}
       >
         <div class="flex shrink-0 pe-1">
@@ -117,14 +145,11 @@ export function CollapsedSidebarToggle() {
 // the space begins, in pixels from the content area's start edge, so every header's contents line up after the toggle.
 export function CollapsedSidebarToggleSpace(props: { start?: number; class?: string }) {
   const slot = useCollapsedSlot()
+  const ref = slotRef(() => slot.width() + contentStart - (props.start ?? contentStart))
 
   return (
     <Show when={slot.visible()}>
-      <div
-        aria-hidden="true"
-        class={`${slotClass} ${props.class ?? ""}`}
-        style={{ width: slot.open() ? "0px" : `${slot.width() + contentStart - (props.start ?? contentStart)}px` }}
-      />
+      <div ref={ref} aria-hidden="true" class={`${slotClass} ${props.class ?? ""}`} />
     </Show>
   )
 }

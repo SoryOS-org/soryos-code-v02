@@ -1314,14 +1314,13 @@ for (const direction of ["ltr", "rtl"] as const) {
     await expect.poll(() => toggle.boundingBox()).toEqual(closed)
     await expect(panel).toBeHidden()
 
-    // Opened, the panel fills the rest of the row beside the chat; closed, it is gone at once.
+    // The chat's width springs; once the panel settles open, it fills the rest of the row beside the chat.
     for (const opened of [true, false]) {
       await toggle.click()
       await expect(toggle).toHaveAttribute("aria-expanded", String(opened))
+      await expect(panel).toHaveAttribute("aria-hidden", String(!opened))
 
-      if (!opened) continue
-      await expect(panel).toHaveAttribute("aria-hidden", "false")
-      await expect(() => expectHeaderClearOfToggle(page, toggle)).toPass()
+      if (opened) await expect(() => expectHeaderClearOfToggle(page, toggle)).toPass()
     }
 
     await expect(panel).toBeHidden()

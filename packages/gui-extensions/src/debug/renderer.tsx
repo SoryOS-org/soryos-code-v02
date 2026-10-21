@@ -8,23 +8,13 @@ const setup: Setup<typeof Debug> = (ctx) => {
   // builds, prod included, drop the import and never contain knobs.
   const motionTools = import.meta.env.DEV || import.meta.env.VITE_OPENCODE_CHANNEL === "beta"
   const Motion = motionTools ? lazy(() => import("./motion")) : undefined
-  const TypePanel = motionTools ? lazy(() => import("./type-panel")) : undefined
-
-  if (motionTools) void import("./type").then((type) => type.applyStored())
   const bar = ctx.stores.bar
   const visible = () => bar.value.visible
   const motion = () => bar.value.motion
-  const typing = () => bar.value.type
 
   const toggle = () => {
     bar.update((draft) => {
       draft.visible = !draft.visible
-    })
-  }
-
-  const toggleType = () => {
-    bar.update((draft) => {
-      draft.type = !draft.type
     })
   }
 
@@ -55,7 +45,6 @@ const setup: Setup<typeof Debug> = (ctx) => {
               diagnostics={import.meta.env.DEV}
               onClose={toggle}
               motion={Motion ? { open: motion(), toggle: toggleMotion } : undefined}
-              type={TypePanel ? { open: typing(), toggle: toggleType } : undefined}
               inline
             />
           </Suspense>
@@ -65,13 +54,6 @@ const setup: Setup<typeof Debug> = (ctx) => {
           <Show when={visible() && motion()}>
             <Suspense>
               <Motion title={ctx.t("motion.title")} />
-            </Suspense>
-          </Show>
-        )}
-        {TypePanel && (
-          <Show when={visible() && typing()}>
-            <Suspense>
-              <TypePanel title={ctx.t("type.title")} />
             </Suspense>
           </Show>
         )}

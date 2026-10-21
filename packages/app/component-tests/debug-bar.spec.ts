@@ -23,7 +23,7 @@ story("the debug bar stays open across a remount until its close button hides it
 
     const first = mountExtensions({
       definitions: [definition],
-      stored: { "extension.debug.bar": { visible: true, motion: false, type: false } },
+      stored: { "extension.debug.bar": { visible: true, motion: false } },
     })
 
     first.release()
@@ -49,5 +49,5 @@ story("the debug bar stays open across a remount until its close button hides it
     return { opened, saved: saved["extension.debug.bar"], reopened }
   }, modules)
 
-  expect(result).toEqual({ opened: true, saved: { visible: false, motion: false, type: false }, reopened: false })
+  expect(result).toEqual({ opened: true, saved: { visible: false, motion: false }, reopened: false })
 })
