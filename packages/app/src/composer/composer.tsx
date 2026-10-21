@@ -41,10 +41,8 @@ export function Composer(props: {
     return language.t("dialog.model.select.title")
   }
 
-  // The model control's `cqw` cap measures the composer, not the panel around it, so a panel animating its width
-  // re-evaluates no container query here.
   return (
-    <div class="@container flex flex-col gap-3">
+    <div class="flex flex-col gap-3">
       <ComposerEditor
         controller={props.model}
         borderUnderlay={props.borderUnderlay}

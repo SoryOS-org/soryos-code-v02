@@ -26,7 +26,8 @@ for (const reducedMotion of [false, true]) {
 
       if (opened) await expect(presence).toHaveCSS("transform", "none")
 
-      if (!opened) await expect(presence).toHaveCount(0)
+      // A settled close keeps the side region mounted and skips its contents.
+      if (!opened) await expect(presence).toHaveCSS("content-visibility", "hidden")
       await expect(thumb).toHaveCSS("visibility", "hidden")
       // Late scroll anchoring must not bring the thumb back after the panel has settled.
       await viewport.evaluate(
