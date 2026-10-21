@@ -346,21 +346,22 @@ it.effect("falls back to the primary model when the small model fails", () =>
   }),
 )
 
-const primaryRef = Model.Ref.make({
-  providerID: Provider.ID.make("test"),
-  id: Model.ID.make("title-model"),
-  variant: Model.VariantID.make("high"),
-})
+const primaryRef = (variant?: string) =>
+  Model.Ref.make({
+    providerID: Provider.ID.make("test"),
+    id: Model.ID.make("title-model"),
+    ...(variant ? { variant: Model.VariantID.make(variant) } : {}),
+  })
 const primaryInfo = (variants: string[]) =>
   Model.Info.make({
     ...Model.Info.default(Provider.ID.make("test"), Model.ID.make("title-model")),
     variants: variants.map((id) => ({ id: Model.VariantID.make(id) })),
   })
 
-const titleAttempts = (sessionID: Session.ID, text: string) =>
+const titleAttempts = (sessionID: Session.ID, text: string, variant?: string) =>
   Effect.gen(function* () {
     yield* enableTitleAgent
-    yield* insertSession(sessionID, undefined, undefined, primaryRef)
+    yield* insertSession(sessionID, undefined, undefined, primaryRef(variant))
     yield* prompt(sessionID, text)
     const attempted: Model.Ref[] = []
     const hooks = yield* PluginHooks.Service
@@ -377,8 +378,12 @@ const titleAttempts = (sessionID: Session.ID, text: string) =>
 
 it.effect("uses the primary model at its lowest variant without a small model", () =>
   Effect.gen(function* () {
-    selectedPrimary = primaryInfo(["high", "low", "none"])
-    const result = yield* titleAttempts(Session.ID.make("ses_title_primary_lowest"), "Title with the lowest variant")
+    selectedPrimary = primaryInfo(["none", "low", "high"])
+    const result = yield* titleAttempts(
+      Session.ID.make("ses_title_primary_lowest"),
+      "Title with the lowest variant",
+      "high",
+    )
     expect(result.attempted).toEqual(["none"])
     expect(result.title).toBe("Generated Title")
   }),
@@ -388,8 +393,12 @@ it.effect("falls back to the selected primary variant when the lowest variant fa
   Effect.gen(function* () {
     titleStream = () =>
       requests.length === 1 ? Stream.make(LLMEvent.providerError({ message: "Variant rejected" })) : successfulTitle()
-    selectedPrimary = primaryInfo(["high", "low"])
-    const result = yield* titleAttempts(Session.ID.make("ses_title_primary_fallback"), "Fall back to the selection")
+    selectedPrimary = primaryInfo(["low", "high"])
+    const result = yield* titleAttempts(
+      Session.ID.make("ses_title_primary_fallback"),
+      "Fall back to the selection",
+      "high",
+    )
     expect(result.attempted).toEqual(["low", "high"])
     expect(result.title).toBe("Generated Title")
   }),
@@ -398,8 +407,30 @@ it.effect("falls back to the selected primary variant when the lowest variant fa
 it.effect("uses the selected primary variant when no lower variant exists", () =>
   Effect.gen(function* () {
     selectedPrimary = primaryInfo(["high", "max"])
-    const result = yield* titleAttempts(Session.ID.make("ses_title_primary_selected"), "No lower variant here")
+    const result = yield* titleAttempts(Session.ID.make("ses_title_primary_selected"), "No lower variant here", "high")
     expect(result.attempted).toEqual(["high"])
+    expect(result.title).toBe("Generated Title")
+  }),
+)
+
+it.effect("keeps the primary default variant instead of a low variant that may enable reasoning", () =>
+  Effect.gen(function* () {
+    selectedPrimary = primaryInfo(["low", "high"])
+    const result = yield* titleAttempts(
+      Session.ID.make("ses_title_primary_default"),
+      "Default may not reason",
+      undefined,
+    )
+    expect(result.attempted).toEqual(["default"])
+    expect(result.title).toBe("Generated Title")
+  }),
+)
+
+it.effect("uses the primary none variant from its default variant", () =>
+  Effect.gen(function* () {
+    selectedPrimary = primaryInfo(["none", "low", "high"])
+    const result = yield* titleAttempts(Session.ID.make("ses_title_primary_none"), "Disable reasoning", undefined)
+    expect(result.attempted).toEqual(["none"])
     expect(result.title).toBe("Generated Title")
   }),
 )
