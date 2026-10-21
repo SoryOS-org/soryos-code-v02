@@ -21,6 +21,7 @@ import { Button } from "@opencode/ui/button"
 import { Badge } from "@opencode/ui/badge"
 import { Dialog, DialogBody, DialogTitle } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -45,6 +46,7 @@ import {
 import { consoleProviderName } from "@/providers/catalog/console"
 import "@/settings/settings.css"
 import "@/shell/commands/dialog.css"
+import "@/shell/palette-menu.css"
 import "./select-dialog.css"
 
 const MobilePanelDrawer = lazy(async () => {
@@ -638,7 +640,6 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
   const [staged, setStaged] = createStore<Record<string, string | null>>({})
 
   let container: HTMLElement | undefined
-  let input: HTMLInputElement | undefined
   let flyoutRef: HTMLDivElement | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(timer))
@@ -849,16 +850,16 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         <Show when={row.item.latest}>
           <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
         </Show>
-        <Show when={variantsOf(row.item).length > 0 && variant(row.item)}>
-          {(name) => (
-            <span
-              data-slot="model-dialog-variant"
-              class="w-[72px] shrink-0 truncate text-end capitalize"
-              classList={{ invisible: !selected() && !active() }}
-            >
-              {name()}
-            </span>
-          )}
+        {/* The slot keeps its width while hidden, so hovering a row never shifts it. The selected row shows only an explicit variant. */}
+        <Show when={variantsOf(row.item).length > 0}>
+          <span
+            data-slot="model-dialog-variant"
+            data-default={variant(row.item) ? undefined : ""}
+            class="w-[72px] shrink-0 truncate text-end capitalize"
+            classList={{ invisible: !active() && !(selected() && variant(row.item)) }}
+          >
+            {variant(row.item) ?? language.t("common.default")}
+          </span>
         </Show>
         <span class="flex size-4 shrink-0 items-center justify-center">
           <Show when={selected()}>
@@ -875,59 +876,58 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         <DialogTitle>{language.t("dialog.model.select.title")}</DialogTitle>
       </div>
       <DialogBody class="command-palette-body">
-        <div data-slot="model-dialog-search">
-          <div data-slot="model-dialog-search-box" onClick={() => input?.focus()}>
-            <Icon name="magnifying-glass" size="small" class="shrink-0" />
-            <input
-              ref={(element) => (input = element)}
-              type="search"
-              value={store.search}
-              autofocus
-              placeholder={language.t("dialog.model.search.placeholder")}
-              aria-label={language.t("dialog.model.search.placeholder")}
-              spellcheck={false}
-              autocorrect="off"
-              autocomplete="off"
-              autocapitalize="off"
-              onInput={(event) => setSearch(event.currentTarget.value)}
-              onKeyDown={onKeyDown}
-            />
-            <Show when={store.search.trim()}>
-              <button
-                type="button"
-                class="-me-1 flex size-5 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-faint transition-colors hover:text-v2-icon-icon-base [&>*]:block"
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => setSearch("")}
-                aria-label={language.t("common.clear")}
-              >
-                <Icon name="circle-xmark" />
-              </button>
-            </Show>
-            <div class="flex shrink-0 items-center gap-0">
-              <Tooltip placement="top" gutter={4} value={language.t("command.provider.connect")} ignoreSafeArea={false}>
-                <button
-                  type="button"
-                  class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                  aria-label={language.t("command.provider.connect")}
-                  onPointerDown={(event) => event.preventDefault()}
-                  onClick={connect}
+        <div class="palette-menu-search">
+          <TextInput
+            type="search"
+            appearance="large"
+            value={store.search}
+            autofocus
+            placeholder={language.t("dialog.model.search.placeholder")}
+            aria-label={language.t("dialog.model.search.placeholder")}
+            spellcheck={false}
+            autocorrect="off"
+            autocomplete="off"
+            autocapitalize="off"
+            leadingIcon={<Icon name="magnifying-glass" />}
+            onInput={(event) => setSearch(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+            trailing={
+              <>
+                <Show when={store.search.trim()}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="circle-xmark" />}
+                    aria-label={language.t("common.clear")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={() => setSearch("")}
+                  />
+                </Show>
+                <Tooltip
+                  placement="top"
+                  gutter={4}
+                  value={language.t("command.provider.connect")}
+                  ignoreSafeArea={false}
                 >
-                  <Icon name="plus" size="small" />
-                </button>
-              </Tooltip>
-              <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
-                <button
-                  type="button"
-                  class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                  aria-label={language.t("dialog.model.manage")}
-                  onPointerDown={(event) => event.preventDefault()}
-                  onClick={manage}
-                >
-                  <Icon name="outline-sliders" size="small" />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="plus" />}
+                    aria-label={language.t("command.provider.connect")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={connect}
+                  />
+                </Tooltip>
+                <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="outline-sliders" />}
+                    aria-label={language.t("dialog.model.manage")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={manage}
+                  />
+                </Tooltip>
+              </>
+            }
+          />
         </div>
         <ScrollView
           class="command-palette-scroll"

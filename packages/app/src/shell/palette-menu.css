@@ -6,6 +6,7 @@
 .palette-menu-search [data-component="text-input-v2"] {
   width: 100%;
   height: 36px;
+  padding-inline-end: 12px;
   border-radius: 6px;
   outline: 0;
   background: color-mix(in srgb, var(--v2-background-bg-layer-02) 60%, transparent);
