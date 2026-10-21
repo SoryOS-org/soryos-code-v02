@@ -243,8 +243,6 @@
     justify-content: flex-end;
     gap: 10px;
     width: 100%;
-    transition: opacity 0.15s ease;
-    will-change: opacity;
 
     @media (hover: hover) {
       opacity: 0;
@@ -327,7 +325,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: opacity 0.15s ease;
 
     @media (hover: hover) {
       opacity: 0;
@@ -366,8 +363,6 @@
     align-items: center;
     justify-content: flex-start;
     gap: 10px;
-    transition: opacity 0.15s ease;
-    will-change: opacity;
 
     @media (hover: hover) {
       opacity: 0;
