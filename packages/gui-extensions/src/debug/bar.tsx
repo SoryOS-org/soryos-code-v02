@@ -13,6 +13,7 @@ import {
   type ProviderMetricState,
 } from "./metrics"
 import { motionGlobals, motionTuning } from "@opencode/ui/motion-tuning"
+import { SessionTurn } from "@opencode/util/session-turn"
 
 type Mem = Performance & {
   memory?: {
@@ -241,13 +242,25 @@ export default function DebugBar(props: {
     { equals: (a, b) => a?.data === b?.data && a?.id === b?.id },
   )
 
-  // History comes from the already-loaded message projection; live requests refine it in place.
-  const projected = createMemo(() => {
+  const messages = createMemo(() => {
     const current = target()
 
-    if (!current) return
+    if (!current) return []
 
-    return projectedProviderMetrics(current.data.session.message.list(current.id))
+    return current.data.session.message.list(current.id)
+  })
+
+  // History comes from the already-loaded message projection; live requests refine it in place.
+  const projected = createMemo(() => projectedProviderMetrics(messages()))
+
+  // The TUI footer's number for the latest turn, through its last step that finished streaming.
+  const tps = createMemo(() => {
+    const list = messages()
+    const index = list.findLastIndex((item) => item.type === "assistant" && item.time.streamed !== undefined)
+
+    if (index === -1) return
+
+    return SessionTurn.tokensPerSecond(list, list[index], { index })
   })
 
   // Missed events during an outage are never replayed, so live metrics hold only for the target and the outage count
@@ -629,8 +642,8 @@ export default function DebugBar(props: {
         <Cell
           label={ctx.t("tps.label")}
           tip={ctx.t("tps.tip")}
-          value={fixed(metrics()?.tps, 1) ?? na()}
-          dim={metrics()?.tps === undefined}
+          value={fixed(tps(), 1) ?? na()}
+          dim={tps() === undefined}
           inline={props.inline}
         />
         <Cell

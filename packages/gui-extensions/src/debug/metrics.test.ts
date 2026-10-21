@@ -59,7 +59,6 @@ test("calculates provider response metrics from durable events", () => {
   const state: ProviderMetricState = {}
   events.forEach((event) => applyProviderMetricEvent(state, event))
   expect(state.latest).toEqual({
-    tps: 50,
     ttft: 300,
     ttfa: 800,
     e2e: 2_800,
@@ -85,6 +84,7 @@ test("derives a baseline from the latest completed projected request", () => {
     assistant,
     { ...assistant, id: "msg_running", tokens: undefined, time: { created: 5_000 } },
   ]
-  // Reasoning ended at 1_700, so TPS spans 1_700 → 3_800 = 100 / 2.1s.
-  expect(projectedProviderMetrics(messages)).toEqual({ tps: 100 / 2.1, ttft: 300, ttfa: 700, e2e: 2_800 })
+
+  // Reasoning ended at 1_700, which approximates the answer start.
+  expect(projectedProviderMetrics(messages)).toEqual({ ttft: 300, ttfa: 700, e2e: 2_800 })
 })
