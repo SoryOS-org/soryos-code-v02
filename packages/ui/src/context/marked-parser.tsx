@@ -15,6 +15,7 @@ const markdownCode: MarkedExtension = {
   renderer: {
     code(token) {
       const language = (token.lang?.match(/^\S*/)?.[0] ?? "").toLowerCase().replace(/[^\w#+.-]/g, "") || "text"
+
       const html = decoder.decode(
         codeToHtml(token.text, { lang: isSupportedLanguage(language) ? language : "text", theme: OpenCodeTheme }),
       )
