@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "bun:test"
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test"
 import { mountGoUpsellHero } from "./go-upsell-hero-art"
 
 const original = {
@@ -8,16 +8,36 @@ const original = {
 }
 
 let frames: Map<number, FrameRequestCallback>
-let cancelled: number[]
-let mediaListeners: Set<unknown>
+
+let mediaListeners: number
+
+class Query extends EventTarget {
+  onchange = null
+
+  constructor(
+    readonly matches: boolean,
+    readonly media: string,
+  ) {
+    super()
+  }
+
+  addListener() {}
+
+  removeListener() {}
+
+  override addEventListener(...args: Parameters<EventTarget["addEventListener"]>) {
+    mediaListeners++
+    super.addEventListener(...args)
+  }
+
+  override removeEventListener(...args: Parameters<EventTarget["removeEventListener"]>) {
+    mediaListeners--
+    super.removeEventListener(...args)
+  }
+}
 
 function prefersReducedMotion(matches: boolean) {
-  window.matchMedia = ((query: string) => ({
-    matches,
-    media: query,
-    addEventListener: (_: string, listener: unknown) => mediaListeners.add(listener),
-    removeEventListener: (_: string, listener: unknown) => mediaListeners.delete(listener),
-  })) as unknown as typeof window.matchMedia
+  window.matchMedia = (query) => new Query(matches, query)
 }
 
 function hero() {
@@ -26,23 +46,24 @@ function hero() {
   const count = { frames: 0, cells: 0 }
   ctx.clearRect = () => count.frames++
   ctx.fillRect = () => count.cells++
-  canvas.getContext = (() => ctx) as unknown as typeof canvas.getContext
+  spyOn(canvas, "getContext").mockReturnValue(ctx)
   Object.defineProperties(canvas, { clientWidth: { value: 480 }, clientHeight: { value: 176 } })
   document.body.append(canvas)
+
   return { canvas, count }
 }
 
 beforeEach(() => {
   frames = new Map()
-  cancelled = []
-  mediaListeners = new Set()
+  mediaListeners = 0
   let id = 0
   globalThis.requestAnimationFrame = (callback) => {
     frames.set(++id, callback)
+
     return id
   }
+
   globalThis.cancelAnimationFrame = (handle) => {
-    cancelled.push(handle)
     frames.delete(handle)
   }
 })
@@ -74,7 +95,7 @@ test("stops the loop and its listeners when unmounted", () => {
 
   const dispose = mountGoUpsellHero(canvas)
   expect(frames.size).toBe(1)
-  expect(mediaListeners.size).toBe(1)
+  expect(mediaListeners).toBe(1)
 
   const [id, tick] = [...frames][0]!
   frames.delete(id)
@@ -84,7 +105,7 @@ test("stops the loop and its listeners when unmounted", () => {
 
   dispose()
   expect(frames.size).toBe(0)
-  expect(mediaListeners.size).toBe(0)
+  expect(mediaListeners).toBe(0)
 
   document.dispatchEvent(new Event("visibilitychange"))
   expect(frames.size).toBe(0)

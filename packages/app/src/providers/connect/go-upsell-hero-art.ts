@@ -16,21 +16,30 @@ export type HeroPalette = {
 }
 
 const PITCH = 8
+
 // How much light the letters' counters (shadow cells, holes, the gap) take, as a fraction of the strokes'.
 const COUNTER = 0.15
 
 // The OpenCode pixel letters (packages/tui/src/logo.ts `go`): 4×5 units per letter, s = shadow.
 const GO = ["GGGG.OOOO", "G....O..O", "GsGG.OssO", "GssG.OssO", "GGGG.OOOO"]
+
 const LOGO_COLS = 18
+
 const LOGO_ROWS = 10
 
 type Kind = 0 | 1 | 2 // G, O, shadow
+
 type LogoCell = { col: number; row: number; kind: Kind }
 
 const LOGO: LogoCell[] = GO.flatMap((line, uy) =>
   Array.from(line).flatMap((ch, ux) => {
     if (ch === ".") return []
-    const kind: Kind = ch === "G" ? 0 : ch === "O" ? 1 : 2
+    let kind: Kind = 2
+
+    if (ch === "G") kind = 0
+
+    if (ch === "O") kind = 1
+
     return [0, 1, 2, 3].map((i) => ({ col: ux * 2 + (i % 2), row: uy * 2 + (i >> 1), kind }))
   }),
 )
@@ -39,27 +48,37 @@ const rng = (seed: number) => () => {
   seed = (seed + 0x6d2b79f5) | 0
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
 // ── math ──────────────────────────────────────────────────────────────────────
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
 const smoothstep = (a: number, b: number, v: number) => {
   const t = clamp01((v - a) / (b - a))
+
   return t * t * (3 - 2 * t)
 }
+
 /** Instant attack, convex decay: a flash that cools. */
 const flash = (age: number, tau: number) => (age < 0 ? 0 : Math.exp(-age / tau))
+
 /** sin² window: rings fade in and out instead of popping. */
 const envelope = (phase: number) => {
   const s = Math.sin(clamp01(phase) * Math.PI)
+
   return s * s * (3 - 2 * s)
 }
+
 const mixRGB = (a: RGB, b: RGB, t: number): RGB => {
   const k = clamp01(t)
+
   return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
 }
+
 const rgba = (c: RGB, a: number) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${clamp01(a).toFixed(3)})`
 
 // ── timeline (art ms) ─────────────────────────────────────────────────────────
@@ -67,16 +86,25 @@ const rgba = (c: RGB, a: number) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${
 // 560 the brake ring leaves GO, slows with the warp, then drifts at the loop's speed
 // 1400–2300 streaks cool and the grid returns · then Ripple: three rings per 4.6 s, a shimmer through GO
 const ATTACK_START = 340
+
 const ATTACK_END = 520
+
 const BRAKE = 900
+
 const BRAKE_TAU = 260
+
 const PERIOD = 4600
+
 const SPACING = PERIOD / 3
+
 const BRAKE_RING_START = 560
+
 /** The share of the field the brake ring covers on the warp's momentum, before it drifts like a loop ring. */
 const BRAKE_RING_KICK = 0.45
+
 /** When the brake ring would have launched had it drifted at the loop's speed all along. */
 const RING_ORIGIN = BRAKE_RING_START - PERIOD * BRAKE_RING_KICK
+
 /** Loop rings keep the brake ring's cadence: the first slot after it is skipped because GO is still landing. */
 const LOOP_START = RING_ORIGIN + SPACING * 2
 
@@ -87,26 +115,36 @@ export const STILL_TIME = LOOP_START + PERIOD * 0.42
 function warpDistance(t: number) {
   if (t <= ATTACK_START) return 0
   const span = ATTACK_END - ATTACK_START
+
   const attack = (x: number) => {
     const u = clamp01((x - ATTACK_START) / span)
+
     return span * (u * u * u - 0.5 * u * u * u * u)
   }
+
   if (t <= ATTACK_END) return attack(t)
+
   if (t <= BRAKE) return attack(ATTACK_END) + (t - ATTACK_END)
+
   return attack(ATTACK_END) + (BRAKE - ATTACK_END) + BRAKE_TAU * (1 - Math.exp(-(t - BRAKE) / BRAKE_TAU))
 }
+
 const WARP_TOTAL = warpDistance(Infinity)
 
 function warpVelocity(t: number) {
   if (t <= ATTACK_START) return 0
+
   if (t <= ATTACK_END) return smoothstep(ATTACK_START, ATTACK_END, t)
+
   if (t <= BRAKE) return 1
+
   return Math.exp(-(t - BRAKE) / BRAKE_TAU)
 }
 
 /** GO's arrival scale: from far away with a small push past rest, never from zero. */
 function arrivalScale(t: number) {
   const p = clamp01((t - ATTACK_START) / 660)
+
   return lerp(0.55, 1, 1 - (1 - p) ** 3) + Math.sin(p * Math.PI) * 0.06 * (1 - p)
 }
 
@@ -116,11 +154,13 @@ function arrivalScale(t: number) {
  */
 function brakeRingPhase(t: number) {
   const warp = (warpDistance(t) - warpDistance(BRAKE_RING_START)) / (WARP_TOTAL - warpDistance(BRAKE_RING_START))
+
   return (t - BRAKE_RING_START) / PERIOD + BRAKE_RING_KICK * warp
 }
 
 const STARS = (() => {
   const random = rng(23)
+
   return Array.from({ length: 120 }, () => ({
     angle: random() * Math.PI * 2,
     r0: random(),
@@ -147,6 +187,7 @@ function geometry(w: number, h: number, dpr: number) {
   const reach = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy))
   const dist = new Float32Array(cols * rows)
   const falloff = new Float32Array(cols * rows)
+
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
       const x = ox + c * P + P / 2
@@ -157,7 +198,9 @@ function geometry(w: number, h: number, dpr: number) {
       const edge = clamp01(Math.min(Math.min(x, w - x) / 48, Math.min(y, h - y) / 32))
       falloff[r * cols + c] = (1 - smoothstep(reach * 0.45, reach * 1.05, d)) * edge
     }
+
   const field = new Float32Array(cols * rows)
+
   return { w, h, dpr, P, cols, rows, ox, oy, lc, lr, cx, cy, reach, dist, falloff, field }
 }
 
@@ -176,30 +219,39 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
   const breath = (0.5 + 0.5 * Math.sin(t * 0.0008)) * 0.05 * smoothstep(1800, 2600, t)
 
   const rings: { head: number; amp: number }[] = []
+
   if (t > BRAKE_RING_START) {
     const phase = brakeRingPhase(t)
     // Strong on the brake, calming to a loop ring's strength, then fading out like one.
     const amp = lerp(1, 0.55, smoothstep(BRAKE, 1700, t)) * smoothstep(BRAKE_RING_START, BRAKE_RING_START + 120, t)
+
     if (phase < 1) rings.push({ head: phase * R, amp: amp * (phase < 0.5 ? 1 : envelope(phase)) })
   }
+
   if (t > LOOP_START) {
     const newest = Math.floor((t - RING_ORIGIN) / SPACING)
+
     for (let n = Math.max(2, newest - 3); n <= newest; n++) {
       const phase = (t - RING_ORIGIN - n * SPACING) / PERIOD
+
       if (phase >= 0 && phase < 1) rings.push({ head: phase * R, amp: envelope(phase) * 0.55 })
     }
   }
+
   const crest = P * 2.6
   const tail = P * 8
+
   for (let i = 0; i < field.length; i++) {
     const d = g.dist[i]!
     let level = gather * Math.exp(-d / (P * 4)) * 0.9
+
     for (const ring of rings) {
       const delta = d - ring.head
       const c = Math.abs(delta) < crest ? 0.5 + 0.5 * Math.cos((delta / crest) * Math.PI) : 0
       const tl = delta < 0 && delta > -tail ? (1 + delta / tail) ** 2.3 : 0
       level += (c * 0.62 + tl * 0.16) * ring.amp * g.falloff[i]!
     }
+
     field[i] = level + breath * g.falloff[i]!
   }
 
@@ -209,6 +261,7 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
   const arrive = smoothstep(ATTACK_START, ATTACK_END, t)
   const landing = flash(t - 720, 260)
   const bloom = arrive * (0.4 + landing * 0.6 + gather * 0.8) + gather * 0.6 + breath * 2
+
   if (bloom > 0.01) {
     const rad = LOGO_COLS * P * 0.9 * dpr
     const grad = ctx.createRadialGradient(g.cx * dpr, g.cy * dpr, 0, g.cx * dpr, g.cy * dpr, rad)
@@ -227,11 +280,13 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
 
   // Warp streaks emerge from behind GO and fade before the hero's sides.
   const cool = 1 - smoothstep(1400, 2300, t)
+
   if (cool > 0 && t > ATTACK_START) {
     const hw = (LOGO_COLS / 2 + 1) * P
     const hh = (LOGO_ROWS / 2 + 1) * P
     const color = mixRGB(pal.accent, pal.peak, v * 0.5)
     ctx.lineCap = "round"
+
     for (const s of STARS) {
       const dx = Math.cos(s.angle)
       const dy = Math.sin(s.angle) * 0.8
@@ -243,6 +298,7 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
       const y1 = g.cy + dy * r
       const edgeFade = clamp01(Math.min(x1, g.w - x1) / 64) * clamp01(Math.min(y1, g.h - y1) / 36)
       const alpha = smoothstep(0, P * 3, travel) * cool * (0.3 + 0.5 * v) * edgeFade
+
       if (alpha < 0.01) continue
       const r0 = Math.max(edge, r - len)
       ctx.strokeStyle = rgba(color, alpha)
@@ -257,8 +313,10 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
   // The grid: resting dots grow into lit cells as energy reaches them.
   const dot = Math.max(1.5, P * 0.19)
   const full = P * 0.74
+
   for (let r = 0; r < g.rows; r++) {
     const y = g.oy + r * P + P / 2
+
     for (let c = 0; c < g.cols; c++) {
       const i = r * g.cols + c
       const fall = g.falloff[i]!
@@ -266,6 +324,7 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
       const inLogo = c >= g.lc && c < g.lc + LOGO_COLS && r >= g.lr && r < g.lr + LOGO_ROWS
       const e = Math.min(1, field[i]!) * (inLogo ? COUNTER : 1)
       const base = pal.dotAlpha * fall * dim
+
       if (base < 0.004 && e < 0.01) continue
       const x = g.ox + c * P + P / 2
       const s = lerp(dot, full, e ** 1.3) * dpr
@@ -277,32 +336,40 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
   // GO, drawn last so nothing passes over it. The Ripple shimmer crosses it as each ring leaves the centre.
   const maxD = Math.hypot(LOGO_COLS / 2, LOGO_ROWS / 2)
   const shimmer = smoothstep(LOOP_START - 400, LOOP_START + 500, t)
+
   const heads = [0, 0.5].map((off) => {
     const ph = ((((t - RING_ORIGIN) / PERIOD + off + 0.71) % 1) + 1) % 1
+
     return { head: ph * (maxD + 6), amp: envelope(ph) * shimmer }
   })
+
   const scale = arrivalScale(t)
   const gap = Math.max(1, Math.round(P * 0.14 * dpr)) / dpr
+
   for (const cell of LOGO) {
     const d = Math.hypot(cell.col + 0.5 - LOGO_COLS / 2, cell.row + 0.5 - LOGO_ROWS / 2)
     let peak = landing * 0.8
     let glow = (1 - smoothstep(ATTACK_END, 1100, t)) * 0.7 * arrive + landing * 0.3
+
     for (const h of heads) {
       const delta = d - h.head
       peak += Math.exp(-(Math.abs(delta / 1.3) ** 1.8)) * 0.5 * h.amp
       glow += (delta < 0 && delta > -6 ? (1 + delta / 6) ** 2.6 : 0) * 0.3 * h.amp
     }
+
     // Shadow cells are counters once they settle: they take only a fraction of the strokes' light.
     const damp = cell.kind === 2 ? lerp(1, COUNTER, smoothstep(0.7, 1, arrive)) : 1
-    const tone = cell.kind === 0 ? pal.logoG : cell.kind === 1 ? pal.logoO : pal.shadow
+    const tone = [pal.logoG, pal.logoO, pal.shadow][cell.kind]!
     const hot = mixRGB(mixRGB(tone, pal.accent, Math.min(1, glow) * damp), pal.peak, Math.min(1, peak) * damp)
     const color = arrive < 0.3 ? mixRGB(pal.dot, hot, arrive / 0.3) : hot
     const alpha = lerp(pal.dotAlpha * 1.4, 1, smoothstep(0, 0.6, arrive)) * arrive
+
     if (alpha <= 0.002) continue
     const s = lerp(dot, P - gap, arrive ** 1.2) * scale * dpr
     const x = (g.cx + (g.ox + (g.lc + cell.col) * P + P / 2 - g.cx) * scale) * dpr - s / 2
     const y = (g.cy + (g.oy + (g.lr + cell.row) * P + P / 2 - g.cy) * scale) * dpr - s / 2
     ctx.fillStyle = rgba(color, alpha)
+
     // Snap only at rest on the grid; while GO scales in, cells keep sub-pixel positions.
     if (scale === 1) ctx.fillRect(Math.round(x), Math.round(y), Math.round(s), Math.round(s))
     else ctx.fillRect(x, y, s, s)
@@ -316,12 +383,17 @@ function parseColor(ctx: CanvasRenderingContext2D, value: string, fallback: RGB)
   ctx.fillStyle = value
   const css = String(ctx.fillStyle).trim()
   const hex = /^#([0-9a-f]{3,8})$/i.exec(css)?.[1]
+
   if (hex) {
     const full = hex.length <= 4 ? Array.from(hex, (ch) => ch + ch).join("") : hex
+
     return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16)]
   }
+
   const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(css)
+
   if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])]
+
   return fallback
 }
 
@@ -333,6 +405,7 @@ export function readPalette(el: Element, ctx: CanvasRenderingContext2D): HeroPal
   const light = (surface[0] * 0.2126 + surface[1] * 0.7152 + surface[2] * 0.0722) / 255 > 0.5
   const text = token("--v2-text-text-base", light ? [22, 22, 22] : [250, 250, 250])
   const accent = light ? token("--v2-orange-800", [209, 100, 39]) : token("--v2-orange-500", [255, 164, 120])
+
   return {
     light,
     dot: text,
@@ -354,7 +427,9 @@ export function readPalette(el: Element, ctx: CanvasRenderingContext2D): HeroPal
  */
 export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d")
+
   if (!ctx) return () => {}
+
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)")
   let palette = readPalette(canvas, ctx)
   let g: Geometry | undefined
@@ -366,11 +441,13 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
     const dpr = Math.min(3, window.devicePixelRatio || 1)
     const w = Math.max(1, canvas.clientWidth)
     const h = Math.max(1, canvas.clientHeight)
+
     if (!g || g.w !== w || g.h !== h || g.dpr !== dpr) {
       canvas.width = Math.round(w * dpr)
       canvas.height = Math.round(h * dpr)
       g = geometry(w, h, dpr)
     }
+
     draw(ctx, g, palette, reduce.matches ? STILL_TIME : t)
   }
 
@@ -384,7 +461,9 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
   const run = () => {
     cancelAnimationFrame(raf)
     raf = 0
+
     if (reduce.matches) return render()
+
     if (document.hidden) return
     last = performance.now()
     raf = requestAnimationFrame(tick)
@@ -394,6 +473,7 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
   const redraw = () => {
     if (!raf) render()
   }
+
   const restyle = () => {
     palette = readPalette(canvas, ctx)
     redraw()
