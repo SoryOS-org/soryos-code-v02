@@ -497,7 +497,7 @@ test("form review scrolls from the first answer to the last", async () => {
   }
 })
 
-test("multi-file edit permissions label each diff with its file", async () => {
+test.each([false, true])("multi-file edit permissions label each diff with its file (mono=%s)", async (mono) => {
   const app = await testRender(
     () => (
       <RunPermissionBody
@@ -525,8 +525,9 @@ test("multi-file edit permissions label each diff with its file", async () => {
           },
         }}
         directory={() => "/project"}
-        theme={RUN_THEME_FALLBACK.footer}
-        block={RUN_THEME_FALLBACK.block}
+        theme={mono ? RUN_THEME_MONO.footer : RUN_THEME_FALLBACK.footer}
+        block={mono ? RUN_THEME_MONO.block : RUN_THEME_FALLBACK.block}
+        mono={mono}
         onReply={() => {}}
       />
     ),
@@ -541,6 +542,8 @@ test("multi-file edit permissions label each diff with its file", async () => {
     expect(frame).not.toContain("old.ts")
     expect(frame).toContain("FIRST_DIFF")
     expect(frame).toContain("SECOND_DIFF")
+    const order = ["src/new.ts", "FIRST_DIFF", "src/other.ts", "SECOND_DIFF"].map((value) => frame.indexOf(value))
+    expect(order).toEqual([...order].sort((a, b) => a - b))
   } finally {
     app.renderer.destroy()
   }
