@@ -137,14 +137,11 @@ test("the free usage limit opens the Go dialog once, leaves a readable notice, a
         id: "opencode-go",
         name: "OpenCode Go",
         methods: [{ type: "key" }],
-        connections: state.authorized ? [{ type: "credential", id: "cred_go", label: "Anomaly", method: "oauth" }] : [],
+        connections: state.authorized ? [{ type: "credential", id: "cred_go", label: "Go key", method: "key" }] : [],
       },
     ],
-    onIntegrationOAuth: () => ({ url: "https://auth.example.test/device?user_code=GOGO-1234" }),
-    onIntegrationOAuthStatus: () => {
-      state.authorized = true
-
-      return "complete"
+    onConnectKey: (input) => {
+      if (input.integrationID === "opencode-go") state.authorized = true
     },
     pageMessages: () => ({
       items: [
@@ -183,10 +180,11 @@ test("the free usage limit opens the Go dialog once, leaves a readable notice, a
   await expect(view.editor).toHaveText("Refactor the parser")
   await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
 
-  // Subscribe -> Go sign-in -> Continue switches the model in the current session without opening a new draft tab.
+  // Subscribe -> Go API key -> Continue switches the model in the current session without opening a new draft tab.
   await upsell.getByRole("button", { name: "Subscribe", exact: true }).click()
-  const connect = page.getByRole("dialog")
-  await connect.getByRole("button", { name: "Continue in the browser", exact: true }).click()
+  const connect = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
+  await connect.getByPlaceholder("API key").fill("sk-go-test")
+  await connect.getByRole("button", { name: "Continue", exact: true }).click()
   const connected = page.getByRole("dialog", { name: "Connected to OpenCode Go" })
   await expect(connected.getByRole("radio", { name: "GLM-5 Go", exact: true })).toHaveAttribute("aria-checked", "true")
   await connected.getByRole("button", { name: "Continue", exact: true }).click()
@@ -232,7 +230,9 @@ test("the free usage limit opens the Go dialog once, leaves a readable notice, a
     mimeType: "image/png",
     buffer: Buffer.from("png-bytes"),
   })
-  await expect(page.locator('[data-component="composer-attachments"]')).toContainText("diagram.png")
+  await expect(
+    page.locator('[data-component="composer-attachments"]').getByRole("img", { name: "diagram.png", exact: true }),
+  ).toBeVisible()
 
   await view.push([
     {
@@ -255,7 +255,9 @@ test("the free usage limit opens the Go dialog once, leaves a readable notice, a
 
   await expect(page.getByRole("status").filter({ hasText: "You've used today's free messages." })).toBeVisible()
   await expect(page.getByRole("dialog")).toHaveCount(0)
-  await expect(page.locator('[data-component="composer-attachments"]')).toContainText("diagram.png")
+  await expect(
+    page.locator('[data-component="composer-attachments"]').getByRole("img", { name: "diagram.png", exact: true }),
+  ).toBeVisible()
   await expect(view.editor).toHaveText("")
 })
 

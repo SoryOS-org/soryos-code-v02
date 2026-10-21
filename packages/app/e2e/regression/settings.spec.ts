@@ -1106,27 +1106,20 @@ test("providers: the free tier upsell opens Go on its own, sized to its content"
     {
       id: "evt_free_tier_limit",
       created: 1700000000000,
-      type: "session.status",
+      type: "session.step.failed",
       location: { directory: view.directory },
+      durable: { aggregateID: view.session.id, seq: 1, version: 1 },
       data: {
         sessionID: view.session.id,
-        status: {
-          type: "retry",
-          attempt: 1,
-          message: "Free tier limit reached",
-          next: 1700000060000,
-          action: {
-            reason: "free_tier_limit",
-            provider: "opencode",
-            title: "Free tier limit reached",
-            message: "Subscribe to OpenCode Go to keep going.",
-            label: "Continue with OpenCode Go",
-          },
-        },
+        assistantMessageID: "msg_free_tier_assistant",
+        error: { type: "provider.free-limit", message: "Free usage limit reached.", status: 429 },
       },
     },
   ])
-  await page.getByRole("button", { name: "Continue with OpenCode Go", exact: true }).click()
+  await page
+    .getByRole("dialog", { name: "Free limit reached" })
+    .getByRole("button", { name: "Subscribe", exact: true })
+    .click()
 
   const dialog = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
   const container = page.locator('[data-slot="dialog-container"]')
