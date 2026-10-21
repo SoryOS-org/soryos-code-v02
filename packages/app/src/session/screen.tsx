@@ -45,7 +45,7 @@ import { SessionIdentityHeader, SessionLocation } from "./session-identity-heade
 import { SessionHeaderDrag, windowDragEnabled } from "./header/drag-area"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useServer } from "@/runtime/server/current"
-import { SessionReviewToggle } from "./header/session-header-actions"
+import { reviewGlyphFill, SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
 import { createPanelMotion, replayPanelToggle } from "@/shell/panel-motion"
 
@@ -155,11 +155,22 @@ function SessionScreenContent(props: {
 
   // Once opened, the side region stays mounted and is skipped by content-visibility when a close settles, so neither
   // direction mounts its contents mid-flight, and a reopen reuses their style and layout.
+  let sideContent: HTMLDivElement | undefined
+  let sideGlyph: SVGPathElement | undefined
+  let sideClosed = 0
+  // The toggle's pane fills from the panel's edge as far as the panel is open.
+  const paintSideGlyph = () => sideGlyph?.setAttribute("transform", reviewGlyphFill(1 - sideClosed))
   const sideMotion = createPanelMotion({
     open: sideVisible,
     identity: session.layout.tabKey,
     // The chat's real width moves the side panel's edge, whose contents keep their open width pinned to it.
     paint: (closed) => {
+      sideClosed = closed
+      paintSideGlyph()
+
+      // Dims the contents as they leave and fades them in as they arrive.
+      if (sideContent) sideContent.style.opacity = closed === 0 ? "" : `${1 - closed}`
+
       if (!chat) return
       const open = chatOpenWidth()
 
@@ -424,7 +435,13 @@ function SessionScreenContent(props: {
               onPointerDown={hideTimelineScrollbar}
               onClick={hideTimelineScrollbar}
             >
-              <SessionReviewToggle onToggle={region.toggle} />
+              <SessionReviewToggle
+                onToggle={region.toggle}
+                glyph={(fill) => {
+                  sideGlyph = fill
+                  paintSideGlyph()
+                }}
+              />
             </div>
           </Show>
           <div
@@ -474,8 +491,9 @@ function SessionScreenContent(props: {
               }}
             >
               <div
+                ref={sideContent}
                 data-slot="session-side-panel-content"
-                class="absolute inset-y-0 start-0 size-full [contain:layout_style]"
+                class="absolute inset-y-0 start-0 size-full [contain:layout_style] will-change-[opacity]"
                 style={{ "--session-side-content-width": screen.side.contentWidth() }}
               >
                 <div data-slot="session-side-region" class="absolute inset-0 min-h-0 overflow-visible">

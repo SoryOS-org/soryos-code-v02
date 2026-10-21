@@ -46,6 +46,8 @@ export function createPanelMotion(input: {
   /** A change shows the new state without motion, e.g. switching to another session's layout. */
   identity?: Accessor<unknown>
   onClosed?: () => void
+  /** Reads layout in the frame loop's read phase, before each frame of a flight paints. */
+  measure?: () => void
 }) {
   const [present, setPresent] = createSignal(input.open())
   // Percent closed, so the spring's rest threshold stays well under a pixel.
@@ -118,7 +120,7 @@ export function createPanelMotion(input: {
         motion.set(target)
         fly(true)
         // Writes only; anything reading layout this frame does so in the loop's read phase, before this runs.
-        stop ??= frameLoop.add((dt) => {
+        const step = (dt: number) => {
           motion.step(dt)
           paint()
 
@@ -127,7 +129,8 @@ export function createPanelMotion(input: {
           settle()
 
           return false
-        })
+        }
+        stop ??= input.measure ? frameLoop.addMeasured(input.measure, step) : frameLoop.add(step)
       },
     ),
   )

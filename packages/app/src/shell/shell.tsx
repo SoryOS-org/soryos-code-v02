@@ -13,7 +13,7 @@ import { ExtensionServerCover } from "@/runtime/extension/server-shell"
 import { ExtensionSlot } from "@/runtime/extension/render"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { CollapsedSidebarToggle, paintCollapsedSlots } from "@/shell/sidebar-toggle"
+import { CollapsedSidebarToggle, measureSidebarToggles, paintCollapsedSlots } from "@/shell/sidebar-toggle"
 import { createPanelMotion, guardClosingFocus, replayPanelToggle } from "@/shell/panel-motion"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
@@ -46,8 +46,12 @@ export default function Layout(props: ParentProps) {
       const aside = state.tabsAside
 
       if (aside) aside.style.width = `${state.tabsWidth * (1 - closed)}px`
+
+      // Dims the contents, background included, as they leave and fade them in as they arrive.
+      if (state.tabsMount) state.tabsMount.style.opacity = closed === 0 ? "" : `${1 - closed}`
       paintCollapsedSlots(closed)
     },
+    measure: () => measureSidebarToggles(state.tabsWidth),
   })
 
   replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
@@ -124,7 +128,7 @@ export default function Layout(props: ParentProps) {
               >
                 <div
                   ref={(element) => setState("tabsMount", element)}
-                  class="absolute inset-y-0 end-0 contain-strict flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+                  class="absolute inset-y-0 end-0 contain-strict will-change-[opacity] flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
                   style={{
                     width: `${state.tabsWidth}px`,
                     "padding-bottom": "max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
@@ -165,8 +169,8 @@ export default function Layout(props: ParentProps) {
             <ExtensionServerCover>
               <Suspense>{props.children}</Suspense>
             </ExtensionServerCover>
-            <CollapsedSidebarToggle />
           </main>
+          <CollapsedSidebarToggle />
         </div>
         <ExtensionSlot at="window.bottom" input={{}} />
         <ToastRegion />

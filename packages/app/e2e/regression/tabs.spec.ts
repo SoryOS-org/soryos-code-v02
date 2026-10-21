@@ -490,7 +490,10 @@ for (const [screen, href] of [
 
     const sidebar = page.locator('[data-slot="vertical-tabs-sidebar"]')
     await expect(sidebar).toHaveAttribute("data-state", "closed")
-    await page.locator("main").getByRole("button", { name: "Toggle sidebar", exact: true }).click()
+    await page
+      .locator('[data-slot="collapsed-sidebar-toggle"]')
+      .getByRole("button", { name: "Toggle sidebar", exact: true })
+      .click()
     await expect(sidebar).toHaveAttribute("data-state", "open")
     await expect(sidebar.getByRole("button", { name: "Toggle sidebar", exact: true })).toHaveAttribute(
       "aria-expanded",
