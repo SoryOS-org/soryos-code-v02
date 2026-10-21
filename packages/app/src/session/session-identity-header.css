@@ -3,6 +3,7 @@
 }
 
 .session-header-layout {
+  container: session-header / inline-size;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -20,20 +21,42 @@
 
 .session-header-location > [data-slot="session-location-trigger"] {
   max-inline-size: 100%;
-  gap: 6px;
-  padding-inline: 4px;
 }
 
-/* The header shows the location as the project avatar and, in a worktree, the worktree icon, so the title keeps the
-   row. The names stay for assistive tech, and the location card shows them in full. */
-.session-header-location [data-slot="session-location-project"],
-.session-header-location [data-slot="session-location-worktree"] {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+/* Use the header's available width, not the window: opening a side panel also narrows the timeline. */
+@container session-header (max-width: 640px) {
+  .session-header-location {
+    gap: 4px;
+  }
+
+  .session-header-location > [data-slot="session-location-trigger"] {
+    gap: 8px;
+    padding-inline: 4px;
+  }
+
+  .session-header-location [data-component="project-avatar-v2"] {
+    margin-inline-end: 2px;
+  }
+
+  .session-header-location [data-slot="session-location-project"] + span {
+    padding-inline: 0;
+  }
+
+  .session-header-location > .session-location-separator[data-variant="slash"] {
+    /* Together with the row's 2px gap and the title's 4px padding, leave 10px before the title. */
+    padding-inline: 0 4px;
+  }
+
+  /* Keep the names available to assistive tech while the icons leave room for the title. */
+  .session-header-location [data-slot="session-location-project"],
+  .session-header-location [data-slot="session-location-worktree"] {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .session-header-title {

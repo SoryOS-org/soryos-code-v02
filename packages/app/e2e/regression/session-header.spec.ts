@@ -130,6 +130,66 @@ test.describe("location", () => {
     sessions: [{ id: "ses_location", title: "Location session", directory: worktree }],
   }
 
+  test("only collapses location names when the timeline header is narrow", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openSession(page, {
+      ...workspace,
+      sessions: [{ id: "ses_location", title: "Investigate session header layout regression", directory: worktree }],
+    })
+    const header = page.locator("[data-session-title]")
+    const names = header.locator('[data-slot="session-location-project"], [data-slot="session-location-worktree"]')
+    const review = page.getByRole("button", { name: "Toggle review", exact: true })
+    await expect(names).toHaveText(["Location", "quiet-falcon"])
+
+    for (const panel of [false, true, false]) {
+      if (panel || (await review.getAttribute("aria-expanded")) === "true") await review.click()
+      await expect(review).toHaveAttribute("aria-expanded", String(panel))
+      await expect
+        .poll(() =>
+          names.evaluateAll((elements) => elements.every((element) => getComputedStyle(element).clipPath === "none")),
+        )
+        .toBe(!panel)
+      await expect(header.getByRole("button", { name: "More options", exact: true })).toBeInViewport()
+      await expect
+        .poll(() => header.getByRole("heading").evaluate((element) => element.scrollWidth <= element.clientWidth))
+        .toBe(true)
+      if (panel) {
+        await expect
+          .poll(() =>
+            header.evaluate((element) => {
+              const icon = element.querySelector('svg:has(use[href="#opencode-v2-icon-outline-worktree"])')
+              const before = icon?.previousElementSibling?.getBoundingClientRect()
+              const separator = element.querySelector('[data-slot="session-title-separator"]')
+              const after = separator?.getBoundingClientRect()
+              const title = element.querySelector("h1")
+              const avatar = element
+                .querySelector('[data-slot="session-location-trigger"]')
+                ?.firstElementChild?.getBoundingClientRect()
+              const bounds = icon?.getBoundingClientRect()
+
+              return bounds && before && after && avatar && separator && title
+                ? [
+                    before.left - avatar.right,
+                    bounds.left - before.right,
+                    after.left - bounds.right,
+                    title.getBoundingClientRect().left +
+                      parseFloat(getComputedStyle(title).paddingLeft) -
+                      after.right +
+                      parseFloat(getComputedStyle(separator).paddingRight),
+                  ]
+                : []
+            }),
+          )
+          .toEqual([10, 8, 8, 10])
+        const location = header.locator('[data-slot="session-location-trigger"]')
+        await location.hover()
+        await expect(location).toHaveCSS("padding-inline-start", "4px")
+        await expect(location).toHaveCSS("padding-inline-end", "4px")
+      }
+      await header.screenshot({ path: test.info().outputPath(`location-${panel ? "compact" : "expanded"}.png`) })
+    }
+  })
+
   test("names the project and worktree, and the card copies the full path", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"])
     await openSession(page, workspace)
