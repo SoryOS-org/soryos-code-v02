@@ -15,7 +15,7 @@ const retryDelayMs = 15
 // A sharing violation is the one failure a later attempt can survive; nothing else clears by
 // waiting. The three codes are what Node reports for it, depending on how the holder opened the
 // file: EPERM for a denied replacement, EBUSY for a denied open.
-function isLockedError(cause: unknown) {
+function isLockedError(cause: unknown): cause is NodeJS.ErrnoException {
   if (!(cause instanceof Error) || !("code" in cause)) return false
 
   return cause.code === "EPERM" || cause.code === "EACCES" || cause.code === "EBUSY"
