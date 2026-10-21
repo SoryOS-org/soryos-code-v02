@@ -1743,7 +1743,8 @@ for (const style of ["Silk", "Waves"] as const) {
       )
       .toBe(true)
     // Drive presentation timestamps at 60Hz even on slow software-rendering CI machines.
-    await page.clock.pauseAt(new Date((await page.evaluate(() => Date.now())) + 100))
+    // Leave room for browser RPCs under software rendering; pauseAt advances instantly, without a real wait.
+    await page.clock.pauseAt(new Date((await page.evaluate(() => Date.now())) + 10_000))
     const shaderTime = () =>
       canvas.evaluate((element: HTMLCanvasElement) => {
         const gl = element.getContext("webgl")!
