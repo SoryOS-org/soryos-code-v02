@@ -1430,32 +1430,49 @@ function ComposerEditorAlternateDelivery(props: { controller: ComposerEditorMode
   )
 }
 
-const submitGlyphChoice = motionTuning.choice("composer.buttonIcons", {
-  label: "Composer button icons",
+const sendIcon = motionTuning.choice("composer.sendIcon", {
+  label: "Send icon",
   group: "Experiments",
   value: "today",
-  labels: { today: "Today", heavy: "Heavier", filled: "Filled", ios: "iOS" },
+  labels: { today: "Today", ios: "iOS", heavy: "Heavier", filled: "Filled" },
 })
 
-const [glyphs, setGlyphs] = createSignal(submitGlyphChoice())
+const stopIcon = motionTuning.choice("composer.stopIcon", {
+  label: "Stop icon",
+  group: "Experiments",
+  value: "today",
+  labels: { today: "Today", rounded: "Rounded", ios: "iOS", heavy: "Heavier" },
+})
 
-motionTuning.subscribe(() => setGlyphs(submitGlyphChoice()))
+const roundedStopSize = motionTuning.number("composer.stopIcon.size", {
+  label: "Rounded stop size",
+  group: "Experiments",
+  value: 10,
+  min: 6,
+  max: 14,
+  step: 1,
+  unit: "px",
+})
+
+const [icons, setIcons] = createStore({ send: sendIcon(), stop: stopIcon(), size: roundedStopSize() })
+
+motionTuning.subscribe(() => setIcons({ send: sendIcon(), stop: stopIcon(), size: roundedStopSize() }))
 
 // Drawn on a 16px grid so straight edges land on whole pixels at 1×.
-const submitGlyphs = {
+const sendGlyphs = {
   today: undefined,
-  heavy: {
-    stop: `<rect x="3" y="3" width="10" height="10" rx="1" fill="currentColor"/>`,
-    send: `<path d="M8 14V4M3.5 8.5 8 4l4.5 4.5" stroke="currentColor" stroke-width="2"/>`,
-  },
-  filled: {
-    stop: `<rect x="3" y="3" width="10" height="10" rx="2.5" fill="currentColor"/>`,
-    send: `<path d="M8 2l5.5 6H9v6H7V8H2.5z" fill="currentColor"/>`,
-  },
-  ios: {
-    stop: `<rect x="4" y="4" width="8" height="8" rx="2" fill="currentColor"/>`,
-    send: `<path d="M8 13.5V3.5M3.75 7.75 8 3.5l4.25 4.25" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
-  },
+  ios: `<path d="M8 13.5V3.5M3.75 7.75 8 3.5l4.25 4.25" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  heavy: `<path d="M8 14V4M3.5 8.5 8 4l4.5 4.5" stroke="currentColor" stroke-width="2"/>`,
+  filled: `<path d="M8 2l5.5 6H9v6H7V8H2.5z" fill="currentColor"/>`,
+}
+
+function stopGlyph() {
+  if (icons.stop === "today") return undefined
+
+  const [size, radius] = { rounded: [icons.size, icons.size / 4], ios: [8, 2], heavy: [10, 1] }[icons.stop]
+  const start = 8 - size / 2
+
+  return `<rect x="${start}" y="${start}" width="${size}" height="${size}" rx="${radius}" fill="currentColor"/>`
 }
 
 export function ComposerEditorSubmitButton(props: {
@@ -1484,7 +1501,7 @@ export function ComposerEditorSubmitButton(props: {
             <Spinner class="size-4" />
           ) : (
             <Show
-              when={(props.stopping || props.mode !== "shell") && submitGlyphs[glyphs()]}
+              when={props.stopping ? stopGlyph() : props.mode !== "shell" && sendGlyphs[icons.send]}
               fallback={
                 <Icon name={props.stopping ? "stop" : props.mode === "shell" ? "arrow-undo-down" : "arrow-up"} />
               }
@@ -1496,7 +1513,7 @@ export function ComposerEditorSubmitButton(props: {
                   viewBox="0 0 16 16"
                   fill="none"
                   aria-hidden="true"
-                  innerHTML={glyph()[props.stopping ? "stop" : "send"]}
+                  innerHTML={glyph()}
                 />
               )}
             </Show>
