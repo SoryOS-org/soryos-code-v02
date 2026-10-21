@@ -145,14 +145,14 @@ const layer = Layer.effect(
       const changed = replaced ?? unarchived
       if (changed) yield* bus.publish(ProjectSchema.Event.Updated, fromRow(changed))
       if (!project.vcs) return project
-      const directories: Array<{ projectID: ID; directory: AbsolutePath; strategy?: string }> = [
+      const directories: Array<{ projectID: ID; directory: AbsolutePath; strategy?: Worktree.StrategyID }> = [
         { projectID: project.id, directory: project.canonical },
       ]
       if (project.directory !== project.canonical)
         directories.push({
           projectID: project.id,
           directory: project.directory,
-          strategy: project.vcs.type === "git" ? "git" : undefined,
+          strategy: project.vcs.type === "git" ? Worktree.StrategyID.make("git") : undefined,
         })
       // A missing directory row means this directory's resolution is a new durable
       // fact. The row insert commits atomically with the event, so a crash between
