@@ -1355,6 +1355,18 @@ test("the tab layout preference switches to vertical tabs and survives reload", 
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
 })
 
+test("the tab grouping preference selects project groups and survives reload", async ({ page }) => {
+  const { settings } = await open(page)
+  const grouping = settings.locator('[data-action="settings-tab-groups"]')
+  await expect(grouping).toContainText("Off")
+  await grouping.click()
+  await page.getByRole("option", { name: "By project" }).click()
+  await expect(grouping).toContainText("By project")
+
+  await page.reload()
+  await expect(grouping).toContainText("By project")
+})
+
 for (const viewport of [
   { name: "desktop", width: 1280, height: 720, bottom: false },
   { name: "mobile", width: 390, height: 844, bottom: true },

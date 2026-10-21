@@ -13,8 +13,8 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
+import { ProjectIcon } from "@/shell/layout/project-icon"
 import { sessionLabel } from "@/session/title"
-import { HomeProjectAvatar } from "../projects/view"
 import { shouldOpenSessionInBackground } from "./open"
 import { createAltHold } from "./alt-hold"
 import "./view.css"
@@ -572,7 +572,7 @@ function HomeSessionProjectGroupHeader(props: {
         </span>
         <span class="flex min-w-0 items-center gap-1.5" style={{ opacity: props.titleOpacity }}>
           <span aria-hidden="true" class="flex shrink-0">
-            <Show when={props.group.project}>{(project) => <HomeProjectAvatar project={project()} />}</Show>
+            <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
           </span>
           <span class={`${HOME_SECTION_LABEL} min-w-0 overflow-hidden text-ellipsis whitespace-nowrap`}>
             {props.group.title}

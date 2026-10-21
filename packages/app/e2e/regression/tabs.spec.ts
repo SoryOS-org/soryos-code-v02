@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import {
   NO_PROVIDER,
@@ -187,6 +187,92 @@ test("option arrows move to the previous or next tab, and with shift to the next
   await page.keyboard.press("Shift+Alt+ArrowDown")
   await expectPath(page, sessionHref(c.id))
 })
+
+for (const row of [{ tabLayout: "horizontal", width: 1440 }, { tabLayout: "vertical", width: 1440 }] as const) {
+  test(`session tabs cluster under collapsible project groups (${row.tabLayout})`, async ({ page }) => {
+    await page.setViewportSize({ width: row.width, height: 900 })
+    const second = "C:/OpenCode/TabGroups"
+    const secondProject = "proj_tab_groups"
+    const x = { id: "ses_tab_x", title: "Tab X session", directory: second, projectID: secondProject }
+    const y = { id: "ses_tab_y", title: "Tab Y session", directory: second, projectID: secondProject }
+
+    const workspace = await mockWorkspace(page, {
+      name: "Tabs",
+      projects: [
+        project({ id: "proj_tabs", directory: "C:/OpenCode/Tabs", name: "Tabs" }),
+        project({ id: secondProject, directory: second, name: "TabGroups" }),
+      ],
+      sessions: [a, x, b, y],
+      seed: {
+        tabs: [a.id, x.id, { draft: "draft_tab_group", directory: "C:/OpenCode/Tabs" }, b.id, y.id],
+        settings: { appearance: { tabLayout: row.tabLayout, tabGroups: "project" } },
+        projects: {
+          local: [
+            { worktree: "C:/OpenCode/Tabs", expanded: true },
+            { worktree: second, expanded: true },
+          ],
+        },
+      },
+    })
+
+    await page.goto(sessionHref(a.id, workspace.server))
+
+    const headers = page.locator('[data-component="titlebar-tab-group"]')
+    const tabsHeader = page.getByRole("button", { name: "Tabs", exact: true })
+    const groupsHeader = page.getByRole("button", { name: "TabGroups", exact: true })
+    const slot = (href: string) => page.locator(`[data-titlebar-tab-slot]:has(a[href="${href}"])`)
+    const hrefs = {
+      a: sessionHref(a.id, workspace.server),
+      draft: `/new-session?draftId=draft_tab_group`,
+      b: sessionHref(b.id, workspace.server),
+      x: sessionHref(x.id, workspace.server),
+      y: sessionHref(y.id, workspace.server),
+    }
+
+    await expect(headers).toHaveCount(2)
+    await expect(slot(hrefs.a)).toBeVisible()
+    await expect(slot(hrefs.y)).toBeVisible()
+
+    // Groups partition the strip in visual order even though the persisted
+    // order interleaves the two projects.
+    const axis = row.tabLayout === "vertical" ? "y" : "x"
+    const position = async (locator: Locator) => (await locator.boundingBox())![axis]
+
+    expect(await position(tabsHeader)).toBeLessThan(await position(slot(hrefs.a)))
+    expect(await position(slot(hrefs.a))).toBeLessThan(await position(slot(hrefs.draft)))
+    expect(await position(slot(hrefs.draft))).toBeLessThan(await position(slot(hrefs.b)))
+    expect(await position(slot(hrefs.b))).toBeLessThan(await position(groupsHeader))
+    expect(await position(groupsHeader)).toBeLessThan(await position(slot(hrefs.x)))
+    expect(await position(slot(hrefs.x))).toBeLessThan(await position(slot(hrefs.y)))
+
+    // Collapsing one group hides exactly its members, draft included.
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "true")
+    await tabsHeader.click()
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "false")
+    await expect(slot(hrefs.a)).not.toBeAttached()
+    await expect(slot(hrefs.draft)).not.toBeAttached()
+    await expect(slot(hrefs.b)).not.toBeAttached()
+    await expect(slot(hrefs.x)).toBeVisible()
+
+    // Tab cycling skips the collapsed group's members.
+    await page.locator(`a[data-titlebar-tab-link][href="${hrefs.x}"]`).click()
+    await expectPath(page, sessionHref(x.id, workspace.server))
+    await page.keyboard.press("Alt+ArrowDown")
+    await expectPath(page, sessionHref(y.id, workspace.server))
+    await page.keyboard.press("Alt+ArrowUp")
+    await expectPath(page, sessionHref(x.id, workspace.server))
+
+    // Both the grouping mode and the collapsed group survive a reload.
+    await page.reload()
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "false")
+    await expect(slot(hrefs.x)).toBeVisible()
+    await expect(slot(hrefs.a)).not.toBeAttached()
+
+    // Expanding restores the hidden members.
+    await tabsHeader.click()
+    await expect(slot(hrefs.a)).toBeVisible()
+  })
+}
 
 for (const row of [
   { tabLayout: "horizontal", width: 360, hasTouch: false, direction: "ltr" },
