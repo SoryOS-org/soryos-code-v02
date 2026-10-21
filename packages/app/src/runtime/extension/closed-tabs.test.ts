@@ -34,7 +34,7 @@ test("keeps a session's closed tabs newest first, once each, up to the limit", (
   for (const index of Array.from({ length: CLOSED_TABS_LIMIT + 2 }, (_, value) => value))
     closed.push(a, { key: `file://${index}.ts`, title: `${index}.ts` })
   closed.push(a, { key: "file://5.ts", title: "5.ts" })
-  closed.push(session("b"), { key: "file://b.ts", title: "b.ts" })
+  closed.push(session("b"), { key: "review:main", title: "Review" })
 
   const keys = closed.list(a).map((entry) => entry.key)
 
@@ -45,7 +45,7 @@ test("keeps a session's closed tabs newest first, once each, up to the limit", (
     `file://${CLOSED_TABS_LIMIT}.ts`,
   ])
   expect(keys.filter((key) => key === "file://5.ts")).toHaveLength(1)
-  expect(closed.list(session("b")).map((entry) => entry.key)).toEqual(["file://b.ts"])
+  expect(closed.list(session("b")).map((entry) => entry.key)).toEqual(["review:main"])
 })
 
 test("takes the newest closed tab, or the one asked for", () => {
@@ -53,29 +53,37 @@ test("takes the newest closed tab, or the one asked for", () => {
   const a = session("a")
 
   closed.push(a, { key: "file://one.ts", title: "one.ts" })
-  closed.push(a, { key: "file://two.ts", title: "two.ts", file: "two.ts" })
-  closed.push(a, { key: "file://three.ts", title: "three.ts" })
+  closed.push(a, { key: "browser:tab", title: "Docs", data: "https://example.com" })
+  closed.push(a, { key: "context:main", title: "Context" })
 
-  expect(closed.take(a, "file://two.ts")?.file).toBe("two.ts")
-  expect(closed.take(a)?.key).toBe("file://three.ts")
+  expect(closed.take(a, "browser:tab")?.data).toBe("https://example.com")
+  expect(closed.take(a)?.key).toBe("context:main")
   expect(closed.list(a).map((entry) => entry.key)).toEqual(["file://one.ts"])
   expect(closed.take(a, "missing")).toBeUndefined()
 })
 
-test("lists only closing file tabs, by their panel's word or their title, and never a transient one unasked", () => {
-  expect(closedEntry("file://a.ts", panel({}), props({ title: "a.ts", file: "a.ts" }))).toEqual({
-    key: "file://a.ts",
-    title: "a.ts",
-    icon: undefined,
-    file: "a.ts",
+test("lists a closing tab by its panel's word, its title by default, and never a transient one unasked", () => {
+  const mobile = { title: "Context", order: 0, kind: "menu", icon: "status" } as const
+
+  expect(closedEntry("context:main", panel({ mobile }), props({ title: "Context" }))).toEqual({
+    key: "context:main",
+    title: "Context",
+    icon: "status",
+    file: undefined,
     detail: undefined,
     data: undefined,
   })
-  expect(
-    closedEntry("file://a.ts", panel({ closed: () => ({ title: "A" }) }), props({ title: "a.ts", file: "a.ts" })),
-  ).toMatchObject({ title: "A", file: "a.ts" })
-  expect(closedEntry("context:main", panel({}), props({ title: "Context" }))).toBeUndefined()
-  expect(closedEntry("review:changes", panel({ closed: () => ({ title: "Review" }) }), props({}))).toBeUndefined()
-  expect(closedEntry("file://a.ts", panel({ closed: () => false }), props({ file: "a.ts" }))).toBeUndefined()
-  expect(closedEntry("file:open", panel({}), props({ transient: true, file: "a.ts" }))).toBeUndefined()
+  expect(closedEntry("file://a.ts", panel({}), props({ title: "a.ts", file: "a.ts" }))?.file).toBe("a.ts")
+
+  const browser = panel({ closed: () => ({ icon: "globe", detail: "example.com", data: "https://example.com" }) })
+
+  expect(closedEntry("browser:t", browser, props({ title: "Docs" }))).toMatchObject({
+    title: "Docs",
+    icon: "globe",
+    detail: "example.com",
+    data: "https://example.com",
+  })
+  expect(closedEntry("browser:t", panel({ closed: () => false }), props({}))).toBeUndefined()
+  expect(closedEntry("terminal:1", panel({ transient: true }), props({}))).toBeUndefined()
+  expect(closedEntry("file:open", panel({}), props({ transient: true }))).toBeUndefined()
 })

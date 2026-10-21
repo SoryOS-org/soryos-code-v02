@@ -385,11 +385,14 @@ export function createRegion(input: {
           }),
         )
     },
-    /** The session's closed tabs that are not open again, newest first. */
+    /**
+     * The session's closed files that are not open again, newest first, as "Recently closed" lists them. ⌘⇧T still
+     * reopens the newest closed tab of any kind.
+     */
     recent: createMemo(() => {
       const open = new Set(stored())
 
-      return input.closed.list(input.view()).filter((entry) => !open.has(entry.key))
+      return input.closed.list(input.view()).filter((entry) => !!entry.file && !open.has(entry.key))
     }),
     /** Brings back the closed tab under `key`, or the newest one. */
     reopen(key?: string) {

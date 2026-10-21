@@ -263,6 +263,17 @@ const setup: Setup<typeof definition> = (ctx) => {
       </Show>
     ),
     close: (input) => model()?.closeTab(input.session, input.tab.id),
+    // A blank new tab does not come back; a page comes back as a new tab on its address.
+    closed(input) {
+      const url = model()?.tab(input.session, input.tab.id)?.url
+
+      if (!url || url === "about:blank") return false
+
+      return { icon: "globe", detail: URL.canParse(url) ? new URL(url).host : undefined, data: url }
+    },
+    restore: (input) => {
+      if (input.data) model()?.openURL(input.session, input.data)
+    },
     focus: (input) => model()?.focusTab(input.session, input.tab.id),
     // A blank tab starts in its address field, like a browser's new tab.
     enter: () => {
