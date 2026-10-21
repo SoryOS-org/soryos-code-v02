@@ -120,21 +120,23 @@ for (const direction of ["ltr", "rtl"] as const) {
 
 // A frameless desktop window moves when its titlebar row is dragged. The session header continues that row through one
 // area over the empty gap between the title and the actions, so no control sits under it.
-test("the desktop session header drags the window from the gap after the title", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await mockStressTimeline(page)
-  await page.goto(
-    `/e2e/utils/windows-menu.html?${new URLSearchParams({ server: fixture.serverKey, path: sessionHref(fixture.targetID, "sidecar") })}`,
-  )
-  const header = page.locator("[data-session-title]")
-  const area = page.locator('[data-slot="session-header-drag"]')
-  const options = header.getByRole("button", { name: "More options", exact: true })
-  const actions = header.locator(".session-header-actions")
-  await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
-  await expect(area).toHaveCSS("app-region", "drag")
-  await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCSS("app-region", "drag")
-  await expect
-    .poll(async () => {
+for (const direction of ["ltr", "rtl"] as const) {
+  test(`the desktop session header drags the window from the gap after the title in ${direction}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockStressTimeline(page)
+    await page.goto(
+      `/e2e/utils/windows-menu.html?${new URLSearchParams({ server: fixture.serverKey, path: sessionHref(fixture.targetID, "sidecar") })}`,
+    )
+    const header = page.locator("[data-session-title]")
+    const area = page.locator('[data-slot="session-header-drag"]')
+    const options = header.getByRole("button", { name: "More options", exact: true })
+    const actions = header.locator(".session-header-actions")
+    await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
+    await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
+    await expect(area).toHaveCSS("app-region", "drag")
+    await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCSS("app-region", "drag")
+
+    const aligned = async () => {
       const [gap, end, start, bar] = await Promise.all([
         area.boundingBox(),
         options.boundingBox(),
@@ -143,23 +145,32 @@ test("the desktop session header drags the window from the gap after the title",
       ])
 
       if (!gap || !end || !start || !bar) return false
+      const [left, right] = direction === "ltr" ? [end.x + end.width, start.x] : [start.x + start.width, end.x]
 
       return (
-        Math.abs(gap.x - (end.x + end.width)) <= 0.5 &&
-        Math.abs(gap.x + gap.width - start.x) <= 0.5 &&
+        Math.abs(gap.x - left) <= 0.5 &&
+        Math.abs(gap.x + gap.width - right) <= 0.5 &&
         Math.abs(gap.y - bar.y) <= 0.5 &&
         Math.abs(gap.height - bar.height) <= 0.5
       )
-    })
-    .toBe(true)
+    }
 
-  // The rename field takes the gap's place, so the area steps aside until the title is back.
-  await header.getByRole("heading").click()
-  await expect(header.getByRole("textbox")).toBeFocused()
-  await expect(area).toBeHidden()
-  await header.getByRole("textbox").press("Escape")
-  await expect(area).toBeVisible()
-})
+    await expect.poll(aligned).toBe(true)
+
+    // The area lives outside the timeline's scroller, so scrolling leaves it over the header.
+    const timeline = page.locator('[data-slot="session-timeline-scroll"]')
+    await timeline.hover()
+    await page.mouse.wheel(0, -2000)
+    await expect.poll(aligned).toBe(true)
+
+    // The rename field takes the gap's place, so the area steps aside until the title is back.
+    await header.getByRole("heading").click()
+    await expect(header.getByRole("textbox")).toBeFocused()
+    await expect(area).toBeHidden()
+    await header.getByRole("textbox").press("Escape")
+    await expect(area).toBeVisible()
+  })
+}
 
 test("the web session header leaves window dragging to the browser", async ({ page }) => {
   await mockStressTimeline(page)

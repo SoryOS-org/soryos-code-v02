@@ -1,11 +1,13 @@
 import { createEffect, createSignal, onCleanup, Show } from "solid-js"
-import { createStore } from "solid-js/store"
-import { usePlatform } from "@/runtime/platform/platform"
-
-type Gap = { x: number; y: number; width: number; height: number }
+import { usePlatform, type Platform } from "@/runtime/platform/platform"
 
 // Narrower gaps leave nothing worth grabbing between the title and the actions.
 const minWidth = 24
+
+/** Whether this window hides its native titlebar and moves from app-drawn drag regions. */
+export function windowDragEnabled(platform: Platform) {
+  return platform.platform === "desktop" && (platform.os === "macos" || platform.os === "windows")
+}
 
 /**
  * Moves the window from the empty gap between the session title and the header actions, as the hidden titlebar's row
@@ -14,12 +16,12 @@ const minWidth = 24
  */
 export function createSessionHeaderDrag() {
   const platform = usePlatform()
-  const enabled = () => platform.platform === "desktop" && (platform.os === "macos" || platform.os === "windows")
+  const enabled = () => windowDragEnabled(platform)
   // Every cached timeline registers its header and stays registered while detached for another session, so the area
   // follows whichever header is on screen.
   const [headers, setHeaders] = createSignal<HTMLElement[]>([])
-  const [gap, setGap] = createStore<{ value?: Gap }>({})
-  let area: HTMLDivElement | undefined
+  const [gap, setGap] = createSignal<{ x: number; y: number; width: number; height: number }>()
+  const [area, setArea] = createSignal<HTMLDivElement>()
 
   const register = (element: HTMLElement) => {
     setHeaders((items) => [...items, element])
@@ -32,90 +34,106 @@ export function createSessionHeaderDrag() {
     actions: layout.querySelector<HTMLElement>(".session-header-actions"),
   })
 
-  const measure = (layouts: HTMLElement[]) => {
-    const pane = area?.parentElement
+  const measure = (pane: HTMLElement, layouts: HTMLElement[]) => {
     const layout = layouts.findLast((item) => item.isConnected && item.getBoundingClientRect().width > 0)
-    const { title, actions } = layout ? parts(layout) : { title: null, actions: null }
+    const slots = layout && parts(layout)
 
     // An open rename field fills the gap, and the area must not take its clicks.
-    if (!pane || !layout || !title || title.querySelector("input")) return setGap("value", undefined)
+    if (!layout || !slots?.title || slots.title.querySelector("input")) {
+      setGap(undefined)
+      return
+    }
+
     const bounds = layout.getBoundingClientRect()
     const rtl = getComputedStyle(layout).direction === "rtl"
+    // Inline-end and inline-start edges of a box.
+    const after = (rect: DOMRect) => (rtl ? rect.left : rect.right)
+    const before = (rect: DOMRect) => (rtl ? rect.right : rect.left)
     // The title slot grows to fill the row, so its end is where its last item (the title or the options menu) ends.
-    const items = [...title.children].map((child) => child.getBoundingClientRect()).filter((rect) => rect.width)
-    const slot = title.getBoundingClientRect()
+    const items = [...slots.title.children].map((child) => child.getBoundingClientRect()).filter((rect) => rect.width)
     const end = items.length
-      ? rtl
-        ? Math.min(...items.map((rect) => rect.left))
-        : Math.max(...items.map((rect) => rect.right))
-      : rtl
-        ? slot.right
-        : slot.left
-    const limit = actions?.getBoundingClientRect()
-    const start = limit ? (rtl ? limit.right : limit.left) : rtl ? bounds.left : bounds.right
-    const left = rtl ? start : end
-    const right = rtl ? end : start
+      ? (rtl ? Math.min : Math.max)(...items.map(after))
+      : before(slots.title.getBoundingClientRect())
+    const start = slots.actions ? before(slots.actions.getBoundingClientRect()) : after(bounds)
+    const left = Math.min(start, end)
+    const right = Math.max(start, end)
 
-    if (right - left < minWidth) return setGap("value", undefined)
+    if ((rtl ? end - start : start - end) < minWidth) {
+      setGap(undefined)
+      return
+    }
+
     const origin = pane.getBoundingClientRect()
-    setGap("value", { x: left - origin.left, y: bounds.top - origin.top, width: right - left, height: bounds.height })
+    setGap({ x: left - origin.left, y: bounds.top - origin.top, width: right - left, height: bounds.height })
   }
 
   // Sizes change on rename, truncation, readout updates and pane resizes; nothing here runs while the timeline scrolls.
   createEffect(() => {
     const layouts = headers()
+    const pane = area()?.parentElement
 
-    if (!enabled() || !layouts.length) return setGap("value", undefined)
-    const update = () => measure(layouts)
+    if (!enabled() || !pane || !layouts.length) {
+      setGap(undefined)
+      return
+    }
+
+    const update = () => measure(pane, layouts)
     const resize = new ResizeObserver(update)
 
     const observe = () => {
       resize.disconnect()
-
-      if (area?.parentElement) resize.observe(area.parentElement)
+      resize.observe(pane)
 
       for (const layout of layouts) {
-        const { title, actions } = parts(layout)
+        const slots = parts(layout)
         resize.observe(layout)
 
-        for (const element of [title, actions, ...(title?.children ?? [])]) if (element) resize.observe(element)
+        for (const element of [slots.title, slots.actions, ...(slots.title?.children ?? [])])
+          if (element) resize.observe(element)
       }
     }
 
-    // Renaming swaps the heading for an input and the actions come and go with the session, so rebind on changes.
+    // Renaming swaps the heading for an input and the actions come and go with the session, so rebind when children
+    // change. Size changes alone reach the resize observer.
+    let frame: number | undefined
     const mutations = new MutationObserver(() => {
-      observe()
-      update()
+      if (frame !== undefined) return
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        observe()
+        update()
+      })
     })
 
-    for (const layout of layouts) mutations.observe(layout, { childList: true, subtree: true, characterData: true })
+    for (const layout of layouts) mutations.observe(layout, { childList: true, subtree: true })
 
     observe()
     update()
     onCleanup(() => {
       resize.disconnect()
       mutations.disconnect()
+
+      if (frame !== undefined) cancelAnimationFrame(frame)
     })
   })
+
+  const style = () => {
+    const value = gap()
+
+    if (!value) return { display: "none" }
+
+    return { left: `${value.x}px`, top: `${value.y}px`, width: `${value.width}px`, height: `${value.height}px` }
+  }
 
   // Rendered as a child of the pane, which positions it.
   const Area = () => (
     <Show when={enabled()}>
       <div
-        ref={area}
+        ref={setArea}
         data-slot="session-header-drag"
         aria-hidden="true"
         class="absolute"
-        style={
-          gap.value
-            ? {
-                left: `${gap.value.x}px`,
-                top: `${gap.value.y}px`,
-                width: `${gap.value.width}px`,
-                height: `${gap.value.height}px`,
-              }
-            : { display: "none" }
-        }
+        style={style()}
         data-tauri-drag-region
       />
     </Show>

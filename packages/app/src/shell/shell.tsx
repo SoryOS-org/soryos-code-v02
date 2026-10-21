@@ -15,6 +15,7 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { CollapsedSidebarToggle, paintCollapsedSlots } from "@/shell/sidebar-toggle"
 import { createPanelMotion, guardClosingFocus, replayPanelToggle } from "@/shell/panel-motion"
+import { windowDragEnabled } from "@/session/header/drag-area"
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
@@ -75,8 +76,7 @@ export default function Layout(props: ParentProps) {
       : [],
   )
   const bottomTitlebar = () => mobile() && preferences.general.mobileTitlebarPosition() === "bottom"
-  const dragInset = () =>
-    platform.platform === "desktop" && (platform.os === "macos" || platform.os === "windows") && !mobile()
+  const dragInset = () => windowDragEnabled(platform) && !mobile()
 
   return (
     <TitlebarRightProvider>
