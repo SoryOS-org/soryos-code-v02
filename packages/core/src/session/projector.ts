@@ -11,7 +11,6 @@ import { SessionEvent } from "./event.js"
 import { SessionMessage } from "./message.js"
 import { SessionMessageUpdater } from "./message-updater.js"
 import { SessionInbox } from "./inbox.js"
-import { Workspace } from "@opencode/schema/workspace"
 import { InstructionState } from "./instruction-state.js"
 import { SessionInboxTable, SessionMessageTable, SessionTable } from "./sql.js"
 import { InstructionEntry } from "./instruction-entry.js"
@@ -311,7 +310,7 @@ function run(db: DatabaseService, event: MessageEvent) {
                 ? {
                     location: {
                       directory: AbsolutePath.make(row.directory),
-                      workspaceID: row.workspaceID ? Workspace.ID.make(row.workspaceID) : undefined,
+                      workspaceID: row.workspaceID ?? undefined,
                     },
                     projectID: row.projectID,
                     subpath: row.subpath === null ? undefined : RelativePath.make(row.subpath),
@@ -467,7 +466,7 @@ const layer = Layer.effectDiscard(
           .values({
             id: event.data.sessionID,
             project_id: event.data.projectID,
-            workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
+            workspace_id: event.data.location.workspaceID ?? null,
             parent_id: event.data.parentID,
             slug: event.data.slug,
             directory: event.data.location.directory,
@@ -497,7 +496,7 @@ const layer = Layer.effectDiscard(
             directory: event.data.location.directory,
             path: event.data.subpath,
             ...(event.data.projectID ? { project_id: event.data.projectID } : {}),
-            workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
+            workspace_id: event.data.location.workspaceID ?? null,
             time_updated: event.created,
           })
           .where(eq(SessionTable.id, event.data.sessionID))
@@ -772,7 +771,7 @@ const layer = Layer.effectDiscard(
         yield* db
           .update(SessionTable)
           .set({
-            revert: { ...revert, files: revert.files ? [...revert.files] : undefined },
+            revert,
             time_updated: event.created,
           })
           .where(eq(SessionTable.id, event.data.sessionID))
