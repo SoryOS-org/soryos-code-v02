@@ -1,6 +1,6 @@
 export * as SessionRevert from "./revert.js"
 
-import { and, asc, eq, gt } from "drizzle-orm"
+import { and, asc, eq, gt, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { Database } from "../database/database.js"
 import { Bus } from "../bus.js"
@@ -8,6 +8,7 @@ import { Instance } from "../instance/service.js"
 import { RelativePath } from "../schema.js"
 import { Snapshot } from "../snapshot.js"
 import { SessionEvent } from "./event.js"
+import { Money } from "@opencode/schema/money"
 import { MessageNotFoundError } from "./error.js"
 import { SessionMessage } from "./message.js"
 import { SessionSchema } from "./schema.js"
@@ -76,6 +77,58 @@ export const clear = Effect.fn("SessionRevert.clear")(function* (session: Sessio
 
 export const commit = Effect.fn("SessionRevert.commit")(function* (bus: Bus.Interface, session: SessionSchema.Info) {
   if (!session.revert) return
+  const database = yield* Database.Service
+  const boundary = yield* database.db
+    .select({ seq: SessionMessageTable.seq })
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, session.id), eq(SessionMessageTable.id, session.revert.messageID)))
+    .get()
+    .pipe(Effect.orDie)
+  // Committing deletes every message row from the boundary onward, which drops their usage from
+  // SessionStats. Record it durably first so stats can keep counting the reverted work. The projector
+  // leaves the session counters alone for this source: the steps already contributed to them when they
+  // ended, so applying it there would double count.
+  if (boundary) {
+    const usage = yield* database.db
+      .get<{
+        input: number
+        output: number
+        reasoning: number
+        cacheRead: number
+        cacheWrite: number
+        cost: number
+      }>(
+        sql`
+        SELECT
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.tokens.input')), 0) AS input,
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.tokens.output')), 0) AS output,
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.tokens.reasoning')), 0) AS reasoning,
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.tokens.cache.read')), 0) AS cacheRead,
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.tokens.cache.write')), 0) AS cacheWrite,
+          coalesce(sum(json_extract(${SessionMessageTable.data}, '$.cost')), 0) AS cost
+        FROM ${SessionMessageTable}
+        WHERE ${SessionMessageTable.session_id} = ${session.id}
+          AND ${SessionMessageTable.type} = 'assistant'
+          AND ${SessionMessageTable.seq} >= ${boundary.seq}
+      `,
+      )
+      .pipe(Effect.orDie)
+    if (
+      usage &&
+      (usage.input + usage.output + usage.reasoning + usage.cacheRead + usage.cacheWrite > 0 || usage.cost > 0)
+    )
+      yield* bus.publish(SessionEvent.UsageRecorded, {
+        sessionID: session.id,
+        source: "revert",
+        cost: Money.USD.make(usage.cost),
+        tokens: {
+          input: usage.input,
+          output: usage.output,
+          reasoning: usage.reasoning,
+          cache: { read: usage.cacheRead, write: usage.cacheWrite },
+        },
+      })
+  }
   yield* bus.publish(SessionEvent.RevertEvent.Committed, {
     sessionID: session.id,
     to: session.revert.messageID,
