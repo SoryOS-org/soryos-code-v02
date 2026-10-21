@@ -4,6 +4,7 @@ import { nativeTheme } from "electron"
 import oc2ThemeJson from "../../../../ui/src/theme/themes/oc-2.json"
 import { BACKGROUND_COLOR_KEY, ZOOM_FACTOR_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
+import { normalizeZoomFactor } from "./zoom-factor"
 
 // Frame defaults shared by the early window (created on ready, before the renderer exists) and the
 // full window setup in appearance.ts, so both draw the same frame.
@@ -39,6 +40,5 @@ export function titlebarOverlay(mode: "light" | "dark" = tone(), zoom = 1) {
 
 // The early window needs this before renderer storage is available, just like its background colour.
 export function storedZoomFactor() {
-  const stored = getStore().get(ZOOM_FACTOR_KEY)
-  return typeof stored === "number" && Number.isFinite(stored) && stored >= 0.2 && stored <= 10 ? stored : 1
+  return normalizeZoomFactor(getStore().get(ZOOM_FACTOR_KEY))
 }

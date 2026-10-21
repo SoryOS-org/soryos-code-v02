@@ -7,16 +7,21 @@ import type { DesktopPaths } from "../paths"
 import { BACKGROUND_COLOR_KEY, PINCH_ZOOM_ENABLED_KEY, ZOOM_FACTOR_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
 import { storedBackgroundColor, storedZoomFactor, titlebarOverlay, tone } from "./defaults"
+import { MAX_ZOOM_LEVEL, MIN_ZOOM_LEVEL } from "./zoom-factor"
 
 const titlebarThemes = new WeakMap<BrowserWindow, Partial<TitlebarTheme>>()
 
 const pinchZoomEnabled = new WeakMap<BrowserWindow, boolean>()
 
-const maxZoomLevel = 10
-
-const minZoomLevel = 0.2
-
 let backgroundColor: string | undefined
+
+let saveZoomTimer: ReturnType<typeof setTimeout> | undefined
+
+let pendingZoomFactor: number | undefined
+
+// Zoom changes arrive continuously while pinching, and every store write rewrites the settings
+// file, so coalesce them and flush on quit instead of writing on each event.
+app.on("before-quit", flushZoomFactor)
 
 export function windowAppearance(path: Path.Path, paths: DesktopPaths.Resolved) {
   const mode = tone()
@@ -105,8 +110,7 @@ export function getPinchZoomEnabled() {
 export function setZoomFactor(win: BrowserWindow, factor: number) {
   const next = clampZoom(factor)
   win.webContents.setZoomFactor(next)
-
-  if (getStore().get(ZOOM_FACTOR_KEY) !== next) getStore().set(ZOOM_FACTOR_KEY, next)
+  persistZoomFactor(next)
   updateZoom(win)
 }
 
@@ -145,7 +149,26 @@ function overlay(theme: Partial<TitlebarTheme> = {}, zoom = 1) {
 }
 
 function clampZoom(value: number) {
-  return Math.min(Math.max(value, minZoomLevel), maxZoomLevel)
+  return Math.min(Math.max(value, MIN_ZOOM_LEVEL), MAX_ZOOM_LEVEL)
+}
+
+function persistZoomFactor(value: number) {
+  pendingZoomFactor = value
+  if (saveZoomTimer) clearTimeout(saveZoomTimer)
+  saveZoomTimer = setTimeout(flushZoomFactor, 250)
+}
+
+function flushZoomFactor() {
+  if (saveZoomTimer) {
+    clearTimeout(saveZoomTimer)
+    saveZoomTimer = undefined
+  }
+
+  const value = pendingZoomFactor
+  pendingZoomFactor = undefined
+
+  if (value === undefined) return
+  if (getStore().get(ZOOM_FACTOR_KEY) !== value) getStore().set(ZOOM_FACTOR_KEY, value)
 }
 
 function updateZoom(win: BrowserWindow) {
