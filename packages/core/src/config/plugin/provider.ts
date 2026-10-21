@@ -58,12 +58,14 @@ export const Plugin = define({
         const current = providers.get(providerID)
         const source = providers.get(item.canonical ?? current?.provider.canonical ?? providerID)
         const changed = item.canonical !== undefined && item.canonical !== current?.provider.canonical
+        let catalogBaseURL: string | undefined
         providers.update(providerID, (provider) => {
           if (changed && source && source.provider !== provider)
             Object.assign(provider, structuredClone(source.provider), {
               id: provider.id,
               integrationID: provider.integrationID,
             })
+          catalogBaseURL = provider.settings?.baseURL
           provider.activation = "enabled"
           if (item.canonical !== undefined) provider.canonical = item.canonical
           if (item.name) provider.name = item.name
@@ -74,10 +76,11 @@ export const Plugin = define({
           if (item.headers !== undefined) provider.headers = Provider.mergeHeaders(provider.headers, item.headers)
           if (item.body !== undefined) provider.body = Provider.mergeOverlay(provider.body, item.body)
         })
-        // Catalog models can carry their own endpoint, which would otherwise win over the configured one.
-        if (item.settings?.baseURL !== undefined)
+        // A catalog model can carry a variant of the provider endpoint, which would otherwise win over the
+        // configured one. A model on another origin (Azure, Bedrock, Vertex partner models) keeps its own.
+        if (item.settings?.baseURL !== undefined && catalogBaseURL !== undefined)
           for (const [id, model] of providers.get(providerID)?.models ?? [])
-            if (model.settings?.baseURL !== undefined)
+            if (model.settings?.baseURL !== undefined && sameOrigin(model.settings.baseURL, catalogBaseURL))
               providers.models.update(providerID, id, (model) => {
                 if (model.settings) delete model.settings.baseURL
               })
@@ -202,4 +205,12 @@ function configuredProviders(entries: readonly Entry[]) {
   return entries
     .filter((entry): entry is Document => entry.type === "document")
     .flatMap((file) => Object.entries(file.info.providers ?? {}))
+}
+
+const sameOrigin = (a: string, b: string) => {
+  try {
+    return new URL(a).origin === new URL(b).origin
+  } catch {
+    return false
+  }
 }

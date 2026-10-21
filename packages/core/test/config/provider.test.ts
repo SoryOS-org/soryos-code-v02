@@ -730,6 +730,50 @@ describe("ConfigProviderPlugin.Plugin", () => {
     }).pipe(Effect.provide(ModelResolver.layer)),
   )
 
+  it.effect("keeps a catalog model endpoint on another origin, or under a provider with no catalog baseURL", () =>
+    Effect.gen(function* () {
+      const providers = yield* Provider.Service
+      const models = yield* Model.Service
+      const withBase = Provider.ID.make("custom")
+      const withoutBase = Provider.ID.make("partner")
+      yield* providers.transform((editor) => {
+        editor.update(withBase, (provider) => {
+          provider.package = "@opencode/ai/providers/openai/chat"
+          provider.settings = { baseURL: "https://catalog.example/v1" }
+        })
+        editor.models.update(withBase, Model.ID.make("partner-model"), (model) => {
+          model.settings = { baseURL: "https://partner.example/models" }
+        })
+        editor.update(withoutBase, (provider) => {
+          provider.package = "@opencode/ai/providers/openai/chat"
+        })
+        editor.models.update(withoutBase, Model.ID.make("claude"), (model) => {
+          model.settings = { baseURL: "https://resource.example/anthropic/v1" }
+        })
+      })
+      yield* addPlugin([
+        new Document({
+          type: "document",
+          info: decode({
+            providers: {
+              custom: { settings: { baseURL: "https://gateway.example/v1" } },
+              partner: { settings: { baseURL: "https://vpc.example/v1" } },
+            },
+          }),
+        }),
+      ])
+
+      const resolver = yield* ModelResolver.Service
+      const endpoint = (providerID: Provider.ID, id: string) =>
+        models.get(providerID, Model.ID.make(id)).pipe(
+          Effect.flatMap((model) => resolver.resolveModel(required(model))),
+          Effect.map((resolved) => resolved.model.route.endpoint.baseURL),
+        )
+      expect(yield* endpoint(withBase, "partner-model")).toBe("https://partner.example/models")
+      expect(yield* endpoint(withoutBase, "claude")).toBe("https://resource.example/anthropic/v1")
+    }).pipe(Effect.provide(ModelResolver.layer)),
+  )
+
   it.effect("generates variants after rewriting a configured model package", () =>
     Effect.gen(function* () {
       const models = yield* Model.Service
