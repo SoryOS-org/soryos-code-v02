@@ -18,6 +18,9 @@ import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionProjector } from "@opencode/core/session/projector"
+import { SessionStats } from "@opencode/core/session/stats"
+import { SessionTable } from "@opencode/core/session/sql"
+import { eq } from "drizzle-orm"
 import { Snapshot } from "@opencode/core/snapshot"
 import { Money } from "@opencode/schema/money"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -116,6 +119,104 @@ describe("Session.revert files", () => {
         }).pipe(Effect.provide(LocationServiceMap.Service.get(created.location)))
       }),
     // Real Location/plugin startup and Git snapshots can exceed five seconds under CI load.
+    { timeout: 15_000 },
+  )
+})
+
+describe("Session.revert stats", () => {
+  it.live(
+    "keeps reverted step usage in stats without double counting session totals",
+    () =>
+      Effect.gen(function* () {
+        const tmp = yield* tmpdirScoped()
+        const directory = path.join(tmp.path, "project")
+        yield* Effect.promise(async () => {
+          await fs.mkdir(directory, { recursive: true })
+          await $`git init -q`.cwd(directory).quiet()
+        })
+
+        const session = yield* Session.Service
+        const database = yield* Database.Service
+        const bus = yield* Bus.Service
+        const created = yield* session.create({ location: { directory: AbsolutePath.make(directory) } })
+
+        yield* Effect.gen(function* () {
+          const plugins = yield* Plugin.Service
+          yield* plugins.awaitActivation
+          const snapshot = yield* Snapshot.Service
+
+          const prompt = (text: string) =>
+            Effect.gen(function* () {
+              const admitted = yield* session.prompt({ sessionID: created.id, text, resume: false })
+              yield* SessionInbox.promote(database.db, bus, created.id, "steer")
+              return admitted
+            })
+
+          const step = Effect.fnUntraced(function* () {
+            const before = yield* snapshot.capture()
+            if (!before) throw new Error("Initial snapshot missing")
+            const assistantMessageID = SessionMessage.ID.create()
+            yield* bus.publish(SessionEvent.Step.Started, {
+              sessionID: created.id,
+              assistantMessageID,
+              agent: Agent.defaultID,
+              model: { id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") },
+              snapshot: before,
+              started: 0,
+            })
+            const after = yield* snapshot.capture()
+            if (!after) throw new Error("Snapshot missing")
+            yield* bus.publish(SessionEvent.Step.Ended, {
+              sessionID: created.id,
+              assistantMessageID,
+              finish: "stop",
+              cost: Money.USD.make(0.5),
+              tokens: { input: 1000, output: 100, reasoning: 10, cache: { read: 5, write: 3 } },
+              snapshot: after,
+              files: yield* snapshot.files({ from: before, to: after }),
+            })
+          })
+
+          yield* prompt("First")
+          yield* step()
+          const second = yield* prompt("Second")
+          yield* step()
+
+          const before = yield* SessionStats.get({ timezone: "UTC", tools: "none" })
+          expect(before.tokens).toEqual({
+            input: 2000,
+            output: 200,
+            reasoning: 20,
+            cache: { read: 10, write: 6 },
+          })
+
+          // Prompting with a staged revert commits it, deleting the second exchange's message rows.
+          yield* session.revert.stage({ sessionID: created.id, messageID: second.id })
+          yield* prompt("Third")
+
+          const stats = yield* SessionStats.get({ timezone: "UTC", tools: "none" })
+          expect(stats.tokens).toEqual({
+            input: 2000,
+            output: 200,
+            reasoning: 20,
+            cache: { read: 10, write: 6 },
+          })
+          expect(stats.cost).toBe(Money.USD.make(1))
+
+          const row = yield* database.db
+            .select()
+            .from(SessionTable)
+            .where(eq(SessionTable.id, created.id))
+            .get()
+            .pipe(Effect.orDie)
+          expect(row?.tokens_input).toBe(2000)
+          expect(row?.tokens_output).toBe(200)
+          expect(row?.tokens_reasoning).toBe(20)
+          expect(row?.tokens_cache_read).toBe(10)
+          expect(row?.tokens_cache_write).toBe(6)
+          expect(row?.cost).toBe(1)
+        }).pipe(Effect.provide(LocationServiceMap.Service.get(created.location)))
+      }),
     { timeout: 15_000 },
   )
 })
