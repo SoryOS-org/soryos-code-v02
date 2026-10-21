@@ -14,8 +14,8 @@ const cleanups: (() => void)[] = []
 const originals = { raf: globalThis.requestAnimationFrame, caf: globalThis.cancelAnimationFrame }
 
 beforeEach(() => {
-  // Kit's spring tests run with the James option off; its own tests turn it on.
-  setLow(false)
+  // The spring tests run with James off; James's own tests turn it on.
+  setJames(false)
   frames = new Map()
   id = 0
   time = 0
@@ -35,7 +35,7 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originals.raf
   globalThis.cancelAnimationFrame = originals.caf
   setStyle("spring")
-  setLow(false)
+  setJames(false)
 })
 
 function setStyle(value: string) {
@@ -44,9 +44,9 @@ function setStyle(value: string) {
   if (knob?.kind === "choice") motionTuning.set(knob, value)
 }
 
-// The James option is a mode, chosen in the preset strip rather than the Motion choice.
-function setLow(on: boolean) {
-  const knob = motionTuning.list().find((item) => item.id === "sidebars.low")
+// James is a mode, chosen in the preset strip rather than the Motion choice.
+function setJames(on: boolean) {
+  const knob = motionTuning.list().find((item) => item.id === "sidebars.james")
 
   if (knob?.kind === "mode") motionTuning.set(knob, on)
 }
@@ -253,9 +253,9 @@ type Played = {
   finish: () => void
 }
 
-// happy-dom has no Web Animations, so the panel layer records what the James option asks it to play.
-function setupLow(initial: boolean) {
-  setLow(true)
+// happy-dom has no Web Animations, so the panel layer records what James asks it to play.
+function setupJames(initial: boolean) {
+  setJames(true)
   const [open, setOpen] = createSignal(initial)
   const played: Played[] = []
   const closed: number[] = []
@@ -304,8 +304,8 @@ const land = async (played: Played[]) => {
   await tick()
 }
 
-it("The James option opens with the layout first, then shifts the panel in on a spring and fades it up from 0.15", async () => {
-  const panel = setupLow(false)
+it("James opens with the layout first, then shifts the panel in on a spring and fades it up from 0.15", async () => {
+  const panel = setupJames(false)
   panel.setOpen(true)
   expect(panel.painted.width).toBe(200)
   expect(panel.motion.present()).toBe(true)
@@ -331,8 +331,8 @@ it("The James option opens with the layout first, then shifts the panel in on a 
   expect(panelsMoving()).toBe(false)
 })
 
-it("The James option closes at once, cancelling an opening in flight", async () => {
-  const panel = setupLow(false)
+it("James closes at once, cancelling an opening in flight", async () => {
+  const panel = setupJames(false)
   panel.setOpen(true)
   await tick()
   panel.setOpen(false)
@@ -345,10 +345,10 @@ it("The James option closes at once, cancelling an opening in flight", async () 
   expect(panelsMoving()).toBe(false)
 })
 
-it("The James option snaps under reduced motion", () => {
+it("James snaps under reduced motion", () => {
   document.documentElement.dataset.motion = "reduce"
   cleanups.push(() => delete document.documentElement.dataset.motion)
-  const panel = setupLow(true)
+  const panel = setupJames(true)
   panel.setOpen(false)
 
   expect(panel.played).toEqual([])
@@ -356,7 +356,7 @@ it("The James option snaps under reduced motion", () => {
   expect(panel.motion.present()).toBe(false)
 })
 
-it("swaps Kit's knobs for the James option's while its mode is on", () => {
+it("swaps the spring knobs for James's while it's on", () => {
   const shown = () =>
     motionTuning
       .list()
@@ -364,17 +364,17 @@ it("swaps Kit's knobs for the James option's while its mode is on", () => {
       .map((knob) => knob.label)
 
   expect(shown()).toEqual(["Spring", "Motion"])
-  setLow(true)
+  setJames(true)
   expect(shown()).toEqual(["Movement", "Fade", "Fade duration", "Panel shift", "Layout", "Layout open", "Layout close"])
-  setLow(false)
+  setJames(false)
   expect(shown()).toEqual(["Spring", "Motion"])
 })
 
-it("ships the James option as the default sidebar motion", () => {
-  const knob = motionTuning.list().find((item) => item.id === "sidebars.low")
+it("ships James as the default sidebar motion", () => {
+  const knob = motionTuning.list().find((item) => item.id === "sidebars.james")
 
   expect(knob?.kind).toBe("mode")
   expect(knob?.initial).toBe(true)
   // The side panel shifts 30px by default; the left sidebar stays at 10px.
-  expect(motionTuning.list().find((item) => item.id === "sidebars.low.panelShift")?.initial).toBe(30)
+  expect(motionTuning.list().find((item) => item.id === "sidebars.james.panelShift")?.initial).toBe(30)
 })
