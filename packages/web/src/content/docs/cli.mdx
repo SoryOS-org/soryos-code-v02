@@ -430,10 +430,10 @@ Set service configuration.
 opencode service set hostname 0.0.0.0
 ```
 
-Allow an extra CORS origin.
+Set the allowed CORS origins, replacing the current list. The value is a comma-separated list of HTTP(S) origins, written without paths or trailing slashes.
 
 ```bash
-opencode service set cors https://app.example.com
+opencode service set cors https://app.example.com,https://admin.example.com
 ```
 
 Pass an environment variable to the server process.
