@@ -417,6 +417,33 @@ test("keeps a 25000-line crash report editable in a new session", async ({ page 
   await expectCaretVisible(input)
 })
 
+test("keeps a line added at the end of a scrolling prompt clear of the bottom fade", async ({ page }) => {
+  const { editor } = await openSession(page, { name: "ComposerFade" })
+  await editor.click()
+
+  for (const line of Array.from({ length: 12 }, (_, index) => `Line ${index + 1}`)) {
+    await page.keyboard.type(line)
+    await page.keyboard.press("Shift+Enter")
+  }
+  await page.keyboard.type("Last line")
+  await expect.poll(() => editor.innerText()).toMatch(/Line 12\nLast line$/)
+
+  // The mask fades the viewport's bottom --composer-fade-bottom pixels; the last line must end above them.
+  await expect
+    .poll(() =>
+      editor.evaluate((element) => {
+        const viewport = element.closest(".scroll-view__viewport")!
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        const line = Array.from(range.getClientRects()).reduce((last, rect) => (rect.bottom > last.bottom ? rect : last))
+        const fade = parseFloat(getComputedStyle(viewport).getPropertyValue("--composer-fade-bottom"))
+
+        return Math.max(0, Math.round(line.bottom - (viewport.getBoundingClientRect().bottom - fade)))
+      }),
+    )
+    .toBe(0)
+})
+
 test("a key-up never moves the caret back after later navigation", async ({ page }) => {
   const input = await draft(page)
   await input.pressSequentially("first line")

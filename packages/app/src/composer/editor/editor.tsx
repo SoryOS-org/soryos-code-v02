@@ -380,9 +380,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
                   if (!caret.height) return
                   const bounds = viewport.getBoundingClientRect()
 
-                  if (caret.bottom > bounds.bottom - 8) viewport.scrollTop += caret.bottom - bounds.bottom + 8
+                  // Matches the viewport's 16px scroll-padding, which keeps the caret clear of the fades.
+                  if (caret.bottom > bounds.bottom - 16) viewport.scrollTop += caret.bottom - bounds.bottom + 16
 
-                  if (caret.top < bounds.top + 8) viewport.scrollTop += caret.top - bounds.top - 8
+                  if (caret.top < bounds.top + 16) viewport.scrollTop += caret.top - bounds.top - 16
                 })
               }}
               onFocus={() => props.controller.dispatch({ type: "focus.editor" })}

@@ -23,6 +23,13 @@
   );
 }
 
+/* Chromium reveals the caret flush with the viewport edge after Enter or typing, ignoring the editor padding, so the
+   last line would land under the fade. Keep revealed carets clear of both 16px fades. */
+[data-component="composer-scroll"] > .scroll-view__viewport,
+[data-slot="composer-content"][data-history-preview] {
+  scroll-padding-block: 16px;
+}
+
 /* History scrolls text and attachments together, so only the outer viewport applies the mask. */
 [data-slot="composer-content"][data-history-preview] [data-component="composer-scroll"] > .scroll-view__viewport {
   mask-image: none;
