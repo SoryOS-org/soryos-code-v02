@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Diagnostyka wydajności w środowisku deweloperskim",
   providerAriaLabel: "Diagnostyka wydajności dostawcy",
   na: "n.d.",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Czas od wysłania żądania do dostawcy do pierwszego wyniku modelu.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Czas od wysłania żądania do dostawcy do pierwszego tekstu odpowiedzi.",
+  "duration.label": "TIME",
+  "duration.tip": "Czas od polecenia, które rozpoczęło ostatnią turę, do zakończenia odpowiedzi.",
   "tps.label": "TPS",
   "tps.tip":
     "Tokeny wyjściowe i rozumowania na sekundę we wszystkich żądaniach do modelu w ostatniej turze, bez czasu narzędzi.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Czas od wysłania żądania do dostawcy do zakończenia strumienia odpowiedzi.",
   "nav.label": "NAV",
   "nav.tip":
     "Ostatnie zakończone przejście między trasami obejmujące stronę sesji, mierzone od uruchomienia routera do pierwszego odrysowania po ustabilizowaniu widoku.",

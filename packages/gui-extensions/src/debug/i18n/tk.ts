@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Ösüş öndürijiligini anyklaýyş",
   providerAriaLabel: "Hyzmat üpjünçiniň öndürijilik diagnostikasy",
   na: "n / a",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Hyzmat üpjünçä haýyş iberilenden modeliň ilkinji çykyşyna çenli wagt.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Hyzmat üpjünçä haýyş iberilenden jogabyň ilkinji tekstine çenli wagt.",
+  "duration.label": "TIME",
+  "duration.tip": "Soňky nobaty başlan haýyşdan jogabyň tamamlanmagyna çenli wagt.",
   "tps.label": "TPS",
   "tps.tip":
     "Soňky nobatyň model haýyşlary boýunça sekuntda çykyş we pikirleniş tokenleri, gural wagty hasaba alynmazdan.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Hyzmat üpjünçä haýyş iberilenden jogap akymynyň tamamlanmagyna çenli wagt.",
   "nav.label": "NAV",
   "nav.tip":
     "Iň soňky tamamlanan marşrut geçiş, sessiýa sahypasyna degip, marşrutizatoryň başyndan başlap, birinji boýag kesgitlenýänçä ölçelýär.",

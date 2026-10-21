@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Utvecklingsprestandadiagnostik",
   providerAriaLabel: "Prestandadiagnostik för leverantör",
   na: "n/a",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Tid från att leverantörsbegäran skickas tills modellen ger sin första utdata.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Tid från att leverantörsbegäran skickas tills den första svarstexten visas.",
+  "duration.label": "TIME",
+  "duration.tip": "Tid från prompten som startade den senaste turen tills svaret var klart.",
   "tps.label": "TPS",
   "tps.tip":
     "Utdata- och resonemangstoken per sekund över modellförfrågningarna i den senaste turen, utan verktygstid.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Tid från att leverantörsbegäran skickas tills svarsströmmen avslutas.",
   "nav.label": "NAV",
   "nav.tip":
     "Senast slutförda ruttövergång som berör en sessionssida, mätt från routerns start till första bildrutans rendering efter att övergången har slutförts.",

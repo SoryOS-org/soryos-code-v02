@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Diagnostik prestasi pembangunan",
   providerAriaLabel: "Diagnostik prestasi penyedia",
   na: "tiada",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Masa dari penghantaran permintaan penyedia hingga output pertama model.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Masa dari penghantaran permintaan penyedia hingga teks jawapan pertama.",
+  "duration.label": "TIME",
+  "duration.tip": "Masa dari gesaan yang memulakan giliran terakhir sehingga responsnya selesai.",
   "tps.label": "TPS",
   "tps.tip":
     "Token output dan penaakulan sesaat merentas permintaan model dalam giliran terakhir, tidak termasuk masa alat.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Masa dari penghantaran permintaan penyedia hingga strim responsnya tamat.",
   "nav.label": "NAV",
   "nav.tip":
     "Peralihan laluan terakhir yang melibatkan halaman sesi, diukur dari permulaan router hingga cat pertama selepas ia stabil.",

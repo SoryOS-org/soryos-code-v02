@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Diagnostica delle prestazioni di sviluppo",
   providerAriaLabel: "Diagnostica delle prestazioni del provider",
   na: "n/d",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Tempo dall’invio della richiesta al provider al primo output del modello.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Tempo dall’invio della richiesta al provider al primo testo della risposta.",
+  "duration.label": "TIME",
+  "duration.tip": "Tempo dal prompt che ha avviato l'ultimo turno al completamento della risposta.",
   "tps.label": "TPS",
   "tps.tip":
     "Token di output e di ragionamento al secondo nelle richieste al modello dell'ultimo turno, escluso il tempo degli strumenti.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Tempo dall’invio della richiesta al provider alla fine del flusso di risposta.",
   "nav.label": "NAV",
   "nav.tip":
     "Ultima transizione completata relativa a una pagina di sessione, misurata dall'avvio del router fino al primo rendering dopo la stabilizzazione.",

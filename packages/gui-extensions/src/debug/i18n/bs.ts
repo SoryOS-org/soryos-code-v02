@@ -3,15 +3,11 @@ export default {
   ariaLabel: "Dijagnostika performansi razvoja",
   providerAriaLabel: "Dijagnostika performansi pružaoca usluge",
   na: "n/a",
-  "ttft.label": "TTFT",
-  "ttft.tip": "Vrijeme od slanja zahtjeva pružaocu do prvog izlaza modela.",
-  "ttfa.label": "TTFA",
-  "ttfa.tip": "Vrijeme od slanja zahtjeva pružaocu do prvog teksta odgovora.",
+  "duration.label": "TIME",
+  "duration.tip": "Vrijeme od upita koji je započeo posljednji potez do završetka odgovora.",
   "tps.label": "TPS",
   "tps.tip":
     "Izlazni tokeni i tokeni rasuđivanja u sekundi kroz zahtjeve modelu u posljednjem potezu, bez vremena alata.",
-  "e2e.label": "E2E",
-  "e2e.tip": "Vrijeme od slanja zahtjeva pružaocu do završetka toka odgovora.",
   "nav.label": "NAV",
   "nav.tip":
     "Posljednji završeni prelazak rute koji dotiče stranicu sesije, mjeren od početka rutera do prvog iscrtavanja nakon smirivanja.",
