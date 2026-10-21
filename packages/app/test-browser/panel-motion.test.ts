@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "bun:test"
 import { batch, createRoot, createSignal } from "solid-js"
 import { motionTuning } from "@opencode/ui/motion-tuning"
-import { createPanelMotion } from "../src/shell/panel-motion"
+import { createPanelMotion, guardClosingFocus, panelsMoving } from "../src/shell/panel-motion"
 
 let frames: Map<number, FrameRequestCallback>
 
@@ -186,4 +186,52 @@ it("runs settled work once the flight lands, dropping work queued before a turna
   expect(ran).toEqual(["closed"])
   panel.motion.whenSettled(() => ran.push("at rest"))
   expect(ran).toEqual(["closed", "at rest"])
+})
+
+it("reports a flight from its first frame until it lands, for native views to hide", () => {
+  const panel = setup(true)
+  expect(panelsMoving()).toBe(false)
+
+  panel.setOpen(false)
+  expect(panelsMoving()).toBe(true)
+  frame()
+  panel.setOpen(true)
+  expect(panelsMoving()).toBe(true)
+  settle()
+  expect(panelsMoving()).toBe(false)
+
+  setStyle("instant")
+  panel.setOpen(false)
+  expect(panelsMoving()).toBe(false)
+})
+
+it("moves focus out of a closing panel when the close starts and when it re-enters mid-flight", () => {
+  const root = document.createElement("div")
+  const inner = document.createElement("button")
+  const toggle = document.createElement("button")
+  root.append(inner)
+  document.body.append(root, toggle)
+  const [closing, setClosing] = createSignal(false)
+  cleanups.push(
+    createRoot((dispose) => {
+      guardClosingFocus({ root: () => root, closing, target: () => toggle })
+
+      return dispose
+    }),
+    () => {
+      root.remove()
+      toggle.remove()
+    },
+  )
+
+  inner.focus()
+  setClosing(true)
+  expect(document.activeElement).toBe(toggle)
+
+  inner.focus()
+  expect(document.activeElement).toBe(toggle)
+
+  setClosing(false)
+  inner.focus()
+  expect(document.activeElement).toBe(inner)
 })

@@ -449,8 +449,12 @@ function SessionScreenContent(props: {
           <Show when={sideMotion.present() || store.sideMounted}>
             <div
               data-slot="session-side-panel-presence"
-              class="relative z-0 min-w-0 h-full flex-1 overflow-visible"
-              classList={{ "[content-visibility:hidden]": !sideMotion.present() }}
+              class="z-0 min-w-0 h-full overflow-visible"
+              classList={{
+                "relative flex-1": sideMotion.present(),
+                // Out of the row, so a closed panel takes no space or gap.
+                "absolute inset-y-0 end-0 w-0 [content-visibility:hidden]": !sideMotion.present(),
+              }}
             >
               <div
                 data-slot="session-side-panel-content"

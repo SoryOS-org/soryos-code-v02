@@ -14,7 +14,7 @@ import { ExtensionSlot } from "@/runtime/extension/render"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { CollapsedSidebarToggle, paintCollapsedSlots } from "@/shell/sidebar-toggle"
-import { createPanelMotion, replayPanelToggle } from "@/shell/panel-motion"
+import { createPanelMotion, guardClosingFocus, replayPanelToggle } from "@/shell/panel-motion"
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
@@ -50,6 +50,16 @@ export default function Layout(props: ParentProps) {
   })
 
   replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
+
+  guardClosingFocus({
+    root: () => state.tabsAside,
+    closing: () => !preferences.appearance.sidebarOpen() && sidebarMotion.present(),
+    // The toggle that reopens the sidebar, outside it.
+    target: () =>
+      [...document.querySelectorAll<HTMLElement>('button[aria-controls="vertical-tabs-sidebar"]')].find(
+        (button) => !state.tabsAside?.contains(button),
+      ),
+  })
 
   command.register("sidebar", () =>
     verticalTabs()

@@ -54,7 +54,12 @@ import { refusal } from "./policy"
 
 /** The renderer host pieces the pane runs on, passed in by `packages/app/component-tests/browser-pane.spec.ts`. */
 type PaneHost = {
-  createEmbeds(input: { bridge: Bridge | undefined; zoom: () => number; dialog: () => boolean }): Embeds
+  createEmbeds(input: {
+    bridge: Bridge | undefined
+    zoom: () => number
+    dialog: () => boolean
+    moving: () => boolean
+  }): Embeds
   LanguageProvider: Component<{ locale: string; children: JSX.Element }>
   UiI18nBridge: ParentComponent
   useLanguage(): { t(key: string): string }
@@ -73,6 +78,8 @@ type PaneFixtureState = {
   error: string | undefined
   layouts: Record<string, BridgeLayout | undefined>
   covered: boolean
+  /** A panel is in flight, as the host's panel motion reports it. */
+  moving: boolean
   captures: number
   holdCapture: boolean
   picker: Record<string, boolean | undefined>
@@ -132,6 +139,7 @@ export function mountBrowserPane(input: PaneHost) {
       error: undefined,
       layouts: {},
       covered: false,
+      moving: false,
       captures: 0,
       holdCapture: false,
       picker: {},
@@ -185,7 +193,12 @@ export function mountBrowserPane(input: PaneHost) {
     }
 
     // SAFETY: the host embeds call only `embed` and `capture` on their bridge (`runtime/extension/embeds.tsx`).
-    const embeds = input.createEmbeds({ bridge: bridge as Bridge, zoom: () => 1, dialog: () => false })
+    const embeds = input.createEmbeds({
+      bridge: bridge as Bridge,
+      zoom: () => 1,
+      dialog: () => false,
+      moving: () => store.moving,
+    })
 
     const t = (key: string, params?: Readonly<Partial<Record<string, string | number>>>) =>
       (messages.get(key) ?? language.t(key)).replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
@@ -476,6 +489,7 @@ export function mountBrowserPane(input: PaneHost) {
             <button onClick={() => setStore("holdCapture", true)}>Hold capture</button>
             <button onClick={() => held.splice(0).forEach((resolve) => resolve())}>Release capture</button>
             <button onClick={() => setStore("covered", (covered) => !covered)}>Toggle popover</button>
+            <button onClick={() => setStore("moving", (moving) => !moving)}>Toggle panel motion</button>
             <button onClick={pick}>Pick element</button>
             <button onClick={() => setStore("history", { visits })}>Seed history</button>
             <button onClick={() => emit(store.session, { type: "page", tabID: current().id, icon, zoom: store.zoom })}>
@@ -616,7 +630,9 @@ type RegionHost = {
     reopenSide: () => void
     switchSession: () => void
     /** The side region, for its tab shortcuts. */
-    side: () => { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void } | undefined
+    side: () =>
+      | { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void }
+      | undefined
     /** The shortcut the browser's + menu item shows, as the host formats it; empty when it shows none. */
     shortcut: (shortcut: Accessor<string>) => void
   }>

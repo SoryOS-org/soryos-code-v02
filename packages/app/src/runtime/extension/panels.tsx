@@ -117,7 +117,7 @@ export function createRegion(input: {
   side: Accessor<{ opened(): boolean; toggle(): void }>
   /** Runs when a close leaves no stored tab, in the same batch as the close. */
   onEmptied?: () => void
-  /** Runs work that forces a layout, like moving focus, once the region's open or close motion lands. */
+  /** Runs work that forces a layout, like moving focus, once the region's open motion lands. */
   settled?: (run: () => void) => void
 }) {
   const settled = input.settled ?? ((run: () => void) => run())
@@ -332,7 +332,7 @@ export function createRegion(input: {
     select(key: string) {
       input.tabs().setActive(key)
     },
-    /** Opens or closes the side region for the user. Opening moves focus into it; closing gives focus back. */
+    /** Opens or closes the side region for the user. Opening moves focus into it once it lands; closing gives focus back. */
     toggle() {
       const side = input.side()
       const focused = document.activeElement
@@ -341,10 +341,10 @@ export function createRegion(input: {
         const inside = !!document.getElementById("review-panel")?.contains(focused)
         const back = returnFocus
         returnFocus = undefined
+
+        // Focus leaves before the close starts, back to where it was; otherwise the panel hands it to its toggle.
+        if (inside && back?.isConnected) back.focus({ preventScroll: true })
         side.toggle()
-        settled(() => {
-          if (inside && back?.isConnected) back.focus({ preventScroll: true })
-        })
 
         return
       }

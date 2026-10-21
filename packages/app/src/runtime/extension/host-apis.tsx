@@ -47,6 +47,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { useIsRouting, useLocation } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
 import { createClosedTabs } from "./closed-tabs"
+import { panelsMoving } from "@/shell/panel-motion"
 import { createEmbeds } from "./embeds"
 import { useExtensionHost, type HostApiFactories } from "./host"
 import { createLocatedWrites } from "./located"
@@ -122,6 +123,7 @@ export function createHostApis() {
     bridge: platform.extensions,
     zoom: () => platform.webviewZoom?.() ?? 1,
     dialog: () => !!dialog.active,
+    moving: panelsMoving,
   })
 
   // A server or session store's key needs the server's scope, which the mounted interface provides.

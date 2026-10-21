@@ -66,6 +66,22 @@ story("hides the native view immediately while the pane stays mounted", async ({
   await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
 })
 
+story("hides the native view from the first frame a panel moves until it lands", async ({ page }) => {
+  const root = page.getByTestId("browser-pane-fixture")
+  const motion = root.getByRole("button", { name: "Toggle panel motion", exact: true })
+
+  // Read in the same task as the click: a native view left up for even one frame floats over the moving app.
+  const visible = await motion.evaluate((element) => {
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+
+    return document.querySelector('[data-testid="native-Alpha"]')?.getAttribute("data-visible")
+  })
+
+  expect(visible).toBe("false")
+  await motion.click()
+  await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
+})
+
 story("keeps a still of the page under floating content that covers it", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   const still = root.locator("#browser-panel img")

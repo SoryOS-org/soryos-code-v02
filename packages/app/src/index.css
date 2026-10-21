@@ -85,8 +85,9 @@
     );
   }
 
-  /* The review's container is its fixed-width content, not the panel, so a panel animating its width re-evaluates no
-     container queries. */
+  /* The review panel's visible width, which the header fade below tracks while the panel animates. Its fixed-width
+     content holds nothing else that reads it. */
+  #review-panel,
   #bottom-panel {
     container-type: inline-size;
   }

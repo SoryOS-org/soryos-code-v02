@@ -4,6 +4,11 @@ import { motionTuning } from "@opencode/ui/motion-tuning"
 
 const group = "Sidebars"
 
+// Panels in flight, across the app. Native views, which no DOM box clips, stay hidden while any panel moves.
+const [flights, setFlights] = createSignal(0)
+
+export const panelsMoving = () => flights() > 0
+
 // The left sidebar and the side panel share one spring, so they move as one system.
 const spring = motionTuning.spring("sidebars", {
   label: "Spring",
@@ -49,12 +54,20 @@ export function createPanelMotion(input: {
   let landed: (() => void)[] = []
   // A state `sync` asked to show at once, for when the change hasn't reached this motion yet, e.g. inside a batch.
   let snapTo: boolean | undefined
+  let flying = false
+
+  const fly = (next: boolean) => {
+    if (flying === next) return
+    flying = next
+    setFlights((count) => count + (next ? 1 : -1))
+  }
 
   const paint = () => input.paint(Math.min(1, Math.max(0, motion.value / 100)))
 
   const settle = () => {
     stop?.()
     stop = undefined
+    fly(false)
     const queued = landed
     landed = []
 
@@ -87,6 +100,7 @@ export function createPanelMotion(input: {
         if (previous === undefined || previous[1] !== identity) {
           stop?.()
           stop = undefined
+          fly(false)
           motion.snap(target)
           paint()
 
@@ -102,6 +116,7 @@ export function createPanelMotion(input: {
         motion.zeta = 1 - tuning.bounce
         // Retargeting keeps the current position and velocity, so a second toggle mid-flight turns around smoothly.
         motion.set(target)
+        fly(true)
         // Writes only; anything reading layout this frame does so in the loop's read phase, before this runs.
         stop ??= frameLoop.add((dt) => {
           motion.step(dt)
@@ -120,7 +135,10 @@ export function createPanelMotion(input: {
   // Repaints at rest when the open size changes, e.g. a resize drag or a window resize.
   createEffect(paint)
 
-  onCleanup(() => stop?.())
+  onCleanup(() => {
+    stop?.()
+    fly(false)
+  })
 
   return {
     present,
@@ -133,4 +151,35 @@ export function createPanelMotion(input: {
       run()
     },
   }
+}
+
+/**
+ * Keeps focus out of a closing panel without `inert`, which would restyle every element in it: focus inside moves to
+ * `target` when the close starts and whenever it enters during the flight. A settled panel is skipped, so nothing in
+ * it can take focus.
+ */
+export function guardClosingFocus(input: {
+  root: Accessor<HTMLElement | undefined>
+  closing: Accessor<boolean>
+  target: () => HTMLElement | undefined
+}) {
+  const evict = () => {
+    const root = input.root()
+
+    if (!input.closing() || !root?.contains(document.activeElement)) return
+    const target = input.target()
+
+    if (target) return target.focus({ preventScroll: true })
+
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  }
+
+  createEffect(on(input.closing, evict, { defer: true }))
+  createEffect(() => {
+    const root = input.root()
+
+    if (!root) return
+    root.addEventListener("focusin", evict)
+    onCleanup(() => root.removeEventListener("focusin", evict))
+  })
 }

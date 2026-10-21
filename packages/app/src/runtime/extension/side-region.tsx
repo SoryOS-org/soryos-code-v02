@@ -29,6 +29,7 @@ import {
   type SessionPanelMenuItem,
 } from "@opencode/gui-extensions/sdk"
 import { useCommand } from "@/shell/commands/command"
+import { guardClosingFocus } from "@/shell/panel-motion"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useLayout } from "@/shell/state/layout"
 import { useSessionLayout } from "@/session/session-layout"
@@ -86,7 +87,7 @@ export function SideRegion(props: {
   })
 
   const [column, setColumn] = createStore({ height: 0 })
-  let root: HTMLElement | undefined
+  const [root, setRoot] = createSignal<HTMLElement>()
   let stack: HTMLDivElement | undefined
 
   createResizeObserver(
@@ -96,20 +97,16 @@ export function SideRegion(props: {
 
   const lowerHeight = createMemo(() => Math.round(column.height * (1 - view().split.ratio())))
 
-  createEffect(() => {
-    if (tabsOpen()) return
-    const active = document.activeElement
-
-    if (!(active instanceof HTMLElement)) return
-
-    if (!root?.contains(active)) return
-    active.blur()
+  guardClosingFocus({
+    root,
+    closing: () => !tabsOpen() && tabsVisible(),
+    target: () => document.querySelector<HTMLElement>('[data-slot="session-review-toggle"] button') ?? undefined,
   })
 
   return (
     <Show when={isDesktop() && !!params.id}>
       <aside
-        ref={root}
+        ref={setRoot}
         id="review-panel"
         tabIndex={-1}
         aria-label={language.t("session.panel.reviewAndFiles")}
@@ -124,7 +121,7 @@ export function SideRegion(props: {
         <Show when={contentMounted()}>
           <div
             data-slot="session-review-content"
-            class="h-full flex shrink-0 contain-strict [container-type:inline-size]"
+            class="h-full flex shrink-0 contain-strict"
             style={{ width: "var(--session-side-content-width, 100%)" }}
           >
             <div
@@ -165,7 +162,7 @@ export function SideRegion(props: {
                       view={props.view}
                       screen={props.screen}
                       sidebar={props.sidebar}
-                      shown={tabsVisible}
+                      shown={tabsOpen}
                       present={tabsVisible}
                       animate={() => !props.size.active()}
                       placeholder={index() === 0}
