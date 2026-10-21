@@ -373,7 +373,10 @@ const titleAttempts = (sessionID: Session.ID, text: string, variant?: string) =>
     const title = yield* SessionTitle.Service
     yield* title.generate(sessionID)
     const store = yield* SessionStore.Service
-    return { attempted: attempted.map((model) => String(model.variant)), title: (yield* store.get(sessionID))?.title }
+    return {
+      attempted: attempted.map((model) => (model.variant ? String(model.variant) : undefined)),
+      title: (yield* store.get(sessionID))?.title,
+    }
   })
 
 it.effect("uses the primary model at its lowest variant without a small model", () =>
@@ -421,7 +424,7 @@ it.effect("keeps the primary default variant instead of a low variant that may e
       "Default may not reason",
       undefined,
     )
-    expect(result.attempted).toEqual(["default"])
+    expect(result.attempted).toEqual([undefined])
     expect(result.title).toBe("Generated Title")
   }),
 )
