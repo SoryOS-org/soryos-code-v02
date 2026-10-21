@@ -121,4 +121,19 @@ describe("reorderGroupedStrip", () => {
   test("a no-op drag returns the order unchanged", () => {
     expect(reorderGroupedStrip(input(1, 1))).toBe(keys)
   })
+
+  test("a tab dropped at a foreign group boundary it cannot honor is rejected", () => {
+    // a2 lands between group b's header and its member: no same-group
+    // neighbor on either side, so the drag snaps back.
+    expect(reorderGroupedStrip(input(2, 3))).toBeUndefined()
+  })
+
+  test("a tab dragged to the first and last slot of its own group reorders it", () => {
+    expect(reorderGroupedStrip(input(1, 2))).toEqual(["a2", "a1", "a3", "b1"])
+    expect(reorderGroupedStrip(input(2, 1))).toEqual(["a2", "a1", "a3", "b1"])
+  })
+
+  test("a header dropped inside another group's segment without changing header order is a no-op", () => {
+    expect(reorderGroupedStrip(input(3, 1))).toEqual(keys)
+  })
 })

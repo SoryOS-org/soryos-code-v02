@@ -38,6 +38,7 @@ export function tabGroupVariant(id: string, color?: string): ProjectAvatarVarian
     if (variant !== "gray") return variant
   }
 
+  // Java's String.hashCode multiplier: spreads short group ids well.
   let hash = 0
   for (let index = 0; index < id.length; index++) hash = (hash * 31 + id.charCodeAt(index)) | 0
 

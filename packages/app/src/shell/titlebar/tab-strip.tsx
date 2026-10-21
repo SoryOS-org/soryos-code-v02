@@ -374,7 +374,10 @@ export function TitlebarTabStrip(props: {
 
   // Mirrors the rendered order below — every group header, each expanded
   // group's visible members, then the ungrouped tail — so sortable indexes
-  // and drag results stay in sync with the DOM.
+  // and drag results stay in sync with the DOM. Session tabs enter one frame
+  // after their slot mounts (the entry reports visibility through an
+  // effect, as the ungrouped indexes below have always done); the window
+  // self-heals and only a drag started in that frame could see it.
   const groupedSequence = createMemo(() => {
     const result = groupedTabs()
 
@@ -757,6 +760,8 @@ function TabGroupHeader(props: {
         />
       </span>
       <Show when={props.vertical}>
+        {/* Vertical headers carry the project icon; horizontal badges use the
+            project color alone, Edge-style, so the chip stays compact. */}
         <span aria-hidden="true" class="flex shrink-0">
           <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
         </span>
