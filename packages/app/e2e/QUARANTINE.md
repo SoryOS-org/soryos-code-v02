@@ -1,6 +1,6 @@
 # Quarantined browser tests
 
-Beta pull request and push runs skip tests tagged `@quarantine` (`--grep-invert @quarantine`). Most failed in every beta run, so they gave no signal and slowed every leg with retries. `dev` runs are unchanged.
+Beta pull request and push runs skip the 24 tests tagged `@quarantine` (`--grep-invert @quarantine`). Most failed in every beta run, so they gave no signal and slowed every leg with retries. `dev` runs are unchanged.
 
 To run only the quarantined tests, use `gh workflow run test.yml --ref beta -f quarantine=true`. Their legs report without failing the e2e checks. `nightly-beta.yml` dispatches that run, plus a full beta run, every night. GitHub fires schedules only from the default branch (`dev`), so the nightly run starts once that workflow is on `dev`; until then, dispatch by hand.
 
@@ -23,7 +23,6 @@ Quarantined 2026-10-21, so the deadline is **2026-11-04**. "First red" is the ea
 | `regression/review.spec.ts` › open file tab browses, searches, and tracks missing files                                           | file search request has an unexpected `directory` field                       | ≤ 2026-10-20 11:29     | unowned     |
 | `regression/review.spec.ts` › rereads a file each time an artifact link opens it                                                  | `first draft` never visible in `#review-panel`                                | ≤ 2026-10-20 11:29     | unowned     |
 | `regression/session-queue.spec.ts` › keeps finished tools above a pending steer follow-up                                         | pending steer color `rgb(242, 242, 242)`, received `rgb(250, 250, 250)`       | ≤ 2026-10-20 11:29     | unowned     |
-| `regression/session-header.spec.ts` › location › only collapses location names when the timeline header is narrow                 | collapsed name lengths `[10, 8, 8, 10]`, received `[10, 8, 8, 9]`             | 2026-10-21 (added red) | usrnk1      |
 
 ## App component tests (`packages/app/component-tests`)
 
