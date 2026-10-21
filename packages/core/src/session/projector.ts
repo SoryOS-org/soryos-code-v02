@@ -224,16 +224,11 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
         }
         // A summary references the first message it kept, which the fork copied under a new ID.
         const keepID = row.type === "compaction" ? row.data.metadata?.keepID : undefined
-        if (typeof keepID !== "string") return copy
+        if (!Schema.is(SessionMessage.ID)(keepID)) return copy
         const kept = yield* db
           .select({ seq: SessionMessageTable.seq })
           .from(SessionMessageTable)
-          .where(
-            and(
-              eq(SessionMessageTable.session_id, event.data.parentID),
-              eq(SessionMessageTable.id, SessionMessage.ID.make(keepID)),
-            ),
-          )
+          .where(and(eq(SessionMessageTable.session_id, event.data.parentID), eq(SessionMessageTable.id, keepID)))
           .get()
           .pipe(Effect.orDie)
         if (!kept) return copy
