@@ -115,26 +115,16 @@ it.live("serializes removal across exit settlement and publication", () =>
       yield* beforeExitControl.exit
       yield* beforeExitControl.releaseOutput
       yield* beforeExitControl.settled
-      expect(events).toEqual(["shell.created", "shell.deleted"])
+      expect(events).toEqual(["shell.created", "shell.exited", "shell.deleted"])
       expect(yield* Effect.promise(() => Bun.file(removedBeforeExit.file).exists())).toBe(false)
 
       events.length = 0
       const removed = yield* shell.create({ shell: "sh", command: "removed", timeout: 0 })
       const removedControl = yield* Queue.take(completions)
       yield* removedControl.exit
-      const waitForExit = (remaining = 1_000): Effect.Effect<void, Error> =>
-        shell.get(removed.id).pipe(
-          Effect.flatMap((info) => {
-            if (info.status === "exited") return Effect.void
-            if (remaining === 0) return Effect.fail(new Error("Timed out waiting for exit observer"))
-            return Effect.yieldNow.pipe(Effect.andThen(waitForExit(remaining - 1)))
-          }),
-        )
-      yield* waitForExit()
       const removingDuringOutput = yield* shell.remove(removed.id).pipe(Effect.forkChild({ startImmediately: true }))
-      yield* Effect.yieldNow
-      yield* removedControl.releaseOutput
       yield* Fiber.join(removingDuringOutput)
+      yield* removedControl.releaseOutput
       expect((yield* shell.result(removed)).capture).toBeUndefined()
       expect(yield* shell.remove(removed.id).pipe(Effect.flip)).toBeInstanceOf(Shell.NotFoundError)
       yield* removedControl.settled
