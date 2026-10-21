@@ -93,7 +93,8 @@ test("a catalog refresh cannot replace an existing session's model", async ({ pa
   await expect(page.getByRole("button", { name: "Choose model variant", exact: true })).toHaveText("high")
   await view.editor.press("Enter")
   await expect.poll(() => prompts.length).toBe(1)
-  expect(switches).toEqual([{ model: { id: "alpha", providerID: "opencode", variant: "high" } }])
+  // The session already runs Alpha high, so the send has no switch to make.
+  expect(switches).toEqual([])
 
   catalog.current = provider(beta)
   await view.push([
@@ -115,10 +116,7 @@ test("a catalog refresh cannot replace an existing session's model", async ({ pa
   await view.editor.fill("Use the replacement I chose")
   await view.editor.press("Enter")
   await expect.poll(() => prompts.length).toBe(2)
-  expect(switches).toEqual([
-    { model: { id: "alpha", providerID: "opencode", variant: "high" } },
-    { model: { id: "beta", providerID: "opencode" } },
-  ])
+  expect(switches).toEqual([{ model: { id: "beta", providerID: "opencode" } }])
 })
 
 test("an existing session's model never shows a fallback while its agent loads", async ({ page }) => {

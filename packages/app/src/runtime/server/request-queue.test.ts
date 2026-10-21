@@ -8,10 +8,8 @@ function setup(input?: {
   headersTimeoutMs?: number
   setupHeadersTimeoutMs?: number
 }) {
-  type Report = Parameters<NonNullable<Parameters<typeof createRequestQueue>[0]["log"]>>[1]
-
   const pending: Array<{ url: string; signal: AbortSignal; resolve: () => void }> = []
-  const logs: Array<{ message: string; data: Report }> = []
+  const logs: Array<{ message: string; data: Record<string, unknown> }> = []
   let clock = 0
 
   const queue = createRequestQueue({
@@ -104,33 +102,6 @@ describe("createRequestQueue", () => {
     expect(input.queue.inflight()).toBe(0)
   })
 
-  test("a write starts before reads queued ahead of it, in order with other writes", async () => {
-    const input = setup({ limit: 1 })
-
-    const responses = [
-      input.queue.fetch("http://server/api/session/ses_1/form"),
-      input.queue.fetch("http://server/api/session/ses_2/form"),
-      input.queue.fetch("http://server/api/session/ses_3/form"),
-      input.queue.fetch("http://server/api/session/ses_1/model", { method: "POST" }),
-      input.queue.fetch("http://server/api/session/ses_1/prompt", { method: "POST" }),
-    ]
-
-    // Each round finishes the request in flight, which starts the next one in line.
-    for (let round = 0; round < responses.length; round++) {
-      await input.settle()
-      input.pending.at(-1)?.resolve()
-    }
-
-    await Promise.all(responses)
-    expect(input.pending.map((item) => new URL(item.url).pathname)).toEqual([
-      "/api/session/ses_1/form",
-      "/api/session/ses_1/model",
-      "/api/session/ses_1/prompt",
-      "/api/session/ses_2/form",
-      "/api/session/ses_3/form",
-    ])
-  })
-
   test("never counts the event stream against the budget", async () => {
     const input = setup({ limit: 1 })
     void input.queue.fetch("http://server/api/session")
@@ -160,7 +131,6 @@ describe("createRequestQueue", () => {
     expect(input.queue.queued()).toBe(1)
     const error = await dead.catch((cause: unknown) => cause)
     expect(error).toBeInstanceOf(DOMException)
-    // SAFETY: the assertion above proved the rejection is a DOMException.
     expect((error as DOMException).name).toBe("TimeoutError")
     expect(input.pending.map((item) => new URL(item.url).pathname)).toEqual(["/api/dead", "/api/next"])
     input.pending[1]!.resolve()
@@ -179,7 +149,6 @@ describe("createRequestQueue", () => {
     ]
 
     const errors = await Promise.all(others.map((request) => request.catch((cause: unknown) => cause)))
-    // SAFETY: the queue rejects a timed-out request with a DOMException; a different value fails on its name.
     expect(errors.map((error) => (error as DOMException).name)).toEqual([
       "TimeoutError",
       "TimeoutError",

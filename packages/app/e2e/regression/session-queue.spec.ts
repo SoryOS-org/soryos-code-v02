@@ -227,7 +227,7 @@ test("follow-up preference controls Enter while Mod+Enter uses the alternate del
   await expect(view.input).toHaveText("")
 })
 
-test("a steer shows as pending in the timeline as the composer clears, before its selection commits", async ({
+test("a steer shows as pending in the timeline as the composer clears, before the server admits it", async ({
   page,
 }) => {
   // The running execution has delivered input, so a new steer waits behind its work.
@@ -237,7 +237,7 @@ test("a steer shows as pending in the timeline as the composer clears, before it
   )
 
   const view = await openQueue(page, mock, "steer")
-  const commit = await holdRoute(page, (url) => url.pathname === `/api/session/${sessionID}/model`, { method: "POST" })
+  const commit = await holdRoute(page, (url) => url.pathname === `/api/session/${sessionID}/prompt`, { method: "POST" })
 
   const prompt = page.locator('[data-timeline-virtual-content] [data-timeline-row="UserMessage"]', {
     hasText: "steer while the model commits",
