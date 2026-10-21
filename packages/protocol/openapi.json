@@ -14448,8 +14448,14 @@
               }
             ]
           },
-          "session_retention": {
-            "type": "string"
+          "storage": {
+            "type": "object",
+            "properties": {
+              "sessions": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
           },
           "providers": {
             "type": "object",

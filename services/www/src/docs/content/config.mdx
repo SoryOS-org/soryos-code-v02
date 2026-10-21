@@ -410,16 +410,18 @@ interval and 30-minute active window.
 See the [warming guide](/warming) for request behavior, customization,
 and cost considerations.
 
-### Session retention
+### Storage
 
-OpenCode keeps sessions forever by default. Set `session_retention` to a
+OpenCode keeps sessions forever by default. Set `storage.sessions` to a
 duration to delete sessions whose last activity is older than it. Subagent
 sessions are deleted with the session that started them. OpenCode checks once
 an hour and skips sessions that are still running.
 
 ```jsonc
 {
-  "session_retention": "30 days",
+  "storage": {
+    "sessions": "30 days",
+  },
 }
 ```
 

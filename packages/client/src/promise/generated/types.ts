@@ -2299,7 +2299,7 @@ export type ConfigEntry =
         plugins?: Array<string | { package: string; options?: { [x: string]: JsonValue } }>
         worktree?: ConfigWorktree
         warming?: boolean | { prompt?: string; interval?: string; duration?: string }
-        session_retention?: string
+        storage?: { sessions?: string }
         providers?: {
           [x: string]: {
             canonical?: ProviderID

@@ -16,7 +16,7 @@ import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { SessionProjector } from "@opencode/core/session/projector"
-import { SessionRetention } from "@opencode/core/session/retention"
+import { SessionExpiry } from "@opencode/core/session/expiry"
 import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { WellKnown } from "@opencode/core/wellknown"
@@ -28,7 +28,7 @@ import { emptyCredentialNode, emptyWellknownNode } from "./fixture/config-nodes"
 import { testEffect } from "./lib/effect"
 import { globalProjectNode } from "./lib/project"
 
-const globalDirectory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "opencode-session-retention-")))
+const globalDirectory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "opencode-session-expiry-")))
 afterAll(() => fs.rmSync(globalDirectory, { recursive: true, force: true }))
 
 const it = testEffect(
@@ -80,8 +80,8 @@ const exists = (sessionID: Session.ID) =>
     )
   })
 
-describe("SessionRetention", () => {
-  it.effect("deletes top-level sessions and their children past retention", () =>
+describe("SessionExpiry", () => {
+  it.effect("deletes top-level sessions and their children past their max age", () =>
     Effect.gen(function* () {
       const session = yield* Session.Service
       const old = yield* session.create({ location })
@@ -92,7 +92,7 @@ describe("SessionRetention", () => {
       yield* age(child.id, 1)
       yield* age(recent.id, 10)
 
-      expect(yield* SessionRetention.expire(Duration.days(30))).toBe(1)
+      expect(yield* SessionExpiry.expire(Duration.days(30))).toBe(1)
       expect(yield* exists(old.id)).toBe(false)
       expect(yield* exists(child.id)).toBe(false)
       expect(yield* exists(recent.id)).toBe(true)
@@ -107,19 +107,19 @@ describe("SessionRetention", () => {
       yield* store.claim(suspended.id)
       yield* age(suspended.id, 40)
 
-      expect(yield* SessionRetention.expire(Duration.days(30))).toBe(0)
+      expect(yield* SessionExpiry.expire(Duration.days(30))).toBe(0)
       expect(yield* exists(suspended.id)).toBe(true)
     }),
   )
 
-  it.effect("reads retention from global config and keeps sessions when unset", () =>
+  it.effect("reads storage.sessions from global config and keeps sessions when unset", () =>
     Effect.gen(function* () {
       const file = path.join(globalDirectory, "opencode.json")
       fs.rmSync(file, { force: true })
-      expect(yield* SessionRetention.configured()).toBeUndefined()
+      expect(yield* SessionExpiry.configured()).toBeUndefined()
 
-      fs.writeFileSync(file, JSON.stringify({ session_retention: "30 days" }))
-      expect(Duration.toMillis((yield* SessionRetention.configured())!)).toBe(Duration.toMillis(Duration.days(30)))
+      fs.writeFileSync(file, JSON.stringify({ storage: { sessions: "30 days" } }))
+      expect(Duration.toMillis((yield* SessionExpiry.configured())!)).toBe(Duration.toMillis(Duration.days(30)))
       fs.rmSync(file)
     }),
   )
