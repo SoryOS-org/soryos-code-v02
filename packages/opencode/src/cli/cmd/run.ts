@@ -25,6 +25,7 @@ import { Filesystem } from "@/util/filesystem"
 import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, resolveInteractiveStdin } from "./run/runtime.stdin"
+import { resolveSession } from "../session"
 
 type ModelInput = Parameters<OpencodeClient["session"]["prompt"]>[0]["model"]
 
@@ -151,7 +152,7 @@ export const RunCommand = effectCmd({
       })
       .option("session", {
         alias: ["s"],
-        describe: "session id to continue",
+        describe: "session id or unique prefix to continue",
         type: "string",
       })
       .option("fork", {
@@ -455,20 +456,11 @@ export const RunCommand = effectCmd({
 
       async function session(sdk: OpencodeClient): Promise<SessionInfo | undefined> {
         if (args.session) {
-          const current = await sdk.session
-            .get({
-              sessionID: args.session,
-            })
-            .catch(() => undefined)
-
-          if (!current?.data) {
-            UI.error("Session not found")
-            process.exit(1)
-          }
+          const current = await resolveSession(sdk, args.session)
 
           if (args.fork) {
             const forked = await sdk.session.fork({
-              sessionID: args.session,
+              sessionID: current.id,
             })
             const id = forked.data?.id
             if (!id) {
@@ -477,15 +469,15 @@ export const RunCommand = effectCmd({
 
             return {
               id,
-              title: forked.data?.title ?? current.data.title,
-              directory: forked.data?.directory ?? current.data.directory,
+              title: forked.data?.title ?? current.title,
+              directory: forked.data?.directory ?? current.directory,
             }
           }
 
           return {
-            id: current.data.id,
-            title: current.data.title,
-            directory: current.data.directory,
+            id: current.id,
+            title: current.title,
+            directory: current.directory,
           }
         }
 

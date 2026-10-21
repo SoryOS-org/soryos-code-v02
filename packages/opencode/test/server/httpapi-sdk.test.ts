@@ -12,6 +12,7 @@ import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { validateSession } from "../../src/cli/tui/validate-session"
+import { resolveSession } from "../../src/cli/session"
 import { InstanceBootstrap } from "../../src/project/bootstrap"
 import { InstanceStore } from "../../src/project/instance-store"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
@@ -486,6 +487,52 @@ describe("HttpApi SDK", () => {
         return errorMessage(thrown)
       }),
     ),
+  )
+
+  httpapiInstance("resolves full and short session IDs for -s", { serverPath: "raw" }, ({ sdk, directory }) =>
+    Effect.gen(function* () {
+      const created = yield* call(() => sdk.session.create({ title: "resume" }, { throwOnError: true }))
+      const id = created.data.id
+      const fetch = yield* serverFetch("raw")
+
+      for (const sessionID of [id, id.slice(4), id.slice(0, -1), id.slice(4, -1)]) {
+        const resolved = yield* call(() => validateSession({ url: "http://localhost", directory, sessionID, fetch }))
+        expect(resolved).toBe(id)
+      }
+
+      const resolved = yield* call(() => resolveSession(sdk, id.slice(4, -1)))
+      const forked = yield* call(() => sdk.session.fork({ sessionID: resolved.id }, { throwOnError: true }))
+      expect(forked.data.id).not.toBe(id)
+      expect(yield* call(() => validateSession({ url: "http://localhost", directory, fetch }))).toBeUndefined()
+    }),
+  )
+
+  httpapiInstance("rejects ambiguous session IDs for -s", { serverPath: "raw" }, ({ sdk, directory }) =>
+    Effect.gen(function* () {
+      const first = yield* call(() => sdk.session.create({ title: "first" }, { throwOnError: true }))
+      const second = yield* call(() => sdk.session.create({ title: "second" }, { throwOnError: true }))
+      const fetch = yield* serverFetch("raw")
+      const thrown = yield* captureThrown(() =>
+        validateSession({ url: "http://localhost", directory, sessionID: "ses_", fetch }),
+      )
+      expect(errorMessage(thrown)).toContain("Ambiguous session ID: ses_")
+      expect(errorMessage(thrown)).toContain(first.data.id)
+      expect(errorMessage(thrown)).toContain(second.data.id)
+      expect((yield* call(() => resolveSession(sdk, first.data.id))).id).toBe(first.data.id)
+    }),
+  )
+
+  httpapiInstance("resolves short IDs older than the default session list limit", { serverPath: "raw" }, ({ sdk }) =>
+    Effect.gen(function* () {
+      const created = yield* call(() => sdk.session.create({ title: "oldest" }, { throwOnError: true }))
+      yield* Effect.forEach(Array.from({ length: 101 }), () =>
+        call(() => sdk.session.create({ title: "newer" }, { throwOnError: true })),
+      )
+      const listed = yield* call(() => sdk.session.list({}, { throwOnError: true }))
+      expect(listed.data).toHaveLength(100)
+      expect(listed.data.map((session) => session.id)).not.toContain(created.data.id)
+      expect((yield* call(() => resolveSession(sdk, created.data.id.slice(4, -1)))).id).toBe(created.data.id)
+    }),
   )
 
   httpapiInstance(

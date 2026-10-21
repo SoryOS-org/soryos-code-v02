@@ -91,7 +91,7 @@ export const TuiThreadCommand = cmd({
       .option("session", {
         alias: ["s"],
         type: "string",
-        describe: "session id to continue",
+        describe: "session id or unique prefix to continue",
       })
       .option("fork", {
         type: "boolean",
@@ -249,7 +249,7 @@ export const TuiThreadCommand = cmd({
           }
 
       try {
-        await validateSession({
+        args.session = await validateSession({
           url: transport.url,
           sessionID: args.session,
           directory: cwd,

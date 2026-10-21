@@ -26,7 +26,7 @@ export const AttachCommand = cmd({
       .option("session", {
         alias: ["s"],
         type: "string",
-        describe: "session id to continue",
+        describe: "session id or unique prefix to continue",
       })
       .option("fork", {
         type: "boolean",
@@ -115,7 +115,7 @@ export const AttachCommand = cmd({
     const config = await TuiConfig.get()
 
     try {
-      await validateSession({
+      args.session = await validateSession({
         url: args.url,
         sessionID: args.session,
         directory,
