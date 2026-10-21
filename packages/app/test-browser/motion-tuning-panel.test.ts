@@ -62,6 +62,33 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
   expect(image()).toEqual({ duration: 0.3, bounce: 0 })
 })
 
+it("closes only from its own close button or Esc inside it, never from the app around it", async () => {
+  let closed = 0
+  const outside = document.createElement("button")
+  const container = document.createElement("div")
+  document.body.append(outside, container)
+  cleanups.push(mountMotionPanel(container, { onClose: () => closed++ }))
+
+  const close = await waitFor(() => container.querySelector<HTMLButtonElement>(".knobs-close") ?? undefined)
+
+  outside.focus()
+  outside.click()
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "p", metaKey: true, bubbles: true }))
+  expect(closed).toBe(0)
+
+  const random = await waitFor(
+    () => container.querySelector<HTMLButtonElement>('button[aria-label="Random"]') ?? undefined,
+  )
+
+  random.focus()
+  random.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))
+  expect(closed).toBe(1)
+
+  close.click()
+  expect(closed).toBe(2)
+})
+
 async function waitFor<T>(find: () => T | undefined) {
   for (let i = 0; i < 200; i++) {
     const found = find()
