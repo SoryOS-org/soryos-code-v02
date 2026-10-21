@@ -102,8 +102,12 @@ export function createQuads(canvas: HTMLCanvasElement, restored: () => void) {
       drawCanvas(surface.current.ctx, region, scale)
     },
     dispose() {
-      if (surface.current && "gl" in surface.current)
-        surface.current.gl.getExtension("WEBGL_lose_context")?.loseContext()
+      const current = surface.current
+      if (!current || !("gl" in current)) return
+      // Losing the context in the frame the canvas leaves the page lets the compositor redraw the last
+      // frame from a released buffer, which some GPUs show as a one-frame white flash. Drop it once the
+      // canvas is gone instead.
+      setTimeout(() => current.gl.getExtension("WEBGL_lose_context")?.loseContext(), 250)
     },
   }
 
