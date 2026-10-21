@@ -1,4 +1,4 @@
-type Entry = { method: string; url: string; at: number; slow: boolean }
+type Entry = { method: string; url: string; at: number; slow: boolean; priority: boolean }
 
 // Chromium allows six connections per origin. The event stream holds one for the life of the
 // connection and health probes use their own fetch, so the app's API calls stay below that or
@@ -86,7 +86,7 @@ export function createRequestQueue(input: {
     return [...inflight].filter((item) => item.slow).length < slowLimit
   }
 
-  // FIFO, except a slow request waits its turn behind faster ones while the slow slots are full.
+  // FIFO after priority requests, except a slow request waits its turn behind faster ones while the slow slots are full.
   const release = (entry: Entry) => {
     inflight.delete(entry)
     const index = waiting.findIndex((item) => canStart(item.entry))
@@ -111,7 +111,8 @@ export function createRequestQueue(input: {
         resolve()
       }
 
-      waiting.push({ entry, start })
+      const position = entry.priority ? waiting.findIndex((item) => !item.entry.priority) : -1
+      waiting.splice(position === -1 ? waiting.length : position, 0, { entry, start })
       watcher ??= setTimeout(watch, stallMs)
     })
   }
@@ -123,7 +124,10 @@ export function createRequestQueue(input: {
 
       // The event stream is long-lived; never count it against the request budget.
       if (pathname === "/api/event") return base(request)
-      const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname) }
+      // Listing sessions is one indexed database read, and Home shows nothing until it answers. It takes the next free
+      // slot ahead of queued location reads, which can each wait seconds on a location the server is still loading.
+      const priority = request.method === "GET" && pathname === "/api/session"
+      const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname), priority }
       const queued = acquire(entry)
 
       if (queued) await queued

@@ -70,6 +70,8 @@ export function createHomeSessionsController(home: HomeController) {
         : skipToken,
       retry: false,
       staleTime: 30_000,
+      // Returning to Home shows the last list and refreshes it, instead of loading again once the cache expires.
+      gcTime: Infinity,
       refetchOnMount: true,
       refetchOnReconnect: true,
       select: selectSessions,
