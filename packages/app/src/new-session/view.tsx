@@ -2,6 +2,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { Icon } from "@opencode/ui/icon"
 import { Show, createMemo, createSignal, type JSX } from "solid-js"
+import { createStore } from "solid-js/store"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { getFilename } from "@opencode/util/path"
 import {
@@ -57,7 +58,10 @@ export function NewSessionView(props: {
   )
 
   const settings = useSettings()
-  const [wordmark, setWordmark] = createSignal<HTMLDivElement>()
+  const [wordmark, setWordmark] = createStore({
+    box: undefined as HTMLDivElement | undefined,
+    mode: "flat" as "flat" | "open" | "closing",
+  })
 
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
@@ -71,7 +75,13 @@ export function NewSessionView(props: {
         />
         <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <NewSessionWordmark ref={setWordmark} />
+            <NewSessionWordmark
+              ref={(box) => setWordmark("box", box)}
+              sound={settings.sounds.interfaceEnabled}
+              onOpen={() => setWordmark("mode", "open")}
+              onClose={() => setWordmark("mode", "closing")}
+              onFlat={() => setWordmark("mode", "flat")}
+            />
             <div class="mt-8 flex flex-col gap-3">
               <div data-slot="new-session-composer">
                 <div class="relative z-10">
@@ -102,8 +112,15 @@ export function NewSessionView(props: {
             </div>
           </div>
         </div>
-        <Show when={wordmark()}>
-          {(logo) => <NewSessionPinBoard logo={logo()} sound={settings.sounds.interfaceEnabled} />}
+        <Show when={wordmark.mode !== "flat" && wordmark.box}>
+          {(logo) => (
+            <NewSessionPinBoard
+              logo={logo()}
+              sound={settings.sounds.interfaceEnabled}
+              entrance="chain"
+              closing={wordmark.mode === "closing"}
+            />
+          )}
         </Show>
         <NewSessionTips selection={props.composer.model.selection} onDone={props.composer.restoreFocus} />
       </div>

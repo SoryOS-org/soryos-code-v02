@@ -1,4 +1,4 @@
-import { onCleanup, onMount } from "solid-js"
+import { createEffect, onCleanup, onMount } from "solid-js"
 import { createQuads, type Quads, type Rgba } from "./pin-quads"
 import { PinSound } from "./pin-sound"
 import { prefersReducedMotion } from "@opencode/ui/motion"
@@ -27,6 +27,8 @@ const HOME = 0
 const AIR = 1
 const REST = 2
 const RETURN = 3
+
+export type PinEntrance = "sweep" | "chain"
 
 const REST_TILT = [0.42, 0.7] as const
 const LIGHT = [0.55 / Math.hypot(0.55, 0.83), -0.83 / Math.hypot(0.55, 0.83)] as const
@@ -64,6 +66,7 @@ type Pin = {
   duration: number
   lift: number
   fd: number
+  bd: number
 }
 
 /**
@@ -71,11 +74,22 @@ type Pin = {
  * A click or drag knocks pins out; they pop toward the viewer, pile up on the composer,
  * then slot back in. The animation loop only runs while something is moving.
  */
-export function NewSessionPinBoard(props: { logo: HTMLElement; sound: () => boolean }) {
+export function NewSessionPinBoard(props: {
+  logo: HTMLElement
+  sound: () => boolean
+  entrance?: PinEntrance
+  closing?: boolean
+}) {
   let back!: HTMLCanvasElement
   let front!: HTMLCanvasElement
 
-  onMount(() => onCleanup(mountPinBoard(back, front, props.logo, props.sound)))
+  onMount(() => {
+    const board = mountPinBoard(back, front, props.logo, props.sound, props.entrance)
+    createEffect(() => {
+      if (props.closing) board.close()
+    })
+    onCleanup(board.dispose)
+  })
 
   return (
     <>
@@ -95,7 +109,13 @@ export function NewSessionPinBoard(props: { logo: HTMLElement; sound: () => bool
   )
 }
 
-function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: HTMLElement, sound: () => boolean) {
+function mountPinBoard(
+  back: HTMLCanvasElement,
+  front: HTMLCanvasElement,
+  logo: HTMLElement,
+  sound: () => boolean,
+  entrance: PinEntrance = "sweep",
+) {
   const stage = back.parentElement!
   // The pins behind the composer and the ones popped in front of it are each one layer of quads.
   const layers = { back: createQuads(back, () => wake()), front: createQuads(front, () => wake()) }
@@ -125,7 +145,7 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
   const pointer = { x: 0, y: 0, lx: 0, ly: 0, vx: 0, vy: 0, inside: false, down: false, dragX: 0, dragY: 0 }
   const tilt = { x: REST_TILT[0], y: REST_TILT[1] }
   const piles = { top: new Int16Array(0), floor: new Int16Array(0) }
-  const clock = { born: performance.now() / 1000 - (still ? REVEAL * 2 : 0), last: 0, knocked: -99 }
+  const clock = { born: performance.now() / 1000 - (still ? REVEAL * 2 : 0), last: 0, knocked: -99, closed: 0 }
   let colors = readColors(stage)
   let raf = 0
 
@@ -149,12 +169,16 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
     const s = stage.getBoundingClientRect()
     const l = logo.getBoundingClientRect()
     const composer = stage.querySelector('[data-component="composer"]')?.getBoundingClientRect()
+    const pitch = Math.max(3, Math.round(l.width / COLS))
+    const x0 = Math.round(l.left - s.left + (l.width - pitch * COLS) / 2)
+    const y0 = Math.round(l.top - s.top + (l.height - pitch * ROWS) / 2)
     view.left = s.left
     view.top = s.top
+    if (view.w === s.width && view.h === s.height && view.pitch === pitch && view.x0 === x0 && view.y0 === y0) return
     view.w = s.width
     view.h = s.height
     view.dpr = Math.min(2, devicePixelRatio || 1)
-    view.pitch = Math.max(3, Math.round(l.width / COLS))
+    view.pitch = pitch
     view.depth = view.pitch * 1.7
     view.size = view.pitch * 0.8
     view.composer = composer && {
@@ -162,8 +186,8 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
       right: composer.right - s.left,
       top: composer.top - s.top,
     }
-    view.x0 = Math.round(l.left - s.left + (l.width - view.pitch * COLS) / 2)
-    view.y0 = Math.round(l.top - s.top + (l.height - view.pitch * ROWS) / 2)
+    view.x0 = x0
+    view.y0 = y0
     for (const p of pins) {
       p.hx = view.x0 + (p.c + 0.5) * view.pitch
       p.hy = view.y0 + (p.r + 0.5) * view.pitch
@@ -356,8 +380,8 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
             rot: 0,
             spin: 0,
             pop: 0,
-            e: 0.9,
-            z: -0.8,
+            e: clock.closed ? 0.5 : 0.9,
+            z: clock.closed ? -0.2 : -0.8,
             zv: 0,
           })
           if (sound()) PinSound.slot(p.c, COLS, p.hx, view.w)
@@ -399,8 +423,10 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
     if (view.region.full && pins.every((p) => p.state === HOME)) setRegion(false)
   }
 
+  const revealSpan = entrance === "sweep" ? REVEAL : 1.3
   const settled = (now: number) => {
-    if (now - clock.born < REVEAL || pointer.down || view.activity > 1e-3) return false
+    if (clock.closed) return now - clock.closed >= 1.2 && pins.every((p) => p.state === HOME)
+    if (now - clock.born < revealSpan || pointer.down || view.activity > 1e-3) return false
     return pins.every((p) => p.state === HOME)
   }
 
@@ -449,15 +475,26 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
     const half = view.size / 2
     const size = view.size
     const age = now - clock.born
+    const closeAge = clock.closed ? now - clock.closed : -1
 
     for (const p of pins) {
-      if (p.state !== HOME || age < (p.c / COLS) * 0.45) continue
+      if (p.state !== HOME) continue
+      const g =
+        closeAge >= 0
+          ? closeOf(p, closeAge)
+          : entrance === "sweep"
+            ? age >= (p.c / COLS) * 0.45
+              ? 1
+              : 0
+            : chainOf(p, age)
+      if (g <= 0.05) continue
+      const s = Math.min(1, g)
       quads.shadow(
-        p.hx + ox - LIGHT[0] * 2.5 - half - 1,
-        p.hy + oy - LIGHT[1] * 2.5 - half - 1,
+        p.hx + ox * s - LIGHT[0] * 2.5 * s - half - 1,
+        p.hy + oy * s - LIGHT[1] * 2.5 * s - half - 1,
         size + 2,
         size + 2,
-        colors.shadow,
+        [colors.shadow[0], colors.shadow[1], colors.shadow[2], colors.shadow[3] * s],
       )
     }
 
@@ -496,12 +533,12 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
         for (const p of band) {
           if (p.lv !== lv) continue
           const fx = p.hx + ox * p.fd + sx * half
-          quads.quad(fx, p.hy + oy * p.fd - half, ox * (1 - p.fd), oy * (1 - p.fd), 0, size, colors.side[lv][sideX])
+          quads.quad(fx, p.hy + oy * p.fd - half, ox * (p.bd - p.fd), oy * (p.bd - p.fd), 0, size, colors.side[lv][sideX])
         }
         for (const p of band) {
           if (p.lv !== lv) continue
           const fy = p.hy + oy * p.fd + sy * half
-          quads.quad(p.hx + ox * p.fd - half, fy, size, 0, ox * (1 - p.fd), oy * (1 - p.fd), colors.side[lv][sideY])
+          quads.quad(p.hx + ox * p.fd - half, fy, size, 0, ox * (p.bd - p.fd), oy * (p.bd - p.fd), colors.side[lv][sideY])
         }
       }
       for (const p of band)
@@ -534,10 +571,21 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
     band.length = 0
     for (const p of order) {
       if (p.state !== HOME) continue
-      const grow = Math.min(1, Math.max(0, (age - (p.c / COLS) * 0.45) / 0.3))
-      if (!grow) continue
       const height = (p.lv === 1 ? 0.35 : 1) * (1 - Math.max(0, p.z)) + Math.max(0, -p.z) * 0.6
-      p.fd = 1 - height * (1 - Math.pow(1 - grow, 3))
+      if (entrance === "sweep" && closeAge < 0) {
+        const grow = Math.min(1, Math.max(0, (age - (p.c / COLS) * 0.45) / 0.3))
+        if (!grow) continue
+        p.bd = 1
+        p.fd = 1 - height * (1 - Math.pow(1 - grow, 3))
+      }
+      if (entrance !== "sweep" || closeAge >= 0) {
+        const w = closeAge >= 0 ? closeOf(p, closeAge) : chainOf(p, age)
+        if (w <= 0.01) continue
+        const g = Math.min(1, w)
+        p.bd = g
+        p.fd = (1 - height) * g
+        p.e = Math.max(p.e, Math.sin(g * Math.PI) * 0.85)
+      }
       const k = p.c * sx + p.r * sy
       if (k !== current && band.length) {
         flush()
@@ -652,25 +700,47 @@ function mountPinBoard(back: HTMLCanvasElement, front: HTMLCanvasElement, logo: 
   }
   layout()
   // The reveal staggers columns over 0.45 s and each rises over 0.3 s; the sweep spans the same window.
-  if (!still && sound()) PinSound.sweep({ duration: REVEAL, columns: COLS })
+  if (!still && sound()) PinSound.sweep({ duration: entrance === "sweep" ? REVEAL : 0.9, columns: COLS })
 
-  return () => {
-    cancelAnimationFrame(raf)
-    resize.disconnect()
-    theme.disconnect()
-    scheme.removeEventListener("change", onTheme)
-    stage.removeEventListener("pointerenter", onEnter)
-    stage.removeEventListener("pointermove", onMove)
-    stage.removeEventListener("pointerleave", onLeave)
-    stage.removeEventListener("pointerdown", onDown)
-    stage.removeEventListener("pointerup", onUp)
-    stage.removeEventListener("pointercancel", onUp)
-    stage.removeEventListener("lostpointercapture", onUp)
-    stage.removeEventListener("selectstart", onSelect)
-    stage.removeEventListener("dragstart", onSelect)
-    window.removeEventListener("blur", onUp)
-    layers.back.dispose()
-    layers.front.dispose()
+  return {
+    close: () => {
+      if (clock.closed) return
+      const now = performance.now() / 1000
+      clock.closed = now
+      pointer.down = false
+      piles.top.fill(0)
+      piles.floor.fill(0)
+      for (const p of pins) {
+        if (p.state === HOME) continue
+        p.state = RETURN
+        p.x0 = p.x
+        p.y0 = p.y
+        p.rot0 = p.rot
+        p.t0 = now + (p.c / COLS) * 0.18
+        p.duration = 0.28 + Math.random() * 0.06
+        p.lift = 24 + Math.random() * 42
+      }
+      if (!still && sound()) PinSound.sweep({ duration: 0.95, columns: COLS, reverse: true })
+      wake()
+    },
+    dispose: () => {
+      cancelAnimationFrame(raf)
+      resize.disconnect()
+      theme.disconnect()
+      scheme.removeEventListener("change", onTheme)
+      stage.removeEventListener("pointerenter", onEnter)
+      stage.removeEventListener("pointermove", onMove)
+      stage.removeEventListener("pointerleave", onLeave)
+      stage.removeEventListener("pointerdown", onDown)
+      stage.removeEventListener("pointerup", onUp)
+      stage.removeEventListener("pointercancel", onUp)
+      stage.removeEventListener("lostpointercapture", onUp)
+      stage.removeEventListener("selectstart", onSelect)
+      stage.removeEventListener("dragstart", onSelect)
+      window.removeEventListener("blur", onUp)
+      layers.back.dispose()
+      layers.front.dispose()
+    },
   }
 }
 
@@ -703,7 +773,26 @@ function createPin(c: number, r: number, lv: number): Pin {
     duration: 0,
     lift: 0,
     fd: 0,
+    bd: 1,
   }
+}
+
+// Radial chain-reaction from the starter pin in the "e" (column 75, row 3).
+function chainOf(p: Pin, age: number) {
+  const dist = Math.hypot(p.c - 75, (p.r - 3) * 1.4)
+  const u = (age - (dist / 76) * 0.62) / 0.36
+  if (u <= 0) return 0
+  if (u >= 1) return 1
+  return 1 - Math.pow(1 - u, 3)
+}
+
+// Reverse wave reeling pins from left ("o") back into the "e" hole when the lodger is tucked back in.
+function closeOf(p: Pin, closeAge: number) {
+  const dist = Math.hypot(p.c - 75, (p.r - 3) * 1.4)
+  const u = (closeAge - (0.32 + ((76 - dist) / 76) * 0.48)) / 0.32
+  if (u <= 0) return 1
+  if (u >= 1) return 0
+  return 1 - u * u * (3 - 2 * u)
 }
 
 // Theme colours are resolved through a 1×1 canvas so any CSS colour syntax works.

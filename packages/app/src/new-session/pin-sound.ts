@@ -98,8 +98,8 @@ const note = (step: number) =>
 const panOf = (x: number, width: number) => (width ? (x / width) * 1.6 - 0.8 : 0)
 
 export const PinSound = {
-  /** The wordmark rising in: a gritty stone slide sweeping left to right with pebbles settling under it. */
-  sweep(input: { duration: number; columns: number }) {
+  /** The wordmark rising in: a gritty stone slide sweeping across with pebbles settling under it. */
+  sweep(input: { duration: number; columns: number; reverse?: boolean }) {
     const a = audio()
     if (!a) return
     const c = a.context
@@ -112,8 +112,8 @@ export const PinSound = {
     const grit = c.createBiquadFilter()
     grit.type = "bandpass"
     grit.Q.value = 1.4
-    grit.frequency.setValueAtTime(260, at)
-    grit.frequency.exponentialRampToValueAtTime(1500, end)
+    grit.frequency.setValueAtTime(input.reverse ? 1500 : 260, at)
+    grit.frequency.exponentialRampToValueAtTime(input.reverse ? 260 : 1500, end)
     const body = c.createBiquadFilter()
     body.type = "lowpass"
     body.frequency.value = 2400
