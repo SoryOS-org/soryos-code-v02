@@ -22,11 +22,11 @@ import { showToast } from "@/shell/notifications/toast"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Icon } from "@opencode/ui/icon"
-import { displayName } from "@opencode/ui/project-avatar"
+import { displayName, type ProjectAvatarVariant } from "@opencode/ui/project-avatar"
 import { useSettings } from "@/settings/model"
 import { pathKey } from "@/workspaces/path-key"
 import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
-import { groupTabsByProject, type TabGroup } from "./tab-groups"
+import { groupTabsByProject, reorderGroupedStrip, tabGroupVariant, type StripItem, type TabGroup } from "./tab-groups"
 import type { SessionInfo } from "@opencode/client/promise"
 
 export const TabGroupsViewSchema = Schema.Struct({
@@ -44,6 +44,8 @@ function SessionTabSlot(props: {
   unread: boolean
   loading: boolean
   fallbackTitle?: string
+  accent?: ProjectAvatarVariant
+  showProjectAvatar?: boolean
   onRename: (title: string) => Promise<void>
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
@@ -89,6 +91,8 @@ function SessionTabSlot(props: {
         active={props.active}
         dragging={sortable.isDragSource()}
         orientation={props.orientation}
+        accent={props.accent}
+        showProjectAvatar={props.showProjectAvatar}
       />
     </div>
   )
@@ -101,6 +105,8 @@ function SessionTabEntry(props: {
   active: boolean
   orientation: "horizontal" | "vertical"
   serverCtx: ServerCtx | undefined
+  accent?: ProjectAvatarVariant
+  showProjectAvatar?: boolean
   onVisibleChange: (visible: boolean) => void
   onUnreadChange: (unread: boolean) => void
   onNavigate: (element: HTMLDivElement) => void
@@ -222,6 +228,8 @@ function SessionTabEntry(props: {
             ? language.t("session.tab.session")
             : (persisted()?.title ?? (missingSession() ? language.t("session.tab.unknown") : undefined))
         }
+        accent={props.accent}
+        showProjectAvatar={props.showProjectAvatar}
         onRename={rename}
         onNavigate={props.onNavigate}
         onClose={props.onClose}
@@ -237,6 +245,7 @@ function DraftTabSlot(props: {
   active: boolean
   orientation: "horizontal" | "vertical"
   title: string
+  accent?: ProjectAvatarVariant
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
 }) {
@@ -275,6 +284,7 @@ function DraftTabSlot(props: {
         active={props.active}
         dragging={sortable.isDragSource()}
         orientation={props.orientation}
+        accent={props.accent}
       />
     </div>
   )
@@ -337,11 +347,15 @@ export function TitlebarTabStrip(props: {
             pathKey(item.worktree) === pathKey(directory) ||
             item.sandboxes?.some((sandbox) => pathKey(sandbox) === pathKey(directory)),
         )
+    // Groups key by the project, not the session directory, so worktree and
+    // sandbox tabs land in the same group as the main worktree.
+    const id = `${tab.server}\0${pathKey(project?.worktree ?? directory)}`
 
     return {
-      id: `${tab.server}\0${pathKey(directory)}`,
+      id,
       title: displayName(project ?? { worktree: directory }),
       project,
+      variant: tabGroupVariant(id, project?.icon?.color),
     }
   }
 
@@ -356,6 +370,42 @@ export function TitlebarTabStrip(props: {
       ...result.groups.flatMap((group) => (isGroupCollapsed(group.id) ? [] : group.tabs)),
       ...result.ungrouped,
     ]
+  })
+
+  // Mirrors the rendered order below — every group header, each expanded
+  // group's visible members, then the ungrouped tail — so sortable indexes
+  // and drag results stay in sync with the DOM.
+  const groupedSequence = createMemo(() => {
+    const result = groupedTabs()
+
+    if (!result) return
+    const items: StripItem[] = []
+    const index = new Map<string, number>()
+
+    for (const group of result.groups) {
+      index.set(`group:${group.id}`, items.length)
+      items.push({ kind: "group", id: group.id })
+
+      if (!isGroupCollapsed(group.id)) {
+        for (const tab of group.tabs) {
+          const key = tabKey(tab)
+
+          if (tab.type !== "draft" && !visibility[key]) continue
+          index.set(key, items.length)
+          items.push({ kind: "tab", key, group: group.id })
+        }
+      }
+    }
+
+    for (const tab of result.ungrouped) {
+      const key = tabKey(tab)
+
+      if (tab.type !== "draft" && !visibility[key]) continue
+      index.set(key, items.length)
+      items.push({ kind: "tab", key, group: undefined })
+    }
+
+    return { items, index }
   })
 
   const visibleTabs = createMemo(() => orderedTabs().filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
@@ -408,10 +458,11 @@ export function TitlebarTabStrip(props: {
     },
   ])
 
-  const renderTab = (tab: Tab) => {
+  const renderTab = (tab: Tab, variant?: ProjectAvatarVariant) => {
     const id = tabKey(tab)
     let ref!: HTMLDivElement
     const visibleIndex = () => visibleTabs().findIndex((item) => tabKey(item) === id)
+    const sortableIndex = () => groupedSequence()?.index.get(id) ?? visibleIndex()
     useTabShortcut(visibleIndex, () => props.onNavigate(tab, ref))
 
     const serverCtx = useServerCtx(() => {
@@ -425,10 +476,12 @@ export function TitlebarTabStrip(props: {
         <SessionTabEntry
           tab={tab}
           id={id}
-          index={visibleIndex()}
+          index={sortableIndex()}
           active={props.currentTab === tab}
           orientation={vertical() ? "vertical" : "horizontal"}
           serverCtx={serverCtx()}
+          accent={vertical() ? undefined : variant}
+          showProjectAvatar={!vertical() || variant === undefined}
           onVisibleChange={(visible) => setVisibility(id, visible)}
           onUnreadChange={(value) => setUnread(id, value)}
           onNavigate={(element) => {
@@ -444,10 +497,11 @@ export function TitlebarTabStrip(props: {
       <DraftTabSlot
         tab={tab}
         id={id}
-        index={visibleIndex()}
+        index={sortableIndex()}
         active={props.currentTab === tab}
         orientation={vertical() ? "vertical" : "horizontal"}
         title={language.t("session.tab.session")}
+        accent={vertical() ? undefined : variant}
         onNavigate={(element) => {
           ref = element
           props.onNavigate(tab, element)
@@ -481,21 +535,17 @@ export function TitlebarTabStrip(props: {
         }}
       >
         <DragDropProvider
-          sensors={
-            grouped()
-              ? []
-              : [
-                  PointerSensor.configure({
-                    activationConstraints: (event) =>
-                      event.pointerType === "touch"
-                        ? [new PointerActivationConstraints.Distance({ value: 8 })]
-                        : [new PointerActivationConstraints.Distance({ value: 4 })],
-                    preventActivation: (event) =>
-                      event.target instanceof Element &&
-                      !!event.target.closest('[data-slot="tab-close"], [contenteditable="true"]'),
-                  }),
-                ]
-          }
+          sensors={[
+            PointerSensor.configure({
+              activationConstraints: (event) =>
+                event.pointerType === "touch"
+                  ? [new PointerActivationConstraints.Distance({ value: 8 })]
+                  : [new PointerActivationConstraints.Distance({ value: 4 })],
+              preventActivation: (event) =>
+                event.target instanceof Element &&
+                !!event.target.closest('[data-slot="tab-close"], [contenteditable="true"]'),
+            }),
+          ]}
           modifiers={[
             vertical() ? RestrictToVerticalAxis : RestrictToHorizontalAxis,
             RestrictToElement.configure({ element: () => listRef }),
@@ -518,22 +568,46 @@ export function TitlebarTabStrip(props: {
             props.onNavigate(tab, tabEl ?? undefined)
           }}
           onDragEnd={(event) => {
-            const current = visibleTabIds()
             const source = event.operation.source
 
             if (event.canceled || !isSortable(source)) return
 
             const { initialIndex, index } = source
 
-            if (initialIndex !== index) {
-              props.onReorder(
-                mergeVisibleTabOrder(
-                  props.tabs.map(tabKey),
-                  current,
-                  arrayMove(current, source.initialIndex, source.index),
-                ),
-              )
+            if (initialIndex === index) return
+
+            const sequence = groupedSequence()
+
+            if (sequence) {
+              const membership = new Map<string, string>()
+              const result = groupedTabs()
+
+              for (const group of result?.groups ?? []) {
+                for (const tab of group.tabs) membership.set(tabKey(tab), group.id)
+              }
+
+              const keys = reorderGroupedStrip({
+                keys: props.tabs.map(tabKey),
+                membership,
+                sequence: sequence.items,
+                from: initialIndex,
+                to: index,
+              })
+
+              if (keys) props.onReorder(keys)
+
+              return
             }
+
+            const current = visibleTabIds()
+
+            props.onReorder(
+              mergeVisibleTabOrder(
+                props.tabs.map(tabKey),
+                current,
+                arrayMove(current, source.initialIndex, source.index),
+              ),
+            )
           }}
         >
           <div
@@ -558,8 +632,9 @@ export function TitlebarTabStrip(props: {
                   <Index each={result().groups}>
                     {(group) => (
                       <>
-                        <TabGroupHeader
+                        <TabGroupHeaderSlot
                           group={group()}
+                          index={groupedSequence()?.index.get(`group:${group().id}`) ?? 0}
                           collapsed={isGroupCollapsed(group().id)}
                           vertical={vertical()}
                           onToggle={() => toggleGroupCollapsed(group().id)}
@@ -573,7 +648,7 @@ export function TitlebarTabStrip(props: {
                             }}
                           >
                             <For each={group().tabs}>
-                              {(tab) => renderTab(tab)}
+                              {(tab) => renderTab(tab, group().variant)}
                             </For>
                           </div>
                         </Show>
@@ -605,37 +680,86 @@ export function TitlebarTabStrip(props: {
   )
 }
 
-function TabGroupHeader(props: { group: TabGroup; collapsed: boolean; vertical: boolean; onToggle: () => void }) {
+function TabGroupHeaderSlot(props: {
+  group: TabGroup
+  index: number
+  collapsed: boolean
+  vertical: boolean
+  onToggle: () => void
+}) {
+  const sortable = useSortable({
+    get id() {
+      return `group:${props.group.id}`
+    },
+    get index() {
+      return props.index
+    },
+  })
+
+  return (
+    <div
+      ref={sortable.ref}
+      data-tab-group-slot
+      class="flex"
+      classList={{ "w-full shrink-0": props.vertical, "shrink-0": !props.vertical }}
+    >
+      <TabGroupHeader
+        group={props.group}
+        collapsed={props.collapsed}
+        vertical={props.vertical}
+        dragging={sortable.isDragSource()}
+        onToggle={props.onToggle}
+      />
+    </div>
+  )
+}
+
+function TabGroupHeader(props: {
+  group: TabGroup
+  collapsed: boolean
+  vertical: boolean
+  dragging?: boolean
+  onToggle: () => void
+}) {
   return (
     <button
       type="button"
       data-component="titlebar-tab-group"
       data-collapsed={props.collapsed || undefined}
+      data-project-variant={props.group.variant}
       aria-expanded={!props.collapsed}
       class={`
-        flex h-7 min-w-0 shrink-0 items-center gap-1.5 rounded-[6px] border-0 bg-transparent pe-1.5
-        text-start text-[13px] leading-4 tracking-[-0.04px] text-v2-text-text-muted [font-weight:440]
-        transition-[background-color] duration-[120ms] ease-in-out
-        hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
+        flex min-w-0 shrink-0 items-center gap-1 rounded-[6px] border-0 bg-transparent text-start
+        [font-weight:440] focus-visible:outline-none
       `}
-      classList={{ "w-full ps-1.5": props.vertical, "max-w-40": !props.vertical }}
+      classList={{
+        // Horizontal groups read as Edge-style badges: the project color chips
+        // the label, and member tabs carry the same color as an accent strip.
+        "h-7 max-w-32 px-1.5 text-[13px] leading-4": !props.vertical,
+        // Vertical groups stay quiet and compact; sidebar space is precious.
+        "h-5 w-full ps-1.5 pe-1 text-[11px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover":
+          props.vertical,
+        "opacity-60": !!props.dragging,
+      }}
+      style={!props.vertical ? { background: "var(--project-avatar-bg)", color: "var(--v2-avatar-fg)" } : undefined}
       onClick={props.onToggle}
     >
-      <span class="flex w-4.5 shrink-0 justify-center">
+      <span class="flex w-3.5 shrink-0 justify-center">
         <Icon
           name="chevron-down"
           size="small"
           aria-hidden="true"
-          class="text-v2-icon-icon-muted transition-transform duration-150 ease-in-out"
+          classList={{
+            "text-v2-icon-icon-muted": props.vertical,
+            "transition-transform duration-150 ease-in-out": true,
+          }}
           style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
         />
       </span>
-      <Show when={props.group.project}>
-        {(project) => (
-          <span aria-hidden="true" class="flex shrink-0">
-            <ProjectIcon project={project()} />
-          </span>
-        )}
+      <Show when={props.vertical}>
+        <span aria-hidden="true" class="flex shrink-0">
+          <Show when={props.group.project}>{(project) => <ProjectIcon project={project()} />}</Show>
+        </span>
       </Show>
       <span class="min-w-0 truncate">{props.group.title}</span>
     </button>

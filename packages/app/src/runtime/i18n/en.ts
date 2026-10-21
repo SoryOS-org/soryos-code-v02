@@ -608,6 +608,8 @@ export const dict = {
   "common.copied": "Copied",
 
   "titlebar.tabs": "Tabs",
+  "titlebar.tabGroups.enable": "Group tabs by project",
+  "titlebar.tabGroups.disable": "Turn off tab grouping",
   "titlebar.channel.local": "Local",
   "titlebar.channel.dev": "Dev",
   "titlebar.channel.beta": "Beta",

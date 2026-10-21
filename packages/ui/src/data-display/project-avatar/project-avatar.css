@@ -130,3 +130,50 @@
   height: 16px;
   overflow: visible;
 }
+
+/* Expose the project palette on any element so project-colored affordances
+   (tab group badges, member tab accents) reuse the avatar's semantic colors. */
+[data-project-variant="gray"] {
+  --project-avatar-bg: var(--v2-avatar-bg-gray);
+  --project-avatar-border: var(--v2-avatar-border-gray);
+}
+
+[data-project-variant="orange"] {
+  --project-avatar-bg: var(--v2-avatar-bg-orange);
+  --project-avatar-border: var(--v2-avatar-border-orange);
+}
+
+[data-project-variant="yellow"] {
+  --project-avatar-bg: var(--v2-avatar-bg-yellow);
+  --project-avatar-border: var(--v2-avatar-border-yellow);
+}
+
+[data-project-variant="cyan"] {
+  --project-avatar-bg: var(--v2-avatar-bg-cyan);
+  --project-avatar-border: var(--v2-avatar-border-cyan);
+}
+
+[data-project-variant="green"] {
+  --project-avatar-bg: var(--v2-avatar-bg-green);
+  --project-avatar-border: var(--v2-avatar-border-green);
+}
+
+[data-project-variant="red"] {
+  --project-avatar-bg: var(--v2-avatar-bg-red);
+  --project-avatar-border: var(--v2-avatar-border-red);
+}
+
+[data-project-variant="pink"] {
+  --project-avatar-bg: var(--v2-avatar-bg-pink);
+  --project-avatar-border: var(--v2-avatar-border-pink);
+}
+
+[data-project-variant="blue"] {
+  --project-avatar-bg: var(--v2-avatar-bg-blue);
+  --project-avatar-border: var(--v2-avatar-border-blue);
+}
+
+[data-project-variant="purple"] {
+  --project-avatar-bg: var(--v2-avatar-bg-purple);
+  --project-avatar-border: var(--v2-avatar-border-purple);
+}

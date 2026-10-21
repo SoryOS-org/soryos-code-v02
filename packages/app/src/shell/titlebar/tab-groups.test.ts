@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Tab } from "@/shell/tabs/tabs"
-import { groupTabsByProject, type TabGroup } from "./tab-groups"
+import { groupTabsByProject, reorderGroupedStrip, tabGroupVariant, type StripItem } from "./tab-groups"
 
 const sessionTab = (id: string, server = "local"): Tab => ({
   type: "session",
@@ -40,9 +40,12 @@ describe("groupTabsByProject", () => {
     const group = (tab: Tab) =>
       tab.type === "session" ? { id: tab.sessionId.slice(-1)!, title: `Project ${tab.sessionId.slice(-1)}` } : undefined
 
-    const { groups, ungrouped } = groupTabsByProject([sessionTab("a1"), draftTab("d"), sessionTab("b2"), sessionTab("c1")], group)
+    const { groups, ungrouped } = groupTabsByProject(
+      [sessionTab("a1"), draftTab("d"), sessionTab("b2"), sessionTab("c1")],
+      group,
+    )
 
-    expect(groups.map((item: TabGroup) => item.id)).toEqual(["1", "2"])
+    expect(groups.map((item) => item.id)).toEqual(["1", "2"])
     expect(groups[1].title).toBe("Project 2")
     expect(ungrouped.map((tab) => tab.type)).toEqual(["draft"])
   })
@@ -54,5 +57,68 @@ describe("groupTabsByProject", () => {
     const { groups } = groupTabsByProject([sessionTab("a1", "local"), sessionTab("b1", "remote")], group)
 
     expect(groups).toHaveLength(2)
+  })
+})
+
+describe("tabGroupVariant", () => {
+  test("an explicit project color wins and the id hashes stably onto the palette", () => {
+    expect(tabGroupVariant("id", "orange")).toBe("orange")
+    expect(tabGroupVariant("id")).toBe(tabGroupVariant("id"))
+    expect(tabGroupVariant("id")).not.toBe("gray")
+
+    const variants = new Set(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((id) => tabGroupVariant(id)))
+
+    expect(variants.size).toBeGreaterThan(1)
+  })
+})
+
+describe("reorderGroupedStrip", () => {
+  // a3 stays collapsed out of the rendered sequence but still belongs to group "a".
+  const keys = ["a1", "a2", "a3", "b1"]
+  const membership = new Map([
+    ["a1", "a"],
+    ["a2", "a"],
+    ["a3", "a"],
+    ["b1", "b"],
+  ])
+  const sequence: StripItem[] = [
+    { kind: "group", id: "a" },
+    { kind: "tab", key: "a1", group: "a" },
+    { kind: "tab", key: "a2", group: "a" },
+    { kind: "group", id: "b" },
+    { kind: "tab", key: "b1", group: "b" },
+  ]
+  const input = (from: number, to: number, items: StripItem[] = sequence, order: string[] = keys) => ({
+    keys: order,
+    membership,
+    sequence: items,
+    from,
+    to,
+  })
+
+  test("a header drag moves the whole group, collapsed members included", () => {
+    expect(reorderGroupedStrip(input(3, 0))).toEqual(["b1", "a1", "a2", "a3"])
+  })
+
+  test("a tab drag reorders it within its own group", () => {
+    expect(reorderGroupedStrip(input(2, 1))).toEqual(["a2", "a1", "a3", "b1"])
+  })
+
+  test("a tab dropped inside another group is rejected", () => {
+    expect(reorderGroupedStrip(input(1, 4))).toBeUndefined()
+  })
+
+  test("a tab dragged within the ungrouped tail reorders it", () => {
+    const tail: StripItem[] = [
+      ...sequence,
+      { kind: "tab", key: "u1", group: undefined },
+      { kind: "tab", key: "u2", group: undefined },
+    ]
+
+    expect(reorderGroupedStrip(input(6, 5, tail, [...keys, "u1", "u2"]))).toEqual(["a1", "a2", "a3", "b1", "u2", "u1"])
+  })
+
+  test("a no-op drag returns the order unchanged", () => {
+    expect(reorderGroupedStrip(input(1, 1))).toBe(keys)
   })
 })
