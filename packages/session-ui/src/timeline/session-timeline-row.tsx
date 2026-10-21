@@ -1130,7 +1130,7 @@ function outcomeNoticeColor(outcome: Outcome | undefined) {
 
   if (outcome === "error") return "text-v2-state-fg-danger"
 
-  if (outcome === "cancelled") return "text-v2-state-fg-warning"
+  if (outcome === "cancelled") return "text-[var(--v2-yellow-900)] [[data-color-scheme=dark]_&]:text-v2-state-fg-warning"
 
   return "text-v2-text-text-code-accent"
 }
