@@ -16,7 +16,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macTrafficLightsBaseWidth, macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -43,6 +43,8 @@ const windowsTitlebarHeight = 44 // Includes the content inset; matches the nati
 const minTitlebarZoom = 0.25
 
 const windowsControlsBaseWidth = 138 // 3 native Windows caption buttons at 46px each.
+
+const macTrafficLightsBaseWidth = 68
 
 const macTrafficLightsTopClearance = 28
 
@@ -605,8 +607,10 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   <SidebarToggle />
                 </Show>
                 <Show when={!mobile() && !props.verticalTabs}>
-                  {homeButton()}
-                  {searchButton()}
+                  <div class="flex shrink-0 items-center gap-0">
+                    {homeButton()}
+                    {searchButton()}
+                  </div>
                 </Show>
 
                 <Show
