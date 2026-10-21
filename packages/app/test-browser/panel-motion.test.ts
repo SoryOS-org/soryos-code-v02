@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it } from "bun:test"
-import { createRoot, createSignal } from "solid-js"
+import { batch, createRoot, createSignal } from "solid-js"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 import { createPanelMotion } from "../src/shell/panel-motion"
 
@@ -73,7 +73,7 @@ function setup(initial: boolean) {
     })
   })
 
-  return { painted, setOpen, setIdentity, setSize, closed, present: motion.present }
+  return { painted, setOpen, setIdentity, setSize, closed, present: motion.present, motion }
 }
 
 it("sizes the panel a little every frame on the way open and closed, present until the close settles", () => {
@@ -152,4 +152,38 @@ it("shows another layout's state without motion or a close", () => {
   expect(panel.painted.width).toBe(0)
   expect(panel.closed).toEqual([])
   expect(frames.size).toBe(0)
+})
+
+it("shows a state at once when synced, also from inside a batch", () => {
+  const panel = setup(true)
+
+  batch(() => {
+    panel.setOpen(false)
+    panel.motion.sync(false)
+  })
+  expect(panel.painted.width).toBe(0)
+  expect(panel.present()).toBe(false)
+  expect(frames.size).toBe(0)
+
+  panel.setOpen(true)
+  frame()
+  panel.motion.sync(true)
+  expect(panel.painted.width).toBe(200)
+  expect(frames.size).toBe(0)
+})
+
+it("runs settled work once the flight lands, dropping work queued before a turnaround", () => {
+  const panel = setup(false)
+  const ran: string[] = []
+  panel.setOpen(true)
+  panel.motion.whenSettled(() => ran.push("opened"))
+  frame()
+  panel.setOpen(false)
+  panel.motion.whenSettled(() => ran.push("closed"))
+  frame()
+  expect(ran).toEqual([])
+  settle()
+  expect(ran).toEqual(["closed"])
+  panel.motion.whenSettled(() => ran.push("at rest"))
+  expect(ran).toEqual(["closed", "at rest"])
 })

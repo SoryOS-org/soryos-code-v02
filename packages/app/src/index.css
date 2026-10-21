@@ -85,7 +85,8 @@
     );
   }
 
-  #review-panel,
+  /* The review's container is its fixed-width content, not the panel, so a panel animating its width re-evaluates no
+     container queries. */
   #bottom-panel {
     container-type: inline-size;
   }

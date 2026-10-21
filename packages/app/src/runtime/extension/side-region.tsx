@@ -59,6 +59,8 @@ export function SideRegion(props: {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const tabsOpen = createMemo(() => isDesktop() && view().side.opened())
   const tabsVisible = createMemo(() => tabsOpen() || !!props.present)
+  // Once shown, the contents stay mounted while the region is hidden, so reopening doesn't rebuild them mid-flight.
+  const contentMounted = createMemo<boolean>((mounted) => mounted || tabsVisible(), false)
   const panelWidth = createMemo(() => (tabsVisible() ? "auto" : "0px"))
 
   const menu = createSessionPanelMenu()
@@ -112,18 +114,17 @@ export function SideRegion(props: {
         tabIndex={-1}
         aria-label={language.t("session.panel.reviewAndFiles")}
         aria-hidden={!tabsOpen()}
-        inert={!tabsOpen()}
         class="relative h-full shrink-0 min-w-0 flex overflow-hidden bg-v2-background-bg-base rounded-[10px] shadow-[var(--v2-elevation-raised)] outline-none"
-        classList={{
-          "pointer-events-none": !tabsOpen(),
-          "flex-1": tabsVisible(),
-        }}
+        classList={{ "flex-1": tabsVisible() }}
         style={{ width: panelWidth() }}
       >
-        <Show when={tabsVisible()}>
+        {/* Takes the pointer while the panel closes. Inherited pointer-events or inert would restyle every element in
+            the panel when they flip; once closed, the screen skips the region with content-visibility instead. */}
+        <div class="absolute inset-0 z-50" classList={{ hidden: tabsOpen() || !tabsVisible() }} />
+        <Show when={contentMounted()}>
           <div
             data-slot="session-review-content"
-            class="h-full flex shrink-0 contain-strict"
+            class="h-full flex shrink-0 contain-strict [container-type:inline-size]"
             style={{ width: "var(--session-side-content-width, 100%)" }}
           >
             <div
@@ -164,7 +165,7 @@ export function SideRegion(props: {
                       view={props.view}
                       screen={props.screen}
                       sidebar={props.sidebar}
-                      shown={tabsOpen}
+                      shown={tabsVisible}
                       present={tabsVisible}
                       animate={() => !props.size.active()}
                       placeholder={index() === 0}

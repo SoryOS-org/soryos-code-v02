@@ -30,15 +30,12 @@ export interface ImagePreviewProps {
 
 const STEP = Math.SQRT2
 
-// One spring carries the open and the close, and the backdrop dims on it too.
-const OPEN_SPRING = { duration: 0.3, bounce: 0 }
-
 // Without a flight (reduced motion, or no thumbnail to fly to), the preview only fades.
 const fade = { duration: 0.15, bounce: 0 }
 
 // How long the dialog stays mounted after a close starts, in milliseconds: the flight lands and hands the image back
 // to the page well within this.
-const exitDuration = Math.max(OPEN_SPRING.duration, fade.duration) * 3200
+const exitDuration = Math.max(FLIGHT_SPRING.duration, fade.duration) * 3200
 
 const CENTER = { x: 0, y: 0 }
 
@@ -138,7 +135,7 @@ export function ImagePreview(props: ImagePreviewProps) {
     if (stage() !== "pending" || !dialog.isOpen()) return
     const from = prefersReducedMotion() ? undefined : originFrame()
     holdExit()
-    dimTo(1, from ? OPEN_SPRING : fade)
+    dimTo(1, from ? FLIGHT_SPRING : fade)
 
     if (!from) {
       plain = true
@@ -150,7 +147,7 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     const flight = createFlight(from)
     const rest = restFrame()
-    flight.to(rest, KICK.open, OPEN_SPRING)
+    flight.to(rest, KICK.open, FLIGHT_SPRING)
     course = { at: place(fitted()), flight, landed: () => setStage("rest") }
     hideOrigin()
     paint()
@@ -163,7 +160,7 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     if (stage() === "pending") return
     const to = prefersReducedMotion() ? undefined : originFrame()
-    dimTo(0, to ? OPEN_SPRING : fade)
+    dimTo(0, to ? FLIGHT_SPRING : fade)
 
     if (!to) {
       plain = true
@@ -177,10 +174,10 @@ export function ImagePreview(props: ImagePreviewProps) {
       course = { at: place(fitted()), flight: createFlight(rest), landed: showOrigin }
     }
 
-    course.flight.to(to, KICK.close, OPEN_SPRING)
+    course.flight.to(to, KICK.close, FLIGHT_SPRING)
     course.landed = () => {
       showOrigin()
-      veil.omega = (2 * Math.PI) / (OPEN_SPRING.duration * 0.75)
+      veil.omega = (2 * Math.PI) / (FLIGHT_SPRING.duration * 0.75)
       veil.set(0)
     }
 

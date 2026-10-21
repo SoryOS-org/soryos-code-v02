@@ -94,9 +94,13 @@ export default function Layout(props: ParentProps) {
               data-state={preferences.appearance.sidebarOpen() ? "open" : "closed"}
               ref={(element) => setState("tabsAside", element)}
               class="relative z-10 h-full min-h-0 shrink-0"
-              inert={!preferences.appearance.sidebarOpen()}
             >
-              <div class="absolute inset-0 overflow-hidden" classList={{ invisible: !sidebarMotion.present() }}>
+              {/* Skipped rather than display: none or inert, so neither direction restyles the sidebar's contents and
+                  a reopen reuses their layout. */}
+              <div
+                class="absolute inset-0 overflow-hidden [contain:layout_style_paint]"
+                classList={{ "[content-visibility:hidden]": !sidebarMotion.present() }}
+              >
                 <div
                   ref={(element) => setState("tabsMount", element)}
                   class="absolute inset-y-0 end-0 contain-strict flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
@@ -106,6 +110,11 @@ export default function Layout(props: ParentProps) {
                   }}
                 />
               </div>
+              {/* Takes the pointer while the sidebar closes, without restyling its contents. */}
+              <div
+                class="absolute inset-0 z-20"
+                classList={{ hidden: preferences.appearance.sidebarOpen() || !sidebarMotion.present() }}
+              />
               <Show when={preferences.appearance.sidebarOpen()}>
                 <ResizeHandle
                   class="-end-1"

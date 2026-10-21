@@ -16,13 +16,17 @@ export type Box = { x: number; y: number; width: number; height: number }
 export type FlightFrame = { image: Box; clip: Box; radius: number; surface: Box; surfaceRadius: number; lift: number }
 
 /**
- * Claude's preview, fitted frame by frame: one critically damped spring for both directions, launched with a push of
- * `KICK` times the remaining distance per second. A spring from rest starts too slowly to match.
+ * One critically damped spring for both directions, launched with a push of `KICK` times the remaining distance per
+ * second, since a spring from rest starts too slowly. The shape is Claude's preview, fitted frame by frame at 0.2 s,
+ * slowed to 0.3 s.
  */
-export const FLIGHT_SPRING = { duration: 0.2, bounce: 0 }
+export const FLIGHT_SPRING = { duration: 0.3, bounce: 0 }
 
-/** The launch push on `FLIGHT_SPRING`. Other durations scale it with the spring, so a slower spring keeps its shape. */
-export const KICK = { open: 14, close: 32.5 }
+/**
+ * The launch push on `FLIGHT_SPRING`: Claude's 14 and 32.5 per second at 0.2 s, scaled to 0.3 s so the shape holds.
+ * Other durations scale it the same way.
+ */
+export const KICK = { open: 28 / 3, close: 65 / 3 }
 
 /** A flight frame with one spring per edge, so heading somewhere new mid-flight keeps the velocity it already has. */
 export function createFlight(frame: FlightFrame) {

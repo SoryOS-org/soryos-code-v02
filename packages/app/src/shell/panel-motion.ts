@@ -32,7 +32,8 @@ export function replayPanelToggle(input: { id: string; label: string; toggle: ()
  * Opens and closes an edge panel on the shared sidebar spring. `paint` receives how far closed the panel is, from 0
  * (open) to 1 (closed), every frame of a flight and whenever a signal it reads changes at rest. It sizes the panel's
  * real layout box, so the neighbouring content's edge follows the panel's edge on every frame. `present` stays true
- * until a close settles.
+ * until a close settles. `whenSettled` defers work that would force a layout, like moving focus, until the flight
+ * lands; `sync` shows a state at once, for changes the user makes by hand.
  */
 export function createPanelMotion(input: {
   open: Accessor<boolean>
@@ -45,16 +46,30 @@ export function createPanelMotion(input: {
   // Percent closed, so the spring's rest threshold stays well under a pixel.
   const motion = new Spring(input.open() ? 0 : 100)
   let stop: (() => void) | undefined
+  let landed: (() => void)[] = []
+  // A state `sync` asked to show at once, for when the change hasn't reached this motion yet, e.g. inside a batch.
+  let snapTo: boolean | undefined
 
   const paint = () => input.paint(Math.min(1, Math.max(0, motion.value / 100)))
 
   const settle = () => {
     stop?.()
     stop = undefined
+    const queued = landed
+    landed = []
 
-    if (input.open()) return
-    setPresent(false)
-    input.onClosed?.()
+    if (!input.open()) {
+      setPresent(false)
+      input.onClosed?.()
+    }
+
+    queued.forEach((run) => run())
+  }
+
+  const snap = (open: boolean) => {
+    motion.snap(open ? 0 : 100)
+    paint()
+    settle()
   }
 
   createEffect(
@@ -62,6 +77,10 @@ export function createPanelMotion(input: {
       () => [input.open(), input.identity?.()] as const,
       ([open, identity], previous) => {
         const target = open ? 0 : 100
+        // Work queued for the previous direction no longer applies.
+        landed = []
+        const now = snapTo === open
+        snapTo = undefined
 
         if (open) setPresent(true)
 
@@ -76,13 +95,7 @@ export function createPanelMotion(input: {
           return
         }
 
-        if (prefersReducedMotion() || style() === "instant") {
-          motion.snap(target)
-          paint()
-          settle()
-
-          return
-        }
+        if (now || prefersReducedMotion() || style() === "instant") return snap(open)
 
         const tuning = spring()
         motion.omega = (2 * Math.PI) / tuning.duration
@@ -109,5 +122,15 @@ export function createPanelMotion(input: {
 
   onCleanup(() => stop?.())
 
-  return { present }
+  return {
+    present,
+    sync: (open: boolean) => {
+      if (stop && input.open() === open) return snap(open)
+      snapTo = open
+    },
+    whenSettled: (run: () => void) => {
+      if (stop) return void landed.push(run)
+      run()
+    },
+  }
 }

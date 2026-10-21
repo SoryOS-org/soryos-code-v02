@@ -108,10 +108,10 @@ describe("createFlight", () => {
 
   test("opens fast and settles without overshoot, like Claude's measured preview", () => {
     const flight = createFlight(thumbnail)
-    flight.to(preview, KICK.open)
+    flight.to(preview, KICK.open, { duration: 0.2, bounce: 0 })
     const path = Array.from({ length: 30 }, () => (flight.step(1 / 60), progress(flight)))
 
-    // Measured: 25% after one frame, 61% after three, 91% after seven.
+    // Measured at 0.2 s: 25% after one frame, 61% after three, 91% after seven.
     expect(path[0]).toBeCloseTo(0.25, 1)
     expect(path[2]).toBeCloseTo(0.61, 1)
     expect(path[6]).toBeCloseTo(0.91, 1)
@@ -142,7 +142,7 @@ describe("createFlight", () => {
     const snappy = createFlight(thumbnail)
     const calm = createFlight(thumbnail)
     snappy.to(preview, KICK.open)
-    calm.to(preview, KICK.open, { duration: 0.4, bounce: 0 })
+    calm.to(preview, KICK.open, { duration: 0.6, bounce: 0 })
     snappy.step(1 / 60)
     calm.step(2 / 60)
 
