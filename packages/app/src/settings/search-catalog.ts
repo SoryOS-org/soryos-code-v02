@@ -78,6 +78,13 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
+    label: "settings.timeline.row.turnDiffs.title",
+    description: "settings.timeline.row.turnDiffs.description",
+    target: "settings-show-turn-diffs",
+    section: "settings.timeline.title",
+  },
+  {
+    tab: "general",
     label: "settings.general.row.showCustomAgents.title",
     target: "settings-show-custom-agents",
     section: "settings.general.section.general",
@@ -206,13 +213,6 @@ export const serverSettings: Entry<SettingsServerTab | "servers">[] = [
     target: "settings-shell",
     description: "settings.general.row.shell.description",
     keywords: "bash zsh powershell",
-  },
-  {
-    tab: "servers",
-    label: "settings.server.preferences.websearch.title",
-    target: "settings-websearch",
-    description: "settings.server.preferences.websearch.description",
-    keywords: "web search provider",
   },
 ]
 

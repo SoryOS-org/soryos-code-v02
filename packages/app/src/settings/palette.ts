@@ -20,7 +20,13 @@ export function createSettingsPaletteEntries() {
       const value = query.trim().toLocaleLowerCase()
       const category = language.t("palette.group.settings")
 
+      // A title that starts with the query leads the group.
       return rankSettings(value, settings())
+        .toSorted(
+          (a, b) =>
+            Number(b.title.toLocaleLowerCase().startsWith(value)) -
+            Number(a.title.toLocaleLowerCase().startsWith(value)),
+        )
         .slice(0, LIMIT)
         .map((item) => ({
           id: `setting:${item.id}`,
@@ -28,7 +34,6 @@ export function createSettingsPaletteEntries() {
           title: item.title,
           description: item.page === item.title ? undefined : item.page,
           category,
-          strong: value.length >= 3 && item.title.toLocaleLowerCase().startsWith(value),
           setting: item,
         }))
     },

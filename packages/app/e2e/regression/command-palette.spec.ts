@@ -51,6 +51,27 @@ test("finds a setting and opens Settings with its row in view and highlighted", 
   await expect(input).toBeFocused()
   await input.fill("theme")
   await expect(dialog.getByRole("option", { name: /^Theme/ })).toHaveAttribute("aria-selected", "true")
+
+  // Settings list after commands, and the keyboard walks rows in their visual order.
+  const searched = Promise.all([
+    page.waitForResponse((response) => new URL(response.url()).pathname === "/api/session"),
+    page.waitForResponse((response) => new URL(response.url()).pathname === "/api/fs/find"),
+  ])
+
+  await input.fill("model")
+  await searched
+  const titles = dialog.locator(".command-palette-group-title")
+  await expect(titles.first()).toHaveText("Commands")
+  await expect(titles.last()).toHaveText("Settings")
+  const options = dialog.getByRole("option")
+
+  for (const index of Array.from({ length: await options.count() }, (_, index) => index)) {
+    await expect(options.nth(index)).toHaveAttribute("aria-selected", "true")
+    await input.press("ArrowDown")
+  }
+
+  await input.fill("theme")
+  await expect(dialog.getByRole("option", { name: /^Theme/ })).toHaveAttribute("aria-selected", "true")
   await input.press("Enter")
   await expect(page).toHaveURL("/settings?tab=appearance")
   const row = page.getByTestId("settings-screen").locator('[data-search-target="row"]')

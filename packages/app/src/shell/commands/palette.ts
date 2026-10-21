@@ -39,8 +39,6 @@ export type CommandPaletteEntry = {
   archived?: number
   updated?: number
   setting?: SettingsSearchResult
-  /** A setting whose title starts with the query lists before commands and sessions. */
-  strong?: boolean
 }
 
 const ENTRY_LIMIT = 5

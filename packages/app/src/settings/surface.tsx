@@ -46,7 +46,15 @@ export const { use: useSettingsSurface, provider: SettingsSurfaceProvider } = cr
 
     const extensions = createSettingsPages()
     const open = () => layout.route().type === "settings"
-    const source = () => location.state?.settings?.route ?? { type: "home" as const }
+
+    // While Settings is closed, the current tab is where it would open from.
+    const source = () => {
+      const route = layout.route()
+
+      if (route.type !== "settings") return route
+
+      return location.state?.settings?.route ?? { type: "home" as const }
+    }
 
     const view = () => parseSettingsView(location.search, location.state?.settings?.view, extensions.tabs())
 
