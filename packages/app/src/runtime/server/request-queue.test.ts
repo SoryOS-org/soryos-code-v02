@@ -102,15 +102,22 @@ describe("createRequestQueue", () => {
     expect(input.queue.inflight()).toBe(0)
   })
 
-  test("writes, then session lists, take the next free slot ahead of queued reads, each tier in order", async () => {
+  test("writes, then navigation reads, take the next free slot in order without promoting history or indexes", async () => {
     const input = setup({ limit: 1 })
 
     const requests: [string, string][] = [
       ["GET", "/api/a"],
       ["GET", "/api/b"],
+      ["GET", "/api/session/ses_1/message?cursor=older&order=desc"],
+      ["GET", "/api/session/ses_1/message?limit=25&before=msg_1"],
+      ["GET", "/api/session/ses_1/message?type=user&order=desc"],
+      ["GET", "/api/session/ses_1/message?order=asc"],
+      ["GET", "/api/session/ses_1/message/msg_1"],
       ["GET", "/api/session?limit=1"],
+      ["GET", "/api/session/ses_1/message?limit=40&order=desc"],
       ["POST", "/api/session/ses_1/message"],
       ["GET", "/api/session?limit=2"],
+      ["GET", "/api/session/ses_2/message"],
       ["DELETE", "/api/session/ses_2"],
       ["GET", "/api/session/ses_1"],
     ]
@@ -128,8 +135,15 @@ describe("createRequestQueue", () => {
       "/api/session/ses_1/message",
       "/api/session/ses_2",
       "/api/session?limit=1",
+      "/api/session/ses_1/message?limit=40&order=desc",
       "/api/session?limit=2",
+      "/api/session/ses_2/message",
       "/api/b",
+      "/api/session/ses_1/message?cursor=older&order=desc",
+      "/api/session/ses_1/message?limit=25&before=msg_1",
+      "/api/session/ses_1/message?type=user&order=desc",
+      "/api/session/ses_1/message?order=asc",
+      "/api/session/ses_1/message/msg_1",
       "/api/session/ses_1",
     ])
     await Promise.all(responses)

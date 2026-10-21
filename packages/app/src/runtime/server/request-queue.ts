@@ -120,14 +120,20 @@ export function createRequestQueue(input: {
   const fetch: typeof globalThis.fetch = Object.assign(
     async (resource: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(resource, init)
-      const pathname = new URL(request.url).pathname
+      const url = new URL(request.url)
+      const pathname = url.pathname
 
       // The event stream is long-lived; never count it against the request budget.
       if (pathname === "/api/event") return base(request)
-      // Writes (prompt sends, replies, edits) are the user's own actions and never wait behind reads. Listing sessions is
-      // one indexed database read that Home shows nothing without, so it goes ahead of queued location reads, which can
-      // each wait seconds on a location the server is still loading.
-      const priority = request.method !== "GET" ? 2 : pathname === "/api/session" ? 1 : 0
+      // Writes go first. Session lists and the first transcript page unblock navigation, so they
+      // go ahead of location reads. Older pages and filtered indexes keep background priority.
+      const initialMessages =
+        /^\/api\/session\/[^/]+\/message$/.test(pathname) &&
+        !url.searchParams.has("cursor") &&
+        !url.searchParams.has("before") &&
+        !url.searchParams.has("type") &&
+        url.searchParams.get("order") !== "asc"
+      const priority = request.method !== "GET" ? 2 : pathname === "/api/session" || initialMessages ? 1 : 0
       const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname), priority }
       const queued = acquire(entry)
 
