@@ -6,7 +6,7 @@ import { createStore } from "solid-js/store"
 import { Schema, SchemaGetter } from "effect"
 import { useModels } from "@/providers/models/models"
 import { useSettings } from "@/settings/model"
-import { useProviders } from "@/providers/catalog/providers"
+import { syncWhileBooting, useProviders } from "@/providers/catalog/providers"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { hasCustomAgent, resolveAgent } from "./agent"
@@ -103,7 +103,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       const directory = sdk().directory
 
       if (!directory) return
-      void data.location.agent.sync({ directory }).catch(() => undefined)
+      void syncWhileBooting(() => data.location.agent.sync({ directory })).catch(() => undefined)
     })
 
     const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))

@@ -500,6 +500,28 @@ export function mockMissingLocation(page: Page, directory: string) {
   )
 }
 
+// Answers the first model list as a cold Location does when its plugins outlast the server's wait.
+export function mockPluginsActivating(page: Page) {
+  const pending = { model: true }
+
+  return page.route(/\/api\/model(\?|$)/, (route) => {
+    if (!pending.model) return route.fallback()
+    pending.model = false
+
+    return route.fulfill({
+      status: 503,
+      // SAFETY: the server's wire body for a plugin wait timeout, which the client decodes into its own error.
+      json: {
+        // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- see SAFETY above
+        _tag: "ServiceUnavailableError",
+        message: "Location plugins did not finish activating",
+        service: "plugin",
+      },
+      headers: { "access-control-allow-origin": "*" },
+    })
+  })
+}
+
 // Mocks several servers on one page. Each origin gets its own handler and its own SSE transport for events.
 export async function mockServers(page: Page, servers: Record<string, Omit<MockServerConfig, "server" | "events">>) {
   return Object.fromEntries(
@@ -1259,7 +1281,9 @@ function mockHandlers(
                   currentPermissions(list).length > 0 && status[id]?.type !== "idle" ? [id] : [],
                 ),
                 ...resolve(config.forms ?? []).flatMap((form) =>
-                  Predicate.isObject(form) && Predicate.isString(form.sessionID) && status[form.sessionID]?.type !== "idle"
+                  Predicate.isObject(form) &&
+                  Predicate.isString(form.sessionID) &&
+                  status[form.sessionID]?.type !== "idle"
                     ? [form.sessionID]
                     : [],
                 ),

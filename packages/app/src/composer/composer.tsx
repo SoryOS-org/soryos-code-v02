@@ -36,6 +36,9 @@ export function Composer(props: {
     if (model) return model.name
     const key = selection.key()
 
+    if (key && props.model.model.loading)
+      return `${language.t("common.loading")}${language.t("common.loading.ellipsis")}`
+
     if (key) return language.t("dialog.model.unavailable", { model: key.modelID })
 
     return language.t("dialog.model.select.title")
