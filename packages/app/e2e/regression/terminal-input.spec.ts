@@ -8,15 +8,24 @@ const workspace = { name: "TerminalInput", pty: {} } satisfies WorkspaceInput
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test("clears the terminal line with Command+Delete", async ({ page }) => {
+test("clears the terminal line with Command+Delete and suppresses printable Command chords", async ({ page }) => {
   const { pty } = await openSession(page, workspace)
   const terminal = page.locator('[data-component="terminal"]')
   await page.keyboard.press("Control+Backquote")
   await expect(terminal.locator("textarea")).toHaveCount(1)
   await expect.poll(() => pty.sockets.length).toBe(1)
 
+  await page.keyboard.press("Meta+k")
+  await page.keyboard.press("Meta+j")
+  await terminal.locator("textarea").evaluate((textarea) => {
+    const clipboardData = new DataTransfer()
+    clipboardData.setData("text/plain", "echo pasted")
+    textarea.dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }))
+  })
+  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("echo pasted")
+
   await page.keyboard.press("Meta+Backspace")
-  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("\x15")
+  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("echo pasted\x15")
 })
 
 test("reveals the terminal after its first output and hides the native caret", async ({ page }) => {
