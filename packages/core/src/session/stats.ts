@@ -298,7 +298,7 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
               EventTable.type,
               Event.versionedType(SessionEvent.UsageRecorded.type, SessionEvent.UsageRecorded.durable.version),
             ),
-            sql`json_extract(${EventTable.data}, '$.source') = 'compaction'`,
+            sql`json_extract(${EventTable.data}, '$.source') IN ('compaction', 'revert')`,
             gte(EventTable.created, from),
             lt(EventTable.created, to),
           ),
