@@ -596,12 +596,14 @@ export const make = Effect.fn("PluginHost.make")(function* (
             return yield* instructionEntries.list(input.sessionID)
           }),
           put: Effect.fn(function* (input) {
+            const key = yield* Schema.decodeUnknownEffect(InstructionEntry.Key)(input.key)
             yield* sessions.get(input.sessionID)
-            yield* instructionEntries.put(input)
+            yield* instructionEntries.put({ ...input, key })
           }),
           remove: Effect.fn(function* (input) {
+            const key = yield* Schema.decodeUnknownEffect(InstructionEntry.Key)(input.key)
             yield* sessions.get(input.sessionID)
-            yield* instructionEntries.remove(input)
+            yield* instructionEntries.remove({ ...input, key })
           }),
         },
       },

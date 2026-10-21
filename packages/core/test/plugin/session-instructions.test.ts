@@ -94,6 +94,25 @@ it.live("Effect plugins can put, list, and remove session instruction entries se
         })
         .pipe(Effect.flip),
     ).toBeInstanceOf(InstructionEntry.ValueTooLargeError)
+
+    for (const key of ["Bad Key", "invalid/key"]) {
+      for (const operation of [
+        context.session.instructions.entry.put({ sessionID: created.id, key, value: "rejected" }),
+        context.session.instructions.entry.remove({ sessionID: created.id, key }),
+      ]) {
+        expect(yield* operation.pipe(Effect.flip)).toMatchObject({ _tag: "SchemaError" })
+      }
+    }
+    yield* context.session.instructions.entry.put({
+      sessionID: created.id,
+      key: "recovered",
+      value: "still works",
+    })
+    const fourth = yield* prepareRequest(created.id)
+    expect(fourth.entries.at(-1)?.message).toMatchObject({
+      type: "system",
+      text: ['<context key="recovered">', "still works", "</context>"].join("\n"),
+    })
   }),
 )
 
