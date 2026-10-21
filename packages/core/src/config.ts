@@ -4,7 +4,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import path from "path"
 import { isDeepStrictEqual } from "node:util"
 import { applyEdits, modify, type ParseError, parse, printParseErrorCode } from "jsonc-parser"
-import { Context, Effect, FiberMap, Layer, PubSub, Ref, Result, Schema, Semaphore, Stream } from "effect"
+import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Result, Schema, Semaphore, Stream } from "effect"
 import { Directory, Document, Info, Rejected, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
@@ -212,8 +212,8 @@ export const layer = (options?: Options) =>
           dir: path.dirname(plist),
           text: ConfigDiscovery.stripPreferenceMetadata(result.value.stdout.toString()),
         })
-        const info = yield* parseInfo(text, plist)
-        return info ? [new Document({ type: "document", path: plist, info })] : []
+        const parsed = yield* parseInfo(text, plist)
+        return "rejected" in parsed ? [] : [new Document({ type: "document", path: plist, info: parsed })]
       })
 
       const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath) {
