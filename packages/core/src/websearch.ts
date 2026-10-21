@@ -31,6 +31,7 @@ export type Response = WebSearch.Response
 export const ProviderKey = "websearch:provider"
 export const Selection = Schema.Union([ID, Schema.Literal("random"), Schema.Literal(false)])
 export type Selection = typeof Selection.Type
+const decodeSelection = Schema.decodeUnknownOption(Selection)
 
 export interface ProviderImplementation extends Provider {
   readonly execute: (input: ProviderInput) => Effect.Effect<readonly Result[], unknown>
@@ -125,7 +126,7 @@ const layer = Layer.effect(
       )
         return data.selection
       const stored = yield* kv.get(ProviderKey)
-      const decoded = Schema.decodeUnknownOption(Selection)(stored)
+      const decoded = decodeSelection(stored)
       if (stored !== undefined && Option.isNone(decoded)) yield* kv.remove(ProviderKey)
       return Option.getOrUndefined(decoded)
     })

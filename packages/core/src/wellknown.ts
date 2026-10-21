@@ -9,14 +9,14 @@ import { httpClient } from "@opencode/util/effect/app-node-platform"
 import { Bus } from "./bus.js"
 import { KV } from "./kv.js"
 
-export interface Auth extends Schema.Schema.Type<typeof Auth> {}
-export const Auth = Schema.Struct({
+interface Auth extends Schema.Schema.Type<typeof Auth> {}
+const Auth = Schema.Struct({
   command: Schema.Array(Schema.String),
   env: Schema.String,
 }).annotate({ identifier: "WellKnown.Auth" })
 
-export interface RemoteConfig extends Schema.Schema.Type<typeof RemoteConfig> {}
-export const RemoteConfig = Schema.Struct({
+interface RemoteConfig extends Schema.Schema.Type<typeof RemoteConfig> {}
+const RemoteConfig = Schema.Struct({
   url: Schema.String,
   headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
 }).annotate({ identifier: "WellKnown.RemoteConfig" })
@@ -24,14 +24,14 @@ export const RemoteConfig = Schema.Struct({
 export interface Config extends Schema.Schema.Type<typeof Config> {}
 export const Config = Schema.Record(Schema.String, Schema.Json).annotate({ identifier: "WellKnown.Config" })
 
-export interface Manifest extends Schema.Schema.Type<typeof Manifest> {}
-export const Manifest = Schema.Struct({
+interface Manifest extends Schema.Schema.Type<typeof Manifest> {}
+const Manifest = Schema.Struct({
   auth: Schema.optional(Auth),
   config: Schema.optional(Schema.NullOr(Config)),
   remote_config: Schema.optional(RemoteConfig),
 }).annotate({ identifier: "WellKnown.Manifest" })
 
-export interface ResolveInput {
+interface ResolveInput {
   readonly origin: string
   readonly variables?: Readonly<Record<string, string>>
 }
@@ -98,7 +98,7 @@ const resolveEntry = Effect.fnUntraced(function* (entry: Entry, variables: Reado
       Effect.timeout(requestTimeout),
       Effect.mapError((cause) => new Error(`Failed to load wellknown remote config from ${url}`, { cause })),
     )
-  if (Schema.is(Config)(remote.config)) return [...configs, remote.config]
+  if (isConfig(remote.config)) return [...configs, remote.config]
   return [...configs, remote]
 })
 
@@ -107,6 +107,11 @@ const Sources = Schema.Array(Schema.String)
 const manifestKey = (origin: string) => `wellknown:manifest:${origin}`
 const configKey = (origin: string) => `wellknown:config:${origin}`
 const Configs = Schema.Array(Config)
+const isConfig = Schema.is(Config)
+const isManifest = Schema.is(Manifest)
+const isSources = Schema.is(Sources)
+const isConfigs = Schema.is(Configs)
+const readSources = (kv: KV.Interface) => kv.get(sourcesKey).pipe(Effect.map((value) => (isSources(value) ? value : [])))
 
 const layer = Layer.effect(
   Service,
@@ -126,7 +131,7 @@ const layer = Layer.effect(
             .get(manifestKey(origin))
             .pipe(
               Effect.flatMap((cached) =>
-                Schema.is(Manifest)(cached)
+                isManifest(cached)
                   ? Effect.logWarning("failed to load wellknown manifest", { origin, error }).pipe(Effect.as(cached))
                   : Effect.fail(error),
               ),
@@ -137,8 +142,7 @@ const layer = Layer.effect(
     })
 
     const load = Effect.fn("WellKnown.load")(function* () {
-      const value = yield* kv.get(sourcesKey)
-      const origins = Schema.is(Sources)(value) ? value : []
+      const origins = yield* readSources(kv)
       const current = yield* Ref.get(cache)
       const entries = yield* Effect.forEach(origins, (origin) => {
         const cached = current.get(origin)
@@ -151,8 +155,7 @@ const layer = Layer.effect(
 
     const refresh = Effect.fn("WellKnown.refresh")(
       function* () {
-        const value = yield* kv.get(sourcesKey)
-        const origins = Schema.is(Sources)(value) ? value : []
+        const origins = yield* readSources(kv)
         if (!origins.length) return false
         const entries = yield* Effect.forEach(origins, loadEntry)
         const next = new Map(entries.map((entry) => [entry.origin, entry]))
@@ -174,8 +177,7 @@ const layer = Layer.effect(
           const origin = value.replace(/\/+$/, "")
           const entry = yield* loadEntry(origin)
           if (!entry.manifest.auth) return yield* Effect.fail(new Error(`No authentication method found at ${origin}`))
-          const sources = yield* kv.get(sourcesKey)
-          const origins = Schema.is(Sources)(sources) ? sources : []
+          const origins = yield* readSources(kv)
           yield* kv.set(sourcesKey, Array.from(new Set([...origins, origin])))
           yield* Ref.update(cache, (current) => new Map(current).set(origin, entry))
           yield* bus.publish(Event.Updated, {}, { global: true })
@@ -186,8 +188,7 @@ const layer = Layer.effect(
       remove: Effect.fn("WellKnown.remove")(
         function* (value) {
           const origin = value.replace(/\/+$/, "")
-          const sources = yield* kv.get(sourcesKey)
-          const origins = Schema.is(Sources)(sources) ? sources : []
+          const origins = yield* readSources(kv)
           yield* kv.set(
             sourcesKey,
             origins.filter((item) => item !== origin),
@@ -210,7 +211,7 @@ const layer = Layer.effect(
       }),
       cached: Effect.fn("WellKnown.cached")(function* (origin) {
         const value = yield* kv.get(configKey(origin))
-        return Schema.is(Configs)(value) ? [...value] : []
+        return isConfigs(value) ? [...value] : []
       }),
     })
   }),

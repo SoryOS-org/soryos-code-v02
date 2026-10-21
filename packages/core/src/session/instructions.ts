@@ -15,6 +15,7 @@ import { SessionStore } from "./store.js"
 const InjectedMetadata = Schema.Struct({
   instruction: Schema.Struct({ paths: Schema.Array(Schema.String) }),
 })
+const decodeInjectedMetadata = Schema.decodeUnknownOption(InjectedMetadata)
 
 export interface Interface {
   readonly load: (input: {
@@ -102,11 +103,7 @@ function previouslyInjected(store: SessionStore.Interface, sessionID: SessionSch
     return new Set(
       history
         .filter((message): message is SessionMessage.Synthetic => message.type === "synthetic")
-        .flatMap(
-          (message) =>
-            Option.getOrUndefined(Schema.decodeUnknownOption(InjectedMetadata)(message.metadata))?.instruction.paths ??
-            [],
-        ),
+        .flatMap((message) => Option.getOrUndefined(decodeInjectedMetadata(message.metadata))?.instruction.paths ?? []),
     )
   })
 }

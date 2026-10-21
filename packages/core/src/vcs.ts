@@ -55,6 +55,12 @@ interface Data {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Vcs") {}
 
+const decodeInfo = Schema.decodeUnknownEffect(Schema.toType(Info))
+const decodeBase = Schema.decodeUnknownEffect(Schema.NullOr(Base))
+const decodeBranches = Schema.decodeUnknownEffect(BranchList)
+const decodeStatus = Schema.decodeUnknownEffect(Schema.Array(FileStatus))
+const decodeDiff = Schema.decodeUnknownEffect(Schema.Array(FileDiff.Info))
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -72,11 +78,6 @@ const layer = Layer.effect(
       canonical: location.project.canonical,
       ...(vcs ? { store: vcs.store } : {}),
     }
-    const decodeInfo = Schema.decodeUnknownEffect(Schema.toType(Info))
-    const decodeBase = Schema.decodeUnknownEffect(Schema.NullOr(Base))
-    const decodeBranches = Schema.decodeUnknownEffect(BranchList)
-    const decodeStatus = Schema.decodeUnknownEffect(Schema.Array(FileStatus))
-    const decodeDiff = Schema.decodeUnknownEffect(Schema.Array(FileDiff.Info))
     const state: State.Interface<Data, VcsEditor> = State.create<Data, VcsEditor>({
       name: "vcs",
       initial: () => ({ providers: new Map() }),
