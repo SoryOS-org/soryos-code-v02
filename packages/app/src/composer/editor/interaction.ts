@@ -66,8 +66,9 @@ export function createComposerEditor(input: {
   history?: ComposerHistory
   commands: Accessor<ComposerSuggestion[]>
   context: Accessor<ComposerSuggestion[]>
-  searchContextFiles: (query: string) => ComposerSuggestion[] | Promise<ComposerSuggestion[]>
-  searchSessions?: (query: string) => Promise<ComposerSuggestion[]>
+  searchContextFiles: (query: string, signal?: AbortSignal) => ComposerSuggestion[] | Promise<ComposerSuggestion[]>
+  /** Reads reactively, so newly found sessions refresh the list without waiting on file search. */
+  searchSessions?: (query: string) => ComposerSuggestion[]
   openAttachment?: (attachment: ComposerAttachment, origin?: HTMLElement) => void
   /** An object URL for the image file at this path, which a path attachment references without its bytes. */
   readImage?: (path: string) => Promise<string | undefined>
@@ -157,19 +158,48 @@ export function createComposerEditor(input: {
     )
   }
 
+  const [found, setFound] = createSignal<ComposerSuggestion[]>([])
+  const fileSearch = { query: "", abort: new AbortController() }
+  onCleanup(() => fileSearch.abort.abort())
+
+  // Debounced and abortable: each keystroke replaces the pending file search instead of queueing behind it.
+  const findFiles = (query: string) => {
+    if (query === fileSearch.query) return
+    fileSearch.abort.abort()
+    const abort = new AbortController()
+    Object.assign(fileSearch, { query, abort })
+
+    if (!query.trim() || /\s/.test(query)) return
+
+    const timer = setTimeout(
+      () =>
+        void Promise.resolve(input.searchContextFiles(query, abort.signal)).then(
+          (files) => !abort.signal.aborted && setFound(files),
+          () => undefined,
+        ),
+      150,
+    )
+
+    abort.signal.addEventListener("abort", () => clearTimeout(timer), { once: true })
+  }
+
   const contextList = useFilteredList<ComposerSuggestion>({
-    items: async (query) => {
+    items: (query) => {
       const fixed = input.context().filter((item) => item.kind !== "file")
       const recent = input.context().filter((item) => item.kind === "file" && item.recent)
 
       const seen = new Set(recent.map((item) => item.id))
 
-      const [sessions, files] = await Promise.all([
-        input.searchSessions?.(query) ?? [],
-        query.trim() ? input.searchContextFiles(query) : [],
-      ])
+      findFiles(query)
 
-      return [...sessions, ...fixed, ...recent, ...files.filter((item) => !seen.has(item.id))]
+      const files = query.trim() && !/\s/.test(query) ? found() : []
+
+      return [
+        ...fixed,
+        ...(input.searchSessions?.(query) ?? []),
+        ...recent,
+        ...files.filter((item) => !seen.has(item.id)),
+      ]
     },
     key: (item) => item.id,
     filterKeys: ["label"],
@@ -190,7 +220,7 @@ export function createComposerEditor(input: {
       return "file"
     },
     sortGroupsBy: (a, b) => {
-      const order = ["session", "reference", "skill", "agent", "resource", "recent", "file"]
+      const order = ["reference", "agent", "session", "skill", "resource", "recent", "file"]
 
       return order.indexOf(a.category) - order.indexOf(b.category)
     },
@@ -425,6 +455,13 @@ export function createComposerEditor(input: {
 
     if (state.popover.activeID ? ids.includes(state.popover.activeID) : ids.length === 0) return
     dispatch({ type: "popover.results", ids })
+  })
+
+  // A space ends the mention once nothing matches, so `@` can still start ordinary prose.
+  createEffect(() => {
+    if (state.popover.type !== "context" || !/\s/.test(state.popover.query)) return
+
+    if (contextList.grouped.state === "ready" && contextList.flat().length === 0) dispatch({ type: "popover.close" })
   })
 
   const restoreFocus = (cursor = draft.state.cursor ?? promptLength(draft.state.prompt)) => {

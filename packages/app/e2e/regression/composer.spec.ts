@@ -38,6 +38,43 @@ test("mention a session by title, send its stable token, and open its own tab", 
   await expect(page.locator('[data-titlebar-tab-slot][data-active="true"]')).toContainText("Auth middleware")
 })
 
+test("a bare @ lists sessions, and a multi-word title matches while file search is slow", async ({ page }) => {
+  const target = "ses_0123456789opencodeconsolex"
+  const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []
+
+  const view = await openSession(page, {
+    name: "SessionMentionSearch",
+    findFiles: () => [],
+    sessions: [
+      { id: "ses_mention_search_source", title: "Review the plan" },
+      { id: "ses_0123456789homesessionabcde", title: "HOME" },
+      { id: target, title: "OPENCODE CONSOLE" },
+    ],
+    seed: { tabs: ["ses_mention_search_source"] },
+    onPrompt: (input) => void prompts.push(input.body),
+  })
+
+  const suggestions = page.locator('[data-component="composer-suggestions"]')
+  const files = await holdRoute(page, (url) => url.pathname === "/api/fs/find")
+
+  await view.editor.pressSequentially("Compare with @")
+  await expect(suggestions.getByRole("button", { name: /HOME/ })).toBeVisible()
+  await expect(suggestions.getByRole("button", { name: /OPENCODE CONSOLE/ })).toBeVisible()
+
+  await view.editor.pressSequentially("open")
+  await files.arrived
+  await view.editor.pressSequentially(" con")
+  await expect(suggestions.getByRole("button", { name: /HOME/ })).toHaveCount(0)
+  await expect(suggestions.locator("[data-suggestion-id][data-active]")).toContainText("OPENCODE CONSOLE")
+  await view.editor.press("Enter")
+  await expect(view.editor.locator('[data-mention="session"]')).toHaveText("@OPENCODE CONSOLE")
+  files.release()
+
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts.length).toBe(1)
+  expect(prompts[0]?.text).toBe(`Compare with @session:${target} `)
+})
+
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
   const alpha = { id: "alpha", name: "Alpha", variants: { high: {} } }
   const beta = { id: "beta", name: "Beta" }

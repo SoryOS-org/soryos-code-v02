@@ -126,7 +126,10 @@ function inputChanged(
     ])
   }
 
-  const context = value.slice(0, cursor ?? value.length).match(/(?:^|\s)@([^\s@]*)$/)
+  // An open mention keeps single spaces so multi-word session titles stay searchable.
+  const context = value
+    .slice(0, cursor ?? value.length)
+    .match(state.popover.type === "context" ? /(?:^|\s)@((?:[^\s@]+(?: [^\s@]+)* ?)?)$/ : /(?:^|\s)@([^\s@]*)$/)
 
   if (context) {
     const query = context[1] ?? ""
@@ -249,9 +252,10 @@ function suggestionSelected(
     commands.push({
       type: "mention.add",
       item,
-      ...(item.kind === "skill" && item.label.startsWith("/")
-        ? { range: { start: 0, end: state.popover.type === "command-menu" ? 0 : current.length } }
-        : {}),
+      range:
+        item.kind === "skill" && item.label.startsWith("/")
+          ? { start: 0, end: state.popover.type === "command-menu" ? 0 : current.length }
+          : undefined,
     })
   }
 
