@@ -84,11 +84,6 @@ const attachmentContent = (file: FileAttachment): ContentPart[] => {
 }
 
 const userAttachmentContent = (files: readonly FileAttachment[]) => {
-  const eligible = files.filter(
-    (file) => imageMimes.has(file.mime) && file.source.type === "inline" && file.mention?.text,
-  )
-  if (eligible.length < 2) return files.flatMap(attachmentContent)
-
   const seen = new Map<string, Set<string>>()
   return files.flatMap((file) => {
     if (!imageMimes.has(file.mime) || file.source.type !== "inline" || !file.mention?.text)
@@ -152,8 +147,8 @@ const toolResult = (tool: SessionMessage.AssistantTool, providerMetadata: Provid
 }
 
 const assistant = (message: SessionMessage.Assistant, model: Model.Ref, providerMetadataKey: string) => {
-  const sameProvider = String(message.model.providerID) === String(model.providerID)
-  const sameModel = sameProvider && String(message.model.id) === String(model.id)
+  const sameProvider = message.model.providerID === model.providerID
+  const sameModel = sameProvider && message.model.id === model.id
   const reuseProviderMetadata = sameModel && message.error === undefined
   const reasoningInterrupted = message.content.some(
     (item) => item.type === "reasoning" && item.time !== undefined && item.time.completed === undefined,
