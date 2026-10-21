@@ -818,15 +818,14 @@ const layer = Layer.effect(
           })
           if (!attempt) return yield* new AttemptNotFoundError(input)
           if (attempt.status !== "pending") return
-          if (attempt.authorization.mode === "code" && input.code === undefined) {
-            return yield* new CodeRequiredError({ attemptID: input.attemptID })
-          }
           if (attempt.completing)
             return yield* Effect.die(new Error(`OAuth attempt already completing: ${input.attemptID}`))
           const callback =
             attempt.authorization.mode === "auto"
               ? attempt.authorization.callback
-              : attempt.authorization.callback(input.code as string)
+              : input.code === undefined
+                ? yield* new CodeRequiredError({ attemptID: input.attemptID })
+                : attempt.authorization.callback(input.code)
           const exit = yield* authorize(callback).pipe(Effect.exit)
           yield* settle(input.attemptID, exit)
           if (Exit.isFailure(exit)) return yield* exit

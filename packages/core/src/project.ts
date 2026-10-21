@@ -340,14 +340,13 @@ const layer = Layer.effect(
 
     const hgDiscover = Effect.fnUntraced(function* (dotHg: AbsolutePath) {
       const worktree = AbsolutePath.make(path.dirname(dotHg))
-      const store = AbsolutePath.make(dotHg)
-      const previous = yield* cached(store)
+      const previous = yield* cached(dotHg)
       const id = previous ?? (yield* hgRoot(worktree))
       return {
         previous,
         id: id ?? ID.global,
         directory: worktree,
-        vcs: { type: "hg" as const, store },
+        vcs: { type: "hg" as const, store: dotHg },
       }
     })
 
