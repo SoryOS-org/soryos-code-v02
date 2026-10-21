@@ -20,7 +20,7 @@ import {
 
 const MENU_LIMIT = 10
 
-const SECTION_LIMIT = 10
+const SECTION_LIMIT = 5
 
 /** A closed tab's icon, title and, for a file, its folder. */
 export function ClosedTabVisual(props: { entry: ClosedSideTab }): JSX.Element {
