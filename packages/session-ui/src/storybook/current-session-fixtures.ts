@@ -1104,6 +1104,16 @@ export const attachmentsAndCommentsDocument = document([
   }),
 ] satisfies SessionMessageInfo[])
 
+export const arabicPromptDocument = document([
+  user("msg_user_arabic", "React هو مكتبة واجهة برمجية. سأستخدمه في المشروع.", 90_000),
+  assistant({
+    id: "msg_assistant_arabic",
+    offset: 91_000,
+    completed: 92_500,
+    content: [{ type: "text", text: "تمام. سأشرح الخطوات بالترتيب." }],
+  }),
+])
+
 export const attachmentsAndCommentsPresentation = {
   msg_user_attachments: {
     comments: [

@@ -62,7 +62,7 @@ story("sanitizes raw HTML while preserving supported Markdown markup", async ({ 
   }, fixture)
 
   expect(result).toEqual([
-    "<p><strong>Safe</strong> <em>formatting</em> <code>const x = 1</code></p>",
+    '<p dir="ltr"><strong>Safe</strong> <em>formatting</em> <code>const x = 1</code></p>',
     '<img data-local-image="safe.png"><a>unsafe</a>',
     '<a href="https://example.com" target="_blank" rel="nofollow noopener noreferrer">external</a><a data-local-link="/local" role="link" tabindex="0">local</a>',
     '<form name="user-content-document" id="user-content-location"><input name="user-content-cookie"></form>',
@@ -70,6 +70,101 @@ story("sanitizes raw HTML while preserving supported Markdown markup", async ({ 
     '<svg viewBox="0 0 10 10"><path d="M0 0L10 10"></path></svg>',
   ])
 })
+
+story("derives each block direction from the language it is mostly written in", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { sanitizeMarkdown } = await import(fixture)
+
+    return [
+      "<p>سأستخدم React في المشروع</p>",
+      "<p>React هو مكتبة واجهة برمجية.</p>",
+      "<p>Use React in the project.</p>",
+      "<p>سأستخدم <code>npm install</code> هنا</p>",
+      "<ul><li>سأستخدم npm install في المشروع</li><li>Use the CLI</li></ul>",
+      "<table><thead><tr><th>الاسم</th><th>القيمة</th></tr></thead></table>",
+      "<p>1234</p>",
+    ].map(sanitizeMarkdown)
+  }, fixture)
+
+  expect(result).toEqual([
+    '<p dir="rtl">سأستخدم React في المشروع</p>',
+    '<p dir="rtl">React هو مكتبة واجهة برمجية.</p>',
+    '<p dir="ltr">Use React in the project.</p>',
+    '<p dir="rtl">سأستخدم <code>npm install</code> هنا</p>',
+    '<ul dir="rtl"><li dir="rtl">سأستخدم npm install في المشروع</li><li dir="ltr">Use the CLI</li></ul>',
+    '<table dir="rtl"><thead><tr><th dir="rtl">الاسم</th><th dir="rtl">القيمة</th></tr></thead></table>',
+    "<p>1234</p>",
+  ])
+})
+
+for (const streaming of [false, true]) {
+  story(
+    `keeps Arabic reading order when a reply starts with an English heading in ${streaming ? "streaming" : "completed"} Markdown`,
+    async ({ page }) => {
+      await page.setViewportSize({ width: 1000, height: 900 })
+      await page.evaluate(
+        async ({ fixture, streaming }) => {
+          const { mountMarkdown } = await import(fixture)
+          await mountMarkdown({
+            text: [
+              "## Project setup",
+              "سأستخدم React في المشروع",
+              "React هو مكتبة واجهة برمجية.",
+              "Use React in the project.",
+            ].join("\n\n"),
+            streaming,
+            cached: true,
+          })
+        },
+        { fixture, streaming },
+      )
+
+      const markdown = page.getByTestId("markdown-fixture").locator('[data-component="markdown"]')
+      await expect(markdown).toHaveAttribute("data-markdown-ready", "")
+      const paragraphs = markdown.locator("p")
+      await expect(paragraphs).toHaveCount(3)
+
+      // The first logical word of a right-to-left paragraph sits right of the last one.
+      const layout = await paragraphs.evaluateAll((elements) =>
+        elements.map((element) => {
+          const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+          const words: { left: number; top: number }[] = []
+
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const text = node.nodeValue ?? ""
+            let offset = 0
+
+            for (const part of text.split(/(\s+)/)) {
+              if (part.trim()) {
+                const range = document.createRange()
+                range.setStart(node, offset)
+                range.setEnd(node, offset + part.length)
+                const box = range.getBoundingClientRect()
+                words.push({ left: box.left, top: box.top })
+              }
+
+              offset += part.length
+            }
+          }
+
+          const firstLine = words.filter((word) => Math.abs(word.top - words[0].top) < 10)
+
+          return {
+            dir: element.getAttribute("dir"),
+            direction: getComputedStyle(element).direction,
+            firstOnRight: firstLine[0].left > firstLine[firstLine.length - 1].left,
+          }
+        }),
+      )
+
+      expect(layout).toEqual([
+        { dir: "rtl", direction: "rtl", firstOnRight: true },
+        { dir: "rtl", direction: "rtl", firstOnRight: true },
+        { dir: "ltr", direction: "ltr", firstOnRight: false },
+      ])
+    },
+  )
+}
 
 story("keeps Markdown sanitization and link protections after Mermaid renders", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
