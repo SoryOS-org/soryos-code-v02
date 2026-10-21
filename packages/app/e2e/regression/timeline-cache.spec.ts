@@ -99,6 +99,76 @@ test("paints cold and warm session tabs at the latest message", async ({ page })
   expect(await warm.stop()).toBe(0)
 })
 
+test("reloads a transcript only after inline file links have their final styling", async ({ page }) => {
+  const sessionID = "ses_cold_inline_paths"
+  await mockWorkspace(page, {
+    name: "ColdInlinePaths",
+    sessions: [{ id: sessionID, title: "Cold inline paths" }],
+    findFiles: ({ query }) => (query === "src/file.ts" ? ["src/file.ts"] : []),
+    pageMessages: () => ({
+      items: [
+        { id: "user_cold_paths", type: "user", text: "Review these files", time: { created: 1 } },
+        {
+          id: "answer_cold_paths",
+          type: "assistant",
+          agent: "build",
+          model: { id: "test", providerID: "opencode" },
+          time: { created: 2, completed: 3 },
+          content: [
+            {
+              type: "text",
+              text: "| Area | Files |\n| --- | --- |\n| App | `src/file.ts`, `src/file.ts` |\n| Missing | `missing/file.ts` |",
+            },
+          ],
+        },
+      ],
+    }),
+  })
+  await page.goto(sessionHref(sessionID))
+  const answer = page.locator('[data-timeline-part-id="answer_cold_paths:text:0"]')
+  const content = page.locator("[data-timeline-virtual-content]")
+  await expect(answer.locator('code[data-inline-code-kind="path"]')).toHaveCount(2)
+  await expect(content).toHaveCSS("visibility", "visible")
+  const held = await holdRoute(page, /\/api\/fs\/find\?/)
+
+  try {
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await held.arrived
+    await expect(answer.getByRole("table", { includeHidden: true })).toBeAttached()
+    await expect(content).toHaveCSS("visibility", "hidden")
+    const editor = page.locator('[data-component="composer-editor"]')
+    await expect(editor).toBeEditable()
+    await editor.fill("The composer still works")
+    await expect(editor).toHaveText("The composer still works")
+
+    const reveal = await content.evaluateHandle((root) => {
+      type PathReveal = { kinds?: (string | null)[] }
+
+      const state: PathReveal = {}
+
+      const observer = new MutationObserver(() => {
+        if (!root.checkVisibility({ checkVisibilityCSS: true })) return
+        state.kinds = [...root.querySelectorAll("code")].map((code) => code.getAttribute("data-inline-code-kind"))
+        observer.disconnect()
+      })
+
+      observer.observe(root, { attributes: true, attributeFilter: ["style"] })
+
+      return state
+    })
+
+    held.release()
+    await expect(content).toHaveCSS("visibility", "visible")
+    expect(await reveal.evaluate((state) => state.kinds)).toEqual(["path", "path", null])
+    await reveal.dispose()
+    await expect(answer.locator("code")).toHaveText(["src/file.ts", "src/file.ts", "missing/file.ts"])
+    await expect(answer.locator('code[data-inline-code-kind="path"]')).toHaveText(["src/file.ts", "src/file.ts"])
+    await expect(answer.getByText("missing/file.ts", { exact: true })).not.toHaveAttribute("data-inline-code-kind")
+  } finally {
+    held.release()
+  }
+})
+
 test("restores verified inline paths before painting after a workspace tab switch", async ({ page }) => {
   const directory = "C:/OpenCode/InlinePaths"
   const other = "C:/OpenCode/OtherInlinePaths"

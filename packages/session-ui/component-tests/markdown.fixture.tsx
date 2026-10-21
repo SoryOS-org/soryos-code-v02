@@ -3,7 +3,7 @@ import { render } from "solid-js/web"
 import { DialogProvider } from "@opencode/ui/context/dialog"
 import { Markdown } from "../src/components/markdown"
 import { preloadMarkdown } from "../src/components/markdown-cache"
-import { MarkdownProvider } from "../src/context/markdown"
+import { MarkdownProvider, type MarkdownLocalFileExists } from "../src/context/markdown"
 import { OpenCode } from "@opencode/client/promise"
 import { readLocalImage } from "../../app/src/runtime/server/image"
 
@@ -29,6 +29,7 @@ export async function mountMarkdown(options: {
   cached?: boolean
   images?: boolean
   synchronousFiles?: boolean
+  localFileExists?: MarkdownLocalFileExists
 }) {
   if (options.cached) await preloadMarkdown(options.text, "markdown-test")
   const host = document.createElement("div")
@@ -59,7 +60,8 @@ export async function mountMarkdown(options: {
             options.images ? readLocalImage(api, "C:/project", path, signal) : Promise.resolve(undefined)
           }
           localFileExists={(path) =>
-            options.synchronousFiles ? existingFiles.has(path) : Promise.resolve(existingFiles.has(path))
+            options.localFileExists?.(path) ??
+            (options.synchronousFiles ? existingFiles.has(path) : Promise.resolve(existingFiles.has(path)))
           }
         >
           <Show when={visible()}>

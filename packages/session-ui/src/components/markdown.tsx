@@ -74,6 +74,10 @@ const renderedMarkdown = new WeakMap<
   { renderer: ReturnType<typeof createMarkdownRenderer>; raw: string }
 >()
 
+type InlineCodeCheck = { pending?: Promise<void> }
+
+const inlineCodeChecks = new WeakMap<HTMLDivElement, InlineCodeCheck>()
+
 function escape(text: string) {
   return text
     .replace(/&/g, "&amp;")
@@ -222,6 +226,7 @@ function disposeRenderedMarkdown(root: Element) {
   blocks.forEach((block) => {
     renderedMarkdown.get(block)?.renderer.dispose()
     renderedMarkdown.delete(block)
+    inlineCodeChecks.delete(block)
   })
 }
 
@@ -395,9 +400,13 @@ function markInlineCode(
   source: HTMLDivElement,
   target: HTMLDivElement,
   live: boolean,
+  signal: AbortSignal,
   localFileExists?: MarkdownLocalFileExists,
 ) {
+  const check: InlineCodeCheck = {}
+  inlineCodeChecks.set(target, check)
   const checked = new Map<string, boolean | Promise<boolean>>()
+  const pending: Promise<void>[] = []
 
   for (const code of source.querySelectorAll<HTMLElement>(":not(pre) > code")) {
     delete code.dataset.inlineCodeKind
@@ -427,15 +436,25 @@ function markInlineCode(
       continue
     }
 
-    void exists
-      .then((exists) => {
-        if (!exists) return
-        target.querySelectorAll<HTMLElement>(":not(pre) > code").forEach((node) => {
-          if (!node.closest("a") && (node.textContent ?? "").trim() === text) node.dataset.inlineCodeKind = "path"
+    pending.push(
+      exists
+        .then((exists) => {
+          if (!exists || signal.aborted || inlineCodeChecks.get(target) !== check) return
+          target.querySelectorAll<HTMLElement>(":not(pre) > code").forEach((node) => {
+            if (!node.closest("a") && (node.textContent ?? "").trim() === text) node.dataset.inlineCodeKind = "path"
+          })
         })
-      })
-      .catch(() => undefined)
+        .catch(() => undefined),
+    )
   }
+
+  if (pending.length === 0) return
+
+  check.pending = Promise.all(pending).then(() => {
+    if (inlineCodeChecks.get(target) === check) inlineCodeChecks.delete(target)
+  })
+
+  return check.pending
 }
 
 function localLinkTarget(target: EventTarget | null) {
@@ -815,10 +834,17 @@ export function Markdown(
     const sessionLinks = markdown?.sessionTitle
     const localFileExists = markdown?.localFileExists
 
-    content.forEach((block, index) => {
-      if (renderedBlocks[index] === block && container.children[index] instanceof HTMLDivElement) return
-      updateBlock(container, index, block, labels, sessionLinks, localFileExists)
+    const pending = content.flatMap((block, index) => {
+      const current = container.children[index]
+
+      const check =
+        renderedBlocks[index] === block && current instanceof HTMLDivElement
+          ? inlineCodeChecks.get(current)?.pending
+          : updateBlock(container, index, block, labels, sessionLinks, lifetime.signal, localFileExists)
+
+      return check ? [check] : []
     })
+
     renderedBlocks = content
 
     if (sessionLinks) markSessionLinks(container, sessionLinks)
@@ -854,7 +880,20 @@ export function Markdown(
     if (!faviconCleanup) faviconCleanup = setupExternalLinkFavicons(container)
     container.toggleAttribute("data-local-links", !!markdown?.openLocalFile)
 
-    if (result?.ready && result.text === local.text) container.dataset.markdownReady = ""
+    if (!result?.ready || result.text !== local.text) return
+
+    if (local.streaming || pending.length === 0) {
+      container.dataset.markdownReady = ""
+
+      return
+    }
+
+    // Cold timelines already wait for Markdown readiness before measuring and revealing their content. Include
+    // path classification so the first visible frame uses the final blue-link styling and padding.
+    void Promise.all(pending).then(() => {
+      if (lifetime.signal.aborted || renderedBlocks !== content || result.text !== local.text) return
+      container.dataset.markdownReady = ""
+    })
   })
 
   onCleanup(() => {
@@ -943,6 +982,7 @@ function updateBlock(
   block: RenderedBlock,
   labels: CopyLabels,
   sessionLinks: ((id: string) => string | undefined) | undefined,
+  signal: AbortSignal,
   localFileExists?: MarkdownLocalFileExists,
 ) {
   const current = container.children[index]
@@ -962,10 +1002,11 @@ function updateBlock(
     // A block that finishes streaming keeps its DOM and the user's selection; only its file paths get checked now.
     if (existing.dataset.markdownMode === "live" && block.mode !== "live") {
       existing.dataset.markdownMode = block.mode
-      markInlineCode(existing, existing, false, localFileExists)
+
+      return markInlineCode(existing, existing, false, signal, localFileExists)
     }
 
-    return
+    return inlineCodeChecks.get(existing)?.pending
   }
 
   const next = existing ?? document.createElement("div")
@@ -980,7 +1021,7 @@ function updateBlock(
 
   if (source === next) disposeCopyButtons(next)
   source.innerHTML = block.html
-  markInlineCode(source, next, block.mode === "live", localFileExists)
+  const pending = markInlineCode(source, next, block.mode === "live", signal, localFileExists)
   markCodeLinks(source)
   wrapTables(source)
 
@@ -991,7 +1032,7 @@ function updateBlock(
     rendered.renderer.update(source.innerHTML, block.mode === "live", rendered.raw !== block.raw)
     rendered.raw = block.raw
 
-    return
+    return pending
   }
 
   if (block.mode === "live") {
@@ -1020,17 +1061,19 @@ function updateBlock(
     })
   }
 
-  if (existing) return
+  if (existing) return pending
 
   if (!current) {
     container.appendChild(next)
 
-    return
+    return pending
   }
 
   disposeCopyButtons(current)
   disposeRenderedMarkdown(current)
   current.replaceWith(next)
+
+  return pending
 }
 
 function updateCodeBlock(
