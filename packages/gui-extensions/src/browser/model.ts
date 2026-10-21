@@ -99,7 +99,6 @@ export function createModel(ctx: SetupContext<typeof definition>) {
   const live = new Map<string, Live>()
   const listeners = new Map<string, (event: PaneEvent) => void>()
   const inspectors = new Map<string, Set<(event: InspectEvent) => void>>()
-  const addressed = new Map<string, Set<(tabID: Browser.TabID) => void>>()
   // Sessions where the user just opened a tab; its pane focuses the address field once the blank page shows.
   const opening = new Set<string>()
   // Each tab's last recorded page, so a state that repeats it does not write the history again.
@@ -218,7 +217,6 @@ export function createModel(ctx: SetupContext<typeof definition>) {
 
           if (visits) history.set({ visits })
         },
-        address: (tabID) => addressed.get(id)?.forEach((listener) => listener(tabID)),
         // Only the pane on screen holds the page that had focus.
         shortcut: (event) => {
           if (sessions.current()?.key === id) panes()[0]?.press(event)
@@ -497,18 +495,6 @@ export function createModel(ctx: SetupContext<typeof definition>) {
     clearHistory: () => {
       recorded.clear()
       history.set({ visits: [] })
-    },
-    /** The page asking for the address field with its shortcut. */
-    onAddress(session: Session, listener: (tabID: Browser.TabID) => void) {
-      const set = addressed.get(session.key) ?? new Set()
-      set.add(listener)
-      addressed.set(session.key, set)
-
-      return () => {
-        set.delete(listener)
-
-        if (!set.size) addressed.delete(session.key)
-      }
     },
     pending,
     /**

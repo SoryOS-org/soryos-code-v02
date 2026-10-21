@@ -429,6 +429,45 @@ story("⌘T and ⌘W follow focus: side tabs inside the side panel, session tabs
   await expect(sessions).toHaveText("1")
 })
 
+story("⌘L selects the browser address from the page and the pane, and nowhere else", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"
+  const outside = root.getByRole("button", { name: "Beta", exact: true })
+  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
+  const editor = page.frameLocator('iframe[title="Browser page"]').getByRole("textbox", { name: "Editor page input" })
+
+  const selected = () =>
+    address.evaluate(
+      (input: HTMLInputElement) =>
+        document.activeElement === input &&
+        input.value.length > 0 &&
+        input.selectionStart === 0 &&
+        input.selectionEnd === input.value.length,
+    )
+
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  await outside.click()
+  await root.getByRole("button", { name: "First inventory", exact: true }).click()
+  await expect(root.getByTestId("selected")).toHaveText(/^browser:/)
+
+  // In the main column ⌘L does not reach into the side panel.
+  await outside.focus()
+  await outside.press(`${mod}+l`)
+  await expect(address).not.toBeFocused()
+
+  // A focused page hands ⌘L to the pane, as it does ⌘T and ⌘W, without typing it.
+  await editor.click()
+  await editor.press(`${mod}+l`)
+  await expect.poll(selected).toBe(true)
+  await expect(editor).not.toHaveValue(/l$/)
+
+  // On the pane's own surface too.
+  await page.locator('#browser-panel [data-component="browser-bar"]').click({ position: { x: 2, y: 2 } })
+  await expect(address).not.toBeFocused()
+  await page.keyboard.press(`${mod}+l`)
+  await expect.poll(selected).toBe(true)
+})
+
 story("keeps ⌘T in the browser pane after a click on its loading surface", async ({ page }) => {
   const root = page.getByTestId("browser-region-fixture")
   const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"

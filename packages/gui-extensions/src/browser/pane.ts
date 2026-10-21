@@ -504,16 +504,10 @@ export function createBrowserPane(input: {
         if (entry.pages.has(id)) report(entry, { type: "page", tabID: id, ...value })
       },
       zoomed: () => entry.pages.forEach((page) => page.detail()),
-      address: () => {
-        if (!entry.pages.has(id) || entry.win.isDestroyed()) return
-        // The page held keyboard focus; the app's address field needs it back.
-        entry.win.webContents.focus()
-        publish(entry, { type: "address", tabID: id })
-      },
       shortcut: (shortcut) => {
         if (!entry.pages.has(id) || entry.focusedTabID !== id || entry.win.isDestroyed()) return
 
-        // As for the address shortcut: the command runs in the app, which may move focus there.
+        // The page held keyboard focus; the command runs in the app, which may move focus there, as ⌘L does.
         if (entry.win.isFocused()) entry.win.webContents.focus()
         publish(entry, { type: "shortcut", ...shortcut })
       },

@@ -136,8 +136,6 @@ export function createBrowserPage(
     detail?: (detail: PageDetail) => void
     /** The page's zoom changed, which Chromium applies to every page of the same origin in the partition. */
     zoomed?: () => void
-    /** The user pressed the address shortcut while the page had focus. */
-    address?: () => void
     /** Hands a browser or shell shortcut to the app window. */
     shortcut?: (shortcut: PageShortcut) => void
     /** The page took keyboard focus. */
@@ -210,14 +208,6 @@ export function createBrowserPage(
     if (input.shift && pageLetter(input) === "c") {
       event.preventDefault()
       void toggleInspect(!inspecting)
-
-      return
-    }
-
-    // The system browser's address shortcut. The app's own focus moves to the address field.
-    if (!input.shift && pageLetter(input) === "l") {
-      event.preventDefault()
-      options.address?.()
 
       return
     }

@@ -45,6 +45,10 @@ test("forwards browser and shell shortcuts while leaving page editing, find, rel
     ["mod", "w", true, "w"],
     ["mod", "w", false, "w"],
     ["mod", "\u0432", true, "w", "KeyW"],
+    // The address field, as in a browser.
+    ["mod", "l", true, "l"],
+    ["mod", "l", false, "l"],
+    ["mod", "l", true, "l", "KeyP"],
     ["mod", "n", true, "n"],
     ["mod", "n", false, "n"],
     ["mod", "1", true, "1"],
@@ -98,7 +102,7 @@ test("forwards browser and shell shortcuts while leaving page editing, find, rel
     ["mod", "a", false, undefined],
     ["mod", "z", false, undefined],
     ["mod", "y", false, undefined],
-    // Find, reload, history, and the pane's own address, picker and zoom chords.
+    // Find, reload, history, and the pane's own picker and zoom chords.
     ["mod", "f", true, undefined],
     ["mod", "g", true, undefined],
     ["mod+shift", "G", true, undefined],
@@ -106,7 +110,6 @@ test("forwards browser and shell shortcuts while leaving page editing, find, rel
     ["mod", "r", false, undefined],
     ["mod", "[", true, undefined],
     ["mod", "]", true, undefined],
-    ["mod", "l", true, undefined],
     ["mod+shift", "C", true, undefined],
     ["mod", "=", true, undefined],
     ["mod", "-", true, undefined],

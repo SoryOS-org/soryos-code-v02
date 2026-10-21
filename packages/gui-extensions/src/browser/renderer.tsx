@@ -92,8 +92,8 @@ const setup: Setup<typeof definition> = (ctx) => {
     }
   })
 
-  // The system browser's address shortcut. While the page has focus, the page claims it and main forwards it; here it
-  // covers focus elsewhere in the pane. Ctrl+L focuses the composer outside the pane on Windows and Linux.
+  // The system browser's address shortcut, in the pane and, forwarded like mod+t and mod+w, from a page with focus.
+  // Ctrl+L focuses the composer outside the pane on Windows and Linux.
   ctx.add(Command, (): Command | undefined => {
     const pane = model()?.pane()
 

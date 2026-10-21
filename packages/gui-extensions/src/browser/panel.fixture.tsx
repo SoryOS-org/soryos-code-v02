@@ -495,9 +495,6 @@ export function mountBrowserPane(input: PaneHost) {
             <button onClick={() => emit(store.session, { type: "page", tabID: current().id, icon, zoom: store.zoom })}>
               Page icon
             </button>
-            <button onClick={() => emit(store.session, { type: "address", tabID: current().id })}>
-              Address shortcut
-            </button>
           </nav>
           <p>Captures: {store.captures}</p>
           <p>Zoom: {Math.round(store.zoom * 100)}</p>

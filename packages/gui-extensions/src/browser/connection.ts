@@ -58,8 +58,6 @@ export function createConnection(input: {
   inspect: (event: InspectEvent) => void
   /** A page's icon or zoom changed. */
   page: (event: PageEvent) => void
-  /** The user pressed the address shortcut while the page had focus. */
-  address: (tabID: Browser.TabID) => void
   /** A focused page handed a browser or shell shortcut to the window. */
   shortcut: (event: ShortcutEvent) => void
   /** The user put keyboard focus in a page. */
@@ -161,8 +159,6 @@ export function createConnection(input: {
         if (event.type === "inspect") return input.inspect(event)
 
         if (event.type === "page") return input.page(event)
-
-        if (event.type === "address") return input.address(event.tabID)
 
         if (event.type === "shortcut") return input.shortcut(event)
 

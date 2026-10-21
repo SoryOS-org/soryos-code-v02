@@ -535,14 +535,6 @@ story("adds the whole page to the session and keeps the draft when the button is
   await expect(root.getByTestId("fixture-comments").getByRole("listitem")).toHaveText([/: Check the header layout$/])
 })
 
-story("focuses the address field when the page uses the address shortcut", async ({ page }) => {
-  const root = page.getByTestId("browser-pane-fixture")
-  await root.getByRole("button", { name: "Address shortcut", exact: true }).click()
-  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
-  await expect(address).toBeFocused()
-  await expect(address).toHaveJSProperty("selectionEnd", "https://alpha.example/".length)
-})
-
 story("shows the page's cookies in the site information and clears them", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   await root.getByRole("button", { name: "Site information", exact: true }).click()

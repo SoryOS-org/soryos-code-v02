@@ -451,17 +451,6 @@ export default function SessionBrowserPane(props: {
       ),
   )
 
-  // The page's address shortcut moves focus to this field when the page is the one on screen.
-  createKeyed(
-    () => props.session.key,
-    (sessionKey) =>
-      onCleanup(
-        props.model.onAddress({ key: sessionKey }, (tabID) => {
-          if (tabID === state()?.id && visible()) focusAddress()
-        }),
-      ),
-  )
-
   // A tab the user just opened starts in its address field, once its blank page is on screen. Syncs DOM focus.
   createKeyed(
     () => (visible() && empty() ? state()?.id : undefined),
