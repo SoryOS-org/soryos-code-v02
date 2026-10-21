@@ -41,7 +41,7 @@ export default defineConfig({
   },
   fullyParallel: process.env.PLAYWRIGHT_FULLY_PARALLEL === "1",
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers,
   reporter: [["html", { outputFolder: "e2e/playwright-report", open: "never" }], ["line"]],
   webServer: process.env.PLAYWRIGHT_BASE_URL

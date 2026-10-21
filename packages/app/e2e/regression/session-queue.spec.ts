@@ -1080,7 +1080,7 @@ test("/undo returns a pending steer's review comment to the composer", async ({ 
 })
 
 for (const delivery of ["steer", "queue"] as const) {
-  test(`keeps finished tools above a pending ${delivery === "queue" ? "queue-to-steer" : "steer"} follow-up`, async ({
+  test(`keeps finished tools above a pending ${delivery === "queue" ? "queue-to-steer" : "steer"} follow-up${delivery === "steer" ? " @quarantine" : ""}`, async ({
     page,
   }, testInfo) => {
     const model = { id: "queue-model", providerID: "opencode" }

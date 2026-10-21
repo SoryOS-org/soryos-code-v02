@@ -11,7 +11,7 @@ export function componentConfig(directory: string) {
     expect: { timeout: 10_000 },
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 2 : 0,
+    retries: process.env.CI ? 1 : 0,
     workers: process.env.CI ? 2 : undefined,
     reporter: [["html", { outputFolder: `${directory}/component-tests/playwright-report`, open: "never" }], ["line"]],
     webServer: {

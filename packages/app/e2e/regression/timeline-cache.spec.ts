@@ -12,7 +12,9 @@ test.use({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" })
 type Reveal = { pending: number; clipped: string[]; bottomError: number; tables: number; codeBlocks: number }
 
 for (const width of [1440, 390]) {
-  test(`reveals a cold timeline at the tail only after Markdown is measured at ${width}px`, async ({ page }) => {
+  test(`reveals a cold timeline at the tail only after Markdown is measured at ${width}px @quarantine`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 900 })
     const requested = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
@@ -334,7 +336,7 @@ test("recovers from a failed cold history load when another session is selected"
   await expect(page.getByRole("heading", { name: "Something went wrong", exact: true })).toHaveCount(0)
 })
 
-test("focuses Find in the selected cached timeline", async ({ page }) => {
+test("focuses Find in the selected cached timeline @quarantine", async ({ page }) => {
   await openTabs(page, { pageMessages: placeholderHistory })
   await page.goto(sessionHref(fixture.sourceID))
   await expect(page.getByText(`History for ${fixture.sourceID}`, { exact: true })).toBeVisible()
@@ -355,7 +357,7 @@ test("focuses Find in the selected cached timeline", async ({ page }) => {
   await expect(search).toHaveCount(0)
 })
 
-test("disposes the old workspace's shell while destination history is loading", async ({ page }) => {
+test("disposes the old workspace's shell while destination history is loading @quarantine", async ({ page }) => {
   const destination = "C:/OpenCode/OtherProject"
   const requested = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()

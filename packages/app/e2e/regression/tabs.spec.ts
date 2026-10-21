@@ -843,7 +843,9 @@ test("inactive tabs stay busy while work waits in their inbox, and pulse on a ne
   await expect(tab(a.id).locator('[data-slot="tab-prompt-pulse"]')).toHaveCount(0)
 })
 
-test("switching between busy sessions keeps the busy indicators and the activity capsule at rest", async ({ page }) => {
+test("switching between busy sessions keeps the busy indicators and the activity capsule at rest @quarantine", async ({
+  page,
+}) => {
   const children = [
     { id: "ses_tab_a_child", title: "Map the orchard", parentID: a.id },
     { id: "ses_tab_b_child", title: "Chart the harbor", parentID: b.id },

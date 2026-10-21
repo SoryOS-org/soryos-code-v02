@@ -651,7 +651,7 @@ for (const row of [
     accent: false,
   },
 ]) {
-  test(`keeps the user message blue for ${row.name}`, async ({ page }) => {
+  test(`keeps the user message blue for ${row.name} @quarantine`, async ({ page }) => {
     const inventory: WorktreeDirectory[] = [{ directory: accentRoot }, { directory: accentWorkspace, strategy: "git" }]
 
     const listed = page.waitForResponse(

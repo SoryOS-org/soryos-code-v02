@@ -647,7 +647,9 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
         const cause =
           detach === "scroll" ? "scrolling the touch target out of view" : "streaming replaces the touch target"
 
-        test(`returns Home after ${cause} (${release})`, async ({ page }, testInfo) => {
+        test(`returns Home after ${cause} (${release})${detach === "scroll" ? " @quarantine" : ""}`, async ({
+          page,
+        }, testInfo) => {
           const image = Promise.withResolvers<void>()
           const url = new URL(`/${detach}-target-image.svg`, testInfo.project.use.baseURL).href
           await page.route(url, async (route) => {

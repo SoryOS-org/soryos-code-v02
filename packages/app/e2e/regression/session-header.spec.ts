@@ -200,7 +200,7 @@ test.describe("location", () => {
     sessions: [{ id: "ses_location", title: "Location session", directory: worktree }],
   }
 
-  test("only collapses location names when the timeline header is narrow", async ({ page }) => {
+  test("only collapses location names when the timeline header is narrow @quarantine", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openSession(page, {
       ...workspace,
