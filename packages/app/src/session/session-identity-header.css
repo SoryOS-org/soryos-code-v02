@@ -62,7 +62,11 @@
   top: 48px;
 }
 
-/* Equal inline padding; the glyph's ink is slightly off-centre, so this balances the gaps within 0.5px in both directions. */
+/* The "/" does not mirror and its side bearings differ, so each direction gets its own padding to centre the ink between the segments. */
 .session-location-separator {
-  padding-inline: 3.25px;
+  padding-inline: 3.5px 3px;
+}
+
+.session-location-separator:dir(rtl) {
+  padding-inline: 3.25px 3.5px;
 }
