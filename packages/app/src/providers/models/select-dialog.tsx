@@ -973,16 +973,8 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         </Show>
         <div data-slot="model-dialog-hints">
           <span>
-            <Keybind keys={["↑", "↓"]} variant="neutral" />
-            {language.t("dialog.model.hint.navigate")}
-          </span>
-          <span>
             <Keybind keys={["←", "→"]} variant="neutral" />
             {language.t("dialog.model.hint.variant")}
-          </span>
-          <span>
-            <Keybind keys={["↵"]} variant="neutral" />
-            {language.t("dialog.model.hint.select")}
           </span>
           <span>
             <Keybind keys={formatKeybindParts("mod+f", language.t)} variant="neutral" />
