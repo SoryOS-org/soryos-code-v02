@@ -603,6 +603,43 @@ Use native v2 fields.`,
     }).pipe(Effect.provide(Config.testLayer([]))),
   )
 
+  it.effect("loads an agent file created after startup", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const directory = path.join(tmp.path, "agents")
+          yield* Effect.promise(() => fs.mkdir(directory, { recursive: true }))
+
+          const agents = yield* Agent.Service
+          const bus = yield* Bus.Service
+          const configTest = yield* Config.Test
+          yield* ConfigAgentPlugin.Plugin.effect(host({ agent: agentHost(agents) }))
+
+          // The agent file does not exist when the plugin starts.
+          expect(yield* agents.get(Agent.ID.make("tester"))).toBeUndefined()
+
+          let updated = 0
+          const changed = yield* bus.subscribe(Agent.Event.Updated).pipe(
+            Stream.take(1),
+            Stream.tap(() => Effect.sync(() => updated++)),
+            Stream.runDrain,
+            Effect.forkScoped({ startImmediately: true }),
+          )
+          yield* Effect.yieldNow
+
+          // The file appears mid-session, the way a running session writes one.
+          const file = path.join(directory, "tester.md")
+          yield* Effect.promise(() => fs.writeFile(file, "---\nmode: subagent\n---\nTest runner agent."))
+          yield* configTest.emitChange({ type: "create", path: file })
+          yield* advance(() => updated >= 1)
+          yield* Fiber.join(changed)
+
+          expect(yield* agents.get(Agent.ID.make("tester"))).toMatchObject({ system: "Test runner agent." })
+        }).pipe(Effect.provide(Config.testLayer([directoryEntry(tmp.path)]))),
+      ),
+    ),
+  )
+
   it.effect("ignores updates outside agent source directories", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
       Effect.flatMap((tmp) =>
