@@ -1,20 +1,47 @@
 import { RGBA, TextAttributes, type Renderable } from "@opentui/core"
 import { useRenderer, useTerminalDimensions } from "@opentui/solid"
+import type { FormAnswer, IntegrationOauthConnectOutput, IntegrationOAuthMethod } from "@opencode/client"
 import * as Open from "@opencode/util/open"
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js"
-import { useConfig } from "../config"
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
+import { useConfig, useNewDesigns } from "../config"
+import { useClient } from "../context/client"
+import { useClipboard } from "../context/clipboard"
+import { useData } from "../context/data"
 import { Keymap } from "../context/keymap"
+import { useLocal } from "../context/local"
+import { useLocation } from "../context/location"
 import { useTheme } from "../context/theme"
 import { tint } from "../theme/color"
-import { useDialog } from "../ui/dialog"
+import { DialogFooter, DialogHeader, DialogLayout, useDialog } from "../ui/dialog"
 import { Link } from "../ui/link"
+import { useToast } from "../ui/toast"
+import { errorMessage } from "../util/error"
+import { credentialConnections } from "./dialog-integration"
+import { DialogModel } from "./dialog-model"
 import "./go-upsell-art"
 
 export const GO_URL = "https://opencode.ai/go"
 const ACTIONS = ["don't show again", "dismiss", "subscribe"] as const
 type Action = (typeof ACTIONS)[number]
+type IntegrationAttempt = IntegrationOauthConnectOutput["data"]
+const OAUTH_CODE = /[A-Z0-9]{4}-[A-Z0-9]{4,5}/
 
-export function DialogGoUpsell(props: { reset?: string; onSubscribe: () => void; onDontShowAgain: () => void }) {
+let inflightConnect: Promise<void> = Promise.resolve()
+function trackConnect(task: Promise<void>) {
+  const next = task.catch(() => undefined)
+  inflightConnect = inflightConnect.then(() => next)
+}
+
+export function waitForGoUpsellConnect() {
+  return inflightConnect
+}
+
+export function DialogGoUpsell(props: {
+  reset?: string
+  canContinue?: () => boolean
+  onSubscribe: () => void
+  onDontShowAgain: () => void
+}) {
   const dialog = useDialog()
   const dimensions = useTerminalDimensions()
   const theme = useTheme().surface("dialog")
@@ -56,7 +83,7 @@ export function DialogGoUpsell(props: { reset?: string; onSubscribe: () => void;
   const run = (action: Action) => {
     if (action === "subscribe") {
       Open.openUrl(GO_URL).catch(() => {})
-      props.onSubscribe()
+      dialog.replace(() => <DialogGoUpsellConnect canContinue={props.canContinue} onSubscribed={props.onSubscribe} />)
       return
     }
     if (action === "don't show again") props.onDontShowAgain()
@@ -177,5 +204,258 @@ export function DialogGoUpsell(props: { reset?: string; onSubscribe: () => void;
         </Show>
       </box>
     </box>
+  )
+}
+
+function DialogGoUpsellConnect(props: { canContinue?: () => boolean; onSubscribed: () => void }) {
+  const data = useData()
+  const currentLocation = useLocation()
+  const location = currentLocation.ref ?? data.location.default()
+  const dialog = useDialog()
+  const client = useClient()
+  const toast = useToast()
+  const clipboard = useClipboard()
+  const local = useLocal()
+  const newDesigns = useNewDesigns()
+  const theme = useTheme().surface("dialog")
+  const [attempt, setAttempt] = createSignal<IntegrationAttempt>()
+  const integration = createMemo(() => data.location.integration.list(location)?.find((item) => item.id === "opencode"))
+  const method = createMemo(() =>
+    integration()?.methods.find((item): item is IntegrationOAuthMethod => item.type === "oauth" && item.id === "device"),
+  )
+
+  let started = false
+  let settled = false
+  let closed = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let pendingAttemptID: string | undefined
+
+  const valid = () => {
+    const current = data.location.integration.list(location)?.find((item) => item.id === "opencode")
+    const active = current ? credentialConnections(current)[0] : undefined
+    return Boolean(active && !active.status)
+  }
+
+  const finish = () => {
+    if (props.canContinue && !props.canContinue()) {
+      dialog.clear()
+      return
+    }
+    const goModel = (data.location.model.list(location) ?? []).find(
+      (item) => item.providerID === "opencode-go" && item.status !== "deprecated",
+    )
+    if (goModel) {
+      local.model.set({ providerID: goModel.providerID, modelID: goModel.id }, { recent: true })
+      dialog.clear()
+      props.onSubscribed()
+      return
+    }
+    dialog.replace(() => <DialogModel />)
+  }
+
+  const sync = async (announce: boolean) => {
+    data.location.integration.invalidate(location)
+    data.location.model.invalidate(location)
+    data.location.provider.invalidate(location)
+    try {
+      await Promise.all([
+        data.location.integration.sync(location),
+        data.location.model.sync(location),
+        data.location.provider.sync(location),
+      ])
+    } catch (cause) {
+      if (closed || dialog.stack.length === 0) return false
+      toast.show({ variant: "error", message: errorMessage(cause) })
+      dialog.clear()
+      return false
+    }
+    if (closed || dialog.stack.length === 0) return false
+    if (!valid()) return null
+    if (announce) {
+      toast.show({ variant: "success", message: `Connected ${integration()?.name ?? "OpenCode Console"}` })
+    }
+    finish()
+    return true
+  }
+
+  const poll = (current: IntegrationAttempt) => {
+    trackConnect(
+      (async () => {
+        try {
+          const result = await client.api.integration.oauth.status({
+            integrationID: "opencode",
+            attemptID: current.attemptID,
+            location: { directory: location.directory },
+          })
+          if (closed) return
+          const status = result.data
+          if (status.status === "pending") {
+            timer = setTimeout(() => poll(current), 500)
+            return
+          }
+          settled = true
+          if (status.status === "complete") {
+            const ok = await sync(true)
+            if (ok === null && !closed) dialog.clear()
+            return
+          }
+          toast.show({
+            variant: "error",
+            message: status.status === "failed" ? status.message : "Authorization expired",
+          })
+          dialog.clear()
+        } catch (cause) {
+          if (closed) return
+          settled = true
+          toast.show({ variant: "error", message: errorMessage(cause) })
+          dialog.clear()
+        }
+      })(),
+    )
+  }
+
+  const startOAuth = (oauthMethod: IntegrationOAuthMethod) => {
+    const answer: FormAnswer = {}
+    for (const field of oauthMethod.form ?? []) {
+      if (field.type !== "external" && field.default !== undefined) {
+        answer[field.key] = field.default
+      }
+    }
+    trackConnect(
+      (async () => {
+        try {
+          const base = {
+            integrationID: "opencode",
+            location: { directory: location.directory },
+            methodID: oauthMethod.id,
+          }
+          const result = await client.api.integration.oauth.connect(
+            Object.keys(answer).length > 0 ? { ...base, answer } : base,
+          )
+          if (closed) {
+            void client.api.integration.oauth.cancel({
+              integrationID: "opencode",
+              attemptID: result.data.attemptID,
+              location: { directory: location.directory },
+            })
+            return
+          }
+          pendingAttemptID = result.data.attemptID
+          setAttempt(result.data)
+          poll(result.data)
+        } catch (cause) {
+          if (closed) return
+          toast.show({ variant: "error", message: errorMessage(cause) })
+          dialog.clear()
+        }
+      })(),
+    )
+  }
+
+  createEffect(() => {
+    if (started || closed) return
+    const current = integration()
+    const oauthMethod = method()
+    if (!current || !oauthMethod) return
+    started = true
+    if (valid()) {
+      trackConnect(
+        (async () => {
+          const ok = await sync(false)
+          if (ok === null && !closed) startOAuth(oauthMethod)
+        })(),
+      )
+      return
+    }
+    startOAuth(oauthMethod)
+  })
+
+  onCleanup(() => {
+    closed = true
+    if (timer) clearTimeout(timer)
+    if (settled || !pendingAttemptID) return
+    void client.api.integration.oauth.cancel({
+      integrationID: "opencode",
+      attemptID: pendingAttemptID,
+      location: { directory: location.directory },
+    })
+  })
+
+  const open = () => {
+    const current = attempt()
+    if (!current) return
+    Open.openUrl(current.url).catch(() =>
+      toast.show({
+        message: "Could not open the browser. Copy the URL and continue manually.",
+        variant: "error",
+      }),
+    )
+  }
+
+  const copy = () => {
+    const current = attempt()
+    if (!current) return
+    const value = current.instructions.match(OAUTH_CODE)?.[0] ?? current.url
+    clipboard
+      .write(value)
+      .then(() => toast.show({ message: "Copied to clipboard", variant: "info" }))
+      .catch(toast.error)
+  }
+
+  Keymap.createLayer(() => ({
+    mode: "modal",
+    enabled: () => Boolean(attempt()),
+    commands: [
+      { bind: newDesigns() ? "return" : "o", title: "Open authorization URL", group: "Dialog", run: open },
+      { bind: "c", title: "Copy authorization details", group: "Dialog", run: copy },
+    ],
+  }))
+
+  const title = () => method()?.label ?? "Connect an integration"
+
+  return (
+    <DialogLayout
+      header={<DialogHeader title={title()} />}
+      footer={{
+        actions: {
+          primary: attempt()
+            ? [
+                {
+                  title: attempt()?.instructions.match(OAUTH_CODE) ? "copy code" : "copy link",
+                  key: "c",
+                  onTrigger: copy,
+                },
+                { title: "open link", key: "enter", onTrigger: open },
+              ]
+            : [],
+        },
+      }}
+      legacyFooter={
+        <DialogFooter
+          actions={{
+            secondary: attempt()
+              ? [
+                  { title: "open", key: "o" },
+                  { title: "copy", key: "c" },
+                ]
+              : [],
+          }}
+        />
+      }
+    >
+      <box gap={1}>
+        <Show when={attempt()}>
+          {(current) => (
+            <box gap={1}>
+              <Link href={current().url} fg={theme.markdown.link} />
+              <Show when={current().instructions}>
+                {(instructions) => <text fg={theme.text.muted}>{instructions()}</text>}
+              </Show>
+            </box>
+          )}
+        </Show>
+        <text fg={theme.text.muted}>{attempt() ? "Waiting for authorization…" : "Starting authorization…"}</text>
+      </box>
+    </DialogLayout>
   )
 }

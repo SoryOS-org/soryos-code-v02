@@ -70,9 +70,7 @@ import { statusLabel } from "../../component/dialog-workspace-file-changes"
 import { DialogMessage } from "./dialog-message"
 import { DialogFork } from "./dialog-fork"
 import { DialogTimeline } from "./dialog-timeline"
-import { DialogIntegration } from "../../component/dialog-integration"
 import { DialogGoUpsell } from "../../component/dialog-go-upsell"
-import { DialogModel } from "../../component/dialog-model"
 import { useStorage } from "../../context/storage"
 import { Composer } from "./composer"
 import { filetype } from "../../util/filetype"
@@ -678,14 +676,11 @@ export function Session(props: {
       const expectedAgents = current.current.agents?.length ?? 0
       const expectedSkills = current.current.skills?.length ?? 0
       const expectedPasted = current.current.pasted.length
-      const canOpen = () => {
+      const hasRecalledPrompt = () => {
         const active = prompt()
         return Boolean(
           !sessionDisposed &&
             route.sessionID === event.data.sessionID &&
-            dialog.stack.length === 0 &&
-            !goUpsell.dontShow &&
-            !goUpsellMemory.dontShow &&
             active &&
             active.current.text === expectedText &&
             (active.current.files?.length ?? 0) === expectedFiles &&
@@ -694,6 +689,8 @@ export function Session(props: {
             active.current.pasted.length === expectedPasted,
         )
       }
+      const canOpen = () =>
+        Boolean(hasRecalledPrompt() && dialog.stack.length === 0 && !goUpsell.dontShow && !goUpsellMemory.dontShow)
       const previousSeen = goUpsellMemory.lastSeenAt
       updateGoUpsellMemory((draft) => {
         draft.lastSeenAt = now
@@ -730,6 +727,7 @@ export function Session(props: {
           dialog.replace(() => (
             <DialogGoUpsell
               reset={freeLimitReset(event.data.error.retryAfterMs, event.created)}
+              canContinue={hasRecalledPrompt}
               onDontShowAgain={() => {
                 updateGoUpsellMemory((draft) => {
                   draft.dontShow = true
@@ -738,15 +736,9 @@ export function Session(props: {
                   draft.dontShow = true
                 }).catch(() => undefined)
               }}
-              onSubscribe={() =>
-                dialog.replace(() => (
-                  <DialogIntegration
-                    integrationID="opencode-go"
-                    autoConnect
-                    onConnected={(providerID) => dialog.replace(() => <DialogModel providerID={providerID} />)}
-                  />
-                ))
-              }
+              onSubscribe={() => {
+                prompt()?.submit()
+              }}
             />
           ))
         })
