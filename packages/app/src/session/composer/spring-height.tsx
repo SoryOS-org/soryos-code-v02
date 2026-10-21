@@ -10,9 +10,9 @@ const presets = {
 }
 // Opening and closing share one height spring, so a dock leaves the way it came.
 const morph = motionTuning.spring("docks.morph", { label: "Height", group, shipped: "smooth", presets })
-export const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, shipped: "smooth", presets })
+const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, shipped: "smooth", presets })
 const fadeOut = motionTuning.spring("docks.fade-out", { label: "Fade out", group, shipped: "smooth", presets })
-const blur = motionTuning.number("docks.blur", { label: "Blur", group, value: 4, min: 0, max: 16, step: 0.5, unit: "px" })
+const blur = motionTuning.number("docks.blur", { label: "Blur", group, value: 2, min: 0, max: 6, step: 0.5, unit: "px" })
 export const queueStagger = motionTuning.number("docks.stagger", {
   label: "Queue row stagger",
   group,
@@ -195,6 +195,8 @@ export function Grow<T>(props: {
   fade?: boolean
   card?: boolean
   class?: string
+  /** The spring it closes on, when it closes alongside other motion that should share it. */
+  close?: () => DurationOptions
   onClosed?: () => void
   children: JSX.Element | ((item: NonNullable<T>) => JSX.Element)
 }) {
@@ -213,7 +215,7 @@ export function Grow<T>(props: {
         }
         if (!el || (!entering && (!prev || prev[0] === when))) return
         entering = false
-        grow(el, when, props.fade, props.card, () => {
+        grow(el, when, props.fade, props.card, props.close?.(), () => {
           setPresent(false)
           props.onClosed?.()
         })
@@ -239,14 +241,21 @@ export function Grow<T>(props: {
 
 const growing = new WeakMap<HTMLElement, { spring: Spring; presence: Spring; open: boolean; done?: () => void }>()
 
-function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean, done?: () => void) {
+function grow(
+  el: HTMLElement,
+  open: boolean,
+  withFade?: boolean,
+  card?: boolean,
+  close?: DurationOptions,
+  done?: () => void,
+) {
   const reduced = prefersReducedMotion()
   const current = growing.get(el)
   if (current) {
     current.open = open
     current.done = done
-    tune(current.spring, reduced ? fade : morph())
-    tune(current.presence, reduced ? fade : open ? fadeIn() : fadeOut())
+    tune(current.spring, reduced ? fade : open ? morph() : (close ?? morph()))
+    tune(current.presence, reduced ? fade : open ? fadeIn() : (close ?? fadeOut()))
     return
   }
 
@@ -254,8 +263,11 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
   const prevMb =
     (!mb && el.previousElementSibling ? parseFloat(getComputedStyle(el.previousElementSibling).marginBottom) : 0) || 0
   const state = {
-    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, reduced ? fade : morph()),
-    presence: Spring.fromDuration(open ? 0 : 1, reduced ? fade : open ? fadeIn() : fadeOut()),
+    spring: Spring.fromDuration(
+      open ? 0 : el.getBoundingClientRect().height,
+      reduced ? fade : open ? morph() : (close ?? morph()),
+    ),
+    presence: Spring.fromDuration(open ? 0 : 1, reduced ? fade : open ? fadeIn() : (close ?? fadeOut())),
     open,
     done,
   }
@@ -326,4 +338,31 @@ function finish(el: HTMLElement, open: boolean, done?: () => void) {
     },
   )
   if (!open) done?.()
+}
+
+// Fades `rows` in one after another on the fade-in spring, `step` seconds apart, on the shared frame loop. Returns its
+// cancellation, which clears what it painted.
+export function cascade(rows: HTMLElement[], step: number) {
+  const springs = rows.map(() => Spring.fromDuration(0, fadeIn()))
+  const clear = () => rows.forEach((el) => ["opacity", "filter", "transform"].forEach((prop) => el.style.removeProperty(prop)))
+  let elapsed = 0
+  rows.forEach((el) => styleFace(el, 0, { dy: 4, out: false }))
+  const stop = frameLoop.add((dt) => {
+    elapsed += dt
+    springs.forEach((spring, index) => {
+      if (elapsed < index * step) return
+      spring.set(1).step(dt)
+      if (Math.abs(spring.value - 1) < 0.01 && Math.abs(spring.velocity) < 0.05) spring.snap(1)
+    })
+    if (springs.every((spring) => spring.value === 1)) {
+      clear()
+      return false
+    }
+    rows.forEach((el, index) => styleFace(el, Math.max(0, Math.min(1, springs[index]!.value)), { dy: 4, out: false }))
+    return true
+  })
+  return () => {
+    stop()
+    clear()
+  }
 }

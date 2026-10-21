@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show, untrack } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack } from "solid-js"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
 import { AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/dom"
@@ -13,7 +13,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { prefersReducedMotion } from "@opencode/ui/motion"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { SessionQueueView } from "./queue"
-import { fadeIn, Grow, queueStagger } from "./spring-height"
+import { cascade, Grow, queueStagger } from "./spring-height"
 import "./queue-panel.css"
 
 type QueueRow = ReturnType<SessionQueueView["rows"]>[number]
@@ -40,41 +40,39 @@ export function SessionQueuePanel(props: { queue: SessionQueueView; hidden?: boo
         lastLive = next
         if (next.length === 0) return
 
-        // An in-place edit or reorder replaces row IDs without changing the row count. A refresh that keeps the same
-        // rows must not drop a row that is still closing.
-        const same = next.length === prevLive.length && next.every((row, index) => row.id === prevLive[index]?.id)
-        if (next.length === prevLive.length && prevLive.length > 0 && !same) return setShown(next)
-        if (prevLive.length > 0 && !props.hidden)
+        // An in-place edit or reorder keeps the row count: a row whose ID it replaced swaps in place rather than closing,
+        // while a row that was already closing keeps closing until its exit completes.
+        const swap = next.length === prevLive.length && prevLive.length > 0
+        if (!swap && prevLive.length > 0 && !props.hidden)
           next.forEach((row) => !prevLive.some((item) => item.id === row.id) && appearing.add(row.id))
-        setShown(keepLeaving(untrack(shown), next))
+        const kept = untrack(shown).filter(
+          (row) => !swap || next.some((item) => item.id === row.id) || !prevLive.some((item) => item.id === row.id),
+        )
+        setShown(keepLeaving(kept, next))
       },
       { defer: true },
     ),
   )
 
   // When the panel opens with prompts already queued, such as after a dock closes, its rows can cascade in.
+  let stopCascade: (() => void) | undefined
   createEffect(
     on(
       open,
       (now, was) => {
+        stopCascade?.()
+        stopCascade = undefined
         const step = queueStagger()
         if (!now || was !== false || step <= 0 || prefersReducedMotion()) return
-        queueMicrotask(() =>
-          listRef
-            .querySelectorAll('[data-component="session-queue-row"]')
-            .forEach((row, index) =>
-              row.animate([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "none" }], {
-                duration: fadeIn().duration * 1000,
-                delay: index * step * 1000,
-                easing: "cubic-bezier(0.2, 0, 0, 1)",
-                fill: "backwards",
-              }),
-            ),
-        )
+        queueMicrotask(() => {
+          if (!open()) return
+          stopCascade = cascade([...listRef.querySelectorAll<HTMLElement>('[data-component="session-queue-row"]')], step)
+        })
       },
       { defer: true },
     ),
   )
+  onCleanup(() => stopCascade?.())
 
   return (
     <Grow when={open()} fade class="relative z-0" onClosed={() => setShown(props.queue.rows())}>

@@ -27,7 +27,12 @@ type DockArgs = {
   subagent: boolean
 }
 
-const prompts = ["Rename the Alpha export", "Add a Beta regression test", "Summarize the Gamma changes"]
+const prompts = [
+  "Rename the Alpha export",
+  "Add a Beta regression test",
+  "Summarize the Gamma changes",
+  "Check the Delta fixture",
+]
 
 const websearchRequest: FormInfo = {
   id: "frm_docks_websearch",
@@ -41,13 +46,29 @@ const websearchRequest: FormInfo = {
 // buttons in the Motion panel beside it. Answering, dismissing and Esc close docks the way they do in the app.
 function ComposerDocksPreview(props: DockArgs) {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
-  const [state, setState] = createStore({ ...props, revision: 0, searchProvider: "exa" })
+  const [state, setState] = createStore({
+    ...props,
+    rows: prompts.slice(0, props.queue).map((_, index) => index),
+    revision: 0,
+    searchProvider: "exa",
+  })
+  // Grows or trims the queue to `count`, adding the prompts not queued yet.
+  const queueTo = (count: number) =>
+    setState("rows", (rows) =>
+      [...rows, ...prompts.map((_, index) => index).filter((index) => !rows.includes(index))].slice(
+        0,
+        Math.max(0, Math.min(prompts.length, count)),
+      ),
+    )
+  const dequeue = (id: string) => setState("rows", (rows) => rows.filter((index) => `queued_${index}` !== id))
 
   createEffect(
     on(
       () => [props.question, props.permission, props.websearch, props.queue, props.subagent] as const,
-      ([question, permission, websearch, queue, subagent]) =>
-        setState({ question, permission, websearch, queue, subagent }),
+      ([question, permission, websearch, queue, subagent]) => {
+        setState({ question, permission, websearch, subagent })
+        queueTo(queue)
+      },
       { defer: true },
     ),
   )
@@ -66,16 +87,17 @@ function ComposerDocksPreview(props: DockArgs) {
       .querySelector('[data-component="dock-prompt"][data-kind="question"]')
       ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })),
   )
-  replay("queue-add", "Queue +1", () => setState("queue", (count) => Math.min(prompts.length, count + 1)))
-  replay("queue-remove", "Queue −1", () => setState("queue", (count) => Math.max(0, count - 1)))
+  replay("queue-add", "Queue +1", () => queueTo(state.rows.length + 1))
+  replay("queue-remove", "Queue −1", () => queueTo(state.rows.length - 1))
   replay("subagent", "Subagent", () => setState("subagent", (value) => !value))
+  replay("queue-reverse", "Reverse queue", () => setState("rows", (rows) => rows.toReversed()))
 
   const prompt = createPromptController({
     initial: "",
     placeholder: "Ask anything",
     status: () => ({ type: "busy" }),
     onActivity: () => undefined,
-    onSubmit: () => setState("queue", (count) => Math.min(prompts.length, count + 1)),
+    onSubmit: () => queueTo(state.rows.length + 1),
     onStop: () => undefined,
   })
 
@@ -123,15 +145,19 @@ function ComposerDocksPreview(props: DockArgs) {
   } satisfies SessionComposerRegionViewController
 
   const queue: SessionQueueView = {
-    rows: () => prompts.slice(0, state.queue).map((text, index) => ({ id: `queued_${index}`, text, attachments: 0 })),
+    rows: () => state.rows.map((index) => ({ id: `queued_${index}`, text: prompts[index]!, attachments: 0 })),
     editing: () => undefined,
     working: () => true,
     busy: () => false,
-    steer: async () => void setState("queue", (count) => count - 1),
-    remove: async () => void setState("queue", (count) => count - 1),
-    undo: () => setState("queue", (count) => count - 1),
+    steer: async (id) => dequeue(id),
+    remove: async (id) => dequeue(id),
+    undo: dequeue,
     edit: () => false,
-    reorder: async () => undefined,
+    reorder: async (ids) =>
+      void setState(
+        "rows",
+        ids.map((id) => Number(id.replace("queued_", ""))),
+      ),
   }
 
   return (
@@ -185,7 +211,7 @@ export default {
     },
   },
   argTypes: {
-    queue: { control: { type: "range", min: 0, max: 3, step: 1 } },
+    queue: { control: { type: "range", min: 0, max: 4, step: 1 } },
   },
   args: { question: false, permission: false, websearch: false, queue: 0, subagent: false } satisfies DockArgs,
   render: (args: DockArgs) => <ComposerDocksPreview {...args} />,
