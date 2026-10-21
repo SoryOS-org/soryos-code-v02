@@ -645,7 +645,11 @@ const layer = Layer.effectDiscard(
         .pipe(Effect.orDie),
     )
     yield* bus.project(SessionEvent.MessageContentUpdated, (event) => run(db, event))
-    yield* bus.project(SessionEvent.UsageRecorded, (event) => applyUsage(db, event.data.sessionID, event.data))
+    yield* bus.project(SessionEvent.UsageRecorded, (event) =>
+      // Reverted usage reached the session counters when its steps ended; the event only preserves it
+      // for SessionStats after the message rows are deleted, so applying it here would double count.
+      event.data.source === "revert" ? Effect.void : applyUsage(db, event.data.sessionID, event.data),
+    )
     yield* bus.project(SessionEvent.Forked, (event) => projectFork(db, event))
     yield* bus.project(SessionEvent.InboxDelivered, (event) =>
       Effect.gen(function* () {
