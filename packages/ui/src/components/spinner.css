@@ -39,6 +39,11 @@
   opacity: var(--still);
 }
 
+/* syncSpinPhase marks spinners out of view; `!important` beats the inline animation each dot carries. */
+[data-slot="spinner-dots"][data-offscreen] rect {
+  animation-play-state: paused !important;
+}
+
 :root[data-motion="reduce"] [data-slot="spinner-dots"] rect {
   /* Beats the inline animation each dot carries. */
   animation: none !important;

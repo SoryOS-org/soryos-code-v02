@@ -33,8 +33,10 @@ export function Spinner(props: ComponentProps<"svg"> & { "data-component"?: stri
   const classList = () => ({ ...local.classList, [local.class ?? ""]: !!local.class })
 
   return (
+    // Keyed, so switching variations builds a fresh SVG: its dots, keyframes and phase pin all come from the new one.
     <Show
       when={variant()}
+      keyed
       fallback={
         <svg
           {...rest}
@@ -54,7 +56,7 @@ export function Spinner(props: ComponentProps<"svg"> & { "data-component"?: stri
         if (!added.has(keyframes)) {
           added.add(keyframes)
           const style = document.createElement("style")
-          style.textContent = spinnerKeyframes(keyframes, current())
+          style.textContent = spinnerKeyframes(keyframes, current)
           document.head.append(style)
         }
 
@@ -69,9 +71,9 @@ export function Spinner(props: ComponentProps<"svg"> & { "data-component"?: stri
             classList={classList()}
             fill="currentColor"
           >
-            <For each={spinnerDots(current())}>
+            <For each={spinnerDots(current)}>
               {(dot) => {
-                const loop = current().loop * dot.scale
+                const loop = current.loop * dot.scale
 
                 return (
                   <rect
@@ -81,7 +83,7 @@ export function Spinner(props: ComponentProps<"svg"> & { "data-component"?: stri
                     height={dot.size}
                     rx={dot.size * 0.24}
                     style={{
-                      "--still": dot.hold === "lit" ? 1 : dot.hold === "rest" ? current().dim : dot.still,
+                      "--still": dot.hold === "lit" ? 1 : dot.hold === "rest" ? current.dim : dot.still,
                       animation: dot.hold
                         ? undefined
                         : `${keyframes} calc(${loop}s * var(--spinner-time, 1)) linear calc(${-loop * (1 - dot.at)}s * var(--spinner-time, 1)) infinite`,

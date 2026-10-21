@@ -2,17 +2,43 @@ import { onCleanup } from "solid-js"
 
 // ResizeObserver delivers after style and layout but before paint, so a spinner that mounts or leaves `display: none`
 // (which restarts its CSS animation) paints its first frame already in phase.
-const observer =
+const resize =
   typeof ResizeObserver === "undefined"
     ? undefined
-    : new ResizeObserver((entries) => entries.forEach((entry) => pinSpinPhase(entry.target)))
+    : new ResizeObserver((entries) => entries.forEach((entry) => pinVisible(entry.target)))
 
-/** Use as a `ref` on a looping indicator so every instance on screen shares one phase. */
+// Spinners scrolled or clipped out of view, under a `display: none` or `content-visibility: hidden` ancestor, or sized
+// to nothing get `data-offscreen`, which their CSS uses to pause. Coming back, they resume and re-pin to the shared
+// phase. `visibility: hidden` and `opacity: 0` still count as visible.
+const visibility =
+  typeof IntersectionObserver === "undefined"
+    ? undefined
+    : new IntersectionObserver((entries) =>
+        entries.forEach((entry) => {
+          entry.target.toggleAttribute("data-offscreen", !entry.isIntersecting)
+          pinVisible(entry.target)
+        }),
+      )
+
+/** Use as a `ref` on a looping indicator so every instance on screen shares one phase and pauses while hidden. */
 export function syncSpinPhase(el: Element) {
-  observer?.observe(el)
+  resize?.observe(el)
+  visibility?.observe(el)
   // Turning reduced motion back off restarts the animation without resizing anything.
-  el.addEventListener("animationstart", () => pinSpinPhase(el))
-  onCleanup(() => observer?.unobserve(el))
+  el.addEventListener("animationstart", () => pinVisible(el))
+  onCleanup(() => {
+    resize?.unobserve(el)
+    visibility?.unobserve(el)
+  })
+}
+
+// Setting the start time of a paused CSS animation resumes it and makes it ignore `animation-play-state` from then on,
+// so a paused spinner is left alone until it is visible. `getAnimations` flushes style, so a spinner that has just
+// lost `data-offscreen` is running again by the time it is pinned.
+function pinVisible(el: Element) {
+  if (el.hasAttribute("data-offscreen")) return
+
+  pinSpinPhase(el)
 }
 
 // Starting every infinite loop at the document timeline's origin puts all instances of one animation in phase.
