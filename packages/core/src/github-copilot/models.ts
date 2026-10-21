@@ -96,6 +96,11 @@ export async function load(baseURL: string, headers: RequestInit["headers"]): Pr
 /** Combine remote facts with source templates, never a previously transformed model result. */
 export function derive(baseURL: string, remote: Snapshot, existing: readonly Model.Info[]) {
   const result = new Map(existing.map((model) => [model.id, model]))
+  // Accounts limited to auto model selection (Copilot Free/Student) report every
+  // model as unpickable. Honouring that flag for all of them would leave the
+  // provider with nothing to offer, so only apply it when the account
+  // actually exposes a pickable model.
+  const hasPicker = [...remote.values()].some((model) => model.model_picker_enabled)
 
   // Keep aliases and local metadata, but only when their advertised API model
   // still exists. A partial or malformed item cannot create a broken model.
@@ -105,13 +110,13 @@ export function derive(baseURL: string, remote: Snapshot, existing: readonly Mod
       result.delete(id)
       continue
     }
-    result.set(id, build(id, current, baseURL, model))
+    result.set(id, build(id, current, baseURL, hasPicker, model))
   }
 
   for (const [id, model] of remote) {
     const key = Model.ID.make(id)
     if (result.has(key)) continue
-    result.set(key, build(key, model, baseURL))
+    result.set(key, build(key, model, baseURL, hasPicker))
   }
 
   return result
@@ -126,7 +131,7 @@ function usable(model: RemoteModel): model is UsableModel {
   )
 }
 
-function build(id: Model.ID, remote: UsableModel, baseURL: string, previous?: Model.Info) {
+function build(id: Model.ID, remote: UsableModel, baseURL: string, hasPicker: boolean, previous?: Model.Info) {
   const messages = remote.supported_endpoints?.includes("/v1/messages") ?? false
   const endpoint = messages
     ? "messages"
@@ -186,7 +191,9 @@ function build(id: Model.ID, remote: UsableModel, baseURL: string, previous?: Mo
       },
     ],
     status: "active",
-    enabled: remote.model_picker_enabled,
+    // Without a picker to honour, every usable model stays selectable so an
+    // auto-only account is not left with an empty provider.
+    enabled: hasPicker ? remote.model_picker_enabled : true,
     limit: {
       context: remote.capabilities.limits.max_context_window_tokens ?? remote.capabilities.limits.max_prompt_tokens,
       input: remote.capabilities.limits.max_prompt_tokens,
