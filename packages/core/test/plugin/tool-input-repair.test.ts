@@ -48,6 +48,141 @@ const object = (properties: Record<string, unknown>, required?: string[]) => ({
 })
 
 describe("tool input repair plugin", () => {
+  it.effect("repairs composed object branches selected by required keys and discriminators", () =>
+    Effect.gen(function* () {
+      const schema = object({
+        rule: {
+          oneOf: [
+            {
+              type: "object",
+              properties: { kind: { const: "limit" }, count: { type: "integer" } },
+              required: ["kind", "count"],
+            },
+            {
+              type: "object",
+              properties: { kind: { const: "enabled" }, enabled: { type: "boolean" } },
+              required: ["kind", "enabled"],
+            },
+          ],
+        },
+        target: {
+          type: "object",
+          oneOf: [
+            { properties: { ids: { type: "array", items: { type: "integer" } } }, required: ["ids"] },
+            { properties: { names: { type: "array", items: { type: "string" } } }, required: ["names"] },
+          ],
+        },
+      })
+      expect((yield* run({ rule: { kind: "limit", count: "2" }, target: { ids: "[3,4]" } }, schema)).input).toEqual({
+        rule: { kind: "limit", count: 2 },
+        target: { ids: [3, 4] },
+      })
+    }),
+  )
+
+  it.effect("combines nonconflicting allOf properties for repair", () =>
+    Effect.gen(function* () {
+      const schema = {
+        allOf: [
+          object({ count: { type: "integer" } }, ["count"]),
+          object({ enabled: { type: "boolean" } }, ["enabled"]),
+        ],
+      }
+      expect((yield* run({ count: "2", enabled: "false" }, schema)).input).toEqual({ count: 2, enabled: false })
+    }),
+  )
+
+  it.effect("keeps common object repairs when several union alternatives apply", () =>
+    Effect.gen(function* () {
+      const schema = {
+        ...object({
+          names: { type: "array", items: { type: "string" } },
+          ids: { type: "array", items: { type: "integer" } },
+        }),
+        anyOf: [{ required: ["names"] }, { required: ["ids"] }],
+      }
+      expect((yield* run({ names: '["first"]', ids: [2] }, schema)).input).toEqual({ names: ["first"], ids: [2] })
+    }),
+  )
+
+  it.effect("preserves ambiguous branch repairs and valid JSON-looking strings", () =>
+    Effect.gen(function* () {
+      const input = { value: "2" }
+      for (const keyword of ["anyOf", "oneOf"]) {
+        const ambiguous = {
+          [keyword]: [object({ value: { type: "integer" } }), object({ value: { type: "string" } })],
+        }
+        expect((yield* run(input, ambiguous)).input).toBe(input)
+      }
+      for (const branch of [{ type: "string" }, {}, { properties: { unrelated: { type: "boolean" } } }]) {
+        const schema = { anyOf: [object({ count: { type: "integer" } }), branch] }
+        expect((yield* run('{"count":"2"}', schema)).input).toBe('{"count":"2"}')
+      }
+    }),
+  )
+
+  it.effect("does not select branches using object-valued enum identity", () =>
+    Effect.gen(function* () {
+      const input = { tag: { code: "first" }, value: "2" }
+      const schema = {
+        anyOf: [
+          object({ tag: { const: { code: "first" } }, value: { type: "string" } }),
+          object({ tag: { const: { code: "second" } }, value: { type: "integer" } }),
+        ],
+      }
+      expect((yield* run(input, schema)).input).toBe(input)
+    }),
+  )
+
+  it.effect("preserves required invalid placeholders and unknown fields in compositions", () =>
+    Effect.gen(function* () {
+      for (const value of [null, {}]) {
+        const input = { value, extra: "evidence" }
+        for (const keyword of ["allOf", "anyOf", "oneOf"]) {
+          const schema = {
+            ...object({ value: { type: "integer" } }),
+            [keyword]: [{ required: ["value"] }],
+            additionalProperties: false,
+          }
+          expect((yield* run(input, schema)).input).toBe(input)
+        }
+      }
+    }),
+  )
+
+  it.effect("does not combine overlapping or conflicting allOf property guidance", () =>
+    Effect.gen(function* () {
+      const input = { value: "2" }
+      for (const second of [object({ value: { type: "number" } }), object({ value: { type: "string" } })]) {
+        expect((yield* run(input, { allOf: [object({ value: { type: "integer" } }), second] })).input).toBe(input)
+      }
+      expect((yield* run(input, { allOf: [object({ value: { type: "integer" } }), { type: "string" }] })).input).toBe(
+        input,
+      )
+    }),
+  )
+
+  it.effect("keeps valid open union alternatives and mutually exclusive candidates unchanged", () =>
+    Effect.gen(function* () {
+      const input = { value: "2", extra: true }
+      const closed = { ...object({ value: { type: "integer" } }, ["value"]), additionalProperties: false }
+      expect((yield* run(input, { anyOf: [closed, {}] })).input).toBe(input)
+      expect((yield* run(input, { oneOf: [closed, object({ value: { type: "number" } }, ["value"])] })).input).toBe(
+        input,
+      )
+    }),
+  )
+
+  it.effect("limits conservative field preservation to the composed object", () =>
+    Effect.gen(function* () {
+      const item = { ...object({ count: { type: "integer" } }, ["count"]), additionalProperties: false }
+      const schema = { allOf: [object({ items: { type: "array", items: item } })] }
+      const input = { items: [{ count: "2", extra: true }], extra: true }
+      expect((yield* run(input, schema)).input).toEqual({ items: [{ count: 2 }], extra: true })
+      expect(input.items[0].extra).toBeTrue()
+    }),
+  )
+
   it.effect("preserves valid input identity, nested containers, and unknown properties", () =>
     Effect.gen(function* () {
       const nested = { enabled: true }
@@ -428,7 +563,7 @@ describe("tool input repair plugin", () => {
     }),
   )
 
-  it.effect("leaves ambiguous unions, compositions, and unsupported roots unchanged", () =>
+  it.effect("repairs simple compositions while preserving ambiguous unions and unsupported roots", () =>
     Effect.gen(function* () {
       const input = { numeric: "2", objects: { value: "3" }, both: "4", composed: "5", unknown: "6" }
       const event = yield* run(
@@ -447,9 +582,12 @@ describe("tool input repair plugin", () => {
         }),
       )
 
-      expect(event.input).toBe(input)
+      expect(event.input).toEqual({ ...input, composed: 5 })
       expect((yield* run(input, { properties: { numeric: { type: "integer" } } })).input).toBe(input)
-      expect((yield* run(input, { allOf: [object({ numeric: { type: "integer" } })] })).input).toBe(input)
+      expect((yield* run(input, { allOf: [object({ numeric: { type: "integer" } })] })).input).toEqual({
+        ...input,
+        numeric: 2,
+      })
     }),
   )
 })

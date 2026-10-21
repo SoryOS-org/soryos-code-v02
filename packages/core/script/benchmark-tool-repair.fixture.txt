@@ -1,0 +1,103 @@
+import { expect } from "bun:test"
+import { isDeepStrictEqual } from "node:util"
+import { Effect, Exit } from "effect"
+import { Agent } from "@opencode/core/agent"
+import { Plugin } from "@opencode/core/plugin"
+import { Session } from "@opencode/core/session"
+import { SessionMessage } from "@opencode/core/session/message"
+import { Tool } from "@opencode/core/tool"
+import { testEffect } from "../lib/effect"
+import { PluginTestLayer } from "./fixture"
+
+if (!process.env.OPENCODE_REPAIR_CORPUS || !process.env.OPENCODE_REPAIR_OUTPUT)
+  throw new Error("Run script/benchmark-tool-repair.mjs instead of this fixture directly")
+const corpus = await Bun.file(process.env.OPENCODE_REPAIR_CORPUS).json()
+const pluginPath = new URL("../../src/plugin/tool-input-repair.ts", import.meta.url)
+const feature = await Bun.file(pluginPath).exists()
+const featurePlugin = feature ? (await import(pluginPath.href)).Plugin : undefined
+const identity = {
+  sessionID: Session.ID.make("ses_repair"),
+  agent: Agent.ID.make("build"),
+  messageID: SessionMessage.ID.make("msg_repair"),
+}
+const it = testEffect(PluginTestLayer)
+
+it.effect("scores the frozen corpus through the actual historical registry and validator", () =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugin.Service
+    const registry = yield* Tool.Service
+    const schemas = [...new Set(corpus.cases.map((row) => JSON.stringify(row.schema)))]
+    const index = new Map(schemas.map((schema, position) => [schema, position]))
+    let observed: unknown
+    let invoked = false
+    yield* plugins.activate([
+      ...(featurePlugin ? [{ ...featurePlugin, revision: "benchmark" }] : []),
+      {
+        id: "benchmark-tools",
+        revision: "1",
+        effect: (context) =>
+          context.tool.transform((editor) => {
+            schemas.forEach((schema, position) =>
+              editor.add({
+                name: `benchmark_${position}`,
+                options: { codemode: false },
+                description: "Frozen published API request",
+                input: JSON.parse(schema),
+                execute: (input) =>
+                  Effect.sync(() => {
+                    invoked = true
+                    observed = input
+                  }).pipe(Effect.as({ content: "ok" })),
+              }),
+            )
+          }),
+      },
+    ])
+    const snapshot = yield* registry.snapshot()
+    const records = []
+    for (const [position, row] of corpus.cases.entries()) {
+      invoked = false
+      observed = undefined
+      const result = yield* snapshot
+        .execute({
+          ...identity,
+          call: {
+            type: "tool-call",
+            id: `call-benchmark-${position}`,
+            name: `benchmark_${index.get(JSON.stringify(row.schema))}`,
+            input: structuredClone(row.input),
+          },
+        })
+        .pipe(Effect.exit)
+      records.push({
+        id: row.id,
+        source: row.source,
+        operation: row.operation,
+        kind: row.kind,
+        invoked,
+        success: Exit.isSuccess(result),
+        exact: invoked && isDeepStrictEqual(observed, row.expected),
+      })
+    }
+    const groups = Object.groupBy(records, (row) => `${row.source}:${row.kind === "valid" ? "valid" : "malformed"}`)
+    const totals = Object.fromEntries(
+      Object.entries(groups).map(([key, rows]) => [
+        key,
+        {
+          count: rows.length,
+          invoked: rows.filter((row) => row.invoked).length,
+          exact: rows.filter((row) => row.exact && row.success).length,
+        },
+      ]),
+    )
+    const revision = Bun.spawnSync(["git", "rev-parse", "HEAD"]).stdout.toString().trim()
+    yield* Effect.promise(() =>
+      Bun.write(process.env.OPENCODE_REPAIR_OUTPUT!, JSON.stringify({ revision, feature, totals, records }, null, 2)),
+    )
+    console.log(JSON.stringify({ revision, feature, totals }, null, 2))
+    expect(records).toHaveLength(1843)
+    const recovered = records.filter((row) => row.kind !== "valid" && row.exact && row.success).length
+    if (feature) expect(recovered).toBeGreaterThan(0)
+    else expect(recovered).toBe(0)
+  }),
+)

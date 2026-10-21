@@ -112,3 +112,43 @@ it.effect("repairs namespaced inner tool input called from Code Mode", () =>
     expect(executed).toEqual([{ count: 3 }])
   }),
 )
+
+it.effect("repairs composed tool arguments without bypassing the original validator", () =>
+  Effect.gen(function* () {
+    const plugins = yield* Plugin.Service
+    const registry = yield* Tool.Service
+    const executed: unknown[] = []
+    yield* plugins.activate([{ ...ToolInputRepairPlugin.Plugin, revision: "1" }])
+    yield* registry.transform((draft) =>
+      draft.add({
+        name: "composed",
+        options: { codemode: false },
+        description: "Composed argument validation",
+        input: Schema.Struct({
+          action: Schema.Union([
+            Schema.Struct({
+              type: Schema.Literal("limit"),
+              count: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 10 })),
+            }),
+            Schema.Struct({ type: Schema.Literal("enable"), enabled: Schema.Boolean }),
+          ]),
+        }),
+        execute: (input) => Effect.sync(() => executed.push(input)).pipe(Effect.as({ content: "ok" })),
+      }),
+    )
+    const snapshot = yield* registry.snapshot()
+    const invoke = (input: unknown) =>
+      snapshot.execute({
+        ...identity,
+        call: { type: "tool-call", id: "call-composed", name: "composed", input },
+      })
+    yield* invoke({ action: { type: "limit", count: "2" } })
+    expect(executed).toEqual([{ action: { type: "limit", count: 2 } }])
+    for (const count of ["20", null, {}, "not-a-number"]) {
+      const error = yield* invoke({ action: { type: "limit", count } }).pipe(Effect.flip)
+      expect(error.message).toContain("Invalid arguments")
+    }
+    yield* invoke({ action: { type: "unknown", count: "2" } }).pipe(Effect.flip)
+    expect(executed).toHaveLength(1)
+  }),
+)

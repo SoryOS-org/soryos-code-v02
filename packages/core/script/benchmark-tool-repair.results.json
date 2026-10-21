@@ -1,0 +1,191 @@
+{
+  "sources": [
+    {
+      "name": "github",
+      "url": "https://raw.githubusercontent.com/github/rest-api-description/755ee33b4a81d51f6f07a902cce26cbec3b822f2/descriptions/api.github.com/api.github.com.json",
+      "sha256": "3177ad6a86ca04c57a9bef3fc24e28a339efb8eb040c6f950af3d3ed2fee7fa3"
+    },
+    {
+      "name": "cloudflare",
+      "url": "https://raw.githubusercontent.com/cloudflare/api-schemas/880ff24a8d487f05651f6dc24f482b9845127c7f/openapi.json",
+      "sha256": "f38352849426c3c46c7ea69a77b886f54d319f879696adcee35fc3ebd36f9439"
+    }
+  ],
+  "cases": 1843,
+  "proposedSourceSha256": "8cc73a13c04940fc5db0c475d8b5d9145dd91926baa3709405d4d47737ea033e",
+  "reports": [
+    {
+      "version": "parent",
+      "revision": "219ecada681992eed914c61ac4fb321dd887fbef",
+      "feature": false,
+      "totals": {
+        "github:valid": {
+          "count": 354,
+          "invoked": 351,
+          "exact": 351
+        },
+        "github:malformed": {
+          "count": 1005,
+          "invoked": 118,
+          "exact": 0
+        },
+        "cloudflare:valid": {
+          "count": 106,
+          "invoked": 106,
+          "exact": 106
+        },
+        "cloudflare:malformed": {
+          "count": 378,
+          "invoked": 30,
+          "exact": 0
+        }
+      },
+      "incorrectExecutions": 148,
+      "validRejected": [
+        "github:gists/update:deleteFile",
+        "github:security-advisories/create-repository-advisory:default",
+        "github:security-advisories/create-repository-advisory:withVectorString"
+      ]
+    },
+    {
+      "version": "historical",
+      "revision": "437cdc03a92d5cf7624b87854806108235b2b946",
+      "feature": true,
+      "totals": {
+        "github:valid": {
+          "count": 354,
+          "invoked": 351,
+          "exact": 351
+        },
+        "github:malformed": {
+          "count": 1005,
+          "invoked": 909,
+          "exact": 908
+        },
+        "cloudflare:valid": {
+          "count": 106,
+          "invoked": 106,
+          "exact": 106
+        },
+        "cloudflare:malformed": {
+          "count": 378,
+          "invoked": 239,
+          "exact": 231
+        }
+      },
+      "incorrectExecutions": 9,
+      "validRejected": [
+        "github:gists/update:deleteFile",
+        "github:security-advisories/create-repository-advisory:default",
+        "github:security-advisories/create-repository-advisory:withVectorString"
+      ]
+    },
+    {
+      "version": "baseline",
+      "revision": "79fd806343db0de150f23b09e4b9199434d6779c",
+      "feature": true,
+      "totals": {
+        "github:valid": {
+          "count": 354,
+          "invoked": 351,
+          "exact": 351
+        },
+        "github:malformed": {
+          "count": 1005,
+          "invoked": 909,
+          "exact": 908
+        },
+        "cloudflare:valid": {
+          "count": 106,
+          "invoked": 106,
+          "exact": 106
+        },
+        "cloudflare:malformed": {
+          "count": 378,
+          "invoked": 239,
+          "exact": 231
+        }
+      },
+      "incorrectExecutions": 9,
+      "validRejected": [
+        "github:gists/update:deleteFile",
+        "github:security-advisories/create-repository-advisory:default",
+        "github:security-advisories/create-repository-advisory:withVectorString"
+      ]
+    },
+    {
+      "version": "current",
+      "revision": "a2cb1c4e7f7dfff5de7a17b96a12e78b6799ebcb",
+      "feature": true,
+      "totals": {
+        "github:valid": {
+          "count": 354,
+          "invoked": 351,
+          "exact": 351
+        },
+        "github:malformed": {
+          "count": 1005,
+          "invoked": 970,
+          "exact": 969
+        },
+        "cloudflare:valid": {
+          "count": 106,
+          "invoked": 106,
+          "exact": 106
+        },
+        "cloudflare:malformed": {
+          "count": 378,
+          "invoked": 367,
+          "exact": 367
+        }
+      },
+      "incorrectExecutions": 1,
+      "validRejected": [
+        "github:gists/update:deleteFile",
+        "github:security-advisories/create-repository-advisory:default",
+        "github:security-advisories/create-repository-advisory:withVectorString"
+      ]
+    }
+  ],
+  "gains": {
+    "github:actions/create-org-actions-policy": 4,
+    "github:orgs/delete-attestations-bulk": 4,
+    "github:projects/add-field-for-org": 3,
+    "github:repos/create-org-ruleset": 10,
+    "github:repos/update-org-ruleset": 10,
+    "github:actions/create-repo-actions-policy": 4,
+    "github:actions/review-custom-gates-for-run": 1,
+    "github:repos/add-status-check-contexts": 1,
+    "github:repos/set-status-check-contexts": 2,
+    "github:repos/remove-status-check-contexts": 2,
+    "github:repos/add-team-access-restrictions": 2,
+    "github:repos/set-team-access-restrictions": 2,
+    "github:repos/remove-team-access-restrictions": 2,
+    "github:issues/add-labels": 1,
+    "github:repos/create-repo-ruleset": 1,
+    "github:repos/update-repo-ruleset": 1,
+    "github:codespaces/create-for-authenticated-user": 2,
+    "github:users/add-email-for-authenticated-user": 1,
+    "github:users/delete-email-for-authenticated-user": 1,
+    "github:users/delete-attestations-bulk": 4,
+    "github:projects/add-field-for-user": 3,
+    "cloudflare:access-policies-update-an-access-policy": 11,
+    "cloudflare:art-analytics-query-summary": 3,
+    "cloudflare:art-analytics-query-timeseries": 13,
+    "cloudflare:art-analytics-query-top-n": 14,
+    "cloudflare:basin-update-maintenance-config": 4,
+    "cloudflare:createWorkerBuild": 3,
+    "cloudflare:update-maintenance-config": 4,
+    "cloudflare:r2-create-bucket-job": 3,
+    "cloudflare:sandbox-registrar-domain-registration-create": 21,
+    "cloudflare:registrar-domain-registration-create": 21,
+    "cloudflare:registrar-domain-transfer-in-create": 3,
+    "cloudflare:zone-environment-invalidate": 6,
+    "cloudflare:zone-environment-purge": 6,
+    "cloudflare:fraud-detection-zone-update-settings": 12,
+    "cloudflare:zone-invalidate": 6,
+    "cloudflare:zone-purge": 6
+  },
+  "regressions": [],
+  "newIncorrect": []
+}
