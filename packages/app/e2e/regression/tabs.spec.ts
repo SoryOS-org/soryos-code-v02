@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import {
   NO_PROVIDER,
@@ -187,6 +187,185 @@ test("option arrows move to the previous or next tab, and with shift to the next
   await page.keyboard.press("Shift+Alt+ArrowDown")
   await expectPath(page, sessionHref(c.id))
 })
+
+for (const row of [{ tabLayout: "horizontal", width: 1440 }, { tabLayout: "vertical", width: 1440 }] as const) {
+  test(`session tabs cluster under collapsible project groups (${row.tabLayout})`, async ({ page }) => {
+    await page.setViewportSize({ width: row.width, height: 900 })
+    const second = "C:/OpenCode/TabGroups"
+    const secondProject = "proj_tab_groups"
+    const x = { id: "ses_tab_x", title: "Tab X session", directory: second, projectID: secondProject }
+    const y = { id: "ses_tab_y", title: "Tab Y session", directory: second, projectID: secondProject }
+    const sandbox = "C:/OpenCode/Tabs/.sandbox"
+    const s = { id: "ses_tab_s", title: "Sandbox session", directory: sandbox, projectID: "proj_tabs" }
+
+    const workspace = await mockWorkspace(page, {
+      name: "Tabs",
+      projects: [
+        project({ id: "proj_tabs", directory: "C:/OpenCode/Tabs", name: "Tabs", sandboxes: [sandbox] }),
+        project({ id: secondProject, directory: second, name: "TabGroups" }),
+      ],
+      sessions: [a, x, b, s, y],
+      seed: {
+        tabs: [a.id, x.id, { draft: "draft_tab_group", directory: "C:/OpenCode/Tabs" }, b.id, s.id, y.id],
+        settings: { appearance: { tabLayout: row.tabLayout, tabGroups: "project" } },
+        projects: {
+          local: [
+            { worktree: "C:/OpenCode/Tabs", expanded: true },
+            { worktree: second, expanded: true },
+          ],
+        },
+      },
+    })
+
+    await page.goto(sessionHref(a.id, workspace.server))
+
+    const strip = page.locator(row.tabLayout === "vertical" ? '[data-slot="vertical-tabs"]' : '[data-slot="titlebar-tabs"]')
+    const headers = page.locator('[data-component="titlebar-tab-group"]')
+    const tabsHeader = strip.getByRole("button", { name: "Tabs", exact: true })
+    const groupsHeader = strip.getByRole("button", { name: "TabGroups", exact: true })
+    const slot = (href: string) => page.locator(`[data-titlebar-tab-slot]:has(a[href="${href}"])`)
+    const hrefs = {
+      a: sessionHref(a.id, workspace.server),
+      draft: `/new-session?draftId=draft_tab_group`,
+      b: sessionHref(b.id, workspace.server),
+      s: sessionHref(s.id, workspace.server),
+      x: sessionHref(x.id, workspace.server),
+      y: sessionHref(y.id, workspace.server),
+    }
+
+    // Sandbox tabs join their project's group instead of splitting it.
+    await expect(headers).toHaveCount(2)
+    await expect(slot(hrefs.a)).toBeVisible()
+    await expect(slot(hrefs.s)).toBeVisible()
+    await expect(slot(hrefs.y)).toBeVisible()
+
+    // Groups partition the strip in visual order even though the persisted
+    // order interleaves the two projects.
+    const axis = row.tabLayout === "vertical" ? "y" : "x"
+    const position = async (locator: Locator) => (await locator.boundingBox())![axis]
+
+    expect(await position(tabsHeader)).toBeLessThan(await position(slot(hrefs.a)))
+    expect(await position(slot(hrefs.a))).toBeLessThan(await position(slot(hrefs.draft)))
+    expect(await position(slot(hrefs.draft))).toBeLessThan(await position(slot(hrefs.b)))
+    expect(await position(slot(hrefs.b))).toBeLessThan(await position(slot(hrefs.s)))
+    expect(await position(slot(hrefs.s))).toBeLessThan(await position(groupsHeader))
+    expect(await position(groupsHeader)).toBeLessThan(await position(slot(hrefs.x)))
+    expect(await position(slot(hrefs.x))).toBeLessThan(await position(slot(hrefs.y)))
+
+    if (row.tabLayout === "vertical") {
+      // Vertical grouped rows drop the per-tab project avatar — the header
+      // already names the project — and headers stay compact in the sidebar.
+      await expect(slot(hrefs.a).locator('[data-component="project-avatar-v2"]')).toHaveCount(0)
+      await expect(tabsHeader).toHaveCSS("height", "20px")
+    } else {
+      // Horizontal groups show a one-character project badge with the name
+      // on hover; members carry the group color as an accent strip.
+      await expect(tabsHeader.locator('[data-component="project-avatar-v2"]')).toHaveCount(1)
+      await tabsHeader.locator('[data-component="project-avatar-v2"]').hover()
+      await expect(page.getByRole("tooltip")).toContainText("Tabs")
+      await expect(slot(hrefs.a).locator('[data-slot="tab-group-accent"]')).toHaveCount(1)
+      await expect(slot(hrefs.draft).locator('[data-slot="tab-group-accent"]')).toHaveCount(1)
+    }
+
+    // Collapsing one group hides exactly its members, draft included.
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "true")
+    await tabsHeader.click()
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "false")
+    await expect(slot(hrefs.a)).not.toBeAttached()
+    await expect(slot(hrefs.draft)).not.toBeAttached()
+    await expect(slot(hrefs.b)).not.toBeAttached()
+    await expect(slot(hrefs.s)).not.toBeAttached()
+    await expect(slot(hrefs.x)).toBeVisible()
+
+    // Tab cycling skips the collapsed group's members.
+    await page.locator(`a[data-titlebar-tab-link][href="${hrefs.x}"]`).click()
+    await expectPath(page, sessionHref(x.id, workspace.server))
+    await page.keyboard.press("Alt+ArrowDown")
+    await expectPath(page, sessionHref(y.id, workspace.server))
+    await page.keyboard.press("Alt+ArrowUp")
+    await expectPath(page, sessionHref(x.id, workspace.server))
+
+    // Both the grouping mode and the collapsed group survive a reload.
+    await page.reload()
+    await expect(tabsHeader).toHaveAttribute("aria-expanded", "false")
+    await expect(slot(hrefs.x)).toBeVisible()
+    await expect(slot(hrefs.a)).not.toBeAttached()
+
+    // Expanding restores the hidden members.
+    await tabsHeader.click()
+    await expect(slot(hrefs.a)).toBeVisible()
+  })
+
+  test(`grouped tabs reorder within their group and by dragging headers (${row.tabLayout})`, async ({ page }) => {
+    await page.setViewportSize({ width: row.width, height: 900 })
+    const second = "C:/OpenCode/TabGroups"
+    const secondProject = "proj_tab_groups"
+    const x = { id: "ses_tab_x", title: "Tab X session", directory: second, projectID: secondProject }
+    const y = { id: "ses_tab_y", title: "Tab Y session", directory: second, projectID: secondProject }
+
+    const workspace = await mockWorkspace(page, {
+      name: "Tabs",
+      projects: [
+        project({ id: "proj_tabs", directory: "C:/OpenCode/Tabs", name: "Tabs" }),
+        project({ id: secondProject, directory: second, name: "TabGroups" }),
+      ],
+      sessions: [a, x, b, y],
+      seed: {
+        tabs: [a.id, x.id, b.id, y.id],
+        settings: { appearance: { tabLayout: row.tabLayout, tabGroups: "project" } },
+        projects: {
+          local: [
+            { worktree: "C:/OpenCode/Tabs", expanded: true },
+            { worktree: second, expanded: true },
+          ],
+        },
+      },
+    })
+
+    await page.goto(sessionHref(a.id, workspace.server))
+
+    const strip = page.locator(row.tabLayout === "vertical" ? '[data-slot="vertical-tabs"]' : '[data-slot="titlebar-tabs"]')
+    const tabsHeader = strip.getByRole("button", { name: "Tabs", exact: true })
+    const groupsHeader = strip.getByRole("button", { name: "TabGroups", exact: true })
+    const slot = (id: string) =>
+      page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(id, workspace.server)}"])`)
+    const axis = row.tabLayout === "vertical" ? "y" : "x"
+    const position = async (locator: Locator) => (await locator.boundingBox())![axis]
+
+    await expect(slot(b.id)).toBeVisible()
+    await expect(slot(y.id)).toBeVisible()
+
+    const dragTo = async (source: Locator, target: Locator) => {
+      const from = await source.boundingBox()
+      const to = await target.boundingBox()
+
+      if (!from || !to) throw new Error("drag source or target has no bounding box")
+
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(
+        from.x + from.width / 2 + (axis === "x" ? 10 : 0),
+        from.y + from.height / 2 + (axis === "y" ? 10 : 0),
+        { steps: 2 },
+      )
+      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 10 })
+      await page.mouse.up()
+    }
+
+    // A tab dragged onto an earlier tab of its own group lands before it.
+    await dragTo(slot(b.id), slot(a.id))
+    await expect.poll(async () => (await position(slot(b.id))) < (await position(slot(a.id)))).toBe(true)
+
+    // Dragging a header moves its whole group.
+    await dragTo(tabsHeader, groupsHeader)
+    await expect.poll(async () => (await position(groupsHeader)) < (await position(tabsHeader))).toBe(true)
+
+    // A tab dropped inside another group snaps back without reordering.
+    const dropped = await position(slot(a.id))
+    await dragTo(slot(a.id), slot(x.id))
+    await expect.poll(async () => position(slot(a.id))).toBe(dropped)
+  })
+}
 
 for (const row of [
   { tabLayout: "horizontal", width: 360, hasTouch: false, direction: "ltr" },

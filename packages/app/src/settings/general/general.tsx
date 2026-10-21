@@ -217,6 +217,35 @@ const TabLayoutSetting = () => {
   )
 }
 
+const tabGroupsOptions: ("off" | "project")[] = ["off", "project"]
+
+const TabGroupsSetting = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+
+  return (
+    <SettingsRow
+      title={language.t("settings.appearance.row.tabGroups.title")}
+      description={language.t("settings.appearance.row.tabGroups.description")}
+    >
+      <Select
+        data-action="settings-tab-groups"
+        options={tabGroupsOptions}
+        current={tabGroupsOptions.find((option) => option === settings.appearance.tabGroups())}
+        aria-label={language.t("settings.appearance.row.tabGroups.title")}
+        placement="bottom-end"
+        gutter={6}
+        label={(option) =>
+          option === "off"
+            ? language.t("settings.appearance.row.tabGroups.off")
+            : language.t("settings.appearance.row.tabGroups.project")
+        }
+        onSelect={(option) => option && settings.appearance.setTabGroups(option)}
+      />
+    </SettingsRow>
+  )
+}
+
 export const SettingsGeneral: Component = () => {
   const language = useLanguage()
   const platform = usePlatform()
@@ -244,6 +273,7 @@ export const SettingsGeneral: Component = () => {
       <SettingsList>
         <LanguageSetting />
         <TabLayoutSetting />
+        <TabGroupsSetting />
 
         <WorkspaceDestinationSetting />
         <AutoApprovePermissionsSetting />

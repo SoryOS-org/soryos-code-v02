@@ -10,7 +10,7 @@ import { Menu } from "@opencode/ui/menu"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
-import { displayName } from "@opencode/ui/project-avatar"
+import { displayName, type ProjectAvatarVariant } from "@opencode/ui/project-avatar"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import type { SessionInfo } from "@opencode/client/promise"
@@ -39,6 +39,10 @@ export function TabNavItem(props: {
   pressed?: boolean
   hidden?: boolean
   orientation?: "horizontal" | "vertical"
+  /** The project group's color: grouped horizontal tabs carry it as an accent strip. */
+  accent?: ProjectAvatarVariant
+  /** Vertical grouped rows hide the project avatar; the group header already names the project. */
+  showProjectAvatar?: boolean
 }) {
   const language = useLanguage()
   const [menu, setMenu] = createStore({ open: false, rename: false })
@@ -252,6 +256,17 @@ export function TabNavItem(props: {
       <Show when={promptPulse()} keyed>
         <span data-slot="tab-prompt-pulse" aria-hidden="true" onAnimationEnd={() => setPromptPulse(0)} />
       </Show>
+      <Show when={props.accent}>
+        {(accent) => (
+          <span
+            data-slot="tab-group-accent"
+            data-project-variant={accent()}
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-x-1.5 bottom-0 h-[2px] rounded-[1px]"
+            style={{ background: "var(--project-avatar-border)" }}
+          />
+        )}
+      </Show>
       <Menu.Context.Trigger
         as="a"
         disabled={editing() || props.dragging}
@@ -289,27 +304,36 @@ export function TabNavItem(props: {
       >
         <span data-slot="project-avatar-slot" class="flex size-4 shrink-0 items-center justify-center">
           <Show
-            when={props.session}
-            keyed
+            when={props.showProjectAvatar === false}
             fallback={
               <Show
-                when={props.preparing}
+                when={props.session}
+                keyed
                 fallback={
-                  <span class="block size-4 rounded-[3px] border border-v2-border-border-muted" aria-hidden="true" />
+                  <Show
+                    when={props.preparing}
+                    fallback={
+                      <span class="block size-4 rounded-[3px] border border-v2-border-border-muted" aria-hidden="true" />
+                    }
+                  >
+                    <SessionProgressIndicatorV2 />
+                  </Show>
                 }
               >
-                <SessionProgressIndicatorV2 />
+                {(session) => (
+                  <SessionTabAvatarView
+                    project={project()}
+                    directory={session.location.directory}
+                    unread={false}
+                    loading={props.loading}
+                  />
+                )}
               </Show>
             }
           >
-            {(session) => (
-              <SessionTabAvatarView
-                project={project()}
-                directory={session.location.directory}
-                unread={false}
-                loading={props.loading}
-              />
-            )}
+            <Show when={props.preparing || props.loading}>
+              <SessionProgressIndicatorV2 />
+            </Show>
           </Show>
           <Show when={unread()}>
             <span data-slot="tab-avatar-unread-dot" aria-hidden="true" />
@@ -434,6 +458,8 @@ export function DraftTabItem(props: {
   pressed?: boolean
   hidden?: boolean
   orientation?: "horizontal" | "vertical"
+  /** The project group's color: grouped horizontal tabs carry it as an accent strip. */
+  accent?: ProjectAvatarVariant
 }) {
   const language = useLanguage()
 
@@ -466,6 +492,17 @@ export function DraftTabItem(props: {
         closeTab(event)
       }}
     >
+      <Show when={props.accent}>
+        {(accent) => (
+          <span
+            data-slot="tab-group-accent"
+            data-project-variant={accent()}
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-x-1.5 bottom-0 h-[2px] rounded-[1px]"
+            style={{ background: "var(--project-avatar-border)" }}
+          />
+        )}
+      </Show>
       <a
         data-slot="tab-link"
         data-titlebar-tab-link
