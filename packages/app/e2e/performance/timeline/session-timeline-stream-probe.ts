@@ -426,7 +426,7 @@ export async function installTimelineStreamProbe(
                   : index >= 0
                     ? "stream"
                     : "unknown",
-              tokenSpans: livePart?.querySelectorAll(".shiki span").length ?? 0,
+              tokenSpans: livePart?.querySelectorAll(".highlights span").length ?? 0,
               blocks: livePart?.querySelectorAll("[data-markdown-block]").length ?? 0,
               codeBlocks: livePart?.querySelectorAll('[data-component="markdown-code"]').length ?? 0,
               height: livePart?.getBoundingClientRect().height ?? 0,
