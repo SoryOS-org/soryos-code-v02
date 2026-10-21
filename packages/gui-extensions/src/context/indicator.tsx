@@ -1,4 +1,4 @@
-import { Show, createMemo, type ComponentProps, type JSX } from "solid-js"
+import { Show, createMemo, type ComponentProps, type JSX, type ParentProps } from "solid-js"
 import { ProgressCircle } from "@opencode/ui/progress-circle"
 import { Button } from "@opencode/ui/button"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -74,6 +74,7 @@ export function SessionContextUsage(props: {
   const spent = createMemo(() => (props.session.id ? props.session.server.data.session.cost(props.session.id) : 0))
 
   const cost = createMemo(() => usd().format(spent()))
+  const hasUsage = createMemo(() => messages().length > 0 || spent() > 0)
 
   // Spend anywhere in the family keeps the cost visible, even when this session's model is free.
   const showCost = createMemo(() => {
@@ -107,12 +108,6 @@ export function SessionContextUsage(props: {
     </div>
   )
 
-  const compactCircle = () => (
-    <div class="flex items-center justify-center">
-      <ProgressCircle appearance="compact" size={16} percentage={context()?.usage ?? 0} />
-    </div>
-  )
-
   const tooltipValue = () => (
     <div class="flex w-[120px] flex-col gap-2">
       <Show when={showCost()}>
@@ -132,31 +127,53 @@ export function SessionContextUsage(props: {
         <Show
           when={variant() === "indicator"}
           fallback={
-            <Button
-              type="button"
-              variant="ghost-muted"
-              class="group shrink-0"
-              style={{ padding: "0 6px", color: "var(--v2-text-text-faint)" }}
-              onClick={openContext}
-              aria-expanded={layout.state(`${ctx.id}:main`, props.session) === "visible"}
-              aria-label={ctx.t("usage.toggle")}
+            <SessionContextButton
+              opened={layout.state(`${ctx.id}:main`, props.session) === "visible"}
+              onToggle={openContext}
+              usage={context()?.usage ?? 0}
             >
-              <span class="flex items-center gap-2 whitespace-nowrap group-active:text-v2-text-text-muted">
-                {compactCircle()}
+              <Show when={hasUsage()}>
                 <span>{tokens()}</span>
-                <Show when={showCost()}>
-                  <span aria-hidden="true" class="flex w-1.5 shrink-0 items-center justify-center">
-                    ·
-                  </span>
-                  <span>{cost()}</span>
-                </Show>
-              </span>
-            </Button>
+              </Show>
+              <Show when={hasUsage() && showCost()}>
+                <span aria-hidden="true" class="flex w-1.5 shrink-0 items-center justify-center">
+                  ·
+                </span>
+                <span>{cost()}</span>
+              </Show>
+            </SessionContextButton>
           }
         >
           {circle()}
         </Show>
       </Tooltip>
     </Show>
+  )
+}
+
+/** The context entry point, also shown before a draft has any usage to report. */
+export function SessionContextButton(
+  props: ParentProps<{ opened: boolean; disabled?: boolean; usage?: number; onToggle: () => void }>,
+) {
+  const ctx = useExtension()
+
+  return (
+    <Button
+      type="button"
+      variant="ghost-muted"
+      class="group shrink-0"
+      style={{ padding: "0 6px", color: "var(--v2-text-text-faint)" }}
+      onClick={props.onToggle}
+      disabled={props.disabled}
+      aria-expanded={props.opened}
+      aria-label={ctx.t("usage.toggle")}
+    >
+      <span class="flex items-center gap-2 whitespace-nowrap group-active:text-v2-text-text-muted">
+        <div class="flex items-center justify-center">
+          <ProgressCircle appearance="compact" size={16} percentage={props.usage ?? 0} />
+        </div>
+        {props.children}
+      </span>
+    </Button>
   )
 }

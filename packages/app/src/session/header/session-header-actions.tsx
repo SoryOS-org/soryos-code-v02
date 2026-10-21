@@ -30,6 +30,7 @@ export type SessionHeaderActionsState = {
   reviewKeybind: string[]
   reviewVisible: boolean
   reviewOpened: boolean
+  reviewDisabled?: boolean
   onReviewToggle: () => void
 }
 
@@ -60,6 +61,7 @@ export function SessionHeaderActions(props: { state: SessionHeaderActionsState }
               "--v2-overlay-simple-overlay-pressed": "var(--v2-background-bg-layer-02)",
             }}
             state={props.state.reviewOpened ? "pressed" : undefined}
+            disabled={props.state.reviewDisabled}
             onClick={props.state.onReviewToggle}
             aria-label={props.state.reviewLabel}
             aria-expanded={props.state.reviewOpened}

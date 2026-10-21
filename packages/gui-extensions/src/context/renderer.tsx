@@ -1,9 +1,12 @@
-import { lazy, onCleanup, Show, Suspense } from "solid-js"
-import { onIdle, Panel, Slot, usePanel, type PanelTab, type Setup } from "../sdk"
+import { lazy, onCleanup, onMount, Show, Suspense } from "solid-js"
+import { createStore } from "solid-js/store"
+import { Tooltip } from "@opencode/ui/tooltip"
+import { Command, onIdle, Panel, Slot, usePanel, type PanelTab, type Setup, type SlotMap } from "../sdk"
 import type definition from "./index"
-import { SessionContextUsage } from "./indicator"
+import { SessionContextButton, SessionContextUsage } from "./indicator"
 
 const setup: Setup<typeof definition> = (ctx) => {
+  const [draft, setDraft] = createStore<{ header?: SlotMap["new-session.header"] }>({})
   const SessionContextTab = lazy(() => import("./tab"))
   // Compile the tab while the app idles, so the first open renders at once.
   onCleanup(onIdle(() => void SessionContextTab.preload()))
@@ -26,6 +29,41 @@ const setup: Setup<typeof definition> = (ctx) => {
       </div>
     ),
   }
+
+  ctx.add(
+    Command,
+    (): Command => ({
+      id: "toggle",
+      title: ctx.t("usage.toggle"),
+      group: ctx.t("command.category.view"),
+      section: "session",
+      enabled: !!ctx.sessions.current() || !!draft.header,
+      run() {
+        const session = ctx.sessions.current()
+
+        if (!session) return draft.header?.start(`${ctx.id}.toggle`)
+        ctx.layout.toggle(`${ctx.id}:main`, session)
+      },
+    }),
+  )
+  ctx.add(Slot, {
+    at: "new-session.header",
+    order: 10,
+    render(input) {
+      onMount(() => setDraft("header", input))
+      onCleanup(() => setDraft("header", undefined))
+
+      return (
+        <Tooltip placement="bottom" value={ctx.t("usage.toggle")}>
+          <SessionContextButton
+            opened={false}
+            disabled={input.opening}
+            onToggle={() => void input.start(`${ctx.id}.toggle`)}
+          />
+        </Tooltip>
+      )
+    },
+  })
 
   ctx.add(Slot, {
     at: "session.header",

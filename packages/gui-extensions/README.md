@@ -222,7 +222,7 @@ SDK icon fields use `IconName` from `@opencode/ui/icons/catalog`, a dependency-f
 | [`Server`](src/sdk/registries.ts)       | window  | A source of servers, such as SSH hosts                                                      |
 | [`LinkHandler`](src/sdk/registries.ts)  | window  | Opens local links, such as file paths in messages, and says whether their target exists     |
 | [`TitlebarItem`](src/sdk/registries.ts) | window  | A titlebar pill, or the dev channel badge as a toggle                                       |
-| [`Slot`](src/sdk/registries.ts)         | window  | Content for `window.bottom`, `session.header`, `session.panel.end`, `session.panel.sidebar` |
+| [`Slot`](src/sdk/registries.ts)         | window  | Content for `window.bottom`, `new-session.header`, `session.header`, `session.panel.end`, `session.panel.sidebar` |
 | [`Style`](src/sdk/registries.ts)        | window  | CSS imported with `?inline`                                                                 |
 | [`MenubarItem`](src/sdk/main.ts)        | main    | An item of the native app menu                                                              |
 
@@ -722,3 +722,5 @@ Your own extension takes the same steps:
 7. **Register both entries** in `src/renderer.ts` and `src/main.ts`, as above. The graph matrix then boots each new optional edge with its provider disabled.
 8. **Test it.** Unit-test pure logic beside the code. Prove what the user sees with a case in the area's keeper suite in `packages/app/e2e/regression/`.
 9. **Check it.** Run `bun run lint`, which includes `script/sdk-docs.ts`, then `bun run lint:changed`, and `bun typecheck` in `packages/gui-extensions`.
+
+The `new-session.header` slot exposes tools before the draft has a Session. Its `start(command)` promotes the draft without sending a prompt, preserves its composer, and runs the published command after the real Session screen commits. Contributions disable their triggers while `opening` is true. The ordinary `session.header` then renders the same tool against the real Session; extensions never invent a draft Session identity.

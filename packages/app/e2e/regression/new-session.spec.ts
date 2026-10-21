@@ -1,8 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { OpenCodeEvent, WorktreeDirectory } from "@opencode/client/promise"
-import { draftHref, expectPath, provider, sessionHref } from "../utils/app"
+import { NO_PROVIDER, draftHref, expectPath, provider, sessionHref } from "../utils/app"
+import type { Schema } from "effect"
 import type { MockAnswer } from "../utils/mock-server"
-import { openDraft, openSession, openWorktreeDraft, type WorkspaceInput } from "../utils/workspace"
+import { fileDiff, openDraft, openSession, openWorktreeDraft, type WorkspaceInput } from "../utils/workspace"
 
 const directory = "C:/OpenCode/WorkspacePending"
 
@@ -37,7 +38,7 @@ const pendingDraft = {
   createdSessionTitle: "Created workspace session",
 } satisfies WorkspaceInput & { draftID: string }
 
-const failFirstCreate = (_: unknown, attempt: number): MockAnswer | undefined =>
+const failFirstCreate = (_: Schema.JsonObject, attempt: number): MockAnswer | undefined =>
   attempt === 1 ? { status: 500, body: { message: "Session creation failed in the fixture" } } : undefined
 
 test.use({
@@ -46,9 +47,170 @@ test.use({
   permissions: ["clipboard-read", "clipboard-write"],
 })
 
-test("the new session screen does not show session details", async ({ page }) => {
-  await openDraft(page, { name: "Summary" })
-  await expect(page.getByRole("button", { name: "Session details", exact: true })).toHaveCount(0)
+test("the new session shows its complete header without creating a session", async ({ page }, testInfo) => {
+  const creates: unknown[] = []
+  const prompts: unknown[] = []
+  await openDraft(page, {
+    name: "Summary",
+    onSessionCreate: (body) => {
+      creates.push(body)
+    },
+    onPrompt: (input) => {
+      prompts.push(input)
+    },
+  })
+  const header = page.locator("[data-session-title]")
+  await expect(header.getByRole("heading")).toHaveText("New session")
+  await expect(header.getByRole("button", { name: "More options", exact: true })).toBeVisible()
+  await expect(header.getByRole("button", { name: "Toggle session context", exact: true })).toBeVisible()
+  await expect(header.getByRole("button", { name: "Toggle session context", exact: true })).toHaveText("")
+  await expect(header.getByRole("button", { name: "Session details", exact: true })).toBeVisible()
+  await expect(header.getByRole("button", { name: "Toggle terminal", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Toggle review", exact: true })).toBeVisible()
+  await header.getByRole("button", { name: "More options", exact: true }).click()
+  await expect(page.getByRole("menuitem", { name: "Export…", exact: true })).toBeDisabled()
+  await page.keyboard.press("Escape")
+  expect(creates).toEqual([])
+  expect(prompts).toEqual([])
+  await page.screenshot({ path: testInfo.outputPath("new-session-header.png") })
+})
+
+for (const tool of ["Toggle session context", "Session details", "Toggle terminal"] as const) {
+  test(`opens ${tool} before the first message and preserves the draft`, async ({ page }) => {
+    const creates: unknown[] = []
+    const prompts: unknown[] = []
+    await openDraft(page, {
+      name: "DraftHeaderTool",
+      pty: { prefix: "pty_draft_header_" },
+      onSessionCreate: (body) => {
+        creates.push(body)
+      },
+      onPrompt: (input) => {
+        prompts.push(input)
+      },
+    })
+    await editor(page).fill("Inspect the workspace before running a model.")
+    await page.getByRole("button", { name: tool, exact: true }).click()
+    await expect(page).toHaveURL(/\/session\/[^/]+$/)
+
+    if (tool === "Toggle session context")
+      await expect(page.locator("#review-panel").getByRole("tab", { name: "Context", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      )
+
+    if (tool === "Session details") await expect(page.locator(".session-summary-popover")).toBeVisible()
+
+    if (tool === "Toggle terminal") await expect(page.locator('[data-component="terminal"]')).toBeVisible()
+    await expect(editor(page)).toHaveText("Inspect the workspace before running a model.")
+    await expect(page.locator("[data-message-id]")).toHaveCount(0)
+    expect(creates).toHaveLength(1)
+    expect(prompts).toEqual([])
+  })
+}
+
+test("renames a draft locally and carries its title into the first session", async ({ page }) => {
+  await openDraft(page, { name: "DraftHeaderRename" })
+  const header = page.locator("[data-session-title]")
+  await header.getByRole("button", { name: "More options", exact: true }).click()
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click()
+  const title = header.getByRole("textbox")
+  await expect(title).toBeFocused()
+  await title.fill("Inspect before sending")
+  await title.press("Enter")
+  await expect(header.getByRole("heading")).toHaveText("Inspect before sending")
+  await page.reload()
+  await expect(header.getByRole("heading")).toHaveText("Inspect before sending")
+  await page.getByRole("button", { name: "Toggle review", exact: true }).click()
+  await expect(header.getByRole("heading")).toHaveText("Inspect before sending")
+})
+
+test("opens review before the first message and preserves the unsent draft", async ({ page }) => {
+  const creates: unknown[] = []
+  const prompts: unknown[] = []
+  await openDraft(page, {
+    name: "DraftReview",
+    vcsDiff: [fileDiff("src/existing.ts")],
+    onSessionCreate: (body) => {
+      creates.push(body)
+    },
+    onPrompt: (input) => {
+      prompts.push(input)
+    },
+  })
+  const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
+  await expect(toggle).toBeVisible()
+  await editor(page).fill("Review the existing changes first.")
+  await toggle.click()
+  await expect(page).toHaveURL(/\/session\/[^/]+$/)
+  await expect(page.locator("#review-panel")).toBeVisible()
+  await expect(page.locator('#review-panel [data-slot="session-review-v2-file-name"]')).toHaveText("existing.ts")
+  await expect(toggle).toHaveAttribute("aria-expanded", "true")
+  await expect(editor(page)).toHaveText("Review the existing changes first.")
+  await expect(page.locator("[data-message-id]")).toHaveCount(0)
+  expect(creates).toHaveLength(1)
+  expect(prompts).toEqual([])
+  const modifier = await page.evaluate(() => (/Mac/.test(navigator.platform) ? "Meta" : "Control"))
+  await editor(page).press(`${modifier}+Shift+r`)
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await editor(page).press(`${modifier}+Shift+r`)
+  await expect(toggle).toHaveAttribute("aria-expanded", "true")
+  await page.reload()
+  await expect(editor(page)).toHaveText("Review the existing changes first.")
+  await expect(submit(page)).toBeEnabled()
+  await submit(page).click()
+  await expect.poll(() => prompts.length).toBe(1)
+  expect(creates).toHaveLength(1)
+})
+
+test("opens review with the shortcut in an empty draft without a connected model", async ({ page }) => {
+  const creates: unknown[] = []
+  const prompts: unknown[] = []
+  await openDraft(page, {
+    name: "DraftReviewNoModel",
+    provider: NO_PROVIDER,
+    onSessionCreate: (body) => {
+      creates.push(body)
+    },
+    onPrompt: (input) => {
+      prompts.push(input)
+    },
+  })
+  const modifier = await page.evaluate(() => (/Mac/.test(navigator.platform) ? "Meta" : "Control"))
+  await editor(page).press(`${modifier}+Shift+r`)
+  await expect(page.locator("#review-panel")).toBeVisible()
+  await expect(editor(page)).toBeEmpty()
+  await expect(page.locator("[data-message-id]")).toHaveCount(0)
+  expect(creates).toHaveLength(1)
+  expect(prompts).toEqual([])
+})
+
+test("a failed review session creation keeps the draft and allows retry", async ({ page }) => {
+  const creates: unknown[] = []
+  const prompts: unknown[] = []
+  await openDraft(page, {
+    name: "DraftReviewRetry",
+    onSessionCreate: (body, attempt) => {
+      creates.push(body)
+
+      return failFirstCreate(body, attempt)
+    },
+    onPrompt: (input) => {
+      prompts.push(input)
+    },
+  })
+  await editor(page).fill("Keep this draft if review fails to open.")
+  const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
+  await toggle.click()
+  await expect.poll(() => creates.length).toBe(1)
+  await expect(toggle).toBeEnabled()
+  await expect(page).toHaveURL(/\/new-session\?draftId=/)
+  await expect(editor(page)).toHaveText("Keep this draft if review fails to open.")
+  await toggle.click()
+  await expect(page.locator("#review-panel")).toBeVisible()
+  await expect(editor(page)).toHaveText("Keep this draft if review fails to open.")
+  expect(creates).toHaveLength(2)
+  expect(prompts).toEqual([])
 })
 
 test("the dark new session panel exposes no lighter background at its rounded corners", async ({ page }) => {
@@ -385,6 +547,7 @@ test("executes a selected slash command after creating its worktree", async ({ p
       },
     ])
   // The server owns command expansion; the client receives the expanded inbox item.
+  // SAFETY: this fixture supplies the enqueue event's discriminated shape and the mock server's session ID.
   await mock.push([
     {
       id: "evt_workspace_review",
@@ -475,6 +638,7 @@ for (const row of [
       (response) => new URL(response.url()).pathname === "/api/worktree" && response.request().method() === "GET",
     )
 
+    // SAFETY: this fixture targets the project ID registered above and carries the worktree.updated shape.
     await view.push([
       {
         id: "evt_accent_inventory",
@@ -487,6 +651,7 @@ for (const row of [
     await expect(page).toHaveURL(url)
     await expect(view.editor).toHaveText("Inspect this fixture workspace.")
     await expectBackground(send, "icon-button-contrast")
+    // SAFETY: this fixture supplies a durable execution-start event for the session registered above.
     await view.push([
       {
         id: "evt_accent_running",
@@ -504,6 +669,7 @@ for (const row of [
 }
 
 function renamed(sessionID: string) {
+  // SAFETY: callers pass the mock-created session ID; this is the session.renamed discriminated shape.
   return {
     id: "evt_generated_title",
     type: "session.renamed",

@@ -1,5 +1,10 @@
-import { createMemo, lazy, on, onCleanup, Suspense } from "solid-js"
-import { Command, createKeyed, onIdle, Panel, type Setup } from "../sdk"
+import { createMemo, lazy, on, onCleanup, onMount, Show, Suspense } from "solid-js"
+import { Command, createKeyed, onIdle, Panel, Slot, type Setup, type SlotMap } from "../sdk"
+import { createStore } from "solid-js/store"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Keybind } from "@opencode/ui/keybind"
+import { Tooltip } from "@opencode/ui/tooltip"
 import type Terminal from "./index"
 import { createTerminalModel, type TerminalWorkspace } from "./model"
 
@@ -8,6 +13,7 @@ const DOCK = "terminal:main"
 const setup: Setup<typeof Terminal> = (ctx) => {
   const sessions = ctx.sessions
   const layout = ctx.layout
+  const [draft, setDraft] = createStore<{ header?: SlotMap["new-session.header"] }>({})
   const model = createTerminalModel({ storage: ctx.storage, sessions })
 
   onCleanup(model.dispose)
@@ -39,6 +45,65 @@ const setup: Setup<typeof Terminal> = (ctx) => {
     return { session, terminal: model.load(session) }
   }
 
+  const Toggle = (props: { opened: boolean; disabled?: boolean; onToggle: () => void }) => (
+    <Tooltip
+      placement="bottom"
+      value={
+        <>
+          {ctx.t("command.toggle")}
+          <Show when={ctx.keybinds.keybind(`${ctx.id}.toggle`).length > 0}>
+            <Keybind keys={[...ctx.keybinds.keybind(`${ctx.id}.toggle`)]} variant="neutral" />
+          </Show>
+        </>
+      }
+    >
+      <IconButton
+        type="button"
+        variant="ghost-muted"
+        size="large"
+        icon={<Icon name="terminal" />}
+        aria-label={ctx.t("command.toggle")}
+        aria-expanded={props.opened}
+        state={props.opened ? "pressed" : undefined}
+        disabled={props.disabled}
+        onClick={props.onToggle}
+      />
+    </Tooltip>
+  )
+
+  ctx.add(Slot, {
+    at: "new-session.header",
+    order: 30,
+    render(input) {
+      onMount(() => setDraft("header", input))
+      onCleanup(() => setDraft("header", undefined))
+
+      return <Toggle opened={false} disabled={input.opening} onToggle={() => void input.start(`${ctx.id}.toggle`)} />
+    },
+  })
+  ctx.add(Slot, {
+    at: "session.header",
+    order: 30,
+    render: (input) => (
+      <Toggle
+        opened={layout.dock.opened(input.session)}
+        onToggle={() => {
+          const terminal = model.load(input.session)
+
+          if (layout.dock.opened(input.session)) {
+            terminal.cancelFocus()
+            layout.close(DOCK, input.session)
+
+            return
+          }
+
+          layout.open(DOCK, input.session)
+          terminal.requestFocus(terminal.active())
+        }}
+      />
+    ),
+  })
+
   ctx.add(
     Command,
     (): Command => ({
@@ -50,11 +115,11 @@ const setup: Setup<typeof Terminal> = (ctx) => {
       bind: "ctrl+`",
       slash: { name: "terminal", after: "open" },
       editable: true,
-      enabled: routed(),
-      run() {
+      enabled: routed() || !!draft.header,
+      async run() {
         const target = current()
 
-        if (!target) return
+        if (!target) return draft.header?.start(`${ctx.id}.toggle`)
 
         if (layout.dock.opened(target.session)) {
           target.terminal.cancelFocus()

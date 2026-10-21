@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { createKeyed, onIdle, Panel, Slot, Style, useDrawer, usePanel, type Setup } from "../sdk"
 import type Details from "./index"
 import type { Disclosure } from "./panel"
-import { DetailsHeader } from "./popover"
+import { DetailsHeader, DraftDetailsHeader } from "./popover"
 
 const setup: Setup<typeof Details> = (ctx) => {
   const sessions = ctx.sessions
@@ -33,6 +33,12 @@ const setup: Setup<typeof Details> = (ctx) => {
 
   // Compile the panel while the app idles, so the first open renders at once.
   onCleanup(onIdle(() => void DetailsPanel.preload()))
+
+  ctx.add(Slot, {
+    at: "new-session.header",
+    order: 20,
+    render: (input) => <DraftDetailsHeader {...input} />,
+  })
 
   ctx.add(Slot, {
     at: "session.header",

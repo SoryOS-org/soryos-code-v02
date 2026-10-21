@@ -546,6 +546,18 @@ export interface TitlebarItem {
 export interface SlotMap {
   /** Full-width strip under the window content, above toasts. */
   readonly "window.bottom": Record<string, never>
+  /** Tool entry points on the new-session draft, before it has a durable Session. */
+  readonly "new-session.header": {
+    /** A tool is currently promoting the draft; disable actions until it finishes. */
+    readonly opening: boolean
+    /**
+     * Creates an empty Session, preserves the draft, and runs a published command after the Session screen commits.
+     * Creation failure keeps the draft and reports the error; the command is not run.
+     *
+     * @param command - Published command id to run on the new Session, e.g. the contributing extension's toggle.
+     */
+    start(command: string): Promise<void>
+  }
   /** The timeline title row. Cached timelines stay mounted while hidden; `active` is false then. */
   readonly "session.header": {
     /** The timeline's owning session screen; always present, also while the timeline is cached. */

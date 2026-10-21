@@ -337,13 +337,13 @@ test("context closes the side region only when its button opened it", async ({ p
 
 test("context hides free-model cost but keeps paid-model zero cost", async ({ page }) => {
   const cases = [
-    { id: "ses_context_free", title: "Free model", model: "free", cost: 0, usage: false, text: "0" },
-    { id: "ses_context_paid", title: "Paid model", model: "paid", cost: 0, usage: false, text: "0·$0.00" },
+    { id: "ses_context_free", title: "Free model", model: "free", cost: 0, usage: false, text: "" },
+    { id: "ses_context_paid", title: "Paid model", model: "paid", cost: 0, usage: false, text: "" },
     { id: "ses_context_used", title: "Paid usage", model: "paid", cost: 1.25, usage: true, text: "2k·$1.25" },
     { id: "ses_context_free_used", title: "Free usage", model: "free", cost: 0, usage: true, text: "2k" },
     { id: "ses_context_mixed", title: "Previously paid", model: "free", cost: 1.25, usage: true, text: "2k·$1.25" },
-    { id: "ses_context_unknown", title: "Unknown pricing", model: "missing", cost: 0, usage: false, text: "0·$0.00" },
-    { id: "ses_context_output", title: "Output pricing", model: "output", cost: 0, usage: false, text: "0·$0.00" },
+    { id: "ses_context_unknown", title: "Unknown pricing", model: "missing", cost: 0, usage: false, text: "" },
+    { id: "ses_context_output", title: "Output pricing", model: "output", cost: 0, usage: false, text: "" },
     // The root's model is free, but its subagent spent on a paid model: the family total shows.
     { id: "ses_context_family", title: "Paid subagent", model: "free", cost: 0, usage: true, text: "2k·$1.25" },
     // A completed compaction resets the context until the next reply reports usage, as in the TUI.

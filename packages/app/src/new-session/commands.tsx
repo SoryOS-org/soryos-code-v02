@@ -5,6 +5,10 @@ import { useLanguage } from "@/runtime/i18n/language"
 
 export function useNewSessionCommands(input: {
   restoreFocus: () => void
+  review: {
+    opening: () => boolean
+    open: () => Promise<void>
+  }
   project: {
     empty: () => boolean
     open: () => void
@@ -28,6 +32,14 @@ export function useNewSessionCommands(input: {
         const { DialogCommandPalette } = await import("@/shell/commands/dialog")
         void dialog.show(() => <DialogCommandPalette />)
       },
+    },
+    {
+      id: "review.toggle",
+      title: language.t("command.review.toggle"),
+      category: language.t("command.category.view"),
+      keybind: "mod+shift+r",
+      disabled: input.review.opening(),
+      onSelect: () => input.review.open(),
     },
     {
       id: "input.focus",

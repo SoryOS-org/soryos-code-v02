@@ -5,7 +5,15 @@ import { Keybind } from "@opencode/ui/keybind"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { createMemo, onCleanup, Show, Suspense, type Component, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Command, createKeyed, createVisitState, useExtension, type MountedSession, type SessionScreen } from "../sdk"
+import {
+  Command,
+  createKeyed,
+  createVisitState,
+  useExtension,
+  type MountedSession,
+  type SessionScreen,
+  type SlotMap,
+} from "../sdk"
 import type Details from "./index"
 import type { Disclosure, DetailsPanelProps } from "./panel"
 
@@ -69,7 +77,25 @@ export function DetailsHeader(props: {
   )
 }
 
-function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onOpenChange: (open: boolean) => void }>) {
+/** The same summary trigger on a draft; its panel opens after promotion to a real Session. */
+export function DraftDetailsHeader(props: SlotMap["new-session.header"]) {
+  const ctx = useExtension()
+
+  return (
+    <DetailsPopover
+      active
+      open={false}
+      disabled={props.opening}
+      onOpenChange={(open) => {
+        if (open) void props.start(`${ctx.id}.toggle`)
+      }}
+    />
+  )
+}
+
+function DetailsPopover(
+  props: ParentProps<{ active: boolean; open: boolean; disabled?: boolean; onOpenChange: (open: boolean) => void }>,
+) {
   const ctx = useExtension()
   const keybinds = ctx.keybinds
 
@@ -82,6 +108,7 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
           group: ctx.t("command.category.view"),
           section: "session",
           bind: "mod+shift+y",
+          enabled: !props.disabled,
           run: () => props.onOpenChange(!props.open),
         }
       : undefined,
@@ -110,6 +137,7 @@ function DetailsPopover(props: ParentProps<{ active: boolean; open: boolean; onO
           variant="ghost-muted"
           size="large"
           state={props.open ? "pressed" : undefined}
+          disabled={props.disabled}
           aria-label={ctx.t("title")}
           aria-expanded={props.open}
         />
