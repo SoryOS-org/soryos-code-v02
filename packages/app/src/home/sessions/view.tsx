@@ -555,19 +555,21 @@ function HomeSessionProjectGroupHeader(props: {
         data-collapsed={props.collapsed || undefined}
         aria-expanded={!props.collapsed}
         class={`
-          flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-[6px] border-0 bg-transparent
-          ps-0.5 pe-2 text-start transition-[background-color] duration-[120ms] ease-in-out
+          flex h-7 min-w-0 max-w-full items-center rounded-[6px] border-0 bg-transparent
+          pe-2 text-start transition-[background-color] duration-[120ms] ease-in-out
           hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none
         `}
         onClick={props.onToggle}
       >
-        <Icon
-          name="chevron-down"
-          size="small"
-          aria-hidden="true"
-          class="shrink-0 text-v2-icon-icon-muted transition-transform duration-150 ease-in-out"
-          style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
-        />
+        <span class="flex w-4.5 shrink-0 justify-center">
+          <Icon
+            name="chevron-down"
+            size="small"
+            aria-hidden="true"
+            class="text-v2-icon-icon-muted transition-transform duration-150 ease-in-out"
+            style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
+          />
+        </span>
         <span class="flex min-w-0 items-center gap-1.5" style={{ opacity: props.titleOpacity }}>
           <span aria-hidden="true" class="flex shrink-0">
             <Show when={props.group.project}>{(project) => <HomeProjectAvatar project={project()} />}</Show>
@@ -689,6 +691,9 @@ function HomeSessionRow(
             class="flex h-10 min-w-0 w-full flex-1 items-center py-3 ps-1.5 pe-3 md:ps-3 md:pe-10"
             classList={{ "gap-1.5": props.desktop, "gap-2": !props.desktop }}
           >
+            <Show when={props.groupedByProject}>
+              <span aria-hidden="true" class="w-4.5 shrink-0" />
+            </Show>
             <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
             <div data-slot="home-session-labels" class="contents">
               <InlineInput
@@ -812,6 +817,9 @@ function HomeSessionRow(
             props.onOpenSession(props.record.session, { background: true })
           }}
         >
+          <Show when={props.groupedByProject}>
+            <span aria-hidden="true" class="w-4.5 shrink-0" />
+          </Show>
           <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
           <div
             data-slot="home-session-labels"
