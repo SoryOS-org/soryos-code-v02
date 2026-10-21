@@ -7,6 +7,7 @@ import {
   Switch,
   createMemo,
   createEffect,
+  createSignal,
   on,
   onCleanup,
   untrack,
@@ -41,7 +42,8 @@ import { TimelineSearchBar } from "./timeline/search-bar"
 import { createTimelineQuote, TimelineQuote } from "./timeline/quote"
 import { ActiveSessionComposerRegion, createActiveSessionRegion } from "./composer/region"
 import { SessionIdentityHeader, SessionLocation } from "./session-identity-header"
-import { createSessionHeaderDrag } from "./header/drag-area"
+import { SessionHeaderDrag, windowDragEnabled } from "./header/drag-area"
+import { usePlatform } from "@/runtime/platform/platform"
 import { useServer } from "@/runtime/server/current"
 import { SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
@@ -233,7 +235,14 @@ function SessionScreenContent(props: {
     return <SessionErrorFallback error={cause} sessionID={session.identity.params.id} />
   }
 
-  const headerDrag = createSessionHeaderDrag()
+  const platform = usePlatform()
+  const [headerGap, setHeaderGap] = createSignal<HTMLElement>()
+
+  const registerHeaderGap = (gap: HTMLElement) => {
+    setHeaderGap(gap)
+
+    return () => setHeaderGap((current) => (current === gap ? undefined : current))
+  }
 
   const timelineView = createTimelineCache(
     session,
@@ -249,7 +258,7 @@ function SessionScreenContent(props: {
         <MessageTimeline
           active={active()}
           hideHeader={!isDesktop()}
-          registerHeader={headerDrag.register}
+          registerHeaderGap={registerHeaderGap}
           session={source}
           view={own()}
           screen={props.screen}
@@ -432,7 +441,9 @@ function SessionScreenContent(props: {
                 <ErrorBoundary fallback={sessionErrorFallback}>{sessionPanelContent()}</ErrorBoundary>
               </SessionPanelFrame>
             </Show>
-            <headerDrag.Area />
+            <Show when={windowDragEnabled(platform)}>
+              <SessionHeaderDrag pane={chat} gap={headerGap()} />
+            </Show>
 
             <Show when={screen.panel.resizable()}>
               <div onPointerDown={() => screen.size.start()}>

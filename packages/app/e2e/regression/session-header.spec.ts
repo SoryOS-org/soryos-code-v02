@@ -136,22 +136,28 @@ for (const direction of ["ltr", "rtl"] as const) {
     await expect(area).toHaveCSS("app-region", "drag")
     await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCSS("app-region", "drag")
 
+    const gap = header.locator('[data-slot="session-header-gap"]')
     const aligned = async () => {
-      const [gap, end, start, bar] = await Promise.all([
+      const [box, space, end, start, row] = await Promise.all([
         area.boundingBox(),
+        gap.boundingBox(),
         options.boundingBox(),
         actions.boundingBox(),
         header.locator(".session-header-layout").boundingBox(),
       ])
 
-      if (!gap || !end || !start || !bar) return false
-      const [left, right] = direction === "ltr" ? [end.x + end.width, start.x] : [start.x + start.width, end.x]
+      if (!box || !space || !end || !start || !row) return false
+      const between =
+        direction === "ltr"
+          ? space.x >= end.x + end.width && space.x + space.width <= start.x
+          : space.x + space.width <= end.x && space.x >= start.x + start.width
 
       return (
-        Math.abs(gap.x - left) <= 0.5 &&
-        Math.abs(gap.x + gap.width - right) <= 0.5 &&
-        Math.abs(gap.y - bar.y) <= 0.5 &&
-        Math.abs(gap.height - bar.height) <= 0.5
+        between &&
+        Math.abs(box.x - space.x) <= 0.5 &&
+        Math.abs(box.width - space.width) <= 0.5 &&
+        Math.abs(box.y - row.y) <= 0.5 &&
+        Math.abs(box.height - row.height) <= 0.5
       )
     }
 
