@@ -119,9 +119,9 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 
         // A root session counts as working while any session in its family is busy.
         const busyRoots = new Set(
-          [...data.session.list().map((session) => session.id), ...data.session.active()]
-            .filter((id) => sessionBusy(data, id))
-            .map((id) => data.session.root(id)),
+          [...data.session.list().map((session) => session.id), ...data.session.active()].flatMap((id) =>
+            sessionBusy(data, id) ? [data.session.root(id)] : [],
+          ),
         )
 
         const status = (session: SessionInfo): InboxStatus => {
@@ -165,7 +165,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
   // Pending permissions and questions only load for sessions the client has opened. A running session may be waiting
   // on one, so load them for every working root; events keep them current from then on. `checked` marks the roots
   // whose first load ended, so the first paint can wait for them instead of moving rows a moment later.
-  const [requests, setRequests] = createStore({ checked: {} as Record<string, true> })
+  const [requests, setRequests] = createStore<{ checked: Record<string, true> }>({ checked: {} })
 
   createEffect(() => {
     entries().forEach((entry) => {
@@ -207,7 +207,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 
   // Git info is not stored on the session, so load it for the rows a view shows and mark each location settled once
   // its load ends.
-  const [vcs, setVcs] = createStore({ settled: {} as Record<string, true> })
+  const [vcs, setVcs] = createStore<{ settled: Record<string, true> }>({ settled: {} })
   const queued = new Set<string>()
   const queue: InboxEntry[] = []
   const drain = { running: false }
@@ -235,6 +235,13 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
       const key = locationKey(entry)
 
       if (queued.has(key)) return
+
+      if (!entry.ctx.data.location.info(entry.session.location)) {
+        setVcs("settled", key, true)
+
+        return
+      }
+
       queued.add(key)
       queue.push(entry)
     })
@@ -243,7 +250,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 
   const open = (entry: InboxEntry) => {
     const directory = entry.ctx.projects.forSession(entry.session)?.worktree ?? entry.session.location.directory
-    void entry.ctx.data.session.message.sync(entry.session.id).catch((error: unknown) => {
+    void entry.ctx.data.session.message.sync(entry.session.id).catch((error) => {
       if (isSessionNotFoundError(error)) forget(entry.conn, entry.session.id)
     })
     void startTransition(() => {
@@ -352,7 +359,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
 export type SessionInbox = ReturnType<typeof createSessionInbox>
 
 export function inboxArchived(entry: InboxEntry) {
-  return typeof entry.session.time.archived === "number"
+  return entry.session.time.archived !== undefined
 }
 
 export function inboxBusy(status: InboxStatus) {

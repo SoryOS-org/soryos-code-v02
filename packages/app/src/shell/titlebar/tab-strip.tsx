@@ -99,6 +99,7 @@ function SessionTabSlot(props: {
 
 function SessionTabEntry(props: {
   tab: SessionTab
+  currentTab?: Tab
   id: string
   index: number
   active: boolean
@@ -128,7 +129,7 @@ function SessionTabEntry(props: {
 
   const [loadedSession] = createResource(
     () => {
-      if (pending()) return null
+      if (pending() || (!props.active && persisted()?.title)) return null
       const ctx = props.serverCtx
 
       return ctx ? { id: props.tab.sessionId, ctx } : null
@@ -216,19 +217,45 @@ function SessionTabEntry(props: {
 
   createEffect(() => {
     const ctx = props.serverCtx
-    const value = session()
+    const id = props.tab.sessionId
 
-    if (!ctx || !value || props.active || ctx.sdk.connection.status() !== "connected") return
+    if (
+      pending() ||
+      !ctx ||
+      props.active ||
+      (!session() && !persisted()?.title) ||
+      ctx.sdk.connection.status() !== "connected"
+    )
+      return
+
+    const current = props.currentTab
+
+    if (current?.type === "session" && current.server === props.tab.server && current.sessionId !== id) {
+      const active = ctx.data.session.get(current.sessionId)
+
+      if (
+        !active ||
+        ctx.data.location.agent.list(active.location) === undefined ||
+        ctx.data.location.provider.list(active.location) === undefined ||
+        ctx.data.location.model.list(active.location) === undefined ||
+        ctx.data.location.skill.list(active.location) === undefined
+      )
+        return
+    }
+
+    const running = [id, ...ctx.data.session.family(id)].some(
+      (sessionID) => ctx.data.session.status(sessionID) === "running",
+    )
 
     const timer = window.setTimeout(
       () =>
         void Promise.allSettled([
-          ctx.data.session.sync(value.id, { children: true }),
-          // The selected timeline loads the transcript; inactive tabs need attention, metadata, and the inbox,
-          // whose waiting work keeps the tab busy.
-          ctx.data.session.permission.sync(value.id),
-          ctx.data.session.form.sync(value.id),
-          ctx.data.session.pending.sync(value.id),
+          ctx.data.session.sync(id, { children: true }),
+          // The selected timeline loads the transcript; inactive tabs need metadata and the inbox,
+          // whose waiting work keeps the tab busy. Only a running session can wait on a permission
+          // or form, and reading either boots the session's location on the server.
+          ...(running ? [ctx.data.session.permission.sync(id), ctx.data.session.form.sync(id)] : []),
+          ctx.data.session.pending.sync(id),
         ]),
       300 + props.index * 50,
     )
@@ -511,6 +538,7 @@ export function TitlebarTabStrip(props: {
                   return (
                     <SessionTabEntry
                       tab={tab}
+                      currentTab={props.currentTab}
                       id={id}
                       index={visibleIndex()}
                       active={props.currentTab === tab}

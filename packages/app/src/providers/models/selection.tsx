@@ -98,6 +98,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       ),
     )
 
+    createEffect(() => {
+      if (serverSDK.connection.status() !== "connected") return
+      const directory = sdk().directory
+
+      if (!directory) return
+      void data.location.agent.sync({ directory }).catch(() => undefined)
+    })
+
     const agentsVisible = createMemo(() => settings.visibility.customAgents() || hasCustomAgent(list()))
     const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))
 

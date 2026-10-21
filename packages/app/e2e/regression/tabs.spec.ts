@@ -850,6 +850,7 @@ test("inactive tabs load attention and inbox, but read the transcript only on se
   })
   const state = { text: "Original fixture answer" }
   await mockStressTimeline(page, {
+    sessionStatus: { [fixture.childID]: { type: "running" } },
     pageMessages: (id) => ({
       items: [
         { id: `msg_${id}_user`, type: "user", text: "Review the renderer change", time: { created: 1 } },
@@ -868,13 +869,14 @@ test("inactive tabs load attention and inbox, but read the transcript only on se
     tabs: [fixture.sourceID, fixture.targetID, fixture.childID],
   })
 
-  const attention = Promise.all(
-    [fixture.targetID, fixture.childID].flatMap((id) =>
-      ["permission", "form", "inbox"].map((kind) =>
-        page.waitForResponse((response) => new URL(response.url()).pathname === `/api/session/${id}/${kind}`),
+  const attention = Promise.all([
+    ...["permission", "form", "inbox"].map((kind) =>
+      page.waitForResponse(
+        (response) => new URL(response.url()).pathname === `/api/session/${fixture.childID}/${kind}`,
       ),
     ),
-  )
+    page.waitForResponse((response) => new URL(response.url()).pathname === `/api/session/${fixture.targetID}/inbox`),
+  ])
 
   await page.goto(sessionHref(fixture.sourceID))
   await expectSessionTitle(page, fixture.expected.sourceTitle)
@@ -882,6 +884,8 @@ test("inactive tabs load attention and inbox, but read the transcript only on se
     state.text,
   )
   await attention
+  expect(reads.filter((path) => path === `/api/session/${fixture.targetID}/permission`)).toEqual([])
+  expect(reads.filter((path) => path === `/api/session/${fixture.targetID}/form`)).toEqual([])
 
   const child = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(fixture.childID)}"])`)
   await child.getByRole("button", { name: "Close tab", exact: true }).click()

@@ -1243,14 +1243,25 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        sessionActive: () =>
-          Effect.succeed({
+        sessionActive: () => {
+          const status = resolve(config.sessionStatus ?? {})
+
+          return Effect.succeed({
             data: Object.fromEntries(
-              Object.entries(resolve(config.sessionStatus ?? {})).flatMap(([id, status]) =>
-                status.type === "idle" ? [] : [[id, { type: "running" }]],
-              ),
+              [
+                ...Object.entries(status).flatMap(([id, value]) => (value.type === "idle" ? [] : [id])),
+                ...Object.entries(config.sessionPermissions ?? {}).flatMap(([id, list]) =>
+                  currentPermissions(list).length > 0 && status[id]?.type !== "idle" ? [id] : [],
+                ),
+                ...resolve(config.forms ?? []).flatMap((form) =>
+                  Predicate.isObject(form) && Predicate.isString(form.sessionID) && status[form.sessionID]?.type !== "idle"
+                    ? [form.sessionID]
+                    : [],
+                ),
+              ].map((id) => [id, { type: "running" as const }]),
             ),
-          }),
+          })
+        },
         sessionGet: (ctx) =>
           Effect.suspend(() => {
             config.onSession?.(ctx.params.sessionID)

@@ -117,13 +117,16 @@ export function createHomeSessionsController(home: HomeController) {
     if (!ctx) return
 
     if (record) {
+      if (!ctx.data.location.info(record.session.location)) return
       void ctx.data.location.vcs.sync(record.session.location).catch(() => undefined)
 
       return
     }
 
     const locations = new Map(
-      records().map((record) => [pathKey(record.session.location.directory), record.session.location] as const),
+      records()
+        .filter((record) => !!ctx.data.location.info(record.session.location))
+        .map((record) => [pathKey(record.session.location.directory), record.session.location] as const),
     )
 
     void Promise.allSettled(Array.from(locations.values(), (location) => ctx.data.location.vcs.sync(location)))

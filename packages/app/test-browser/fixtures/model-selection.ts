@@ -154,7 +154,7 @@ function fixture(input: { session?: Commit; agents?: Agent[]; config?: ConfigMod
     data: {
       session: { get: (id: string) => state.sessions[id] },
       location: {
-        agent: { list: () => state.agents },
+        agent: { list: () => state.agents, sync: async () => undefined },
         config: {
           list: () => (state.configLoaded ? [{ type: "document", info: { model: state.config } }] : undefined),
           sync: async () => {
