@@ -903,28 +903,30 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
                 <Icon name="circle-xmark" />
               </button>
             </Show>
-            <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
-              <button
-                type="button"
-                class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                aria-label={language.t("dialog.model.manage")}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={manage}
-              >
-                <Icon name="outline-sliders" size="small" />
-              </button>
-            </Tooltip>
-            <Tooltip placement="top" gutter={4} value={language.t("command.provider.connect")} ignoreSafeArea={false}>
-              <button
-                type="button"
-                class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                aria-label={language.t("command.provider.connect")}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={connect}
-              >
-                <Icon name="plus" size="small" />
-              </button>
-            </Tooltip>
+            <div class="flex shrink-0 items-center gap-0">
+              <Tooltip placement="top" gutter={4} value={language.t("command.provider.connect")} ignoreSafeArea={false}>
+                <button
+                  type="button"
+                  class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
+                  aria-label={language.t("command.provider.connect")}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={connect}
+                >
+                  <Icon name="plus" size="small" />
+                </button>
+              </Tooltip>
+              <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
+                <button
+                  type="button"
+                  class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
+                  aria-label={language.t("dialog.model.manage")}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={manage}
+                >
+                  <Icon name="outline-sliders" size="small" />
+                </button>
+              </Tooltip>
+            </div>
           </div>
         </div>
         <ScrollView
