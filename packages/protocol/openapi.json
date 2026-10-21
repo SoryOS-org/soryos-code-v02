@@ -131,14 +131,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
                 }
               }
             }
@@ -212,6 +205,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -346,6 +349,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve currently registered agents.",
@@ -361,7 +374,7 @@
             "name": "agentID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Agent.ID"
             },
             "required": true
           },
@@ -439,11 +452,18 @@
             }
           },
           "404": {
-            "description": "AgentNotFoundError",
+            "description": "AgentNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AgentNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -533,6 +553,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve enabled server plugins and their current status.",
@@ -605,14 +635,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -623,6 +646,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -701,14 +734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -719,6 +745,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -819,8 +855,7 @@
                 {
                   "anyOf": [
                     {
-                      "type": "string",
-                      "pattern": "^ses"
+                      "$ref": "#/components/schemas/Session.ID"
                     },
                     {
                       "type": "string",
@@ -837,12 +872,28 @@
             "required": false
           },
           {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          },
+          {
             "name": "directory",
             "in": "query",
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/AbsolutePath"
                 },
                 {
                   "type": "null"
@@ -857,7 +908,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Project.ID"
                 },
                 {
                   "type": "null"
@@ -872,7 +923,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/RelativePath"
                 },
                 {
                   "type": "null"
@@ -887,8 +938,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "description": "Opaque pagination cursor returned as cursor.previous or cursor.next in the previous response."
+                  "$ref": "#/components/schemas/SessionsCursor"
                 },
                 {
                   "type": "null"
@@ -918,9 +968,6 @@
                   "anyOf": [
                     {
                       "$ref": "#/components/schemas/InvalidCursorErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                     },
                     {
                       "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
@@ -1009,8 +1056,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^ses"
+                        "$ref": "#/components/schemas/Session.ID"
                       },
                       {
                         "type": "null"
@@ -1020,8 +1066,7 @@
                   "parentID": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^ses"
+                        "$ref": "#/components/schemas/Session.ID"
                       },
                       {
                         "type": "null"
@@ -1041,7 +1086,7 @@
                   "agent": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "$ref": "#/components/schemas/Agent.ID"
                       },
                       {
                         "type": "null"
@@ -1138,7 +1183,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Project.ID"
                 },
                 {
                   "type": "null"
@@ -1203,14 +1248,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -1295,7 +1333,7 @@
             }
           }
         },
-        "description": "Import a projected session transcript at the requested location. If parentID is supplied, the parent session must already exist; import parents before children.",
+        "description": "Import a projected session transcript at the requested location. Accepts transcripts exported by earlier releases. If parentID is supplied, the parent session must already exist; import parents before children.",
         "summary": "Import session",
         "requestBody": {
           "content": {
@@ -1307,10 +1345,7 @@
                     "$ref": "#/components/schemas/Session.Info"
                   },
                   "messages": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/Session.Message.Info"
-                    }
+                    "type": "array"
                   },
                   "location": {
                     "anyOf": [
@@ -1341,8 +1376,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -1447,7 +1481,8 @@
                         "^ses": {
                           "$ref": "#/components/schemas/SessionActive"
                         }
-                      }
+                      },
+                      "additionalProperties": false
                     }
                   },
                   "required": ["data"],
@@ -1490,8 +1525,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1557,8 +1591,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1610,8 +1643,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1642,7 +1674,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -1651,7 +1683,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -1696,6 +1728,17 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "archived": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Archive the session with true or restore it with false. Repeating the current state is a no-op."
                   }
                 },
                 "additionalProperties": false
@@ -1715,8 +1758,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1745,14 +1787,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -1768,19 +1803,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | MessageNotFoundError",
+            "description": "SessionNotFoundError | MessageNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/MessageNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -1799,8 +1834,7 @@
                   "before": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^msg_"
+                        "$ref": "#/components/schemas/Session.Message.ID"
                       },
                       {
                         "type": "null"
@@ -1825,8 +1859,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1857,7 +1890,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -1866,7 +1899,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -1883,7 +1916,7 @@
                 "type": "object",
                 "properties": {
                   "agent": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Agent.ID"
                   }
                 },
                 "required": ["agent"],
@@ -1904,8 +1937,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1936,7 +1968,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -1945,7 +1977,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -1983,8 +2015,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -1999,14 +2030,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -2041,7 +2065,7 @@
                 "type": "object",
                 "properties": {
                   "directory": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/AbsolutePath"
                   },
                   "delivery": {
                     "anyOf": [
@@ -2072,8 +2096,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2102,14 +2125,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -2125,7 +2141,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2134,7 +2150,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2163,8 +2179,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^msg_"
+                        "$ref": "#/components/schemas/Session.Message.ID"
                       },
                       {
                         "type": "null"
@@ -2234,8 +2249,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2266,19 +2280,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | CommandNotFoundError",
+            "description": "SessionNotFoundError | CommandNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/CommandNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2357,8 +2371,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2389,19 +2402,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | SkillNotFoundError",
+            "description": "SessionNotFoundError | SkillNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/SkillNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2418,7 +2431,7 @@
                 "type": "object",
                 "properties": {
                   "id": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Skill.ID"
                   },
                   "resume": {
                     "anyOf": [
@@ -2449,8 +2462,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2495,7 +2507,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2504,7 +2516,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2533,8 +2545,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^msg_"
+                        "$ref": "#/components/schemas/Session.Message.ID"
                       },
                       {
                         "type": "null"
@@ -2596,8 +2607,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2628,7 +2638,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2637,7 +2647,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2656,8 +2666,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^msg_"
+                        "$ref": "#/components/schemas/Session.Message.ID"
                       },
                       {
                         "type": "null"
@@ -2686,8 +2695,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2732,7 +2740,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2741,7 +2749,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2770,8 +2778,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^msg_"
+                        "$ref": "#/components/schemas/Session.Message.ID"
                       },
                       {
                         "type": "null"
@@ -2806,8 +2813,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2838,7 +2844,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2847,7 +2853,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2878,8 +2884,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -2924,7 +2929,7 @@
             }
           },
           "404": {
-            "description": "MessageNotFoundError | SessionNotFoundError",
+            "description": "MessageNotFoundError | SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -2936,7 +2941,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -2973,8 +2978,7 @@
                 "type": "object",
                 "properties": {
                   "messageID": {
-                    "type": "string",
-                    "pattern": "^msg_"
+                    "$ref": "#/components/schemas/Session.Message.ID"
                   },
                   "files": {
                     "anyOf": [
@@ -3005,8 +3009,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3037,7 +3040,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3046,7 +3049,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3086,8 +3089,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3118,7 +3120,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3127,7 +3129,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3157,8 +3159,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3239,8 +3240,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3250,8 +3250,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "pattern": "^msg_"
+                  "$ref": "#/components/schemas/Session.Message.ID"
                 },
                 {
                   "type": "null"
@@ -3267,8 +3266,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "pattern": "^msg_"
+                  "$ref": "#/components/schemas/Session.Message.ID"
                 },
                 {
                   "type": "null"
@@ -3322,14 +3320,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -3345,7 +3336,7 @@
             }
           },
           "404": {
-            "description": "MessageNotFoundError | SessionNotFoundError",
+            "description": "MessageNotFoundError | SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3355,6 +3346,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3385,8 +3379,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3457,8 +3450,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3466,8 +3458,7 @@
             "name": "inboxID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^msg_"
+              "$ref": "#/components/schemas/Session.Message.ID"
             },
             "required": true
           }
@@ -3519,8 +3510,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3528,8 +3518,7 @@
             "name": "inboxID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^msg_"
+              "$ref": "#/components/schemas/Session.Message.ID"
             },
             "required": true
           }
@@ -3610,8 +3599,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3659,7 +3647,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3668,7 +3656,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3689,8 +3677,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3729,7 +3716,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3738,7 +3725,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3782,8 +3769,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3822,7 +3808,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3831,7 +3817,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3852,8 +3838,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -3891,7 +3876,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -3900,7 +3885,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -3948,8 +3933,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -3959,7 +3943,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Event.SeqEncoded"
                 },
                 {
                   "type": "null"
@@ -4011,7 +3995,7 @@
                       "$ref": "#/components/schemas/SessionLogItemEncoded"
                     }
                   },
-                  "required": ["id", "event", "data"],
+                  "required": ["event", "data"],
                   "additionalProperties": false
                 },
                 "x-effect-stream": {
@@ -4073,7 +4057,7 @@
                   "errorSchema": {
                     "not": {}
                   },
-                  "failureEvent": "effect/httpapi/stream/failure"
+                  "failureEvent": "effect/http-api/stream/failure"
                 }
               }
             }
@@ -4122,8 +4106,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -4177,7 +4160,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -4186,7 +4169,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4207,8 +4190,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -4239,7 +4221,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -4248,7 +4230,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4269,8 +4251,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -4278,8 +4259,7 @@
             "name": "messageID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^msg_"
+              "$ref": "#/components/schemas/Session.Message.ID"
             },
             "required": true
           }
@@ -4402,7 +4382,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -4411,7 +4391,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4459,14 +4439,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -4482,7 +4455,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -4491,7 +4464,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4540,8 +4513,7 @@
             "name": "formID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^frm_"
+              "$ref": "#/components/schemas/Form.ID"
             },
             "required": true
           }
@@ -4586,19 +4558,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | FormNotFoundError",
+            "description": "SessionNotFoundError | FormNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/FormNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4625,8 +4597,7 @@
             "name": "formID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^frm_"
+              "$ref": "#/components/schemas/Form.ID"
             },
             "required": true
           },
@@ -4672,19 +4643,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | FormNotFoundError",
+            "description": "SessionNotFoundError | FormNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/FormNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4723,8 +4694,7 @@
             "name": "formID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^frm_"
+              "$ref": "#/components/schemas/Form.ID"
             },
             "required": true
           }
@@ -4762,19 +4732,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | FormNotFoundError",
+            "description": "SessionNotFoundError | FormNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/FormNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -4815,8 +4785,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -4890,8 +4859,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -4962,8 +4930,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -5033,7 +5000,8 @@
                     "skill",
                     "shell",
                     "assistant",
-                    "compaction"
+                    "compaction",
+                    "idle"
                   ]
                 },
                 {
@@ -5190,6 +5158,16 @@
               }
             }
           },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
           "503": {
             "description": "ServiceUnavailableError",
             "content": {
@@ -5290,6 +5268,16 @@
               }
             }
           },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
           "503": {
             "description": "ServiceUnavailableError",
             "content": {
@@ -5327,14 +5315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -5345,6 +5326,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -5383,6 +5374,241 @@
                   }
                 },
                 "required": ["prompt"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/experimental/voice/models": {
+      "get": {
+        "tags": ["voice"],
+        "operationId": "experimental.voice.models",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "VoiceModelsResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceModelsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "List supported voice models, their transports, whether the server has a usable API key for each provider or the connected OpenCode Console hosts the model, and the Console workspace a hosted model bills to.",
+        "summary": "List voice models"
+      }
+    },
+    "/api/experimental/voice/session": {
+      "post": {
+        "tags": ["voice"],
+        "operationId": "experimental.voice.session",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "VoiceSessionResponse",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a server-brokered voice session using the server's configured provider credentials, or the connected OpenCode Console when it hosts the model, and return the WebRTC SDP answer or WebSocket ephemeral token.",
+        "summary": "Create voice session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "session": {
+                    "anyOf": [
+                      {
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "transport": {
+                    "$ref": "#/components/schemas/VoiceTransportInput"
+                  }
+                },
+                "required": ["model", "transport"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/experimental/voice/session/{sessionID}/instructions": {
+      "post": {
+        "tags": ["voice"],
+        "operationId": "experimental.voice.instructions",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replace the backend instructions of a running session the connected OpenCode Console hosts, whose data channel can't change them.",
+        "summary": "Replace voice session instructions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instructions": {
+                    "type": "string"
+                  }
+                },
+                "required": ["instructions"],
                 "additionalProperties": false
               }
             }
@@ -5472,6 +5698,16 @@
               }
             }
           },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
           "503": {
             "description": "ServiceUnavailableError",
             "content": {
@@ -5496,7 +5732,7 @@
             "name": "providerID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Provider.ID"
             },
             "required": true
           },
@@ -5574,11 +5810,18 @@
             }
           },
           "404": {
-            "description": "ProviderNotFoundError",
+            "description": "ProviderNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProviderNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProviderNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -5678,6 +5921,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve available integrations and their authentication methods.",
@@ -5693,7 +5946,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -5771,11 +6024,18 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError",
+            "description": "IntegrationNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntegrationNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -5831,14 +6091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -5849,6 +6102,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -5884,7 +6147,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -5929,14 +6192,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -5952,11 +6208,18 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError",
+            "description": "IntegrationNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IntegrationNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -6003,6 +6266,134 @@
         }
       }
     },
+    "/api/integration/{integrationID}/connect/external": {
+      "post": {
+        "tags": ["integration"],
+        "operationId": "integration.connect.external",
+        "parameters": [
+          {
+            "name": "integrationID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Integration.ID"
+            },
+            "required": true
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "directory": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false,
+            "style": "deepObject",
+            "explode": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IntegrationNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Run an external authentication method and store a reference to its credential source.",
+        "summary": "Connect with external credentials",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "methodID": {
+                    "$ref": "#/components/schemas/Integration.MethodID"
+                  },
+                  "answer": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Form.Answer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "label": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["methodID"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/integration/{integrationID}/connect/oauth": {
       "post": {
         "tags": ["integration"],
@@ -6012,7 +6403,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6074,14 +6465,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -6092,6 +6476,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -6106,7 +6500,7 @@
                 "type": "object",
                 "properties": {
                   "methodID": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Integration.MethodID"
                   },
                   "answer": {
                     "anyOf": [
@@ -6147,7 +6541,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6155,7 +6549,7 @@
             "name": "attemptID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.AttemptID"
             },
             "required": true
           },
@@ -6233,7 +6627,7 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError",
+            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -6243,6 +6637,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IntegrationAttemptNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -6261,7 +6658,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6269,7 +6666,7 @@
             "name": "attemptID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.AttemptID"
             },
             "required": true
           },
@@ -6328,6 +6725,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Cancel an OAuth attempt and release its resources.",
@@ -6343,7 +6750,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6351,7 +6758,7 @@
             "name": "attemptID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.AttemptID"
             },
             "required": true
           },
@@ -6396,14 +6803,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -6419,7 +6819,7 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError",
+            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -6429,6 +6829,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IntegrationAttemptNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -6472,7 +6875,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6534,14 +6937,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -6557,7 +6953,7 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError | IntegrationMethodNotFoundError",
+            "description": "IntegrationNotFoundError | IntegrationMethodNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -6567,6 +6963,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IntegrationMethodNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -6583,7 +6982,7 @@
                 "type": "object",
                 "properties": {
                   "methodID": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Integration.MethodID"
                   },
                   "label": {
                     "anyOf": [
@@ -6614,7 +7013,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6622,7 +7021,7 @@
             "name": "attemptID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.AttemptID"
             },
             "required": true
           },
@@ -6700,7 +7099,7 @@
             }
           },
           "404": {
-            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError",
+            "description": "IntegrationNotFoundError | IntegrationAttemptNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -6710,6 +7109,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IntegrationAttemptNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -6728,7 +7130,7 @@
             "name": "integrationID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.ID"
             },
             "required": true
           },
@@ -6736,7 +7138,7 @@
             "name": "attemptID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Integration.AttemptID"
             },
             "required": true
           },
@@ -6792,6 +7194,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -6881,6 +7293,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve configured MCP servers and their connection status.",
@@ -6952,6 +7374,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -7053,11 +7485,18 @@
             }
           },
           "404": {
-            "description": "McpServerNotFoundError",
+            "description": "McpServerNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -7137,11 +7576,18 @@
             }
           },
           "404": {
-            "description": "McpServerNotFoundError",
+            "description": "McpServerNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -7221,11 +7667,18 @@
             }
           },
           "404": {
-            "description": "McpServerNotFoundError",
+            "description": "McpServerNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/McpServerNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -7309,6 +7762,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -7446,7 +7909,7 @@
             "name": "credentialID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Credential.ID"
             },
             "required": true
           }
@@ -7505,7 +7968,7 @@
             "name": "credentialID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Credential.ID"
             },
             "required": true
           }
@@ -7549,7 +8012,7 @@
             "name": "credentialID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Credential.ID"
             },
             "required": true
           }
@@ -7588,7 +8051,24 @@
       "get": {
         "tags": ["project"],
         "operationId": "project.list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "required": false
+          }
+        ],
         "security": [],
         "responses": {
           "200": {
@@ -7623,9 +8103,19 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
-        "description": "List known projects.",
+        "description": "List known projects. Archived projects are excluded unless archived=true.",
         "summary": "List projects"
       }
     },
@@ -7638,7 +8128,7 @@
             "name": "projectID",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Project.ID"
             },
             "required": true
           }
@@ -7676,11 +8166,18 @@
             }
           },
           "404": {
-            "description": "ProjectNotFoundError",
+            "description": "ProjectNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProjectNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -7695,7 +8192,7 @@
                 "type": "object",
                 "properties": {
                   "canonical": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/AbsolutePath"
                   },
                   "name": {
                     "type": "string"
@@ -7795,6 +8292,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve pending forms for a location.",
@@ -7881,6 +8388,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve pending permission requests for a location.",
@@ -7898,7 +8415,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/Project.ID"
                 },
                 {
                   "type": "null"
@@ -7949,6 +8466,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve saved permissions, optionally filtered by project.",
@@ -7956,6 +8483,122 @@
       }
     },
     "/api/permission/saved/{id}": {
+      "patch": {
+        "tags": ["permission"],
+        "operationId": "permission.saved.update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/PermissionSaved.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PermissionSaved.Info"
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PermissionSavedNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PermissionSavedNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ConflictError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Change the action or resource of a saved permission. Fails with a conflict when the project already has a saved permission with the same action and resource.",
+        "summary": "Update saved permission",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
       "delete": {
         "tags": ["permission"],
         "operationId": "permission.saved.remove",
@@ -7964,7 +8607,7 @@
             "name": "id",
             "in": "path",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/PermissionSaved.ID"
             },
             "required": true
           }
@@ -7993,6 +8636,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Remove a saved permission by ID.",
@@ -8008,8 +8661,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -8027,8 +8679,7 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "string",
-                          "pattern": "^per"
+                          "$ref": "#/components/schemas/Permission.ID"
                         },
                         "effect": {
                           "$ref": "#/components/schemas/Permission.Effect"
@@ -8065,7 +8716,7 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
@@ -8074,7 +8725,7 @@
                       "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -8093,8 +8744,7 @@
                   "id": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "pattern": "^per"
+                        "$ref": "#/components/schemas/Permission.ID"
                       },
                       {
                         "type": "null"
@@ -8125,7 +8775,7 @@
                   "agent": {
                     "anyOf": [
                       {
-                        "type": "string"
+                        "$ref": "#/components/schemas/Agent.ID"
                       },
                       {
                         "type": "null"
@@ -8149,8 +8799,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -8198,11 +8847,18 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError",
+            "description": "SessionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -8221,8 +8877,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -8230,8 +8885,7 @@
             "name": "requestID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^per"
+              "$ref": "#/components/schemas/Permission.ID"
             },
             "required": true
           }
@@ -8276,19 +8930,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | PermissionNotFoundError",
+            "description": "SessionNotFoundError | PermissionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/PermissionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -8309,8 +8963,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -8318,8 +8971,7 @@
             "name": "requestID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^per"
+              "$ref": "#/components/schemas/Permission.ID"
             },
             "required": true
           }
@@ -8350,19 +9002,19 @@
             }
           },
           "404": {
-            "description": "SessionNotFoundError | PermissionNotFoundError",
+            "description": "SessionNotFoundError | PermissionNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
                   "anyOf": [
                     {
+                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                    },
+                    {
                       "$ref": "#/components/schemas/PermissionNotFoundErrorEncoded"
                     },
                     {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SessionNotFoundErrorEncoded"
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                     }
                   ]
                 }
@@ -8471,17 +9123,24 @@
             }
           },
           "404": {
-            "description": "FileNotFoundError",
+            "description": "FileNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/FileNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
           }
         },
-        "description": "Serve one file relative to the requested location.",
+        "description": "Stream one file relative to the requested location with ETag, Last-Modified, and single-range HTTP Range support (206 Partial Content, 416 Range Not Satisfiable, and 304 Not Modified; multi-range and malformed Range headers fall back to 200).",
         "summary": "Read file"
       }
     },
@@ -8578,6 +9237,23 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "FileNotFoundError | LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/FileNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -8699,6 +9375,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Find recursively ranked filesystem entries relative to the requested location.",
@@ -8788,6 +9474,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -8888,6 +9584,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Retrieve currently registered commands.",
@@ -8971,6 +9677,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -9071,6 +9787,16 @@
               }
             }
           },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
           "500": {
             "description": "RpcInternalError",
             "content": {
@@ -9127,7 +9853,7 @@
                       "$ref": "#/components/schemas/V2EventEncoded"
                     }
                   },
-                  "required": ["id", "event", "data"],
+                  "required": ["event", "data"],
                   "additionalProperties": false
                 },
                 "x-effect-stream": {
@@ -9189,7 +9915,7 @@
                   "errorSchema": {
                     "not": {}
                   },
-                  "failureEvent": "effect/httpapi/stream/failure"
+                  "failureEvent": "effect/http-api/stream/failure"
                 }
               }
             }
@@ -9299,6 +10025,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "List PTY sessions for a location, including exited sessions retained until removal.",
@@ -9380,6 +10116,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Create a pseudo-terminal session for a location.",
@@ -9429,8 +10175,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -9508,11 +10253,18 @@
             }
           },
           "404": {
-            "description": "PtyNotFoundError",
+            "description": "PtyNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -9529,8 +10281,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -9608,11 +10359,18 @@
             }
           },
           "404": {
-            "description": "PtyNotFoundError",
+            "description": "PtyNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -9660,8 +10418,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -9722,11 +10479,18 @@
             }
           },
           "404": {
-            "description": "PtyNotFoundError",
+            "description": "PtyNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -9745,8 +10509,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -9849,11 +10612,18 @@
             }
           },
           "404": {
-            "description": "PtyNotFoundError",
+            "description": "PtyNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -9872,8 +10642,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -9942,11 +10711,18 @@
             }
           },
           "404": {
-            "description": "PtyNotFoundError",
+            "description": "PtyNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -9966,8 +10742,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           },
@@ -10057,8 +10832,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -10090,14 +10864,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -10132,8 +10899,7 @@
             "name": "sessionID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^ses"
+              "$ref": "#/components/schemas/Session.ID"
             },
             "required": true
           }
@@ -10162,14 +10928,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -10323,8 +11082,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           }
@@ -10398,8 +11156,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           }
@@ -10483,8 +11240,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           }
@@ -10546,8 +11302,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           }
@@ -10623,8 +11378,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -10725,8 +11479,7 @@
             "name": "ptyID",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^pty"
+              "$ref": "#/components/schemas/Pty.ID"
             },
             "required": true
           },
@@ -10921,6 +11674,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "List currently running shell commands for a location. Exited commands are not included.",
@@ -11002,6 +11765,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Spawn one non-interactive shell command for a location. Combined stdout/stderr is captured to a file pageable via output.",
@@ -11044,8 +11817,7 @@
             "name": "id",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^sh_"
+              "$ref": "#/components/schemas/Shell.ID"
             },
             "required": true
           },
@@ -11123,11 +11895,18 @@
             }
           },
           "404": {
-            "description": "ShellNotFoundError",
+            "description": "ShellNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ShellNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ShellNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -11144,8 +11923,7 @@
             "name": "id",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^sh_"
+              "$ref": "#/components/schemas/Shell.ID"
             },
             "required": true
           },
@@ -11204,6 +11982,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Terminate and remove one shell command and its retained output.",
@@ -11219,8 +12007,7 @@
             "name": "id",
             "in": "path",
             "schema": {
-              "type": "string",
-              "pattern": "^sh_"
+              "$ref": "#/components/schemas/Shell.ID"
             },
             "required": true
           },
@@ -11334,11 +12121,18 @@
             }
           },
           "404": {
-            "description": "ShellNotFoundError",
+            "description": "ShellNotFoundError | LocationNotFoundError",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ShellNotFoundErrorEncoded"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ShellNotFoundErrorEncoded"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                    }
+                  ]
                 }
               }
             }
@@ -11428,6 +12222,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "List references available in the requested location.",
@@ -11443,7 +12247,7 @@
             "name": "projectID",
             "in": "query",
             "schema": {
-              "type": "string"
+              "$ref": "#/components/schemas/Project.ID"
             },
             "required": true
           }
@@ -11679,7 +12483,7 @@
                 "type": "object",
                 "properties": {
                   "projectID": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Project.ID"
                   }
                 },
                 "required": ["projectID"],
@@ -11752,14 +12556,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -11770,6 +12567,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -11886,6 +12693,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Get current and default branch information for the requested location.",
@@ -11973,6 +12790,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -12069,6 +12896,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -12182,6 +13019,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -12299,6 +13146,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -12619,6 +13476,16 @@
               }
             }
           },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
           "503": {
             "description": "ServiceUnavailableError",
             "content": {
@@ -12697,14 +13564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    },
-                    {
-                      "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
                 }
               }
             }
@@ -12715,6 +13575,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
                 }
               }
             }
@@ -12742,7 +13612,7 @@
                     "type": "string"
                   },
                   "providerID": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/WebSearch.ID"
                   }
                 },
                 "required": ["query"],
@@ -12824,6 +13694,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Return configuration documents and discovery sources for the requested location, from lowest to highest priority.",
@@ -12869,6 +13749,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Return shells available to terminal and agent execution.",
@@ -12904,6 +13794,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "LocationNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationNotFoundErrorEncoded"
+                }
+              }
+            }
           }
         },
         "description": "Patch supported fields in the highest-precedence global configuration document.",
@@ -12923,14 +13823,20 @@
   },
   "components": {
     "schemas": {
+      "AbsolutePath": {
+        "type": "string"
+      },
       "Agent.Color": {
+        "type": "string"
+      },
+      "Agent.ID": {
         "type": "string"
       },
       "Agent.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Agent.ID"
           },
           "name": {
             "type": "string"
@@ -13165,7 +14071,7 @@
             "enum": ["directory"]
           },
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           }
         },
         "required": ["type", "path"],
@@ -13179,7 +14085,7 @@
             "enum": ["document"]
           },
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "info": {
             "$ref": "#/components/schemas/Config.InfoEncoded"
@@ -13286,6 +14192,27 @@
           },
           "permissions": {
             "$ref": "#/components/schemas/Permission.Ruleset"
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["provider.use", "tool.use", "integration.use"]
+                },
+                "resource": {
+                  "type": "string"
+                },
+                "effect": {
+                  "type": "string",
+                  "enum": ["allow", "deny"]
+                }
+              },
+              "required": ["action", "resource", "effect"],
+              "additionalProperties": false
+            }
           },
           "agents": {
             "type": "object",
@@ -13533,9 +14460,23 @@
               "portable_shell_scanner": {
                 "type": "boolean"
               },
+              "todo": {
+                "type": "boolean"
+              },
               "subagent_depth": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "location_idle_timeout": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean",
+                    "enum": [false]
+                  }
+                ]
               },
               "policies": {
                 "type": "array",
@@ -13544,7 +14485,7 @@
                   "properties": {
                     "action": {
                       "type": "string",
-                      "enum": ["provider.use", "permission"]
+                      "enum": ["provider.use", "tool.use", "integration.use"]
                     },
                     "resource": {
                       "type": "string"
@@ -13612,6 +14553,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "temperature": {
+            "type": "boolean"
+          },
+          "reasoning": {
+            "$ref": "#/components/schemas/Config.Model.Reasoning"
           }
         },
         "additionalProperties": false
@@ -13655,11 +14602,61 @@
         "required": ["input", "output"],
         "additionalProperties": false
       },
+      "Config.Model.Reasoning": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean",
+                "enum": [false]
+              }
+            },
+            "required": ["supported"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean",
+                "enum": [true]
+              },
+              "toggle": {
+                "type": "boolean"
+              },
+              "effort": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "budget": {
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "type": "integer"
+                  },
+                  "max": {
+                    "type": "integer"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["supported"],
+            "additionalProperties": false
+          }
+        ]
+      },
       "Config.Model.Settings": {
         "type": "object",
         "properties": {
           "compaction": {
             "$ref": "#/components/schemas/Provider.Compaction"
+          },
+          "encoding": {
+            "$ref": "#/components/schemas/Provider.Encoding"
           }
         },
         "allOf": [
@@ -13687,6 +14684,11 @@
           },
           "name": {
             "type": "string"
+          },
+          "releaseDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+            "description": "Release date as YYYY-MM-DD or YYYY-MM"
           },
           "compatibility": {
             "$ref": "#/components/schemas/Model.Compatibility"
@@ -13839,6 +14841,9 @@
           },
           "transport": {
             "$ref": "#/components/schemas/Provider.Transport"
+          },
+          "encoding": {
+            "$ref": "#/components/schemas/Provider.Encoding"
           }
         },
         "allOf": [
@@ -13859,7 +14864,7 @@
         "type": "object",
         "properties": {
           "canonical": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "name": {
             "type": "string"
@@ -13872,6 +14877,9 @@
           },
           "package": {
             "type": "string"
+          },
+          "compatibility": {
+            "$ref": "#/components/schemas/Provider.Compatibility"
           },
           "settings": {
             "$ref": "#/components/schemas/Config.Provider.Settings"
@@ -13981,7 +14989,7 @@
                 "description": "Reuse a randomly selected provider until it is rate limited, then switch to another available provider."
               },
               {
-                "type": "string"
+                "$ref": "#/components/schemas/WebSearch.ID"
               }
             ]
           }
@@ -14021,14 +15029,14 @@
             "enum": ["credential"]
           },
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Credential.ID"
           },
           "label": {
             "type": "string"
           },
           "method": {
             "type": "string",
-            "enum": ["key", "oauth"]
+            "enum": ["key", "oauth", "external"]
           },
           "status": {
             "$ref": "#/components/schemas/Connection.Status"
@@ -14089,10 +15097,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Credential.ID"
           },
           "integrationID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.ID"
           },
           "label": {
             "type": "string"
@@ -14111,10 +15119,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Credential.ID"
           },
           "integrationID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.ID"
           },
           "label": {
             "type": "string"
@@ -14129,6 +15137,26 @@
         "required": ["id", "integrationID", "label", "active", "value"],
         "additionalProperties": false
       },
+      "Credential.External": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["external"]
+          },
+          "methodID": {
+            "$ref": "#/components/schemas/Integration.MethodID"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": ["type", "methodID"],
+        "additionalProperties": false
+      },
+      "Credential.ID": {
+        "type": "string"
+      },
       "Credential.Key": {
         "type": "object",
         "properties": {
@@ -14141,9 +15169,6 @@
           },
           "metadata": {
             "type": "object"
-          },
-          "configuration": {
-            "$ref": "#/components/schemas/Form.Answer_1"
           }
         },
         "required": ["type", "key"],
@@ -14157,7 +15182,7 @@
             "enum": ["oauth"]
           },
           "methodID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.MethodID"
           },
           "refresh": {
             "type": "string"
@@ -14183,8 +15208,14 @@
           },
           {
             "$ref": "#/components/schemas/Credential.Key"
+          },
+          {
+            "$ref": "#/components/schemas/Credential.External"
           }
         ]
+      },
+      "Event.SeqEncoded": {
+        "type": "string"
       },
       "FileDiff.Info": {
         "type": "object",
@@ -14232,7 +15263,7 @@
         "type": "object",
         "properties": {
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/RelativePath"
           },
           "type": {
             "type": "string",
@@ -14246,7 +15277,7 @@
         "type": "object",
         "properties": {
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           }
         },
         "required": ["path"],
@@ -14267,12 +15298,6 @@
         "additionalProperties": false
       },
       "Form.Answer": {
-        "type": "object",
-        "additionalProperties": {
-          "$ref": "#/components/schemas/Form.Value"
-        }
-      },
-      "Form.Answer_1": {
         "type": "object",
         "additionalProperties": {
           "$ref": "#/components/schemas/Form.Value"
@@ -14319,8 +15344,7 @@
           "id": {
             "anyOf": [
               {
-                "type": "string",
-                "pattern": "^frm_"
+                "$ref": "#/components/schemas/Form.ID"
               },
               {
                 "type": "null"
@@ -14344,8 +15368,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^frm_"
+            "$ref": "#/components/schemas/Form.ID"
           },
           "sessionID": {
             "type": "string"
@@ -14447,12 +15470,27 @@
           "$ref": "#/components/schemas/Form.Field"
         }
       },
+      "Form.Fields_3": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "$ref": "#/components/schemas/Form.Field"
+          }
+        ],
+        "minItems": 1,
+        "items": {
+          "$ref": "#/components/schemas/Form.Field"
+        }
+      },
+      "Form.ID": {
+        "type": "string",
+        "pattern": "^frm_"
+      },
       "Form.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^frm_"
+            "$ref": "#/components/schemas/Form.ID"
           },
           "sessionID": {
             "type": "string"
@@ -14961,7 +15999,7 @@
         "type": "object",
         "properties": {
           "attemptID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.AttemptID"
           },
           "url": {
             "type": "string"
@@ -15005,6 +16043,9 @@
         },
         "required": ["attemptID", "url", "instructions", "mode", "time"],
         "additionalProperties": false
+      },
+      "Integration.AttemptID": {
+        "type": "string"
       },
       "Integration.AttemptStatus": {
         "anyOf": [
@@ -15177,7 +16218,7 @@
         "type": "object",
         "properties": {
           "attemptID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.AttemptID"
           },
           "time": {
             "type": "object",
@@ -15386,7 +16427,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.MethodID"
           },
           "type": {
             "type": "string",
@@ -15422,11 +16463,34 @@
         "required": ["type", "names"],
         "additionalProperties": false
       },
+      "Integration.ExternalMethod": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Integration.MethodID"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["external"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "form": {
+            "$ref": "#/components/schemas/Form.Fields_3"
+          }
+        },
+        "required": ["id", "type", "label"],
+        "additionalProperties": false
+      },
+      "Integration.ID": {
+        "type": "string"
+      },
       "Integration.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.ID"
           },
           "name": {
             "type": "string"
@@ -15479,15 +16543,21 @@
             "$ref": "#/components/schemas/Integration.KeyMethod"
           },
           {
+            "$ref": "#/components/schemas/Integration.ExternalMethod"
+          },
+          {
             "$ref": "#/components/schemas/Integration.EnvMethod"
           }
         ]
+      },
+      "Integration.MethodID": {
+        "type": "string"
       },
       "Integration.OAuthMethod": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.MethodID"
           },
           "type": {
             "type": "string",
@@ -15612,19 +16682,19 @@
         "type": "object",
         "properties": {
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "project": {
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "$ref": "#/components/schemas/Project.ID"
               },
               "directory": {
-                "type": "string"
+                "$ref": "#/components/schemas/AbsolutePath"
               },
               "canonical": {
-                "type": "string"
+                "$ref": "#/components/schemas/AbsolutePath"
               }
             },
             "required": ["id", "directory", "canonical"],
@@ -15638,10 +16708,27 @@
         "type": "object",
         "properties": {
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           }
         },
         "required": ["directory"],
+        "additionalProperties": false
+      },
+      "LocationNotFoundErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["LocationNotFoundError"]
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location.PublicRef"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "location", "message"],
         "additionalProperties": false
       },
       "Mcp.LocalConfigEncoded": {
@@ -15875,7 +16962,7 @@
             ]
           },
           "integrationID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.ID"
           }
         },
         "required": ["name", "status"],
@@ -15979,6 +17066,10 @@
         "required": ["_tag", "sessionID", "messageID", "message"],
         "additionalProperties": false
       },
+      "Model.CacheFormat": {
+        "type": "string",
+        "enum": ["anthropic", "alibaba"]
+      },
       "Model.Capabilities": {
         "type": "object",
         "properties": {
@@ -15996,6 +17087,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "temperature": {
+            "type": "boolean"
           }
         },
         "required": ["tools", "input", "output"],
@@ -16020,6 +17114,18 @@
             "type": "boolean"
           },
           "supportsPromptCacheKey": {
+            "type": "boolean"
+          },
+          "streamUsage": {
+            "type": "boolean"
+          },
+          "cacheFormat": {
+            "$ref": "#/components/schemas/Model.CacheFormat"
+          },
+          "supportsThinkingBlockBinding": {
+            "type": "boolean"
+          },
+          "supportsEffortUpdates": {
             "type": "boolean"
           }
         },
@@ -16075,10 +17181,10 @@
             "type": "string"
           },
           "providerID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "canonical": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "family": {
             "type": "string"
@@ -16190,7 +17296,7 @@
             "type": "string"
           },
           "providerID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "variant": {
             "type": "string"
@@ -16204,6 +17310,9 @@
         "properties": {
           "compaction": {
             "$ref": "#/components/schemas/Provider.Compaction"
+          },
+          "encoding": {
+            "$ref": "#/components/schemas/Provider.Encoding"
           }
         },
         "allOf": [
@@ -16268,6 +17377,10 @@
         "type": "string",
         "enum": ["allow", "deny", "ask"]
       },
+      "Permission.ID": {
+        "type": "string",
+        "pattern": "^per"
+      },
       "Permission.Reply": {
         "type": "string",
         "enum": ["once", "always", "reject"]
@@ -16276,12 +17389,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^per"
+            "$ref": "#/components/schemas/Permission.ID"
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "action": {
             "type": "string"
@@ -16371,14 +17482,17 @@
         "required": ["_tag", "requestID", "message"],
         "additionalProperties": false
       },
+      "PermissionSaved.ID": {
+        "type": "string"
+      },
       "PermissionSaved.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/PermissionSaved.ID"
           },
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "action": {
             "type": "string"
@@ -16401,6 +17515,23 @@
           }
         },
         "required": ["id", "projectID", "action", "resource", "time"],
+        "additionalProperties": false
+      },
+      "PermissionSavedNotFoundErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["PermissionSavedNotFoundError"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "id", "message"],
         "additionalProperties": false
       },
       "PersistentPty.CreateInput": {
@@ -16477,8 +17608,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^pty"
+            "$ref": "#/components/schemas/Pty.ID"
           },
           "title": {
             "type": "string"
@@ -16508,8 +17638,7 @@
             "minimum": 0
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "foregroundProcess": {
             "anyOf": [
@@ -16574,8 +17703,7 @@
         "type": "object",
         "properties": {
           "ptyID": {
-            "type": "string",
-            "pattern": "^pty"
+            "$ref": "#/components/schemas/Pty.ID"
           },
           "title": {
             "type": "string"
@@ -16826,10 +17954,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "canonical": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "vcs": {
             "$ref": "#/components/schemas/Project.Vcs"
@@ -16866,6 +17994,9 @@
         },
         "additionalProperties": false
       },
+      "Project.ID": {
+        "type": "string"
+      },
       "Project.Icon": {
         "type": "object",
         "properties": {
@@ -16893,6 +18024,10 @@
             "minimum": 0
           },
           "active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "archived": {
             "type": "integer",
             "minimum": 0
           }
@@ -17012,10 +18147,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.ID"
           },
           "name": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.Name"
           },
           "text": {
             "type": "string"
@@ -17050,7 +18185,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.ID"
           },
           "mention": {
             "$ref": "#/components/schemas/Prompt.Mention"
@@ -17085,17 +18220,54 @@
           }
         ]
       },
+      "Provider.Compatibility": {
+        "type": "object",
+        "properties": {
+          "reasoningField": {
+            "$ref": "#/components/schemas/Model.ReasoningField"
+          },
+          "requireReasoning": {
+            "type": "boolean"
+          },
+          "maxTokensField": {
+            "$ref": "#/components/schemas/Model.MaxTokensField"
+          },
+          "requireFinishReason": {
+            "type": "boolean"
+          },
+          "requireAssistantAfterTool": {
+            "type": "boolean"
+          },
+          "supportsPromptCacheKey": {
+            "type": "boolean"
+          },
+          "streamUsage": {
+            "type": "boolean"
+          },
+          "cacheFormat": {
+            "$ref": "#/components/schemas/Model.CacheFormat"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Provider.Encoding": {
+        "type": "string",
+        "enum": ["zstd", "gzip", "none"]
+      },
+      "Provider.ID": {
+        "type": "string"
+      },
       "Provider.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "canonical": {
-            "type": "string"
+            "$ref": "#/components/schemas/Provider.ID"
           },
           "integrationID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Integration.ID"
           },
           "name": {
             "type": "string"
@@ -17106,6 +18278,9 @@
           },
           "package": {
             "type": "string"
+          },
+          "compatibility": {
+            "$ref": "#/components/schemas/Provider.Compatibility"
           },
           "settings": {
             "$ref": "#/components/schemas/Provider.Settings"
@@ -17183,6 +18358,9 @@
           },
           "transport": {
             "$ref": "#/components/schemas/Provider.Transport"
+          },
+          "encoding": {
+            "$ref": "#/components/schemas/Provider.Encoding"
           }
         },
         "allOf": [
@@ -17217,8 +18395,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^pty"
+            "$ref": "#/components/schemas/Pty.ID"
           },
           "title": {
             "type": "string"
@@ -17250,6 +18427,10 @@
         },
         "required": ["id", "title", "command", "args", "cwd", "status", "pid"],
         "additionalProperties": false
+      },
+      "Pty.ID": {
+        "type": "string",
+        "pattern": "^pty"
       },
       "PtyNotFoundErrorEncoded": {
         "type": "object",
@@ -17306,7 +18487,7 @@
             "type": "string"
           },
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "description": {
             "type": "string"
@@ -17329,7 +18510,7 @@
             "enum": ["local"]
           },
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           }
         },
         "required": ["type", "path"],
@@ -17344,6 +18525,9 @@
             "$ref": "#/components/schemas/Reference.GitSource"
           }
         ]
+      },
+      "RelativePath": {
+        "type": "string"
       },
       "Rpc.Input": {
         "type": "object",
@@ -17497,8 +18681,7 @@
                 "enum": ["before"]
               },
               "messageID": {
-                "type": "string",
-                "pattern": "^msg_"
+                "$ref": "#/components/schemas/Session.Message.ID"
               }
             },
             "required": ["type", "messageID"],
@@ -17512,8 +18695,7 @@
                 "enum": ["through"]
               },
               "messageID": {
-                "type": "string",
-                "pattern": "^msg_"
+                "$ref": "#/components/schemas/Session.Message.ID"
               }
             },
             "required": ["type", "messageID"],
@@ -17521,16 +18703,18 @@
           }
         ]
       },
+      "Session.ID": {
+        "type": "string",
+        "pattern": "^ses"
+      },
       "Session.Inbox.Compaction": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "time": {
             "type": "object",
@@ -17557,14 +18741,9 @@
         "additionalProperties": false
       },
       "Session.Inbox.CompactionPayload": {
-        "anyOf": [
-          {
-            "type": "object"
-          },
-          {
-            "type": "array"
-          }
-        ]
+        "not": {
+          "type": "null"
+        }
       },
       "Session.Inbox.Delivery": {
         "type": "string",
@@ -17590,12 +18769,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "time": {
             "type": "object",
@@ -17625,10 +18802,10 @@
         "type": "object",
         "properties": {
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "subpath": {
-            "type": "string"
+            "$ref": "#/components/schemas/RelativePath"
           },
           "location": {
             "$ref": "#/components/schemas/Location.PublicRef"
@@ -17641,12 +18818,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "time": {
             "type": "object",
@@ -17692,12 +18867,10 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "sessionID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "time": {
             "type": "object",
@@ -17758,19 +18931,16 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "parentID": {
-            "type": "string",
-            "pattern": "^ses"
+            "$ref": "#/components/schemas/Session.ID"
           },
           "fork": {
             "type": "object",
             "properties": {
               "sessionID": {
-                "type": "string",
-                "pattern": "^ses"
+                "$ref": "#/components/schemas/Session.ID"
               },
               "boundary": {
                 "$ref": "#/components/schemas/Session.ForkBoundary"
@@ -17780,10 +18950,10 @@
             "additionalProperties": false
           },
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "agent": {
-            "type": "string"
+            "$ref": "#/components/schemas/Agent.ID"
           },
           "model": {
             "$ref": "#/components/schemas/Model.Ref"
@@ -17824,7 +18994,7 @@
             "type": "string"
           },
           "subpath": {
-            "type": "string"
+            "$ref": "#/components/schemas/RelativePath"
           },
           "metadata": {
             "$ref": "#/components/schemas/Session.Metadata"
@@ -17846,8 +19016,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -17867,10 +19036,10 @@
             "enum": ["agent-switched"]
           },
           "agent": {
-            "type": "string"
+            "$ref": "#/components/schemas/Agent.ID"
           },
           "previous": {
-            "type": "string"
+            "$ref": "#/components/schemas/Agent.ID"
           }
         },
         "required": ["id", "time", "type", "agent"],
@@ -17880,8 +19049,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -17907,7 +19075,7 @@
             "enum": ["assistant"]
           },
           "agent": {
-            "type": "string"
+            "$ref": "#/components/schemas/Agent.ID"
           },
           "model": {
             "$ref": "#/components/schemas/Model.Ref"
@@ -17932,15 +19100,15 @@
             "type": "object",
             "properties": {
               "start": {
-                "type": "string"
+                "$ref": "#/components/schemas/Snapshot.ID"
               },
               "end": {
-                "type": "string"
+                "$ref": "#/components/schemas/Snapshot.ID"
               },
               "files": {
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/RelativePath"
                 }
               }
             },
@@ -17953,8 +19121,8 @@
           "rawFinish": {
             "type": "string"
           },
-          "providerState": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState_4"
+          "native": {
+            "$ref": "#/components/schemas/Session.Message.Native_3"
           },
           "cost": {
             "$ref": "#/components/schemas/Money.USD"
@@ -17982,8 +19150,8 @@
           "text": {
             "type": "string"
           },
-          "state": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState_1"
+          "native": {
+            "$ref": "#/components/schemas/Session.Message.Native_1"
           },
           "time": {
             "type": "object",
@@ -18029,8 +19197,8 @@
           "text": {
             "type": "string"
           },
-          "state": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState"
+          "native": {
+            "$ref": "#/components/schemas/Session.Message.Native"
           }
         },
         "required": ["type", "text"],
@@ -18052,11 +19220,8 @@
           "executed": {
             "type": "boolean"
           },
-          "providerState": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState_2"
-          },
-          "providerResultState": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState_3"
+          "native": {
+            "$ref": "#/components/schemas/Session.Message.Native_2"
           },
           "state": {
             "anyOf": [
@@ -18115,8 +19280,7 @@
             "enum": ["compaction"]
           },
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18142,17 +19306,11 @@
           "model": {
             "$ref": "#/components/schemas/Model.Ref"
           },
-          "providerState": {
-            "$ref": "#/components/schemas/Session.Message.ProviderState_5"
+          "native": {
+            "$ref": "#/components/schemas/Session.Message.Native_4"
           },
           "summary": {
             "type": "string"
-          },
-          "recent": {
-            "type": "string"
-          },
-          "providerContext": {
-            "$ref": "#/components/schemas/Session.ProviderContext"
           },
           "cost": {
             "$ref": "#/components/schemas/Money.USD"
@@ -18161,7 +19319,7 @@
             "$ref": "#/components/schemas/TokenUsage.Info"
           }
         },
-        "required": ["type", "id", "time", "status", "reason", "summary", "recent"],
+        "required": ["type", "id", "time", "status", "reason", "summary"],
         "additionalProperties": false
       },
       "Session.Message.Compaction.Failed": {
@@ -18172,8 +19330,7 @@
             "enum": ["compaction"]
           },
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18217,8 +19374,7 @@
             "enum": ["compaction"]
           },
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18243,20 +19399,20 @@
           },
           "summary": {
             "type": "string"
-          },
-          "recent": {
-            "type": "string"
           }
         },
-        "required": ["type", "id", "time", "status", "reason", "summary", "recent"],
+        "required": ["type", "id", "time", "status", "reason", "summary"],
         "additionalProperties": false
+      },
+      "Session.Message.ID": {
+        "type": "string",
+        "pattern": "^msg_"
       },
       "Session.Message.Idle": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18278,6 +19434,9 @@
           "outcome": {
             "type": "string",
             "enum": ["succeeded", "failed", "interrupted"]
+          },
+          "error": {
+            "$ref": "#/components/schemas/Session.StructuredError"
           }
         },
         "required": ["id", "time", "type", "outcome"],
@@ -18324,8 +19483,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18345,10 +19503,10 @@
             "enum": ["location-switched"]
           },
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "subpath": {
-            "type": "string"
+            "$ref": "#/components/schemas/RelativePath"
           },
           "location": {
             "$ref": "#/components/schemas/Location.PublicRef"
@@ -18362,10 +19520,10 @@
                     "$ref": "#/components/schemas/Location.PublicRef"
                   },
                   "projectID": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/Project.ID"
                   },
                   "subpath": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/RelativePath"
                   }
                 },
                 "required": ["location"],
@@ -18384,8 +19542,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18414,30 +19571,26 @@
         "required": ["id", "time", "type", "model"],
         "additionalProperties": false
       },
-      "Session.Message.ProviderState": {
+      "Session.Message.Native": {
         "type": "object"
       },
-      "Session.Message.ProviderState_1": {
+      "Session.Message.Native_1": {
         "type": "object"
       },
-      "Session.Message.ProviderState_2": {
+      "Session.Message.Native_2": {
         "type": "object"
       },
-      "Session.Message.ProviderState_3": {
+      "Session.Message.Native_3": {
         "type": "object"
       },
-      "Session.Message.ProviderState_4": {
-        "type": "object"
-      },
-      "Session.Message.ProviderState_5": {
+      "Session.Message.Native_4": {
         "type": "object"
       },
       "Session.Message.Shell": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18460,8 +19613,7 @@
             "enum": ["shell"]
           },
           "shellID": {
-            "type": "string",
-            "pattern": "^sh_"
+            "$ref": "#/components/schemas/Shell.ID"
           },
           "command": {
             "type": "string"
@@ -18510,8 +19662,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18531,10 +19682,10 @@
             "enum": ["skill"]
           },
           "skill": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.ID"
           },
           "name": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.Name"
           },
           "text": {
             "type": "string"
@@ -18547,8 +19698,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18581,8 +19731,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18707,8 +19856,7 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "metadata": {
             "type": "object"
@@ -18755,58 +19903,17 @@
       "Session.Metadata": {
         "type": "object"
       },
-      "Session.ProviderContext": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "number",
-            "enum": [1]
-          },
-          "provenance": {
-            "$ref": "#/components/schemas/Session.ProviderContext.Provenance"
-          },
-          "messages": {}
-        },
-        "required": ["version", "provenance", "messages"],
-        "additionalProperties": false
-      },
-      "Session.ProviderContext.Provenance": {
-        "type": "object",
-        "properties": {
-          "providerID": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "modelID": {
-            "type": "string"
-          },
-          "route": {
-            "type": "string"
-          },
-          "protocol": {
-            "type": "string"
-          },
-          "endpoint": {
-            "type": "string"
-          }
-        },
-        "required": ["providerID", "provider", "modelID", "route", "protocol", "endpoint"],
-        "additionalProperties": false
-      },
       "Session.Revert": {
         "type": "object",
         "properties": {
           "messageID": {
-            "type": "string",
-            "pattern": "^msg_"
+            "$ref": "#/components/schemas/Session.Message.ID"
           },
           "partID": {
             "type": "string"
           },
           "snapshot": {
-            "type": "string"
+            "$ref": "#/components/schemas/Snapshot.ID"
           },
           "files": {
             "type": "array",
@@ -18841,6 +19948,10 @@
             },
             "required": ["body"],
             "additionalProperties": false
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": ["type", "message"],
@@ -19191,6 +20302,10 @@
         "required": ["info", "messages"],
         "additionalProperties": false
       },
+      "SessionsCursor": {
+        "type": "string",
+        "description": "Opaque pagination cursor returned as cursor.previous or cursor.next in the previous response."
+      },
       "SessionsResponse": {
         "type": "object",
         "properties": {
@@ -19206,7 +20321,7 @@
               "previous": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "$ref": "#/components/schemas/SessionsCursor"
                   },
                   {
                     "type": "null"
@@ -19216,7 +20331,7 @@
               "next": {
                 "anyOf": [
                   {
-                    "type": "string"
+                    "$ref": "#/components/schemas/SessionsCursor"
                   },
                   {
                     "type": "null"
@@ -19230,12 +20345,15 @@
         "required": ["data", "cursor"],
         "additionalProperties": false
       },
+      "Shell.ID": {
+        "type": "string",
+        "pattern": "^sh_"
+      },
       "Shell.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string",
-            "pattern": "^sh_"
+            "$ref": "#/components/schemas/Shell.ID"
           },
           "status": {
             "type": "string",
@@ -19301,14 +20419,17 @@
         "required": ["_tag", "id", "message"],
         "additionalProperties": false
       },
+      "Skill.ID": {
+        "type": "string"
+      },
       "Skill.Info": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.ID"
           },
           "name": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.Name"
           },
           "description": {
             "type": "string"
@@ -19317,7 +20438,7 @@
             "type": "boolean"
           },
           "path": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "content": {
             "type": "string"
@@ -19325,6 +20446,9 @@
         },
         "required": ["id", "name", "path", "content"],
         "additionalProperties": false
+      },
+      "Skill.Name": {
+        "type": "string"
       },
       "SkillNotFoundErrorEncoded": {
         "type": "object",
@@ -19334,7 +20458,7 @@
             "enum": ["SkillNotFoundError"]
           },
           "skill": {
-            "type": "string"
+            "$ref": "#/components/schemas/Skill.ID"
           },
           "message": {
             "type": "string"
@@ -19342,6 +20466,9 @@
         },
         "required": ["_tag", "skill", "message"],
         "additionalProperties": false
+      },
+      "Snapshot.ID": {
+        "type": "string"
       },
       "TokenUsage.Info": {
         "type": "object",
@@ -19556,11 +20683,229 @@
         "required": ["_tag", "providerID", "message"],
         "additionalProperties": false
       },
+      "VoiceModel": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoiceTransportType"
+            }
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "integration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["model", "provider", "transports", "available"],
+        "additionalProperties": false
+      },
+      "VoiceModelsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "models": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VoiceModel"
+                }
+              },
+              "default": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["models"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"],
+        "additionalProperties": false
+      },
+      "VoiceSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "transport": {
+                "$ref": "#/components/schemas/VoiceTransport"
+              },
+              "session": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["id"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["transport"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"],
+        "additionalProperties": false
+      },
+      "VoiceTransport": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/VoiceWebRTCTransport"
+          },
+          {
+            "$ref": "#/components/schemas/VoiceWebSocketTransport"
+          }
+        ]
+      },
+      "VoiceTransportInput": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/VoiceWebRTCTransportInput"
+          },
+          {
+            "$ref": "#/components/schemas/VoiceWebSocketTransportInput"
+          }
+        ]
+      },
+      "VoiceTransportType": {
+        "type": "string",
+        "enum": ["webrtc", "websocket"]
+      },
+      "VoiceWebRTCTransport": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["webrtc"]
+          },
+          "sdp": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "sdp"],
+        "additionalProperties": false
+      },
+      "VoiceWebRTCTransportInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["webrtc"]
+          },
+          "sdp": {
+            "type": "string"
+          },
+          "dcid": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": ["Infinity", "-Infinity", "NaN"]
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["type", "sdp"],
+        "additionalProperties": false
+      },
+      "VoiceWebSocketTransport": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["websocket"]
+          },
+          "url": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              }
+            ]
+          }
+        },
+        "required": ["type", "url", "token", "expiresAt"],
+        "additionalProperties": false
+      },
+      "VoiceWebSocketTransportInput": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["websocket"]
+          }
+        },
+        "required": ["type"],
+        "additionalProperties": false
+      },
+      "WebSearch.ID": {
+        "type": "string"
+      },
       "WebSearch.Provider": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "$ref": "#/components/schemas/WebSearch.ID"
           },
           "name": {
             "type": "string"
@@ -19573,7 +20918,7 @@
         "type": "object",
         "properties": {
           "providerID": {
-            "type": "string"
+            "$ref": "#/components/schemas/WebSearch.ID"
           },
           "results": {
             "type": "array",
@@ -19614,16 +20959,16 @@
         "type": "object",
         "properties": {
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "from": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "branch": {
             "type": "string"
           },
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "name": {
             "type": "string"
@@ -19636,7 +20981,7 @@
         "type": "object",
         "properties": {
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "strategy": {
             "type": "string"
@@ -19649,7 +20994,7 @@
         "type": "object",
         "properties": {
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           }
         },
         "required": ["directory"],
@@ -19665,10 +21010,10 @@
         "type": "object",
         "properties": {
           "projectID": {
-            "type": "string"
+            "$ref": "#/components/schemas/Project.ID"
           },
           "directory": {
-            "type": "string"
+            "$ref": "#/components/schemas/AbsolutePath"
           },
           "force": {
             "type": "boolean"
@@ -19745,6 +21090,10 @@
     {
       "name": "generate",
       "description": "Experimental one-shot generation routes."
+    },
+    {
+      "name": "voice",
+      "description": "Experimental server-brokered voice session routes."
     },
     {
       "name": "provider",

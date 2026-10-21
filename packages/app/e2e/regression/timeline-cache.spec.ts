@@ -25,9 +25,12 @@ for (const width of [1440, 390]) {
         const answer = document.querySelector<HTMLElement>(`[data-timeline-part-id="${partID}"]`)
         const content = answer?.closest<HTMLElement>("[data-timeline-virtual-content]")
         const root = content?.closest<HTMLElement>(".scroll-view__viewport")
+
         if (!answer || !content || !root || !content.checkVisibility({ checkVisibilityCSS: true })) return
+
         const spacer = content.querySelector('[data-timeline-row="bottom-spacer"]')
-        ;(window as Window & { __coldReveal?: Reveal }).__coldReveal = {
+
+        window.__coldReveal = {
           pending: content.querySelectorAll('[data-component="markdown"]:not([data-markdown-ready])').length,
           clipped: [...content.querySelectorAll<HTMLElement>("[data-timeline-key]")].flatMap((row) =>
             (row.firstElementChild?.getBoundingClientRect().height ?? 0) > row.getBoundingClientRect().height + 1
@@ -40,17 +43,19 @@ for (const width of [1440, 390]) {
         }
         observer.disconnect()
       })
+
       observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] })
     }, expected[fixture.sourceID].answerID)
     await mockStressTimeline(page, { pageMessages: () => ({ items: messages[fixture.sourceID] }) })
     await installTimelineSettings(page)
+
     try {
       await page.goto(sessionHref(fixture.sourceID), { waitUntil: "domcontentloaded" })
       await requested.promise
       await expect(page.locator("[data-timeline-virtual-content]")).toHaveCSS("visibility", "hidden")
       release.resolve()
       await expect(page.locator("[data-timeline-virtual-content]")).toHaveCSS("visibility", "visible")
-      const reveal = await page.evaluate(() => (window as Window & { __coldReveal?: Reveal }).__coldReveal)
+      const reveal = await page.evaluate(() => window.__coldReveal)
       expect(reveal).toMatchObject({ pending: 0, clipped: [], tables: 1, codeBlocks: 4 })
       expect(Math.abs(reveal?.bottomError ?? Infinity)).toBeLessThanOrEqual(1)
       // The gap above the composer is part of the tail.
@@ -99,9 +104,11 @@ test("scrolls within a long answer without mounting unrelated history", async ({
     .poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop))
     .toBeLessThanOrEqual(1)
   const rows = page.locator("[data-timeline-key]")
+
   const keys = await rows.evaluateAll((elements) =>
     elements.map((element) => element.getAttribute("data-timeline-key")),
   )
+
   const top = await answer.evaluate((element) => element.getBoundingClientRect().top)
 
   await scroller.hover()
@@ -117,15 +124,20 @@ test("scrolls within a long answer without mounting unrelated history", async ({
 test("fills a short cold transcript before revealing it", async ({ page }) => {
   const history = messages[fixture.sourceID].slice(-6).map((message, index) => {
     if (message.type === "user") return { ...message, text: `Prompt ${index}`, metadata: undefined }
+
     if (message.type === "assistant")
       return { ...message, content: [{ type: "text" as const, text: `**Answer ${index}**` }] }
+
     return message
   })
+
   await openTimeline(page, history)
+
   for (const message of history) {
     if (message.type === "user") {
       await expect(page.locator(`[data-timeline-row="UserMessage"][data-message-id="${message.id}"]`)).toBeInViewport()
     }
+
     if (message.type === "assistant") {
       const answer = page.locator(`[data-timeline-part-id="${message.id}:text:0"]`)
       await expect(answer).toBeInViewport()
@@ -228,6 +240,7 @@ test("disposes the old workspace's shell while destination history is loading", 
   )
   page.on("request", (request) => {
     const url = new URL(request.url())
+
     if (request.method() === "GET" && url.pathname === "/api/shell/sh_workspace_source/output")
       reads.push(url.searchParams.get("location[directory]") ?? "")
   })
@@ -235,6 +248,7 @@ test("disposes the old workspace's shell while destination history is loading", 
   const shell = page.locator('[data-timeline-part-id="call_workspace_shell"]')
   await expect(shell.locator('[data-slot="bash-result"]')).toContainText("Initial shell output")
   const original = await page.locator("[data-timeline-virtual-content]").elementHandle()
+
   try {
     await tab(page, fixture.targetID).click()
     await requested.promise
@@ -260,7 +274,23 @@ test("loads the transcript code font before opening rich history", async ({ page
   await page.goto(sessionHref(fixture.sourceID))
   await expect(page.getByText("A transcript with no code", { exact: true })).toBeVisible()
   expect((await font).ok()).toBe(true)
-  await expect.poll(() => page.evaluate(() => document.fonts.check('440 13px "IBM Plex Mono"'))).toBe(true)
+  // Chromium recreates every @font-face as "unloaded", keeping its downloaded file, whenever a lazily loaded
+  // stylesheet with @layer rules activates ahead of one already applied, so the preloaded face's status alone is
+  // not stable. Once fonts settle, the first layout of new code must take that file at once, which marks the
+  // current face loaded; a face that still has to fetch its file reports "loading" here instead.
+  expect(
+    await page.evaluate(async () => {
+      await document.fonts.ready
+      const code = document.body.appendChild(document.createElement("code"))
+      code.style.font = "440 13px var(--font-family-mono)"
+      code.textContent = "code"
+      code.getBoundingClientRect()
+      const loaded = document.fonts.check('440 13px "IBM Plex Mono"')
+      code.remove()
+
+      return loaded
+    }),
+  ).toBe(true)
 })
 
 test("waits for the requested session's history before constructing its cold timeline", async ({ page }) => {
@@ -276,6 +306,7 @@ test("waits for the requested session's history before constructing its cold tim
   })
   await page.goto(sessionHref(fixture.sourceID))
   await expectAtTail(page, fixture.expected.sourceMessageIDs.at(-1)!)
+
   try {
     await tab(page, fixture.targetID).click()
     await requested.promise
@@ -322,6 +353,7 @@ for (const grouped of [true, false]) {
         ] satisfies SessionMessageInfo[],
       ]),
     )
+
     const mock = await openTabs(
       page,
       { pageMessages: (id) => ({ items: history[id] ?? [] }) },
@@ -336,8 +368,10 @@ for (const grouped of [true, false]) {
         },
       },
     )
+
     await page.goto(sessionHref(fixture.sourceID))
     await expect(page.getByText(`Answer for ${fixture.sourceID}`, { exact: true })).toBeVisible()
+
     if (grouped)
       await page
         .locator(
@@ -420,6 +454,7 @@ async function openTabs(page: Page, input: Partial<MockServerConfig>, extra: See
     tabs: [fixture.sourceID, fixture.targetID],
     ...extra,
   })
+
   return mock
 }
 
@@ -445,6 +480,13 @@ async function expectAtTail(page: Page, lastUserID: string) {
 
 type TabPaint = { first?: { last: boolean; bottomError?: number }; settled: boolean; removed: number; stop(): void }
 
+declare global {
+  interface Window {
+    __coldReveal?: Reveal
+    __tabPaint?: TabPaint
+  }
+}
+
 // Samples painted frames of the timeline showing `sessionID`: the first frame that shows any of its messages, and
 // every node of the first settled frame (at the tail, Markdown rendered) that is later removed.
 async function sampleTabPaint(page: Page, sessionID: string) {
@@ -454,6 +496,7 @@ async function sampleTabPaint(page: Page, sessionID: string) {
       const destination = new Set(ids)
       const painted = new WeakSet<Node>()
       let running = true
+
       const state: TabPaint = {
         settled: false,
         removed: 0,
@@ -461,12 +504,14 @@ async function sampleTabPaint(page: Page, sessionID: string) {
           running = false
         },
       }
-      ;(window as Window & { __tabPaint?: TabPaint }).__tabPaint = state
+
+      window.__tabPaint = state
       new MutationObserver((records) => {
         if (!state.settled || !running) return
         records.forEach((record) =>
           record.removedNodes.forEach((node) => {
             if (painted.has(node)) state.removed += 1
+
             if (!(node instanceof Element)) return
             node.querySelectorAll("*").forEach((element) => {
               if (painted.has(element)) state.removed += 1
@@ -474,31 +519,41 @@ async function sampleTabPaint(page: Page, sessionID: string) {
           }),
         )
       }).observe(document.documentElement, { childList: true, subtree: true })
+
       const sample = () => {
         if (!running || state.settled) return
+
         const root = [...document.querySelectorAll<HTMLElement>(".scroll-view__viewport")].find((element) =>
           [...element.querySelectorAll<HTMLElement>("[data-message-id]")].some((row) =>
             destination.has(row.dataset.messageId!),
           ),
         )
+
         if (root) {
           const view = root.getBoundingClientRect()
+
           // A frame counts only when the row is painted: inside the viewport and not hidden by CSS.
           const inView = (element: Element) => {
             const rect = element.getBoundingClientRect()
+
             return (
               rect.bottom > view.top &&
               rect.top < view.bottom &&
               element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
             )
           }
-          const visible = [...root.querySelectorAll<HTMLElement>("[data-message-id]")]
-            .filter(inView)
-            .map((element) => element.dataset.messageId!)
-            .filter((id) => destination.has(id))
+
+          const visible = [...root.querySelectorAll<HTMLElement>("[data-message-id]")].flatMap((element) => {
+            const id = element.dataset.messageId
+
+            return id && inView(element) && destination.has(id) ? [id] : []
+          })
+
           const spacer = root.querySelector('[data-timeline-row="bottom-spacer"]')?.getBoundingClientRect()
           const bottomError = spacer ? spacer.bottom - view.bottom : undefined
+
           if (visible.length && !state.first) state.first = { last: visible.includes(last), bottomError }
+
           if (
             visible.includes(last) &&
             Math.abs(bottomError ?? Infinity) <= 1 &&
@@ -510,11 +565,14 @@ async function sampleTabPaint(page: Page, sessionID: string) {
               painted.add(row)
               row.querySelectorAll("*").forEach((element) => painted.add(element))
             })
+
             return
           }
         }
+
         requestAnimationFrame(() => setTimeout(sample, 0))
       }
+
       requestAnimationFrame(() => setTimeout(sample, 0))
     },
     {
@@ -522,19 +580,22 @@ async function sampleTabPaint(page: Page, sessionID: string) {
       last: history.findLast((message) => message.type === "user")!.id,
     },
   )
-  const read = () => page.evaluate(() => (window as Window & { __tabPaint?: TabPaint }).__tabPaint!.first)
+  const read = () => page.evaluate(() => window.__tabPaint!.first)
+
   return {
     async firstPaint() {
       await expect.poll(read).toBeDefined()
       await expect
-        .poll(() => page.evaluate(() => (window as Window & { __tabPaint?: TabPaint }).__tabPaint!.settled))
+        .poll(() => page.evaluate(() => window.__tabPaint!.settled))
         .toBe(true)
+
       return (await read())!
     },
     stop: () =>
       page.evaluate(() => {
-        const state = (window as Window & { __tabPaint?: TabPaint }).__tabPaint!
+        const state = window.__tabPaint!
         state.stop()
+
         return state.removed
       }),
   }
