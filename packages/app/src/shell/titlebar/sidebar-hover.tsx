@@ -184,13 +184,12 @@ function nearest(root: HTMLElement, pointer: { x: number; y: number }) {
 
   if (!first || !last || pointer.y < first.top || pointer.y > last.bottom) return
 
-  if (pointer.x < Math.min(...boxes.map((item) => item.left))) return
-
-  if (pointer.x > Math.max(...boxes.map((item) => item.right))) return
-
   const distance = (row: { top: number; bottom: number }) => Math.max(row.top - pointer.y, pointer.y - row.bottom, 0)
   // A tie in a gap goes to the lower row, as clicks do.
   const row = boxes.reduce((best, item) => (distance(item) <= distance(best) ? item : best))
+
+  // Beside the row, such as on the sidebar toggle next to Home, is off the rows.
+  if (pointer.x < row.left || pointer.x > row.right) return
 
   return { top: row.top - box.top, bottom: row.bottom - box.top, left: row.left - box.left, right: row.right - box.left }
 }
