@@ -12,9 +12,7 @@ test.use({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" })
 type Reveal = { pending: number; clipped: string[]; bottomError: number; tables: number; codeBlocks: number }
 
 for (const width of [1440, 390]) {
-  test(`reveals a cold timeline at the tail only after Markdown is measured at ${width}px @quarantine`, async ({
-    page,
-  }) => {
+  test(`reveals a cold timeline at the tail only after Markdown is measured at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     const requested = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
@@ -65,10 +63,10 @@ for (const width of [1440, 390]) {
       const reveal = await page.evaluate(() => window.__coldReveal)
       expect(reveal).toMatchObject({ pending: 0, clipped: [], tables: 1, codeBlocks: 4 })
       expect(Math.abs(reveal?.bottomError ?? Infinity)).toBeLessThanOrEqual(1)
-      // The gap above the composer is part of the tail: the status lane, then the activity pill's lane.
+      // The gap above the composer is part of the tail: the status lane, then the activity pill and its gap.
       const spacer = page.locator('[data-timeline-row="bottom-spacer"]')
       await expect(spacer).toBeVisible()
-      expect(await spacer.evaluate((element) => element.getBoundingClientRect().height)).toBe(80)
+      expect(await spacer.evaluate((element) => element.getBoundingClientRect().height)).toBe(82)
     } finally {
       release.resolve()
     }

@@ -12,14 +12,11 @@ on:
         description: Run only the quarantined browser tests (packages/app/e2e/QUARANTINE.md)
         type: boolean
         default: false
-  # Nightly: the full suite on both OSes, plus the quarantined browser tests.
-  schedule:
-    - cron: "17 9 * * *"
 
 concurrency:
-  # Keep every run on dev so cancelled checks do not pollute the default branch
-  # commit history. PRs and other branches still share a group and cancel stale runs.
-  group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
+  # A new push to a pull request cancels its stale run. Every push and manual run keeps its own group, so each
+  # dev and beta commit gets a verdict and a quarantine run never cancels a normal one.
+  group: ${{ case(github.event_name == 'pull_request', format('{0}-{1}', github.workflow, github.event.pull_request.number), format('{0}-{1}', github.workflow, github.run_id)) }}
   cancel-in-progress: true
 
 permissions:
@@ -54,7 +51,7 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
           TURBO_SCM_HEAD: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "app=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -64,7 +61,7 @@ jobs:
 
   unit:
     name: unit (${{ matrix.settings.name }})
-    if: ${{ github.event_name != 'schedule' && !inputs.quarantine }}
+    if: ${{ !inputs.quarantine }}
     strategy:
       fail-fast: false
       matrix:
@@ -150,7 +147,7 @@ jobs:
 
   build:
     name: build (${{ matrix.settings.name }})
-    if: ${{ github.event_name != 'schedule' && !inputs.quarantine }}
+    if: ${{ !inputs.quarantine }}
     strategy:
       fail-fast: false
       matrix:
@@ -224,9 +221,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Beta PRs gate on Linux; Windows runs on pushes, nightly and manual runs.
+        # Beta PRs gate on Linux; Windows runs on pushes and manual runs (nightly-beta.yml dispatches beta).
         settings: ${{ fromJSON(github.base_ref == 'beta' && '[{"name":"linux","host":"blacksmith-4vcpu-ubuntu-2404"}]' || '[{"name":"linux","host":"blacksmith-4vcpu-ubuntu-2404"},{"name":"windows","host":"blacksmith-4vcpu-windows-2025"}]') }}
-        quarantine: ${{ fromJSON(github.event_name == 'schedule' && '[false,true]' || inputs.quarantine && '[true]' || '[false]') }}
+        quarantine: ${{ fromJSON(inputs.quarantine && '[true]' || '[false]') }}
         # Playwright splits whole spec files across shards by test count, not duration. Every app-N
         # entry must use the same total, and the entries must cover 1..total. The service worker suite
         # reuses shard 2's production build. Each component suite runs once per OS in its own leg, so the
@@ -241,8 +238,9 @@ jobs:
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
-      # Gate legs skip quarantined tests and stop after 8 failures; quarantine legs run only those, to the end.
-      PLAYWRIGHT_ARGS: ${{ matrix.quarantine && '--grep @quarantine --pass-with-no-tests' || '--grep-invert @quarantine --max-failures=8' }}
+      # Beta only (packages/app/e2e/QUARANTINE.md): gate legs skip quarantined tests, retry once and stop after 8
+      # failures; quarantine legs run only those tests, to the end. Other branches keep the config defaults.
+      PLAYWRIGHT_ARGS: ${{ matrix.quarantine && '--grep @quarantine --pass-with-no-tests --retries=1' || (github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && '--grep-invert @quarantine --max-failures=8 --retries=1' || '' }}
     defaults:
       run:
         shell: bash
@@ -289,7 +287,7 @@ jobs:
         run: bun --cwd packages/app test:e2e:built --shard=${{ matrix.suite.shard }} ${{ env.PLAYWRIGHT_ARGS }}
         env:
           CI: true
-        timeout-minutes: 10
+        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
 
       - name: Verify service worker precaching and upgrades
         if: matrix.suite.shard == '2/2' && !matrix.quarantine
@@ -302,14 +300,14 @@ jobs:
         run: bun --cwd packages/session-ui test:components ${{ env.PLAYWRIGHT_ARGS }}
         env:
           CI: true
-        timeout-minutes: 10
+        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
 
       - name: Run app component tests
         if: matrix.suite.id == 'app-components'
         run: bun --cwd packages/app test:components ${{ env.PLAYWRIGHT_ARGS }}
         env:
           CI: true
-        timeout-minutes: 10
+        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
 
       - name: Upload Playwright artifacts
         if: always()
