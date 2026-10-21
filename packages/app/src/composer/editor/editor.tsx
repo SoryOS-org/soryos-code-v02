@@ -3,6 +3,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  createUniqueId,
   For,
   onCleanup,
   onMount,
@@ -45,8 +46,10 @@ import type {
 import type { ComposerEditorModel, ComposerSelectControl } from "./interaction"
 import { isAttachment } from "../prompt-parts"
 import { QuoteCommentEditor } from "./quote-comment"
+import { formatKeybindParts } from "@/shell/commands/command"
 import "../attachments/attachments.css"
 import "./editor.css"
+import "@/shell/palette-menu.css"
 
 const MobilePanelDrawer = lazy(async () => {
   const { MobilePanelDrawer } = await import("@/shell/mobile-panel-drawer")
@@ -95,11 +98,35 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const i18n = useI18n()
   const state = props.controller.state
   const view = props.controller.view
+  const suggestionsID = createUniqueId()
+  let composer: HTMLFormElement | undefined
+  let content: HTMLDivElement | undefined
   let editor: HTMLDivElement | undefined
   let viewport: HTMLDivElement | undefined
   let controlsViewport!: HTMLDivElement
   let controlsContent!: HTMLDivElement
   const [overflow, setOverflow] = createStore({ start: false, end: false })
+  const [historyLayout, setHistoryLayout] = createStore<{ height?: number }>({})
+
+  createEffect(() => {
+    if (state.popover.type !== "history") setHistoryLayout("height", undefined)
+  })
+
+  createEffect(() => {
+    const preview = historyLayout.height !== undefined
+
+    if (preview) props.controller.parts()
+
+    // Show the beginning of each prompt; attachments remain accessible above it in the same viewport.
+    const frame = requestAnimationFrame(() => {
+      if (preview && content && editor)
+        content.scrollTop += editor.getBoundingClientRect().top - content.getBoundingClientRect().top
+
+      updateScroll()
+    })
+
+    onCleanup(() => cancelAnimationFrame(frame))
+  })
 
   const updateOverflow = () => {
     const offset = Math.abs(controlsViewport.scrollLeft)
@@ -113,8 +140,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const [fadeBottom, setFadeBottom] = createSignal(0)
 
   const updateScroll = () => {
-    if (!viewport) return
-    setFadeBottom(Math.min(16, Math.max(0, viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop)))
+    const scroller = historyLayout.height !== undefined ? content : viewport
+
+    if (!scroller) return
+    setFadeBottom(Math.min(16, Math.max(0, scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop)))
   }
 
   onMount(() => {
@@ -162,16 +191,19 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   // Kept out of JSX: an inline ternary prop compiles to a memo created on every read, and the popover reads
   // search from a ResizeObserver callback, where that memo has no owner and is never disposed.
-  const search = () =>
-    state.popover.type === "command-menu"
-      ? {
-          value: state.popover.query,
-          label: i18n.t("ui.promptInput.commands"),
-          placeholder: "/",
-          onValueChange: props.controller.setQuery,
-          onKeyDown: props.controller.onKeyDown,
-        }
-      : undefined
+  const search = () => {
+    if (state.popover.type !== "history" && state.popover.type !== "command-menu") return
+
+    if (state.popover.type === "history" && !state.popover.searching) return
+
+    return {
+      value: state.popover.query,
+      label: i18n.t(state.popover.type === "history" ? "ui.promptInput.history" : "ui.promptInput.commands"),
+      placeholder: state.popover.type === "history" ? i18n.t("ui.promptInput.history.search") : "/",
+      onValueChange: props.controller.setQuery,
+      onKeyDown: props.controller.onKeyDown,
+    }
+  }
 
   return (
     <div class={`relative size-full flex flex-col gap-0 ${props.class ?? ""}`}>
@@ -189,21 +221,30 @@ export function ComposerEditor(props: ComposerEditorProps) {
       />
       <Show when={!view.draftOnly && state.popover.type !== "closed"}>
         <ComposerEditorPopover
+          id={suggestionsID}
           emptyLabel={i18n.t("ui.promptInput.noMatchingItems")}
           items={props.controller.suggestions()}
           boundary={props.suggestionBoundary}
           activeID={state.popover.type === "closed" ? undefined : state.popover.activeID}
           search={search()}
+          history={state.popover.type === "history" ? state.mode : undefined}
+          historyBrowsing={state.popover.type === "history" && !state.popover.searching}
+          editor={() => editor}
+          onSearch={() => props.controller.dispatch({ type: "history.search" })}
+          onClose={() => props.controller.dispatch({ type: "popover.close" })}
           onActiveChange={(item) => props.controller.dispatch({ type: "popover.active", id: item.id })}
           onSelect={(item) => props.controller.dispatch({ type: "popover.select", item })}
         />
       </Show>
       <form
+        ref={composer}
         data-component="composer"
         data-dock-border-underlay={props.borderUnderlay ? "true" : undefined}
         class="group/composer relative w-full overflow-clip rounded-xl bg-v2-background-bg-base"
+        style={{ height: historyLayout.height === undefined ? undefined : `${historyLayout.height}px` }}
         classList={{
           "shadow-[var(--v2-elevation-raised)]": !props.borderUnderlay,
+          "flex flex-col": historyLayout.height !== undefined,
         }}
         onSubmit={(event) => {
           event.preventDefault()
@@ -215,123 +256,153 @@ export function ComposerEditor(props: ComposerEditorProps) {
         onDragLeave={props.controller.onDragLeave}
         onDrop={props.controller.onDrop}
       >
-        <Show when={state.mode === "normal"}>
-          <ComposerAttachments
-            attachments={props.controller.attachments()}
-            uploads={props.controller.uploads()}
-            comments={props.controller.comments()}
-            files={props.controller.files()}
-            activeCommentID={state.activeContextID}
-            removeLabel={i18n.t("ui.promptInput.removeAttachment")}
-            onAttachmentClick={props.controller.openAttachment}
-            preview={props.controller.previewAttachment}
-            onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
-            onUploadCancel={(upload) => props.controller.cancelUpload(upload.id)}
-            onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
-            onCommentRemove={(comment) => props.controller.removeContext(comment.key)}
-            onFileRemove={(file) => props.controller.removeContext(file.key)}
-            editingQuote={props.controller.editingQuote()}
-            onEditQuote={props.controller.editQuote}
-            onQuoteComment={(quote, comment) => props.controller.commentQuote(quote.key, comment)}
-            searchPaths={props.controller.searchPaths}
-          />
-        </Show>
-
-        <ScrollView
-          data-component="composer-scroll"
-          class="max-h-[180px]"
+        <div
+          ref={content}
+          data-slot="composer-content"
+          data-history-preview={historyLayout.height !== undefined ? "" : undefined}
+          class="min-h-0"
+          classList={{ "flex-1 overflow-y-auto no-scrollbar": historyLayout.height !== undefined }}
           style={{ "--composer-fade-bottom": `${fadeBottom()}px` }}
           onScroll={updateScroll}
-          viewportRef={(element) => {
-            viewport = element
-            element.tabIndex = -1
-          }}
         >
-          <div
-            ref={(element) => {
-              editor = element
-              props.controller.setEditor(element)
-            }}
-            data-component="composer-editor"
-            role="textbox"
-            aria-multiline="true"
-            aria-label={i18n.t("ui.promptInput.label")}
-            dir={state.mode === "normal" ? "auto" : "ltr"}
-            contenteditable={!props.disabled && !props.readOnly}
-            autocapitalize={state.mode === "normal" ? "sentences" : "off"}
-            autocorrect={state.mode === "normal" ? "on" : "off"}
-            spellcheck={state.mode === "normal"}
-            // @ts-expect-error
-            autocomplete="off"
-            class="relative z-10 block w-full whitespace-pre-wrap bg-transparent px-3 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
-            classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell", "opacity-50": props.disabled }}
-            style={{
-              "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined,
-              "text-align": "start",
-            }}
-            onInput={(event) => {
-              const cursor = composerCursor(event.currentTarget)
-              const prompt = parseComposerEditor(event.currentTarget)
-              const attachments = props.controller.parts().filter(isAttachment)
-              localInput = true
-              props.controller.onInput(prompt.map((part) => part.content).join(""), [...prompt, ...attachments], cursor)
-            }}
-            onKeyDown={(event) => {
-              if (!view.draftOnly && props.controller.onKeyDown(event)) return
-              const mod = event.metaKey || event.ctrlKey
-
-              if (mod && event.key === "ArrowUp" && !event.shiftKey && !event.altKey) {
-                if (view.submit.queue?.editFirst()) event.preventDefault()
-
-                return
-              }
-
-              if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-                event.preventDefault()
-
-                if (event.repeat) return
-                props.controller.submit(mod ? { alternate: true } : undefined)
-              }
-            }}
-            onKeyUp={updateCursor}
-            onPointerUp={updateCursor}
-            onPaste={(event) => {
-              props.controller.onPaste(event)
-              // Programmatic multiline insertion does not reliably reveal the caret.
-              requestAnimationFrame(() => {
-                const selection = window.getSelection()
-
-                if (!editor || !viewport || !selection?.isCollapsed || !selection.rangeCount) return
-
-                if (!editor.contains(selection.anchorNode)) return
-                const caret = selection.getRangeAt(0).getBoundingClientRect()
-
-                if (!caret.height) return
-                const bounds = viewport.getBoundingClientRect()
-
-                if (caret.bottom > bounds.bottom - 8) viewport.scrollTop += caret.bottom - bounds.bottom + 8
-
-                if (caret.top < bounds.top + 8) viewport.scrollTop += caret.top - bounds.top - 8
-              })
-            }}
-            onFocus={() => props.controller.dispatch({ type: "focus.editor" })}
-          />
-          <Show when={!props.controller.value()}>
-            <div
-              dir={state.mode === "normal" ? "auto" : "ltr"}
-              class="pointer-events-none absolute inset-x-0 top-0 px-3 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
-              classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell" }}
-              style={{ "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined, "text-align": "start" }}
-            >
-              {view.placeholder?.() ??
-                (state.mode === "shell"
-                  ? i18n.t("ui.promptInput.placeholder.shell")
-                  : i18n.t("ui.promptInput.placeholder.normal", { slash: "/", at: "@" }))}
-            </div>
+          <Show when={state.mode === "normal"}>
+            <ComposerAttachments
+              attachments={props.controller.attachments()}
+              uploads={props.controller.uploads()}
+              comments={props.controller.comments()}
+              files={props.controller.files()}
+              activeCommentID={state.activeContextID}
+              removeLabel={i18n.t("ui.promptInput.removeAttachment")}
+              onAttachmentClick={props.controller.openAttachment}
+              preview={props.controller.previewAttachment}
+              onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
+              onUploadCancel={(upload) => props.controller.cancelUpload(upload.id)}
+              onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
+              onCommentRemove={(comment) => props.controller.removeContext(comment.key)}
+              onFileRemove={(file) => props.controller.removeContext(file.key)}
+              editingQuote={props.controller.editingQuote()}
+              onEditQuote={props.controller.editQuote}
+              onQuoteComment={(quote, comment) => props.controller.commentQuote(quote.key, comment)}
+              searchPaths={props.controller.searchPaths}
+            />
           </Show>
-        </ScrollView>
 
-        <div class="flex h-11 items-center px-2">
+          <ScrollView
+            data-component="composer-scroll"
+            class={historyLayout.height === undefined ? "max-h-[180px]" : undefined}
+            onScroll={updateScroll}
+            viewportRef={(element) => {
+              viewport = element
+              element.tabIndex = -1
+            }}
+          >
+            <div
+              ref={(element) => {
+                editor = element
+                props.controller.setEditor(element)
+              }}
+              data-component="composer-editor"
+              role="textbox"
+              aria-multiline="true"
+              aria-label={i18n.t("ui.promptInput.label")}
+              aria-controls={state.popover.type === "history" ? suggestionsID : undefined}
+              aria-activedescendant={
+                state.popover.type === "history" && !state.popover.searching && state.popover.activeID
+                  ? `${suggestionsID}-${state.popover.activeID}`
+                  : undefined
+              }
+              dir={state.mode === "normal" ? "auto" : "ltr"}
+              contenteditable={!props.disabled && !props.readOnly}
+              autocapitalize={state.mode === "normal" ? "sentences" : "off"}
+              autocorrect={state.mode === "normal" ? "on" : "off"}
+              spellcheck={state.mode === "normal"}
+              // @ts-expect-error
+              autocomplete="off"
+              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent px-3 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
+              classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell", "opacity-50": props.disabled }}
+              style={{
+                "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined,
+                "text-align": "start",
+              }}
+              onInput={(event) => {
+                const cursor = composerCursor(event.currentTarget)
+                const prompt = parseComposerEditor(event.currentTarget)
+                const attachments = props.controller.parts().filter(isAttachment)
+                localInput = true
+                props.controller.onInput(
+                  prompt.map((part) => part.content).join(""),
+                  [...prompt, ...attachments],
+                  cursor,
+                )
+              }}
+              onKeyDown={(event) => {
+                // Capture the opening footprint before the controller applies its first history preview.
+                const height =
+                  state.popover.type === "closed" && event.shiftKey && event.key === "ArrowUp"
+                    ? composer?.getBoundingClientRect().height
+                    : undefined
+
+                if (!view.draftOnly && props.controller.onKeyDown(event)) {
+                  if (height !== undefined && state.popover.type === "history") setHistoryLayout("height", height)
+
+                  return
+                }
+
+                const mod = event.metaKey || event.ctrlKey
+
+                if (mod && event.key === "ArrowUp" && !event.shiftKey && !event.altKey) {
+                  if (view.submit.queue?.editFirst()) event.preventDefault()
+
+                  return
+                }
+
+                if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+                  event.preventDefault()
+
+                  if (event.repeat) return
+                  props.controller.submit(mod ? { alternate: true } : undefined)
+                }
+              }}
+              onKeyUp={updateCursor}
+              onPointerUp={updateCursor}
+              onPaste={(event) => {
+                props.controller.onPaste(event)
+                // Programmatic multiline insertion does not reliably reveal the caret.
+                requestAnimationFrame(() => {
+                  const selection = window.getSelection()
+
+                  if (!editor || !viewport || !selection?.isCollapsed || !selection.rangeCount) return
+
+                  if (!editor.contains(selection.anchorNode)) return
+                  const caret = selection.getRangeAt(0).getBoundingClientRect()
+
+                  if (!caret.height) return
+                  const bounds = viewport.getBoundingClientRect()
+
+                  if (caret.bottom > bounds.bottom - 8) viewport.scrollTop += caret.bottom - bounds.bottom + 8
+
+                  if (caret.top < bounds.top + 8) viewport.scrollTop += caret.top - bounds.top - 8
+                })
+              }}
+              onFocus={() => props.controller.dispatch({ type: "focus.editor" })}
+            />
+            <Show when={!props.controller.value()}>
+              <div
+                dir={state.mode === "normal" ? "auto" : "ltr"}
+                class="pointer-events-none absolute inset-x-0 top-0 px-3 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell" }}
+                style={{ "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined, "text-align": "start" }}
+              >
+                {view.placeholder?.() ??
+                  (state.mode === "shell"
+                    ? i18n.t("ui.promptInput.placeholder.shell")
+                    : i18n.t("ui.promptInput.placeholder.normal", { slash: "/", at: "@" }))}
+              </div>
+            </Show>
+          </ScrollView>
+        </div>
+
+        <div class="flex h-11 shrink-0 items-center px-2">
           <div
             class="flex shrink-0 items-center"
             aria-hidden={state.mode === "shell"}
@@ -1092,9 +1163,15 @@ export function ComposerEditorSelect(props: {
 }
 
 export function ComposerEditorPopover(props: {
+  id?: string
   emptyLabel: string
   items: ComposerSuggestion[]
   activeID?: string
+  history?: ComposerMode
+  historyBrowsing?: boolean
+  editor?: () => HTMLElement | undefined
+  onSearch?: () => void
+  onClose?: () => void
   search?: {
     value: string
     label: string
@@ -1106,10 +1183,44 @@ export function ComposerEditorPopover(props: {
   onActiveChange: (item: ComposerSuggestion) => void
   onSelect: (item: ComposerSuggestion) => void
 }) {
+  const i18n = useI18n()
+  const listID = props.id ?? createUniqueId()
+  let container: HTMLDivElement | undefined
   const [store, setStore] = createStore({ maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT })
 
   const resize = (height: number) =>
-    setStore("maxHeight", composerSuggestionMaxHeight(height, props.search !== undefined))
+    setStore(
+      "maxHeight",
+      composerSuggestionMaxHeight(height, props.search !== undefined || !!props.history, !!props.history),
+    )
+
+  createEffect(() => {
+    if (!props.history || !props.activeID) return
+
+    const frame = requestAnimationFrame(() =>
+      container?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" }),
+    )
+
+    onCleanup(() => cancelAnimationFrame(frame))
+  })
+
+  createEffect(() => {
+    if (!props.history) return
+
+    const dismiss = (event: Event) => {
+      if (!(event.target instanceof Node) || container?.contains(event.target)) return
+
+      if (event.type === "focusin" && props.historyBrowsing && props.editor?.()?.contains(event.target)) return
+      props.onClose?.()
+    }
+
+    document.addEventListener("pointerdown", dismiss)
+    document.addEventListener("focusin", dismiss)
+    onCleanup(() => {
+      document.removeEventListener("pointerdown", dismiss)
+      document.removeEventListener("focusin", dismiss)
+    })
+  })
 
   // A detached boundary (e.g. the previous session's timeline while the next one loads) measures 0px.
   const boundary = () => {
@@ -1123,75 +1234,155 @@ export function ComposerEditorPopover(props: {
 
   return (
     <div
+      ref={container}
       data-component="composer-suggestions"
-      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col overflow-auto rounded-xl bg-v2-background-bg-base p-2 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-2 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      classList={{ "overflow-auto": !props.history, "overflow-hidden": !!props.history }}
       style={{ "max-height": `${store.maxHeight}px` }}
       onMouseDown={(event) => event.preventDefault()}
     >
-      <Show when={props.search}>
-        {(search) => (
-          <div class="shrink-0 px-2 py-1">
-            <input
-              ref={(element) => requestAnimationFrame(() => element.focus())}
-              value={search().value}
-              aria-label={search().label}
-              placeholder={search().placeholder}
-              class="w-full bg-transparent text-[13px] leading-5 text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint"
-              onInput={(event) => search().onValueChange(event.currentTarget.value)}
-              onKeyDown={(event) => search().onKeyDown(event)}
-              onMouseDown={(event) => event.stopPropagation()}
-            />
-          </div>
-        )}
-      </Show>
-      <Show
-        when={props.items.length > 0}
-        fallback={<div class="px-2 py-1 text-v2-text-text-muted">{props.emptyLabel}</div>}
-      >
-        <For each={props.items}>
-          {(item) => (
-            <button
-              type="button"
-              data-suggestion-id={item.id}
-              data-active={props.activeID === item.id ? "" : undefined}
-              class="flex h-7 w-full shrink-0 items-center gap-2 rounded-md px-2 py-1 text-start hover:bg-v2-overlay-simple-overlay-hover"
-              classList={{ "bg-v2-overlay-simple-overlay-hover": props.activeID === item.id }}
-              onPointerMove={() => props.onActiveChange(item)}
-              onClick={() => props.onSelect(item)}
-            >
-              <div class="flex min-w-0 flex-1 items-center gap-2">
-                <ComposerSuggestionIcon item={item} />
-                <bdi dir="auto" class="shrink-0 text-v2-text-text-base">
-                  {item.label}
-                </bdi>
-                <Show when={item.description}>
-                  <span class="min-w-0 truncate text-v2-text-text-muted">{item.description}</span>
-                </Show>
-              </div>
-              <Show when={item.keybind?.length}>
-                <span class="shrink-0 text-v2-text-text-muted">{item.keybind?.join("+")}</span>
-              </Show>
-            </button>
+      <Show when={props.history}>
+        <Show when={props.search}>
+          {(search) => (
+            <div class="shrink-0 px-2 py-1">
+              <input
+                ref={(element) => requestAnimationFrame(() => element.isConnected && element.focus())}
+                value={search().value}
+                aria-label={search().label}
+                placeholder={search().placeholder}
+                autocomplete="off"
+                spellcheck={false}
+                class="w-full bg-transparent text-[13px] leading-5 text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint"
+                role="combobox"
+                aria-expanded="true"
+                aria-autocomplete="list"
+                aria-controls={listID}
+                aria-activedescendant={props.activeID ? `${listID}-${props.activeID}` : undefined}
+                onInput={(event) => search().onValueChange(event.currentTarget.value)}
+                onKeyDown={(event) => search().onKeyDown(event)}
+                onMouseDown={(event) => event.stopPropagation()}
+              />
+            </div>
           )}
-        </For>
+        </Show>
+        <Show when={props.historyBrowsing}>
+          <button
+            type="button"
+            class="flex h-7 shrink-0 items-center justify-between gap-2 rounded-md px-2 text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
+            onClick={props.onSearch}
+          >
+            <span>{i18n.t("ui.promptInput.history.searchAction")}</span>
+            <Keybind keys={formatKeybindParts("mod+f")} variant="ghost" />
+          </button>
+        </Show>
+        <ScrollView class="min-h-0 flex-1">
+          <div id={listID} role="listbox" aria-label={i18n.t("ui.promptInput.history")} class="flex flex-col">
+            <Show
+              when={props.items.length}
+              fallback={<div class="px-2 py-1 text-v2-text-text-muted">{props.emptyLabel}</div>}
+            >
+              <For each={props.items}>
+                {(item) => (
+                  <button
+                    id={`${listID}-${item.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={props.activeID === item.id}
+                    tabindex={-1}
+                    data-suggestion-id={item.id}
+                    data-active={props.activeID === item.id ? "" : undefined}
+                    class="palette-menu-row"
+                    data-size="compact"
+                    onPointerMove={(event) => {
+                      if (event.movementX || event.movementY) props.onActiveChange(item)
+                    }}
+                    onClick={() => props.onSelect(item)}
+                  >
+                    <bdi
+                      dir={props.history === "shell" ? "ltr" : "auto"}
+                      class="palette-menu-title flex-1 text-start"
+                      style={
+                        props.history === "shell"
+                          ? { "font-family": "var(--font-family-mono)", "font-weight": 440 }
+                          : undefined
+                      }
+                    >
+                      {item.label || item.description || i18n.t("ui.promptInput.history.contextOnly")}
+                    </bdi>
+                    <Show when={item.description}>
+                      <Icon name="file-document" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
+          </div>
+        </ScrollView>
+      </Show>
+      <Show when={!props.history}>
+        <Show when={props.search}>
+          {(search) => (
+            <div class="shrink-0 px-2 py-1">
+              <input
+                ref={(element) => requestAnimationFrame(() => element.focus())}
+                value={search().value}
+                aria-label={search().label}
+                placeholder={search().placeholder}
+                class="w-full bg-transparent text-[13px] leading-5 text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint"
+                onInput={(event) => search().onValueChange(event.currentTarget.value)}
+                onKeyDown={(event) => search().onKeyDown(event)}
+                onMouseDown={(event) => event.stopPropagation()}
+              />
+            </div>
+          )}
+        </Show>
+        <Show
+          when={props.items.length > 0}
+          fallback={<div class="px-2 py-1 text-v2-text-text-muted">{props.emptyLabel}</div>}
+        >
+          <For each={props.items}>
+            {(item) => (
+              <button
+                type="button"
+                data-suggestion-id={item.id}
+                data-active={props.activeID === item.id ? "" : undefined}
+                class="flex h-7 w-full shrink-0 items-center gap-2 rounded-md px-2 py-1 text-start hover:bg-v2-overlay-simple-overlay-hover"
+                classList={{ "bg-v2-overlay-simple-overlay-hover": props.activeID === item.id }}
+                onPointerMove={() => props.onActiveChange(item)}
+                onClick={() => props.onSelect(item)}
+              >
+                <div class="flex min-w-0 flex-1 items-center gap-2">
+                  <ComposerSuggestionIcon item={item} />
+                  <bdi dir="auto" class="shrink-0 text-v2-text-text-base">
+                    {item.label}
+                  </bdi>
+                  <Show when={item.description}>
+                    <span class="min-w-0 truncate text-v2-text-text-muted">{item.description}</span>
+                  </Show>
+                </div>
+                <Show when={item.keybind?.length}>
+                  <span class="shrink-0 text-v2-text-text-muted">{item.keybind?.join("+")}</span>
+                </Show>
+              </button>
+            )}
+          </For>
+        </Show>
       </Show>
     </div>
   )
 }
 
-function composerSuggestionMaxHeight(boundaryHeight: number, search: boolean) {
+function composerSuggestionMaxHeight(boundaryHeight: number, search: boolean, history = false) {
   const reserve = Math.min(COMPOSER_SUGGESTION_CONTEXT_RESERVE, boundaryHeight / 4)
   const limit = Math.min(COMPOSER_SUGGESTION_MAX_HEIGHT, boundaryHeight - reserve)
-  const chrome = COMPOSER_SUGGESTION_TOP_PADDING + (search ? COMPOSER_SUGGESTION_SEARCH_HEIGHT : 0)
+  // History has padding on both edges and shows whole rows below the pinned search control.
+  const chrome = COMPOSER_SUGGESTION_TOP_PADDING * (history ? 2 : 1) + (search ? COMPOSER_SUGGESTION_SEARCH_HEIGHT : 0)
+  const row = COMPOSER_SUGGESTION_ROW_HEIGHT
+  const peek = history ? 0 : COMPOSER_SUGGESTION_ROW_PEEK
 
-  if (limit < chrome + COMPOSER_SUGGESTION_ROW_HEIGHT + COMPOSER_SUGGESTION_ROW_PEEK) return limit
+  if (limit < chrome + row + peek) return limit
 
-  return (
-    chrome +
-    Math.floor((limit - chrome - COMPOSER_SUGGESTION_ROW_PEEK) / COMPOSER_SUGGESTION_ROW_HEIGHT) *
-      COMPOSER_SUGGESTION_ROW_HEIGHT +
-    COMPOSER_SUGGESTION_ROW_PEEK
-  )
+  return chrome + Math.floor((limit - chrome - peek) / row) * row + peek
 }
 
 // "Steer ⌘⏎" / "Queue ⌘⏎" hint next to the submit button: submits with the

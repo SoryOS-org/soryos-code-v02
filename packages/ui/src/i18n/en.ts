@@ -150,6 +150,10 @@ const source = {
 
   "ui.promptInput.noMatchingItems": "No matching items",
   "ui.promptInput.commands": "Commands",
+  "ui.promptInput.history": "Prompt history",
+  "ui.promptInput.history.search": "Search prompt history…",
+  "ui.promptInput.history.searchAction": "Search",
+  "ui.promptInput.history.contextOnly": "Prompt with context",
   "ui.promptInput.dropFiles": "Drop files to add",
   "ui.promptInput.dropFiles.image": "Drop images or files to add",
   "ui.promptInput.dropFiles.pdf": "Drop PDFs or files to add",

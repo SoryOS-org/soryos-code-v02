@@ -1,5 +1,5 @@
 import { Predicate } from "effect"
-import { createEffect, createSignal, type Accessor } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useFilteredList } from "@opencode/ui/hooks"
 import { createComposerAttachments, type ComposerAttachmentConfig } from "../attachments/attachments"
@@ -80,10 +80,35 @@ export function createComposerEditor(input: {
 }) {
   let editor: HTMLElement | undefined
   let fileInput: HTMLInputElement | undefined
+  let focusFrame: number | undefined
+  let focusCursor: number | undefined
+
+  const cancelFocus = () => {
+    if (focusFrame === undefined) return
+    cancelAnimationFrame(focusFrame)
+    focusFrame = undefined
+    focusCursor = undefined
+  }
+
+  const flushFocus = () => {
+    const cursor = focusCursor
+
+    if (cursor === undefined) return
+    cancelFocus()
+    editor?.focus()
+    setEditorCursor(editor, cursor)
+  }
+
+  onCleanup(cancelFocus)
   const draft = createComposerEditorActions(input.store)
   const [localQuoteComment, setLocalQuoteComment] = createSignal<string>()
   const quoteComment = input.quoteComment ?? { key: localQuoteComment, set: setLocalQuoteComment }
   const [state, setState] = input.state ?? createComposerEditorState(draft.state.mode)
+  const [savedHistory, setSavedHistory] = createStore<{ entry?: ComposerHistoryEntry; cursor?: number }>({})
+  const [cycle, setCycle] = createStore<{ index: number; entry?: ComposerHistoryEntry; cursor?: number }>({ index: -1 })
+  const resetCycle = () => setCycle({ index: -1, entry: undefined, cursor: undefined })
+
+  createEffect(on([() => draft.state, () => state.mode], resetCycle, { defer: true }))
 
   function addPart(part: ComposerPersistedState["prompt"][number]) {
     if (isAttachment(part)) return false
@@ -115,6 +140,8 @@ export function createComposerEditor(input: {
     : undefined
 
   const attach = () => {
+    resetCycle()
+
     if (!attachments) {
       input.view.add?.onAttach()
 
@@ -174,9 +201,42 @@ export function createComposerEditor(input: {
   })
 
   const list = () => (state.popover.type === "context" ? contextList : commandList)
-  const suggestions = () => list().flat()
+
+  const history = createMemo<ComposerSuggestion[]>(() =>
+    (input.history?.entries(state.mode) ?? []).map((entry, index) => ({
+      id: `history:${index}`,
+      kind: "history",
+      label: entry.prompt.map((part) => ("content" in part ? part.content : "")).join(""),
+      description: entry.prompt.flatMap((part) => (isAttachment(part) ? [part.filename] : [])).join(", "),
+      history: entry,
+    })),
+  )
+
+  const suggestions = () => {
+    if (state.popover.type !== "history") return list().flat()
+    const query = state.popover.query.trim().toLowerCase()
+
+    return history()
+      .filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(query))
+      .toReversed()
+  }
 
   const execute = (command: ComposerInteractionCommand) => {
+    if (command.type === "history.preview") {
+      const item = history().find((entry) => entry.id === command.id)
+
+      if (item?.history)
+        applyHistory(item.history, { focus: state.popover.type === "history" && !state.popover.searching })
+
+      return
+    }
+
+    if (command.type === "history.restore") {
+      if (savedHistory.entry) applyHistory(savedHistory.entry, { cursor: savedHistory.cursor })
+
+      return
+    }
+
     if (command.type === "draft.setText") {
       draft.setText(command.value)
 
@@ -209,10 +269,32 @@ export function createComposerEditor(input: {
       return
     }
 
-    if (command.type === "focus.editor") requestAnimationFrame(() => editor?.focus())
+    if (command.type === "focus.editor") {
+      if (state.popover.type === "history") return restoreFocus()
+      requestAnimationFrame(() => editor?.focus())
+    }
   }
 
   function dispatch(event: ComposerInteractionEvent) {
+    if (event.type === "history.search" || event.type === "popover.close") cancelFocus()
+
+    if (
+      event.type === "history.open" ||
+      event.type === "commands.open" ||
+      event.type === "context.open" ||
+      event.type === "popover.select"
+    )
+      resetCycle()
+
+    if (event.type === "popover.select" && event.item.kind === "history") {
+      if (!event.item.history) return false
+      setState({ popover: { type: "closed" }, focus: "editor" })
+      applyHistory(event.item.history)
+      setSavedHistory({ entry: undefined, cursor: undefined })
+
+      return true
+    }
+
     const mode = state.mode
     const result = transitionComposer(state, event, draft.state)
     const action = event.type === "popover.select" ? input.onSuggestionSelect?.(event.item) : undefined
@@ -231,6 +313,8 @@ export function createComposerEditor(input: {
 
     if (event.type !== "popover.select") result.commands.forEach(execute)
 
+    if (state.popover.type !== "history") setSavedHistory({ entry: undefined, cursor: undefined })
+
     if (mode !== result.state.mode) {
       if (result.state.mode === "shell") input.view.shell?.onOpen()
 
@@ -246,6 +330,23 @@ export function createComposerEditor(input: {
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
+    flushFocus()
+
+    if (
+      state.popover.type === "history" &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !event.isComposing &&
+      event.key.toLowerCase() === "f"
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      dispatch({ type: "history.search" })
+
+      return true
+    }
+
     if (
       state.mode === "normal" &&
       (event.metaKey || event.ctrlKey) &&
@@ -302,8 +403,11 @@ export function createComposerEditor(input: {
       !event.altKey &&
       !event.ctrlKey &&
       !event.metaKey &&
+      !event.isComposing &&
       (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-      navigateHistory(event.key === "ArrowUp" ? "up" : "down")
+      (event.shiftKey
+        ? event.key === "ArrowUp" && openHistory()
+        : navigateHistory(event.key === "ArrowUp" ? "up" : "down"))
     ) {
       event.preventDefault()
 
@@ -322,59 +426,74 @@ export function createComposerEditor(input: {
   })
 
   const restoreFocus = (cursor = draft.state.cursor ?? promptLength(draft.state.prompt)) => {
-    requestAnimationFrame(() => {
-      editor?.focus()
-      setEditorCursor(editor, cursor)
-    })
+    cancelFocus()
+    focusCursor = cursor
+    focusFrame = requestAnimationFrame(flushFocus)
   }
 
-  const applyHistory = (entry: ComposerHistoryEntry, position: "start" | "end") => {
+  const applyHistory = (entry: ComposerHistoryEntry, options?: { focus?: boolean; cursor?: number }) => {
     input.history?.restore?.(entry.metadata)
-    const cursor = position === "start" ? 0 : promptLength(entry.prompt)
+    const cursor = options?.cursor ?? promptLength(entry.prompt)
     draft.setPrompt(clonePrompt(entry.prompt), cursor)
-    restoreFocus(cursor)
+
+    if (options?.focus !== false) restoreFocus(cursor)
+  }
+
+  const openHistory = () => {
+    if (state.popover.type !== "closed" || !editor || !history().length) return false
+    const selection = window.getSelection()
+
+    if (!selection?.isCollapsed || !editor.contains(selection.anchorNode)) return false
+
+    if (draft.state.prompt.some((part) => "content" in part && part.content.length > 0)) return false
+    setSavedHistory({
+      entry: { prompt: clonePrompt(draft.state.prompt), metadata: input.history?.capture?.() },
+      cursor: draft.state.cursor,
+    })
+    dispatch({ type: "history.open", id: history()[0]!.id })
+
+    return true
   }
 
   const navigateHistory = (direction: "up" | "down") => {
-    if (!input.history || !editor) return false
+    if (state.popover.type !== "closed" || !input.history || !editor) return false
     const selection = window.getSelection()
 
     if (!selection?.isCollapsed || !editor.contains(selection.anchorNode)) return false
     const text = draft.state.prompt.map((part) => ("content" in part ? part.content : "")).join("")
 
-    if (!canNavigateHistory(direction, text, editorCursor(editor), state.historyIndex >= 0)) return false
+    if (!canNavigateHistory(direction, text, editorCursor(editor), cycle.index >= 0)) return false
     const entries = input.history.entries(state.mode)
 
     if (direction === "up") {
-      if (entries.length === 0 || state.historyIndex >= entries.length - 1) return false
+      if (entries.length === 0 || cycle.index >= entries.length - 1) return false
 
-      if (state.historyIndex === -1) {
-        setState("savedHistory", {
-          prompt: clonePrompt(draft.state.prompt),
-          metadata: input.history.capture?.(),
+      if (cycle.index === -1) {
+        setCycle({
+          entry: { prompt: clonePrompt(draft.state.prompt), metadata: input.history.capture?.() },
+          cursor: draft.state.cursor,
         })
       }
 
-      const index = state.historyIndex + 1
-      setState("historyIndex", index)
-      applyHistory(entries[index]!, "start")
+      const index = cycle.index + 1
+      setCycle("index", index)
+      applyHistory(entries[index]!, { cursor: 0 })
 
       return true
     }
 
-    if (state.historyIndex < 0) return false
+    if (cycle.index < 0 || !cycle.entry) return false
 
-    if (state.historyIndex > 0) {
-      const index = state.historyIndex - 1
-      setState("historyIndex", index)
-      applyHistory(entries[index]!, "end")
+    if (cycle.index > 0) {
+      const index = cycle.index - 1
+      setCycle("index", index)
+      applyHistory(entries[index]!)
 
       return true
     }
 
-    const saved = state.savedHistory ?? { prompt: [{ type: "text", content: "", start: 0, end: 0 }] }
-    setState({ historyIndex: -1, savedHistory: undefined })
-    applyHistory(saved, "end")
+    applyHistory(cycle.entry, { cursor: cycle.cursor })
+    resetCycle()
 
     return true
   }
@@ -424,6 +543,7 @@ export function createComposerEditor(input: {
       return (await input.searchContextFiles(query)).flatMap((item) => (item.path ? [item.path] : []))
     },
     removeContext(id: string) {
+      resetCycle()
       const item = draft.state.context.items.find((entry) => entry.key === id)
 
       if (item) input.onContextRemove?.(item)
@@ -443,6 +563,7 @@ export function createComposerEditor(input: {
       return input.readImage?.(attachment.path) ?? Promise.resolve(undefined)
     },
     removeAttachment(id: string) {
+      resetCycle()
       draft.removeAttachment(id)
     },
     canSubmit() {
@@ -469,6 +590,9 @@ export function createComposerEditor(input: {
     },
     restoreFocus,
     onInput(value: string, prompt?: ComposerPersistedState["prompt"], cursor?: number) {
+      cancelFocus()
+      resetCycle()
+
       if (prompt) draft.setPrompt(prompt, cursor)
 
       if (input.view.draftOnly) return
@@ -492,6 +616,7 @@ export function createComposerEditor(input: {
       if (input.view.draftOnly) return
 
       if (attachments?.pending().length) return
+      resetCycle()
       input.view.submit.onSubmit(options)
       dispatch({ type: "popover.close" })
     },
@@ -499,17 +624,20 @@ export function createComposerEditor(input: {
       input.view.submit.onStop()
     },
     addHistory(prompt: ComposerPersistedState["prompt"], mode: "normal" | "shell") {
+      resetCycle()
       input.history?.add(prompt, mode)
-      setState({ historyIndex: -1, savedHistory: undefined })
     },
     resetHistory() {
-      setState({ historyIndex: -1, savedHistory: undefined })
+      resetCycle()
+
+      if (state.popover.type === "history") dispatch({ type: "popover.close" })
     },
     onPaste(event: ClipboardEvent) {
       const clipboard = event.clipboardData
       const text = clipboard?.getData("text/plain")
 
       if (attachments && shouldHandlePasteAsAttachment(clipboard, !!input.attachments?.readClipboardImage)) {
+        resetCycle()
         void attachments.handlePaste(event)
 
         return
@@ -572,6 +700,7 @@ export function createComposerEditor(input: {
     },
     addAttachments(files: File[]) {
       if (!attachments) return
+      resetCycle()
       void attachments.addAttachments(files)
       restoreFocus()
     },

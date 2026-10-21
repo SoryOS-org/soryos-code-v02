@@ -47,7 +47,7 @@ export type ComposerOption = {
 
 export type ComposerSuggestion = {
   id: string
-  kind: "agent" | "command" | "file" | "reference" | "resource" | "skill" | "session"
+  kind: "agent" | "command" | "file" | "reference" | "resource" | "skill" | "session" | "history"
   label: string
   title?: string
   trigger?: string
@@ -55,5 +55,6 @@ export type ComposerSuggestion = {
   path?: string
   keybind?: string[]
   recent?: boolean
+  history?: ComposerHistoryEntry
   mention?: ComposerFilePart | ComposerAgentPart | ComposerSkillPart | ComposerSessionPart
 }

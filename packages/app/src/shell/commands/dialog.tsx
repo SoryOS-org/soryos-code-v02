@@ -16,6 +16,7 @@ import { getRelativeTime } from "@/shell/time"
 import { createCommandPaletteFileEntry, createCommandPaletteModel, type CommandPaletteEntry } from "./palette"
 import { createCommandPaletteSearch, matchesCommandPaletteEntry } from "./search"
 import "./dialog.css"
+import "../palette-menu.css"
 
 export { matchesCommandPaletteEntry }
 
@@ -115,7 +116,7 @@ export function CommandPaletteView(props: {
   return (
     <Dialog class="command-palette" size="large">
       <DialogBody class="command-palette-body">
-        <div class="command-palette-search">
+        <div class="palette-menu-search">
           <TextInput
             value={store.query}
             autofocus
@@ -215,7 +216,7 @@ function PaletteRow(props: {
     <button
       id={props.id}
       type="button"
-      class="command-palette-row group"
+      class="command-palette-row palette-menu-row group"
       role="option"
       aria-selected={props.active}
       data-active={props.active ? "" : undefined}
@@ -241,7 +242,7 @@ function PaletteRow(props: {
         <Match when={props.item.type === "command" || props.item.type === "setting"}>
           <div class="command-palette-row-main">
             <div class="command-palette-row-text">
-              <span class="command-palette-title">{props.item.title}</span>
+              <span class="command-palette-title palette-menu-title">{props.item.title}</span>
               <Show when={props.item.description}>
                 <span class="command-palette-description">{props.item.description}</span>
               </Show>
@@ -273,7 +274,10 @@ function PaletteRow(props: {
               </Show>
             </div>
             <div class="command-palette-row-text">
-              <span class="command-palette-title" classList={{ "opacity-70": !!props.item.archived }}>
+              <span
+                class="command-palette-title palette-menu-title"
+                classList={{ "opacity-70": !!props.item.archived }}
+              >
                 {props.item.title}
               </span>
               <Show when={props.item.description}>

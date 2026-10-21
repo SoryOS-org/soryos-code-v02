@@ -60,6 +60,8 @@ function ComposerStory(props: {
   longLabels?: boolean
   alternate?: "queue" | "steer"
   manySuggestions?: boolean
+  history?: boolean
+  manyHistory?: boolean
   suggestionBoundary?: () => HTMLElement | undefined
 }) {
   const [draft, setDraft] = createStore<ComposerPersistedState>({
@@ -149,6 +151,51 @@ function ComposerStory(props: {
     commands: () => commands,
     context: () => context,
     searchContextFiles: () => [],
+    history: props.history
+      ? {
+          entries: (mode) =>
+            mode === "shell"
+              ? [{ prompt: text("bun typecheck") }]
+              : [
+                  { prompt: text("Explain the latest changes") },
+                  {
+                    prompt: [
+                      ...text("Review the composer layout\nKeep keyboard navigation accessible"),
+                      {
+                        type: "path",
+                        id: "history-layout",
+                        filename: "layout.png",
+                        mime: "image/png",
+                        path: "C:/shots/layout.png",
+                      },
+                    ],
+                    metadata: "review",
+                  },
+                  { prompt: text("Run the focused tests") },
+                  ...(props.manyHistory
+                    ? Array.from({ length: 16 }, (_, index) => ({ prompt: text(`Earlier prompt ${index + 1}`) }))
+                    : []),
+                ],
+          add() {},
+          capture: () => (draft.context.items.some((item) => item.key === "history-comment") ? "review" : undefined),
+          restore: (metadata) =>
+            setDraft(
+              "context",
+              "items",
+              metadata === "review"
+                ? [
+                    {
+                      type: "file",
+                      key: "history-comment",
+                      path: "src/composer.tsx",
+                      selection: { startLine: 12, startChar: 0, endLine: 14, endChar: 0 },
+                      comment: "Keep the search separate from the draft",
+                    },
+                  ]
+                : [],
+            ),
+        }
+      : undefined,
     readImage: async () => pixel,
     view: {
       placeholder: () => "Ask anything, / for commands, @ for context...",
@@ -231,7 +278,10 @@ function ComposerStory(props: {
   })
 
   return (
-    <div class="mx-auto flex min-h-80 w-full max-w-200 flex-col justify-end gap-3 rounded-xl bg-v2-background-bg-deep p-6">
+    <div
+      class="mx-auto flex min-h-80 w-full max-w-200 flex-col justify-end gap-3 rounded-xl bg-v2-background-bg-deep p-6"
+      style={{ "min-height": props.manyHistory ? "512px" : undefined }}
+    >
       <output class="text-12-regular text-text-weak" aria-live="polite">
         {story.activity}
       </output>
@@ -251,6 +301,15 @@ export default {
 }
 
 export const EmptyDraft = { render: () => <ComposerStory /> }
+
+export const PromptHistory = {
+  args: { many: false },
+  render: (args: { many: boolean }) => (
+    <div class="w-[min(640px,calc(100vw-32px))]">
+      <ComposerStory history manyHistory={args.many} />
+    </div>
+  ),
+}
 
 export const TextDraft = { render: () => <ComposerStory prompt={text("Explain this change")} /> }
 
