@@ -67,9 +67,11 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  [data-component="home-session-skeleton"] {
+:root[data-motion="reduce"] {
+  [data-component="home-session-skeleton"],
+  [data-slot="home-sessions-list"][data-reveal] > :not([data-component="home-session-skeleton"]) {
     animation: none;
     mask-image: none;
+    transition: none;
   }
 }

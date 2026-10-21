@@ -102,25 +102,35 @@ describe("createRequestQueue", () => {
     expect(input.queue.inflight()).toBe(0)
   })
 
-  test("session lists take the next free slot ahead of queued reads, in their own order", async () => {
+  test("writes, then session lists, take the next free slot ahead of queued reads, each tier in order", async () => {
     const input = setup({ limit: 1 })
-    const paths = ["/api/a", "/api/b", "/api/session?limit=1", "/api/session/ses_1", "/api/session?limit=2"]
-    const responses = paths.map((path) => input.queue.fetch(`http://server${path}`))
-    void input.queue.fetch("http://server/api/session", { method: "POST" })
+
+    const requests: [string, string][] = [
+      ["GET", "/api/a"],
+      ["GET", "/api/b"],
+      ["GET", "/api/session?limit=1"],
+      ["POST", "/api/session/ses_1/message"],
+      ["GET", "/api/session?limit=2"],
+      ["DELETE", "/api/session/ses_2"],
+      ["GET", "/api/session/ses_1"],
+    ]
+
+    const responses = requests.map(([method, path]) => input.queue.fetch(`http://server${path}`, { method }))
     await input.settle()
 
-    for (const _ of paths) {
-      input.pending.at(-1)!.resolve()
+    for (const _ of requests) {
+      input.pending.at(-1)?.resolve()
       await input.settle()
     }
 
     expect(input.pending.map((item) => new URL(item.url).pathname + new URL(item.url).search)).toEqual([
       "/api/a",
+      "/api/session/ses_1/message",
+      "/api/session/ses_2",
       "/api/session?limit=1",
       "/api/session?limit=2",
       "/api/b",
       "/api/session/ses_1",
-      "/api/session",
     ])
     await Promise.all(responses)
   })
