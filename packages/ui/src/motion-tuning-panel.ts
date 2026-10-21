@@ -79,12 +79,13 @@ export function mountMotionPanel(
     const mount = () => {
       unmount?.()
       const all = shown()
-      // Modes sit in the preset strip, not as rows. While one is on, the spring presets only switch back, then apply.
+      // Modes sit in the preset strip, not as rows. While one is on, the spring presets leave its section's springs alone
+      // (choosing one on that section's tab switches back to them first); other sections' springs take presets as usual.
       const active = all.find((item) => item.kind === "mode" && item.value)
       const list = all.filter((item) => item.kind !== "mode")
       const actions = motionTuning.actions()
       const mounted = identity()
-      const springs = active ? [] : list.flatMap((item) => (item.kind === "spring" ? [item] : []))
+      const springs = list.flatMap((item) => (item.kind === "spring" && item.group !== active?.group ? [item] : []))
       const preset = (id: MotionPreset) => Object.fromEntries(springs.map((item) => [item.id, item.presets[id]]))
       // Easing editors open inline, like the spring rows beside them, rather than folded behind a chevron.
       openEditors(list.flatMap((item) => (item.kind === "easing" ? [item.id] : [])))
