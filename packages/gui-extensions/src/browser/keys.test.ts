@@ -65,6 +65,15 @@ test("forwards browser and shell shortcuts while leaving page editing, find, rel
     ["ctrl+shift", "Tab", false, "Tab"],
     ["ctrl", "`", true, "`"],
     ["ctrl", "`", false, "`"],
+    // The side panel's launchers: Review, Browser and Open file.
+    ["ctrl+mod", "b", true, "b"],
+    ["ctrl+mod", "r", true, "r"],
+    ["ctrl+mod", "p", true, "p"],
+    ["ctrl+alt", "b", false, "b"],
+    ["ctrl+alt", "p", false, "p"],
+    // AltGr typing on Windows and Linux layouts arrives as Ctrl+Alt with the character it types.
+    ["ctrl+alt", "\u00a7", false, undefined, "KeyP"],
+    ["ctrl+mod", "k", true, undefined],
     // New Window and Close Window belong to native menu accelerators, which a claimed chord would block.
     ["mod+shift", "W", true, undefined],
     ["mod+shift", "W", false, undefined],

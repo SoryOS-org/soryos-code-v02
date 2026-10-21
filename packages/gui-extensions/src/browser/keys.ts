@@ -19,6 +19,10 @@ const shellKeys = ["t", "w", "n", "1", "2", "3", "4", "5", "6", "7", "8", "9", "
 // (⇧⌘N, ⇧⌘W) stay unclaimed: only their menu accelerators handle them, and claiming a chord also blocks the menu.
 const shellShiftKeys = ["t", "[", "]", "r", "p", "l", "e", "o", "s"]
 
+// The side panel's launchers: Review, Browser and Open file, with ⌃⌘ on macOS and Ctrl+Alt elsewhere. Only a typed
+// Latin letter counts, so AltGr (Ctrl+Alt) typing on other layouts stays with the page.
+const launcherKeys = ["r", "b", "p"]
+
 /**
  * The letter a page key press names, as the app's keybinds read it: the layout's character, so Dvorak's C is "c"
  * although it sits on the physical I key. A layout that types no Latin letter falls back to the physical key.
@@ -57,9 +61,11 @@ export function pageReload(input: PageKey, mac: boolean) {
 export function pageShortcut(input: PageKey, mac: boolean): PageShortcut | undefined {
   const key = pageLetter(input)
   const mod = mac ? input.meta && !input.control : input.control && !input.meta
+  const launcher = mac ? input.meta && input.control && !input.alt : input.control && input.alt && !input.meta
 
   const matched =
     (input.control && !input.meta && !input.alt && (key === "tab" || (key === "`" && !input.shift))) ||
+    (launcher && !input.shift && launcherKeys.includes(input.key.toLowerCase())) ||
     (mod &&
       (input.alt
         ? !input.shift && (key === "arrowleft" || key === "arrowright")

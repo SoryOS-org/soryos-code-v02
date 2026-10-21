@@ -380,6 +380,11 @@ story("opens a browser tab with ⌘T inside the pane and a session everywhere el
   await editor.press(`${mod}+t`)
   await expect(opens).toHaveText("3")
   await expect(sessions).toHaveText("1")
+
+  // The Browser launcher's own chord reaches the app from the page too.
+  await editor.focus()
+  await editor.press(mac ? "Control+Meta+b" : "Control+Alt+b")
+  await expect(opens).toHaveText("4")
 })
 
 story("⌘T and ⌘W follow focus: side tabs inside the side panel, session tabs elsewhere", async ({ page }) => {
