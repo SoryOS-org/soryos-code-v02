@@ -638,26 +638,23 @@ export const layer = (options?: Options) =>
           yield* state.reload()
         }),
         connect: Effect.fn("MCP.connect")(function* (server) {
-          const name = ServerName.make(server)
+          const target = yield* requireServer(server)
           yield* Effect.gen(function* () {
-            const target = yield* requireServer(name)
-            yield* stopServer(name, target.entry)
-            yield* startServer(name, target.entry)
-          }).pipe(locks.withLock(name))
+            yield* stopServer(target.name, target.entry)
+            yield* startServer(target.name, target.entry)
+          }).pipe(locks.withLock(target.name))
         }),
         disconnect: Effect.fn("MCP.disconnect")(function* (server) {
-          const name = ServerName.make(server)
+          const target = yield* requireServer(server)
           yield* Effect.gen(function* () {
-            const target = yield* requireServer(name)
-            yield* stopServer(name, target.entry)
+            yield* stopServer(target.name, target.entry)
             target.entry.status = { status: "disabled" }
-            yield* bus.publish(McpEvent.StatusChanged, { server: name })
-          }).pipe(locks.withLock(name))
+            yield* bus.publish(McpEvent.StatusChanged, { server: target.name })
+          }).pipe(locks.withLock(target.name))
         }),
         remove: Effect.fn("MCP.remove")(function* (server) {
-          const name = ServerName.make(server)
-          yield* requireServer(name)
-          overrides.set(name, false)
+          const target = yield* requireServer(server)
+          overrides.set(target.name, false)
           yield* state.reload()
         }),
         // Reads report what is connected now; servers still starting contribute once they publish a change.
