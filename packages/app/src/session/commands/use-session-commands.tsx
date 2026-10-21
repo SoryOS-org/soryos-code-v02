@@ -14,9 +14,9 @@ import { fetchSessionExport, saveSessionExport, sessionExportFilename } from "@/
 import { usePlatform } from "@/runtime/platform/platform"
 import type { SessionModel } from "@/session/model"
 import type { SessionRevert } from "@/session/revert"
-import { useExtensionScoped } from "@/runtime/extension/commands"
+import { useExtensionClaims, useExtensionScoped } from "@/runtime/extension/commands"
 import type { Region } from "@/runtime/extension/panels"
-import { createSideFocus, sideTabShortcuts } from "@/runtime/extension/closed-tabs"
+import { sideTabShortcuts } from "@/runtime/extension/closed-tabs"
 
 type SessionCommandSource = {
   identity: SessionModel["identity"]
@@ -58,6 +58,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const settings = useSettings()
   const platform = usePlatform()
   const extensionScoped = useExtensionScoped()
+  const extensionClaims = useExtensionClaims()
 
   const openDialog = async <T,>(load: () => Promise<T>, show: (value: T) => void) => {
     const owner = actions.session.ownership.capture()
@@ -77,7 +78,9 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     return entry && !entry.tab.pinned ? entry.key : undefined
   }
 
-  const inSide = createSideFocus()
+  const inSide = actions.region.focus
+  // ⌘T and ⌘W inside the side region open and close its tabs, unless the focused panel binds the key itself there.
+  const sideKey = (event: KeyboardEvent) => inSide(event) && !extensionClaims(event)
   const cycleSideTabs = () => actions.session.layout.view().side.opened() && actions.region.keys().length > 1
 
   const sideFocused = (target: EventTarget | null) => {
@@ -202,9 +205,17 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   }
 
   const closeTab = () => {
+    if (actions.region.closeNewTab()) return
     const tab = closableTab()
 
     if (tab) actions.region.close(tab)
+  }
+
+  // In the pane holding focus; the region itself, or a key a native page handed over, means the selected tab's pane.
+  const openSideTab = () => {
+    const pane = document.activeElement?.closest("[data-pane-content]")?.getAttribute("data-pane-content")
+
+    actions.region.openNewTab(pane === "side" || pane === "split" ? pane : undefined)
   }
 
   const selectAdjacentSideTab = (offset: -1 | 1) => {
@@ -380,6 +391,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const fileCmds = () => {
     const tab = closableTab()
     const cycle = cycleSideTabs()
+    const side = actions.session.layout.view().side.opened()
 
     return [
       fileCommand({
@@ -390,13 +402,23 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
         slash: "open",
         onSelect: openFile,
       }),
-      tab &&
+      side &&
         fileCommand({
           id: "file.close",
           title: language.t("command.tab.close"),
           keybind: settings.keybinds.get("tab.close") ?? "mod+w",
-          when: (event) => !extensionScoped(event.target),
+          hidden: !tab,
+          when: sideKey,
           onSelect: closeTab,
+        }),
+      side &&
+        fileCommand({
+          id: "file.tab.new",
+          title: "",
+          keybind: settings.keybinds.get("tab.new") ?? "mod+t",
+          hidden: true,
+          when: sideKey,
+          onSelect: openSideTab,
         }),
       // As in a browser: in the side panel, ⌘⇧T reopens a side tab rather than a session tab.
       fileCommand({

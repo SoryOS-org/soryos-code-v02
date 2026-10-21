@@ -410,6 +410,8 @@ export default function SessionBrowserPane(props: {
           }),
         )
       },
+      // A focusin inside the pane, so the app's focus tracking sees the page's focus as the side panel's.
+      focused: () => root?.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true })),
     }),
   )
 
@@ -545,7 +547,9 @@ export default function SessionBrowserPane(props: {
     <aside
       ref={root}
       id="browser-panel"
-      class="relative size-full min-w-0 overflow-hidden bg-v2-background-bg-base flex flex-col"
+      // A click on the pane's own surface, like its loading or error view, keeps focus here, so its shortcuts apply.
+      tabIndex={-1}
+      class="relative size-full min-w-0 overflow-hidden bg-v2-background-bg-base flex flex-col outline-none"
     >
       <div
         data-component="browser-bar"

@@ -52,6 +52,8 @@ export const PaneEvent = Schema.Union([
   }),
   // The page asked for the address field, with the platform's address shortcut.
   Schema.Struct({ type: Schema.Literal("address"), tabID: Browser.TabID }),
+  // The user put keyboard focus in the page, outside the window's own document.
+  Schema.Struct({ type: Schema.Literal("focused"), tabID: Browser.TabID }),
   // The page handed a browser or shell shortcut to the window, which runs it as its own key press.
   Schema.Struct({
     type: Schema.Literal("shortcut"),

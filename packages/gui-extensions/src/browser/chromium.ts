@@ -140,6 +140,8 @@ export function createBrowserPage(
     address?: () => void
     /** Hands a browser or shell shortcut to the app window. */
     shortcut?: (shortcut: PageShortcut) => void
+    /** The page took keyboard focus. */
+    focused?: () => void
     fail: () => void
     /** Adopts a page the document opened; a background one leaves the current tab selected. */
     popup: (options: Electron.BrowserWindowConstructorOptions, background: boolean) => WebContents
@@ -306,12 +308,16 @@ export function createBrowserPage(
   let failure: { url: string; message: string } | undefined
   // A blank document is never shown, so its load does not count as loading: a new tab shows its new tab page at once.
   let blank = options.initialize !== false && !options.restore?.url
+  // Chromium names a document after its URL until its <title> parses. A navigation on the same site keeps the shown
+  // title until the new document names itself or stops loading, so a page that reloads or redirects to itself does
+  // not flash its URL in the tab strip.
+  let title = ""
 
   const state = (): Browser.Tab => {
     const page = {
       id: options.id,
       url: (failure?.url ?? contents.getURL()).slice(0, 16_384),
-      title: contents.getTitle().slice(0, 2_048),
+      title: title.slice(0, 2_048),
       loading: contents.isLoading() && !blank,
     }
 
@@ -360,6 +366,7 @@ export function createBrowserPage(
     if (next !== origin) {
       icon = undefined
       iconRequest++
+      title = contents.getTitle()
     }
 
     origin = next
@@ -378,12 +385,21 @@ export function createBrowserPage(
     publish()
   })
   contents.on("dom-ready", settle)
+
+  const retitle = () => {
+    title = contents.getTitle()
+    publish()
+  }
+
   contents.on("did-stop-loading", () => {
     settle()
-    publish()
+    retitle()
   })
-  contents.on("did-navigate-in-page", publish)
-  contents.on("page-title-updated", publish)
+  contents.on("did-navigate-in-page", retitle)
+  contents.on("focus", () => {
+    if (!closed) options.focused?.()
+  })
+  contents.on("page-title-updated", retitle)
   contents.on("render-process-gone", () => {
     if (!closed) options.fail()
   })

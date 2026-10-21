@@ -3,7 +3,7 @@ import { Command } from "@opencode/gui-extensions/sdk"
 import { useCommand, type CommandSource } from "@/shell/commands/command"
 import { useSettings } from "@/settings/model"
 import { migrateKeybinds } from "@/settings/keybinds/migration"
-import { useExtensionHost } from "./host"
+import { useExtensionHost, type Item } from "./host"
 
 /** Publishes extension commands as `${extension}.${id}` in the host command registry. */
 export function ExtensionCommands() {
@@ -43,6 +43,28 @@ export function ExtensionCommands() {
 
 const scopedTo = (scope: string) => (event: KeyboardEvent) =>
   event.target instanceof Element && !!event.target.closest(scope)
+
+/** Whether an enabled extension command scoped around the key's target is bound to that key, so it answers instead. */
+export function useExtensionClaims() {
+  const host = useExtensionHost()
+  const command = useCommand()
+
+  return (event: KeyboardEvent) => extensionClaims(host.items(Command), command.matches, event)
+}
+
+export function extensionClaims(
+  commands: readonly Item<Command>[],
+  matches: (id: string, event: KeyboardEvent) => boolean,
+  event: KeyboardEvent,
+) {
+  return commands.some(
+    (item) =>
+      !!item.value.scope &&
+      item.value.enabled !== false &&
+      scopedTo(item.value.scope)(event) &&
+      matches(`${item.extension}.${item.value.id}`, event),
+  )
+}
 
 /** Focus inside an extension command's scope belongs to that extension, which binds its own shortcuts there. */
 export function useExtensionScoped() {

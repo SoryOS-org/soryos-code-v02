@@ -517,6 +517,9 @@ export function createBrowserPane(input: {
         if (entry.win.isFocused()) entry.win.webContents.focus()
         publish(entry, { type: "shortcut", ...shortcut })
       },
+      focused: () => {
+        if (entry.pages.has(id) && entry.focusedTabID === id) publish(entry, { type: "focused", tabID: id })
+      },
       popup: (popupOptions, background) => {
         const popup = create(entry, false, popupOptions)
 

@@ -11,8 +11,9 @@ import tabStyles from "./tabs.css?inline"
 const setup: Setup<typeof definition> = (ctx) => {
   const sessions = ctx.sessions
   const [model, setModel] = createSignal<Model>()
-  // Settings > Shortcuts lists the command on every platform; it stays disabled until the pane can open. Unbound by
-  // default: the sidebar owns mod+shift+b, and mod+t opens a tab from inside the pane.
+  const mac = /(Mac|iPhone|iPad)/.test(navigator.platform)
+  // Settings > Shortcuts lists the command on every platform; it stays disabled until the pane can open. Bound like
+  // Review's and Open file's launchers, since the sidebar owns mod+shift+b and mod+t opens a tab inside the pane.
   ctx.add(Command, (): Command | undefined => {
     const view = sessions.current()
 
@@ -23,6 +24,8 @@ const setup: Setup<typeof definition> = (ctx) => {
       id: "open",
       title: ctx.t("command.open"),
       group: ctx.t("command.category.view"),
+      bind: mac ? "ctrl+meta+b" : "ctrl+alt+b",
+      editable: true,
       enabled: !!value?.available(view),
       run: () => value?.open(view),
     }
@@ -180,8 +183,7 @@ const setup: Setup<typeof definition> = (ctx) => {
       id: "open",
       title: ctx.t("tab.title"),
       icon: "globe",
-      // mod+t opens a browser tab only inside the pane, so advertise it only while the pane is on screen.
-      keybind: value.pane()?.visible() ? "browser.newTab" : undefined,
+      keybind: "browser.open",
       order: 15,
       run: () => value.open(view),
     }

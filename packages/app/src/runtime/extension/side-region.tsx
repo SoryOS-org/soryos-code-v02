@@ -113,6 +113,7 @@ export function SideRegion(props: {
         tabIndex={-1}
         aria-label={language.t("session.panel.reviewAndFiles")}
         aria-hidden={!tabsOpen()}
+        data-focused={props.region.focus.focused() || undefined}
         class="relative h-full shrink-0 min-w-0 flex overflow-hidden bg-v2-background-bg-base rounded-[10px] shadow-[var(--v2-elevation-raised)] outline-none"
         classList={{ "flex-1": tabsVisible() }}
         style={{ width: panelWidth() }}
@@ -223,18 +224,13 @@ export function PaneTabs(props: {
 
   const modifier = closedTabsModifier()
 
-  // Without a new tab item, "+" opens a host-owned new tab view listing the launchers. It shows while the session and
-  // the pane's selection are the ones it opened over, so a tab that opens and selects itself replaces it.
-  const [adding, setAdding] = createSignal<{ session: string; over: string | undefined }>()
-
-  const newTab = createMemo(() => {
-    const value = adding()
-
-    return !!value && value.session === props.view.key && value.over === props.pane.active()
-  })
+  // Without a new tab item, "+" opens a host-owned new tab view listing the launchers, as ⌘T does inside the region.
+  const newTab = createMemo(() => props.region.newTab(props.pane.id))
+  const add = () => props.region.openNewTab(props.pane.id)
+  const dismiss = () => props.region.closeNewTab(props.pane.id)
 
   // Once replaced, the view is gone: returning to the tab or session it opened over does not show it again.
-  createEffect(on(newTab, (shown) => !shown && setAdding(undefined), { defer: true }))
+  createEffect(on(newTab, (shown) => !shown && dismiss(), { defer: true }))
 
   let selectionEvent: Event | undefined
 
@@ -253,7 +249,7 @@ export function PaneTabs(props: {
           selectionEvent.target instanceof Element &&
           selectionEvent.target.closest('[role="tab"]')
         ) {
-          setAdding(undefined)
+          dismiss()
           props.region.select(value)
         }
       }}
@@ -292,7 +288,7 @@ export function PaneTabs(props: {
             <Tabs.Trigger
               value="new"
               class="group"
-              onMiddleClick={() => setAdding(undefined)}
+              onMiddleClick={dismiss}
               closeButton={
                 <IconButton
                   size="small"
@@ -304,7 +300,7 @@ export function PaneTabs(props: {
                   onClick={(event) => {
                     event.preventDefault()
                     event.stopPropagation()
-                    setAdding(undefined)
+                    dismiss()
                   }}
                   icon={<Icon name="xmark-small" />}
                   aria-label={language.t("common.closeTab")}
@@ -335,7 +331,7 @@ export function PaneTabs(props: {
                           icon={<Icon name="plus" />}
                           variant="ghost-muted"
                           size="large"
-                          onClick={() => setAdding({ session: props.view.key, over: props.pane.active() })}
+                          onClick={add}
                           aria-label={language.t("session.tab.add")}
                         />
                       </Tooltip>
@@ -346,7 +342,7 @@ export function PaneTabs(props: {
                         modifier={key()}
                         entries={closed.entries}
                         onReopen={closed.onReopen}
-                        onNewTab={() => setAdding({ session: props.view.key, over: props.pane.active() })}
+                        onNewTab={add}
                       />
                     )}
                   </Show>

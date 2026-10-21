@@ -112,6 +112,7 @@ function fixture(strip: string[] = []) {
     page: () => undefined,
     address: () => undefined,
     shortcut: () => undefined,
+    focused: () => undefined,
   })
 
   const emit = (index: number, event: PaneEvent) => listeners.get(calls[index].input.binding)?.(event)

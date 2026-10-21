@@ -137,15 +137,15 @@ export function createModifierHeld(modifier: ClosedTabsModifier) {
 
 /**
  * Whether a key event belongs to the side panel: its target is in it, or, when the target is the body because closing
- * the focused tab dropped focus, the user's last focus, click or key was.
+ * the focused tab dropped focus, the user's last focus, click or key was. `focused` reads that last answer.
  */
 export function createSideFocus() {
-  let last = false
-  createEventListener(document, ["focusin", "pointerdown", "keydown"], (event) => (last = inSide(event, last)), {
+  const [last, setLast] = createSignal(false)
+  createEventListener(document, ["focusin", "pointerdown", "keydown"], (event) => setLast(inSide(event, last())), {
     capture: true,
   })
 
-  return (event: Event) => inSide(event, last)
+  return Object.assign((event: Event) => inSide(event, last()), { focused: last })
 }
 
 /** As in a browser: inside the side panel, ⌘1–8 select that side tab, ⌘9 the last one, and ⇧⌘[ and ⇧⌘] the previous and next. */

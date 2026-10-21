@@ -62,6 +62,8 @@ export function createConnection(input: {
   address: (tabID: Browser.TabID) => void
   /** A focused page handed a browser or shell shortcut to the window. */
   shortcut: (event: ShortcutEvent) => void
+  /** The user put keyboard focus in a page. */
+  focused: () => void
 }) {
   const state: ConnectionState = { browser: null, embeds: {}, suspended: false }
   let disposed = false
@@ -163,6 +165,8 @@ export function createConnection(input: {
         if (event.type === "address") return input.address(event.tabID)
 
         if (event.type === "shortcut") return input.shortcut(event)
+
+        if (event.type === "focused") return input.focused()
 
         if (event.type === "embed") {
           state.embeds = { ...state.embeds, [event.tabID]: event.embed }

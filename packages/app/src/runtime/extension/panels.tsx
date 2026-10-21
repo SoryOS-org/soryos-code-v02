@@ -2,6 +2,7 @@ import {
   batch,
   createEffect,
   createMemo,
+  createSignal,
   For,
   mergeProps,
   on,
@@ -34,7 +35,7 @@ import { useExtensionHost } from "./host"
 import { Contribution } from "./render"
 import { useExtensionAttachment } from "./attachment"
 import { legacyKeys, panelKey } from "./panel-keys"
-import { closedEntry, type ClosedTabs } from "./closed-tabs"
+import { closedEntry, createSideFocus, type ClosedTabs } from "./closed-tabs"
 
 type Tabs = Accessor<{
   tabs(): SessionTabs
@@ -308,7 +309,19 @@ export function createRegion(input: {
     return entry ? paneOf(entry) : "side"
   })
 
+  // The host's new tab view: the pane it shows in, and the session and selection it opened over, so a tab that opens
+  // and selects itself replaces it.
+  const [adding, setAdding] = createSignal<{ pane: SessionPane; session: string; over: string | undefined }>()
+
+  const newTab = (pane: SessionPane) => {
+    const value = adding()
+
+    return value?.pane === pane && value.session === input.view().key && value.over === panes[pane].active()
+  }
+
   return {
+    /** Whether a key event belongs to the side region rather than the session around it. */
+    focus: createSideFocus(),
     entries,
     /** The drawn strip of the pane that holds the selected tab, by key. */
     keys: () => panes[activePane()].keys(),
@@ -333,6 +346,21 @@ export function createRegion(input: {
       stored().flatMap((key) => (key.startsWith(`${extension}:`) ? [key.slice(extension.length + 1)] : [])),
     select(key: string) {
       input.tabs().setActive(key)
+    },
+    newTab,
+    /** Shows the new tab view in a pane, by default the one holding the selected tab. */
+    openNewTab(pane: SessionPane = activePane()) {
+      setAdding({ pane, session: input.view().key, over: panes[pane].active() })
+    },
+    /** Closes the new tab view, in one pane or wherever it is; returns whether it was showing. */
+    closeNewTab(pane?: SessionPane) {
+      const value = adding()
+
+      if (!value || (pane && value.pane !== pane)) return false
+      const shown = newTab(value.pane)
+      setAdding(undefined)
+
+      return shown
     },
     /** Opens or closes the side region for the user. Opening moves focus into it once it lands; closing gives focus back. */
     toggle() {

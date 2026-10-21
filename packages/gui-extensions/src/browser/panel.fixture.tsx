@@ -587,6 +587,20 @@ type StripTabs = {
 
 type PaneClient = IpcClient<(typeof BrowserPane)["spec"]>
 
+/** Whether a key event belongs to the side region, and whether the user's focus last was there. */
+type SideFocus = ((event: Event) => boolean) & { focused: () => boolean }
+
+/** What the side region's shortcuts drive. */
+type SideShortcuts = {
+  keys: () => readonly string[]
+  active: () => string | undefined
+  select: (key: string) => void
+  close: (key: string) => void
+  focus: SideFocus
+  openNewTab: () => void
+  closeNewTab: () => boolean
+}
+
 /** The app's extension host and side region, passed in by `packages/app/component-tests/browser-pane-restore.spec.ts`. */
 type RegionHost = {
   LanguageProvider: Component<{ locale: string; children: JSX.Element }>
@@ -616,6 +630,10 @@ type RegionHost = {
     select(key: string): void
     close(key: string): void
     reopen(): void
+    focus: SideFocus
+    newTab(pane: "side"): boolean
+    openNewTab(): void
+    closeNewTab(): boolean
   }
   /** The real browser and file extensions. */
   definitions: readonly Definition[]
@@ -630,9 +648,7 @@ type RegionHost = {
     reopenSide: () => void
     switchSession: () => void
     /** The side region, for its tab shortcuts. */
-    side: () =>
-      | { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void }
-      | undefined
+    side: () => SideShortcuts | undefined
     /** The shortcut the browser's + menu item shows, as the host formats it; empty when it shows none. */
     shortcut: (shortcut: Accessor<string>) => void
   }>
@@ -976,6 +992,12 @@ export function mountBrowserRegion(input: RegionHost) {
         },
         true,
       )
+      // As chromium.ts reports the native page taking keyboard focus.
+      win.addEventListener("focus", () => {
+        const binding = latest()?.binding
+
+        if (binding) listeners.forEach((listener) => listener({ binding, event: { type: "focused", tabID } }))
+      })
     }
 
     // Mounts once every extension is active, as the session screen does.
@@ -1010,7 +1032,12 @@ export function mountBrowserRegion(input: RegionHost) {
       }
 
       return (
-        <aside id="review-panel" tabIndex={-1} aria-label="Side region">
+        <aside
+          id="review-panel"
+          tabIndex={-1}
+          aria-label="Side region"
+          data-focused={region.focus.focused() || undefined}
+        >
           {/* The host strip draws a trigger for each of these keys. */}
           <div role="tablist" aria-label="Side panel" style={{ display: "flex", gap: "8px", margin: "16px 0" }}>
             <For each={region.keys()}>
@@ -1022,6 +1049,7 @@ export function mountBrowserRegion(input: RegionHost) {
             </For>
           </div>
           <p data-testid="selected">{region.active() ?? "none"}</p>
+          <p data-testid="side-new-tab">{region.newTab("side") ? "shown" : "none"}</p>
           <Show when={browser()}>
             {(entry) => (
               <PanelContext.Provider

@@ -67,6 +67,8 @@ type PaneHandle = {
   focusAddress: () => void
   /** Runs a key press the page handed to the app, as if it was pressed in this pane. */
   press: (event: ShortcutEvent) => void
+  /** Marks the pane as holding the user's focus, which the page took outside the window's document. */
+  focused: () => void
 }
 
 export type Model = ReturnType<typeof createModel>
@@ -220,6 +222,9 @@ export function createModel(ctx: SetupContext<typeof definition>) {
         // Only the pane on screen holds the page that had focus.
         shortcut: (event) => {
           if (sessions.current()?.key === id) panes()[0]?.press(event)
+        },
+        focused: () => {
+          if (sessions.current()?.key === id) panes()[0]?.focused()
         },
         change: (next, mirror, native) => {
           if (next.error === "browser.pane.unsupported") {

@@ -17,6 +17,7 @@ const modules = {
   file: source("../../gui-extensions/src/file/index.ts"),
   fileRenderer: source("../../gui-extensions/src/file/renderer.tsx"),
   commands: source("../src/shell/commands/command.tsx"),
+  extensionCommands: source("../src/runtime/extension/commands.tsx"),
   sdk: source("../../gui-extensions/src/sdk/index.ts"),
   render: source("../src/runtime/extension/render.tsx"),
   settings: source("../src/settings/model.tsx"),
@@ -42,6 +43,7 @@ story.beforeEach(async ({ mount, page }) => {
       platform,
       solid,
       closed,
+      extensionCommands,
     ] = await Promise.all([
       import(modules.fixture),
       import(modules.host),
@@ -56,6 +58,7 @@ story.beforeEach(async ({ mount, page }) => {
       import(modules.platform),
       import(modules.solid),
       import(modules.closed),
+      import(modules.extensionCommands),
       // Load the pane before mounting: Vite must not reload the page to optimize its dependencies mid-fixture.
       import(modules.browserPanel),
     ])
@@ -94,7 +97,15 @@ story.beforeEach(async ({ mount, page }) => {
         reopenSide: () => void
         switchSession: () => void
         side: () =>
-          | { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void }
+          | {
+              keys: () => readonly string[]
+              active: () => string | undefined
+              select: (key: string) => void
+              close: (key: string) => void
+              focus: (event: Event) => boolean
+              openNewTab: () => void
+              closeNewTab: () => boolean
+            }
           | undefined
         shortcut: (shortcut: Accessor<string>) => void
       }) => {
@@ -110,7 +121,32 @@ story.beforeEach(async ({ mount, page }) => {
 
           return item?.menu === "session.panel" && item.keybind ? command.keybind(item.keybind) : ""
         })
+
+        // As the session's commands: ⌘T and ⌘W inside the side region, unless the focused panel binds the key there.
+        const sideKey = (event: KeyboardEvent) =>
+          !!props.side()?.focus(event) &&
+          !extensionCommands.extensionClaims(extensions.items(sdk.Command), command.matches, event)
+
         command.register("fixture-session", () => [
+          {
+            id: "file.close",
+            title: "Close side tab",
+            keybind: "mod+w",
+            when: sideKey,
+            onSelect: () => {
+              const side = props.side()
+              const key = side?.active()
+
+              if (side && !side.closeNewTab() && key) side.close(key)
+            },
+          },
+          {
+            id: "file.tab.new",
+            title: "",
+            keybind: "mod+t",
+            when: sideKey,
+            onSelect: () => props.side()?.openNewTab(),
+          },
           {
             id: "tab.close",
             title: "Close session tab",
@@ -344,6 +380,67 @@ story("opens a browser tab with ⌘T inside the pane and a session everywhere el
   await editor.press(`${mod}+t`)
   await expect(opens).toHaveText("3")
   await expect(sessions).toHaveText("1")
+})
+
+story("⌘T and ⌘W follow focus: side tabs inside the side panel, session tabs elsewhere", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"
+  const outside = root.getByRole("button", { name: "Beta", exact: true })
+  const panel = page.locator("#review-panel")
+  const editor = page.frameLocator('iframe[title="Browser page"]').getByRole("textbox", { name: "Editor page input" })
+  const sessions = root.getByTestId("new-sessions")
+  const opens = root.getByTestId("browser-opens")
+  const newTab = root.getByTestId("side-new-tab")
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  await outside.click()
+  await root.getByRole("button", { name: "First inventory", exact: true }).click()
+  await expect(root.getByTestId("selected")).toHaveText(/^browser:/)
+
+  // In the main column the chords keep the session's tabs, and the side panel reads as unfocused.
+  await outside.focus()
+  await outside.press(`${mod}+t`)
+  await expect(sessions).toHaveText("1")
+  await expect(panel).not.toHaveAttribute("data-focused")
+
+  // A click on the side panel's own surface, nothing focusable, leaves focus on the panel: ⌘T opens its new tab view
+  // and ⌘W closes that view, then the selected tab.
+  await panel.getByTestId("selected").click()
+  await expect(panel).toHaveAttribute("data-focused")
+  await page.keyboard.press(`${mod}+t`)
+  await expect(newTab).toHaveText("shown")
+  await page.keyboard.press(`${mod}+w`)
+  await expect(newTab).toHaveText("none")
+  await expect(root.getByTestId("browser-closes")).toHaveText("[]")
+  await page.keyboard.press(`${mod}+w`)
+  await expect(root.getByTestId("browser-closes")).toHaveText('["tab_33333333-3333-3333-3333-333333333333"]')
+  await expect(root.getByTestId("session-state")).toHaveText("open")
+  await expect(sessions).toHaveText("1")
+
+  // The page's focus, which reaches the app only as the pane's report, counts as the side panel's.
+  await outside.focus()
+  await expect(panel).not.toHaveAttribute("data-focused")
+  await editor.click()
+  await expect(panel).toHaveAttribute("data-focused")
+  await editor.press(`${mod}+t`)
+  await expect(opens).toHaveText("1")
+  await expect(sessions).toHaveText("1")
+})
+
+story("keeps ⌘T in the browser pane after a click on its loading surface", async ({ page }) => {
+  const root = page.getByTestId("browser-region-fixture")
+  const mod = (await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))) ? "Meta" : "Control"
+  await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
+  await root.getByRole("button", { name: "Beta", exact: true }).click()
+  await root.getByRole("button", { name: "First inventory", exact: true }).click()
+  await expect(root.getByTestId("selected")).toHaveText(/^browser:/)
+
+  // A page still loading shows the pane's own surface where the native page goes; clicking it must not drop focus
+  // to the side panel around the pane, where ⌘T would open the region's new tab view instead of a browser tab.
+  await page.locator('#browser-panel [data-component="browser-bar"]').click({ position: { x: 2, y: 2 } })
+  await page.keyboard.press(`${mod}+t`)
+  await expect(root.getByTestId("browser-opens")).toHaveText("1")
+  await expect(root.getByTestId("side-new-tab")).toHaveText("none")
+  await expect(root.getByTestId("new-sessions")).toHaveText("0")
 })
 
 story("reloads the browser tab with ⌘R inside the pane and leaves it to the window elsewhere", async ({ page }) => {
