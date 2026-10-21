@@ -698,6 +698,28 @@ test("retains output schemas across paginated MCP discovery", async () => {
   ])
 })
 
+test("keeps an MCP server whose tool output schema has no top-level type", async () => {
+  const result = await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const connection = yield* connect(
+          "anyof-output",
+          new ConfigMCP.Local({
+            type: "local",
+            command: [process.execPath, path.join(import.meta.dir, "fixture/mcp-anyof-output.ts")],
+          }),
+          import.meta.dir,
+        )
+        return { tools: yield* connection.tools(), called: yield* connection.callTool({ name: "callers" }) }
+      }),
+    ),
+  )
+
+  expect(result.tools.map((tool) => tool.name)).toEqual(["plain", "callers"])
+  expect(result.tools[1]?.outputSchema?.type).toBe("object")
+  expect(result.called.structured).toEqual({ kind: "fallback" })
+})
+
 test("lists paginated prompts and invokes them through the MCP client", async () => {
   const result = await Effect.runPromise(
     Effect.scoped(
