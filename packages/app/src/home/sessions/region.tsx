@@ -20,6 +20,11 @@ export function HomeSessions(props: {
           location={props.sessions.location.value}
           onRevealLocations={props.sessions.location.sync}
           showProjectName={props.sessions.session.showProjectName()}
+          groupedByProject={props.sessions.grouping.byProject()}
+          showGroupingToggle={props.sessions.grouping.available()}
+          onToggleGrouping={props.sessions.grouping.toggle}
+          isGroupCollapsed={props.sessions.grouping.collapsed}
+          onToggleGroup={props.sessions.grouping.toggleCollapsed}
           server={server()}
           canCreateSession={props.sessions.session.canCreate()}
           searchValue={props.search.query.value()}

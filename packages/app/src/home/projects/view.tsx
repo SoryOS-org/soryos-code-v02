@@ -830,7 +830,7 @@ function HomeProjectNavButton(props: JSX.ButtonHTMLAttributes<HTMLButtonElement>
   )
 }
 
-function HomeProjectAvatar(props: { project: LocalProject; outline?: boolean }) {
+export function HomeProjectAvatar(props: { project: LocalProject; outline?: boolean }) {
   const name = createMemo(() => displayName(props.project))
 
   return (

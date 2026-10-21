@@ -3,7 +3,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Button } from "@opencode/ui/button"
 import { DialogFooter, DialogHeader, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
 import { skipToken, useQuery, useQueryClient } from "@tanstack/solid-query"
-import { type Accessor, createEffect, createMemo, type JSX, startTransition, untrack } from "solid-js"
+import { type Accessor, createEffect, createMemo, type JSX, createResource, startTransition, untrack } from "solid-js"
 import { notifySessionTabsRemoved } from "@/shell/titlebar/session-events"
 import { useCommand } from "@/shell/commands/command"
 import {
@@ -24,20 +24,24 @@ import { fetchSessionExport, saveSessionExport, sessionExportFilename } from "@/
 import { usePlatform } from "@/runtime/platform/platform"
 import { sessionLabel, sessionTitle } from "@/session/title"
 import { showToast } from "@/shell/notifications/toast"
+import { Schema } from "effect"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
 import { archiveHomeSession } from "./archive"
 import type { HomeController } from "../model"
+import { groupHomeSessionsByProject, type HomeSessionGroup } from "./grouping"
 import { buildHomeSessionRecords, homeProjectForSession, homeSessionLocation, type HomeSessionRecord } from "./records"
 
 export type { HomeSessionRecord } from "./records"
+export type { HomeSessionGroup } from "./grouping"
 
 // Keep the immutable result opaque so Solid Query does not recursively unwrap every session on mount.
 const selectSessions = (sessions: SessionInfo[]) => () => sessions
 
-export type HomeSessionGroup = {
-  id: "today" | "yesterday" | "older"
-  title: string
-  sessions: HomeSessionRecord[]
-}
+export const HomeSessionsViewSchema = Persistence.struct({
+  grouping: Schema.Literals(["date", "project"]),
+  collapsed: Persistence.record(Persistence.fallback(Schema.Boolean, () => false)),
+})
 
 export type OpenSessionOptions = { background?: boolean }
 
@@ -48,6 +52,19 @@ export function createHomeSessionsController(home: HomeController) {
   const language = useLanguage()
   const platform = usePlatform()
   const queryClient = useQueryClient()
+
+  const [storedView, setStoredView, , viewReady] = persisted(
+    Persist.global("home.sessions"),
+    HomeSessionsViewSchema,
+    { grouping: "date", collapsed: {} },
+  )
+  // Reads stay non-reactive until the stored preference hydrates, so a toggle
+  // cannot race the loaded value the way a direct store read would.
+  const [view] = createResource(
+    () => viewReady.promise ?? Promise.resolve(),
+    (promise) => promise.then(() => storedView),
+    { initialValue: storedView },
+  )
 
   const projectDirectories = createMemo(() => {
     const selected = home.selection.value().directory
@@ -101,7 +118,11 @@ export function createHomeSessionsController(home: HomeController) {
   )
 
   const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
-  const groups = createMemo(() => groupSessions(records(), language))
+  // Selecting a project already scopes the list to it, so project grouping only applies to the all-projects view.
+  const byProject = createMemo(() => view().grouping === "project" && !home.project.selected())
+  const groups = createMemo(() =>
+    byProject() ? groupHomeSessionsByProject(records()) : groupSessions(records(), language),
+  )
   const prefetched = new Set<string>()
 
   const location = (record: HomeSessionRecord) => {
@@ -306,6 +327,13 @@ export function createHomeSessionsController(home: HomeController) {
       groups,
       loading: () => sessionLoad.isPending,
       searchRecords: allRecords,
+    },
+    grouping: {
+      byProject,
+      available: () => !home.project.selected(),
+      toggle: () => setStoredView("grouping", view().grouping === "project" ? "date" : "project"),
+      collapsed: (id: string) => view().collapsed[id] ?? false,
+      toggleCollapsed: (id: string) => setStoredView("collapsed", id, !(view().collapsed[id] ?? false)),
     },
     platform: {
       desktop: platform.platform === "desktop",
