@@ -79,6 +79,27 @@ test("finds a setting and opens Settings with its row in view and highlighted", 
   await expect(row).toBeInViewport()
 })
 
+test("opens from the Settings page and finds another setting", async ({ page }) => {
+  await openPaletteWorkspace(page, true)
+  await page.keyboard.press("ControlOrMeta+,")
+  await expect(page).toHaveURL("/settings")
+  const screen = page.getByTestId("settings-screen")
+  await expect(screen.getByRole("tab", { name: "Preferences", exact: true })).toBeVisible()
+
+  await page.keyboard.press("ControlOrMeta+K")
+  const dialog = page.getByRole("dialog")
+  const input = dialog.getByRole("combobox")
+  await expect(input).toBeFocused()
+  await input.fill("theme")
+  await expect(dialog.getByRole("option", { name: /^Theme/ })).toHaveAttribute("aria-selected", "true")
+  await input.press("Enter")
+  await expect(dialog).toHaveCount(0)
+  await expect(page).toHaveURL("/settings?tab=appearance")
+  const row = screen.locator('[data-search-target="row"]')
+  await expect(row).toContainText("Theme")
+  await expect(row).toBeInViewport()
+})
+
 test("lists recent sessions before a query is entered", async ({ page }) => {
   const { dialog } = await openCommandPalette(page, true)
   const session = dialog.getByRole("option", { name: /Palette fixture session/ })

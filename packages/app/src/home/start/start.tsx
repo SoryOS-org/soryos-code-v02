@@ -11,8 +11,7 @@ import {
 } from "@opencode/ui/project-avatar"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { useDialog } from "@opencode/ui/context/dialog"
-import { createEffect, createMemo, For, Match, Show, startTransition, Switch, type JSX } from "solid-js"
+import { createEffect, createMemo, For, Match, Show, Switch, type JSX } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -20,7 +19,6 @@ import { useSettingsCommand } from "@/settings/command"
 import { useSettingsSurface } from "@/settings/surface"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCommand } from "@/shell/commands/command"
-import { useTabs } from "@/shell/tabs/tabs"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
 import { sessionTabTitle } from "@/shell/titlebar/tab-title"
 import type { InboxEntry } from "@/shell/titlebar/inbox-model"
@@ -31,7 +29,8 @@ type Language = ReturnType<typeof useLanguage>
 /** Home: a greeting, every session sorted by what it needs from you, and recent projects beside them. */
 export function StartHome() {
   const model = createStartModel()
-  useStartCommands()
+  // Settings opens from Home like from a session; the palette is the shell's.
+  useSettingsCommand()
 
   return (
     <div
@@ -54,45 +53,6 @@ export function StartHome() {
       </div>
     </div>
   )
-}
-
-/** Home's own palette lists commands and this computer's sessions; Settings opens from Home like from a session. */
-function useStartCommands() {
-  const command = useCommand()
-  const dialog = useDialog()
-  const global = useGlobal()
-  const language = useLanguage()
-  const servers = useServers()
-  const tabs = useTabs()
-
-  useSettingsCommand()
-  command.register("home.palette", () => [
-    {
-      id: "command.palette",
-      title: language.t("command.palette"),
-      hidden: true,
-      onSelect: async () => {
-        const conn = servers.visible.find((item) => servers.current(item)) ?? servers.visible[0]
-
-        if (!conn) return
-        const { HomeCommandPalette } = await import("./command-palette")
-        void dialog.show(() => (
-          <HomeCommandPalette
-            server={conn}
-            onSelectSession={(entry) => {
-              if (!entry.sessionID || !entry.directory || !entry.server) return
-              const sessionID = entry.sessionID
-              const server = entry.server
-              global.ensureServerCtx(conn).projects.touch(entry.project?.worktree ?? entry.directory)
-              void startTransition(() => {
-                tabs.select(tabs.addSessionTab({ server, sessionId: sessionID }))
-              })
-            }}
-          />
-        ))
-      },
-    },
-  ])
 }
 
 function StartGreeting(props: { model: StartModel }) {
@@ -336,12 +296,14 @@ function StartProjects(props: { model: StartModel }) {
 
 function ProjectList(props: { model: StartModel; server: StartServer }) {
   const language = useLanguage()
+
   // Projects that share a name, like a repository and its worktrees, are told apart by their parent folder.
   const repeated = createMemo(() => {
     const names = props.server.projects.map((item) => displayName(item.project))
 
     return new Set(names.filter((name, index) => names.indexOf(name) !== index))
   })
+
   const parent = (worktree: string) =>
     worktree
       .replace(/[/\\]+$/, "")
@@ -596,7 +558,10 @@ function Status(props: { model: StartModel; entry: InboxEntry }) {
             "text-v2-text-text-muted": status() === "done",
           }}
         >
-          {language.t(`sidebar.inbox.status.${status() as "approval" | "input" | "failed" | "done"}`)}
+          {
+            // SAFETY: working and ready matched above, so the remaining statuses each have a label.
+            language.t(`sidebar.inbox.status.${status() as "approval" | "input" | "failed" | "done"}`)
+          }
         </span>
       </Match>
     </Switch>

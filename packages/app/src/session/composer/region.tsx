@@ -237,7 +237,7 @@ export function createActiveSessionRegion(input: {
       return model ? { id: model.id, providerID: model.provider.id, variant: selection.variant.current() } : undefined
     },
   })
-  command.register("session-palette", () => [
+  command.register("palette", () => [
     {
       id: "command.palette",
       title: language.t("command.palette"),
