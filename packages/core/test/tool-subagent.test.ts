@@ -706,7 +706,6 @@ describe("SubagentTool", () => {
           expect((yield* sessions.get(child.id)).model).toEqual({
             id: overrideModel.id,
             providerID: overrideModel.providerID,
-            variant: Model.VariantID.make("default"),
           })
 
           const failures = [
