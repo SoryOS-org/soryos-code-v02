@@ -81,6 +81,24 @@ const mixRGB = (a: RGB, b: RGB, t: number): RGB => {
 
 const rgba = (c: RGB, a: number) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${clamp01(a).toFixed(3)})`
 
+// Colours repeat from frame to frame, so each CSS colour string is built once.
+const styles = new Map<number, string>()
+
+function style(c: RGB, a: number) {
+  const alpha = Math.round(clamp01(a) * 255)
+  const key = ((c[0] << 16) | (c[1] << 8) | c[2]) * 256 + alpha
+  const cached = styles.get(key)
+
+  if (cached) return cached
+
+  if (styles.size > 4096) styles.clear()
+
+  const value = rgba(c, alpha / 255)
+  styles.set(key, value)
+
+  return value
+}
+
 // ── timeline (art ms) ─────────────────────────────────────────────────────────
 // 0–340 gather · 340–520 warp attack · cruise to 900 · brake (τ 260) · GO arrives 340–1000, lands ~720
 // 560 the brake ring leaves GO, slows with the warp, then drifts at the loop's speed
@@ -199,12 +217,89 @@ function geometry(w: number, h: number, dpr: number) {
       falloff[r * cols + c] = (1 - smoothstep(reach * 0.45, reach * 1.05, d)) * edge
     }
 
-  const field = new Float32Array(cols * rows)
+  const width = Math.round(w * dpr)
+  const height = Math.round(h * dpr)
+  // The grid is written as pixels and put in one call; see `draw`.
+  const grid = layer(width, height)
+  const pixels = grid.ctx.createImageData(width, height)
+  const words = new Uint32Array(pixels.data.buffer)
 
-  return { w, h, dpr, P, cols, rows, ox, oy, lc, lr, cx, cy, reach, dist, falloff, field }
+  return {
+    w,
+    h,
+    dpr,
+    P,
+    cols,
+    rows,
+    ox,
+    oy,
+    lc,
+    lr,
+    cx,
+    cy,
+    reach,
+    dist,
+    falloff,
+    width,
+    height,
+    grid,
+    pixels,
+    field: new Float32Array(cols * rows),
+    words,
+    bloom: layer(width, height),
+    bloomAlpha: new Uint8ClampedArray(words.length),
+    bloomWords: new Uint32Array(words.length),
+    bloomLevel: -1,
+  }
+}
+
+type Layer = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; palette?: HeroPalette }
+
+function layer(width: number, height: number): Layer {
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+
+  return { canvas, ctx: canvas.getContext("2d")! }
+}
+
+// ImageData is RGBA in memory, so a little-endian 32-bit word holds it as ABGR.
+const pack = (r: number, g: number, b: number, alpha: number) =>
+  ((alpha << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255)) >>> 0
+
+const BLOOM_MAX = 1.6
+
+/** The bloom at full alpha, rendered once per size and palette, and kept as an alpha mask for the pixel path. */
+function renderBloom(g: Geometry, pal: HeroPalette) {
+  const { ctx } = g.bloom
+  const [x, y] = [g.cx * g.dpr, g.cy * g.dpr]
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, LOGO_COLS * g.P * 0.9 * g.dpr)
+
+  grad.addColorStop(0, rgba(pal.accent, 1))
+  grad.addColorStop(0.45, rgba(pal.accent, 0.35))
+  grad.addColorStop(1, rgba(pal.accent, 0))
+  ctx.clearRect(0, 0, g.width, g.height)
+  ctx.save()
+  ctx.fillStyle = grad
+  ctx.translate(x, y)
+  ctx.scale(1.35, 0.8)
+  ctx.translate(-x, -y)
+  ctx.fillRect(0, 0, g.width, g.height)
+  ctx.restore()
+  const data = ctx.getImageData(0, 0, g.width, g.height).data
+
+  for (let i = 0; i < g.bloomAlpha.length; i++) g.bloomAlpha[i] = data[i * 4 + 3]!
+
+  g.bloom.palette = pal
+  g.bloomLevel = -1
 }
 
 // ── one frame ─────────────────────────────────────────────────────────────────
+// The intro composites layers with the canvas: bloom, streaks, the grid as one image, then GO. Once the streaks
+// are gone the bloom is the only thing under the grid, so the steady loop blends grid over bloom in the pixel
+// buffer and puts the whole frame at once, then draws GO. Both paths produce the same pixels.
+const INTRO_END = 2300
+
 function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: number) {
   const { dpr, P, field } = g
   const R = g.reach * 1.1
@@ -255,33 +350,44 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
     field[i] = level + breath * g.falloff[i]!
   }
 
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-
   // Bloom: one soft radial fill behind GO, the only glow in the scene.
   const arrive = smoothstep(ATTACK_START, ATTACK_END, t)
   const landing = flash(t - 720, 260)
   const bloom = arrive * (0.4 + landing * 0.6 + gather * 0.8) + gather * 0.6 + breath * 2
+  const bloomPeak = bloom > 0.01 ? (pal.light ? 0.1 : 0.16) * Math.min(BLOOM_MAX, bloom) : 0
 
-  if (bloom > 0.01) {
-    const rad = LOGO_COLS * P * 0.9 * dpr
-    const grad = ctx.createRadialGradient(g.cx * dpr, g.cy * dpr, 0, g.cx * dpr, g.cy * dpr, rad)
-    const a = (pal.light ? 0.1 : 0.16) * Math.min(1.6, bloom)
-    grad.addColorStop(0, rgba(pal.accent, a))
-    grad.addColorStop(0.45, rgba(pal.accent, a * 0.35))
-    grad.addColorStop(1, rgba(pal.accent, 0))
-    ctx.save()
-    ctx.fillStyle = grad
-    ctx.translate(g.cx * dpr, g.cy * dpr)
-    ctx.scale(1.35, 0.8)
-    ctx.translate(-g.cx * dpr, -g.cy * dpr)
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-    ctx.restore()
+  if (g.bloom.palette !== pal) renderBloom(g, pal)
+
+  const { words, width, height } = g
+  const steady = t >= INTRO_END
+
+  if (steady) {
+    // Rebuild the bloom pixels only when its peak moves by a quarter of an 8-bit step.
+    const level = Math.round(bloomPeak * 1020)
+
+    if (level !== g.bloomLevel) {
+      const color = pack(pal.accent[0], pal.accent[1], pal.accent[2], 0)
+
+      for (let i = 0; i < g.bloomWords.length; i++)
+        g.bloomWords[i] = (color | (Math.round(g.bloomAlpha[i]! * bloomPeak) << 24)) >>> 0
+
+      g.bloomLevel = level
+    }
+
+    words.set(g.bloomWords)
+  } else {
+    ctx.globalCompositeOperation = "copy"
+    ctx.globalAlpha = bloomPeak
+    ctx.drawImage(g.bloom.canvas, 0, 0)
+    ctx.globalAlpha = 1
+    ctx.globalCompositeOperation = "source-over"
+    words.fill(0)
   }
 
   // Warp streaks emerge from behind GO and fade before the hero's sides.
   const cool = 1 - smoothstep(1400, 2300, t)
 
-  if (cool > 0 && t > ATTACK_START) {
+  if (!steady && cool > 0 && t > ATTACK_START) {
     const hw = (LOGO_COLS / 2 + 1) * P
     const hh = (LOGO_ROWS / 2 + 1) * P
     const color = mixRGB(pal.accent, pal.peak, v * 0.5)
@@ -301,7 +407,7 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
 
       if (alpha < 0.01) continue
       const r0 = Math.max(edge, r - len)
-      ctx.strokeStyle = rgba(color, alpha)
+      ctx.strokeStyle = style(color, alpha)
       ctx.lineWidth = s.width * 1.5 * dpr
       ctx.beginPath()
       ctx.moveTo((g.cx + dx * r0) * dpr, (g.cy + dy * r0) * dpr)
@@ -310,9 +416,17 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
     }
   }
 
-  // The grid: resting dots grow into lit cells as energy reaches them.
+  // The grid: resting dots grow into lit cells as energy reaches them. Cells are whole-pixel squares.
   const dot = Math.max(1.5, P * 0.19)
   const full = P * 0.74
+  const lit = pal.light ? 0.75 : 0.85
+  const accent = pal.accent
+  const dotColor = pal.dot
+  // The intro composites only the part of the grid that has cells in it.
+  let minX = width
+  let minY = height
+  let maxX = 0
+  let maxY = 0
 
   for (let r = 0; r < g.rows; r++) {
     const y = g.oy + r * P + P / 2
@@ -328,9 +442,42 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
       if (base < 0.004 && e < 0.01) continue
       const x = g.ox + c * P + P / 2
       const s = lerp(dot, full, e ** 1.3) * dpr
-      ctx.fillStyle = rgba(mixRGB(pal.dot, pal.accent, e * 1.6), base + e * (pal.light ? 0.75 : 0.85) * fall)
-      ctx.fillRect(Math.round(x * dpr - s / 2), Math.round(y * dpr - s / 2), Math.round(s), Math.round(s))
+      const size = Math.round(s)
+      const left = Math.round(x * dpr - s / 2)
+      const top = Math.round(y * dpr - s / 2)
+      // The cell colour mixes from the dot towards the accent; kept in scalars, as this runs for every cell.
+      const k = clamp01(e * 1.6)
+      const red = dotColor[0] + (accent[0] - dotColor[0]) * k
+      const green = dotColor[1] + (accent[1] - dotColor[1]) * k
+      const blue = dotColor[2] + (accent[2] - dotColor[2]) * k
+      const alpha = Math.round(clamp01(base + e * lit * fall) * 255)
+      const word = pack(red, green, blue, alpha)
+      const x0 = Math.max(0, left)
+      const x1 = Math.min(width, left + size)
+      const y0 = Math.max(0, top)
+      const y1 = Math.min(height, top + size)
+      minX = Math.min(minX, x0)
+      minY = Math.min(minY, y0)
+      maxX = Math.max(maxX, x1)
+      maxY = Math.max(maxY, y1)
+
+      for (let py = y0; py < y1; py++) {
+        const row = py * width
+
+        for (let px = x0; px < x1; px++) {
+          const under = words[row + px]! >>> 24
+          // Over a transparent pixel the cell is copied; over the bloom it is blended like source-over.
+          words[row + px] = under === 0 ? word : over(red, green, blue, alpha, accent, under)
+        }
+      }
     }
+  }
+
+  if (steady) ctx.putImageData(g.pixels, 0, 0)
+  else if (maxX > minX && maxY > minY) {
+    const [sw, sh] = [maxX - minX, maxY - minY]
+    g.grid.ctx.putImageData(g.pixels, 0, 0, minX, minY, sw, sh)
+    ctx.drawImage(g.grid.canvas, minX, minY, sw, sh, minX, minY, sw, sh)
   }
 
   // GO, drawn last so nothing passes over it. The Ripple shimmer crosses it as each ring leaves the centre.
@@ -368,12 +515,27 @@ function draw(ctx: CanvasRenderingContext2D, g: Geometry, pal: HeroPalette, t: n
     const s = lerp(dot, P - gap, arrive ** 1.2) * scale * dpr
     const x = (g.cx + (g.ox + (g.lc + cell.col) * P + P / 2 - g.cx) * scale) * dpr - s / 2
     const y = (g.cy + (g.oy + (g.lr + cell.row) * P + P / 2 - g.cy) * scale) * dpr - s / 2
-    ctx.fillStyle = rgba(color, alpha)
+    ctx.fillStyle = style(color, alpha)
 
     // Snap only at rest on the grid; while GO scales in, cells keep sub-pixel positions.
     if (scale === 1) ctx.fillRect(Math.round(x), Math.round(y), Math.round(s), Math.round(s))
     else ctx.fillRect(x, y, s, s)
   }
+}
+
+/** Source-over of a cell colour on a pixel of bloom (accent at `under`/255 alpha), unpremultiplied for ImageData. */
+function over(red: number, green: number, blue: number, alpha: number, accent: RGB, under: number) {
+  const a = alpha / 255
+  const b = (under / 255) * (1 - a)
+  const out = a + b
+  const k = out > 0 ? 1 / out : 0
+
+  return pack(
+    (red * a + accent[0] * b) * k,
+    (green * a + accent[1] * b) * k,
+    (blue * a + accent[2] * b) * k,
+    Math.round(out * 255),
+  )
 }
 
 // ── theme ─────────────────────────────────────────────────────────────────────
@@ -469,9 +631,23 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
     raf = requestAnimationFrame(tick)
   }
 
-  // A still has to be redrawn when its size or theme changes; a running loop picks both up on its next frame.
+  // A still has to be redrawn when its size, pixel ratio or theme changes; a running loop picks them up next frame.
   const redraw = () => {
     if (!raf) render()
+  }
+
+  // A resolution query matches only the current ratio, so each change re-arms it for the new one.
+  let density: MediaQueryList | undefined
+
+  function watchDensity() {
+    density?.removeEventListener("change", onDensity)
+    density = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+    density.addEventListener("change", onDensity)
+  }
+
+  function onDensity() {
+    watchDensity()
+    redraw()
   }
 
   const restyle = () => {
@@ -488,6 +664,7 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
   })
   document.addEventListener("visibilitychange", run)
   reduce.addEventListener("change", run)
+  watchDensity()
   run()
 
   return () => {
@@ -497,5 +674,6 @@ export function mountGoUpsellHero(canvas: HTMLCanvasElement) {
     theme.disconnect()
     document.removeEventListener("visibilitychange", run)
     reduce.removeEventListener("change", run)
+    density?.removeEventListener("change", onDensity)
   }
 }
