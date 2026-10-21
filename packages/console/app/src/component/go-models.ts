@@ -4,7 +4,7 @@ export const goModels = [
   { id: "qwen3.8-max", name: "Qwen3.8 Max", requests: 160, allowance: 15 },
   { id: "grok-4.7", name: "Grok 4.7", requests: 169, allowance: 15 },
   { id: "glm-5.3", name: "GLM-5.3", requests: 220, allowance: 15 },
-  { id: "step-5-preview", name: "Step 5 Preview", requests: 430, allowance: 15, featured: true, fresh: true },
+  { id: "step-5-preview", name: "Step 5 Preview", requests: 430, allowance: 15 },
   {
     id: "gemini-4-argon-contributor",
     name: "Gemini 4 Argon Contributor",
