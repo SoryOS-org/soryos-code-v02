@@ -20,6 +20,20 @@
 
 .session-header-location > [data-slot="session-location-trigger"] {
   max-inline-size: 100%;
+  gap: 6px;
+  padding-inline: 4px;
+}
+
+/* The header shows the location as the project avatar and, in a worktree, the worktree icon, so the title keeps the
+   row. The names stay for assistive tech, and the location card shows them in full. */
+.session-header-location [data-slot="session-location-project"],
+.session-header-location [data-slot="session-location-worktree"] {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .session-header-title {
