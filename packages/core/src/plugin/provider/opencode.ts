@@ -601,7 +601,10 @@ function credentialHeaders(value: Credential.Key | Credential.OAuth): Record<str
 }
 
 function serverUrl(value: Credential.Value) {
-  return typeof value.metadata?.server === "string" ? value.metadata.server : defaultServer
+  const server = typeof value.metadata?.server === "string" ? value.metadata.server : defaultServer
+  // Credentials saved before August 2026 store the retired console.opencode.ai host, which maps path-for-path onto
+  // the default server; rewriting it lets that host be shut down without forcing those users to reconnect.
+  return server.replace(/^https:\/\/console\.opencode\.ai(?=\/|$)/, defaultServer)
 }
 
 function withoutCredentials<Value>(body: Readonly<Record<string, Value>> | undefined) {

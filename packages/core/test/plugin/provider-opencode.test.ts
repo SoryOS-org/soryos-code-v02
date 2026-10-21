@@ -1313,6 +1313,25 @@ describe("OpencodePlugin", () => {
     }),
   )
 
+  it.effect("sends credentials saved with the retired console.opencode.ai host to the default Console", () =>
+    Effect.gen(function* () {
+      const credentials = yield* Credential.Service
+      const requests: string[] = []
+      const http = HttpClient.make((request) => {
+        requests.push(request.url)
+        return Effect.succeed(HttpClientResponse.fromWeb(request, new Response(null, { status: 404 })))
+      })
+      yield* credentials.create({
+        integrationID: Integration.ID.make("opencode"),
+        value: Credential.Key.make({ type: "key", key: "secret", metadata: { server: "https://console.opencode.ai" } }),
+      })
+      yield* addPlugin().pipe(Effect.provideService(HttpClient.HttpClient, http))
+      yield* drain
+
+      expect(requests).toEqual(["https://opencode.ai/console/api/v2/config"])
+    }),
+  )
+
   it.effect("reports a rejected Console refresh token as signed out without removing the credential", () =>
     Effect.acquireUseRelease(
       Effect.sync(() =>
