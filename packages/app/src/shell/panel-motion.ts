@@ -13,7 +13,8 @@ export const panelsMoving = () => flights() > 0
 // changes in one frame and only the panel moves, a few pixels toward its edge, while it fades. The neighbours beside it
 // glide from their old box to the new one. All run as Web Animations, so the compositor plays them through main-thread
 // work.
-const low = motionTuning.mode("sidebars.low", { label: "James", group })
+// The shipped sidebar motion; Kit's spring presets and Instant stay one choice away.
+const low = motionTuning.mode("sidebars.low", { label: "James", group, value: true })
 
 const kit = () => !low()
 
@@ -74,7 +75,7 @@ export const lowPanelShift = motionTuning.number("sidebars.low.panelShift", {
   label: "Panel shift",
   group,
   when: low,
-  value: 12,
+  value: 30,
   min: 0,
   max: 48,
   step: 1,

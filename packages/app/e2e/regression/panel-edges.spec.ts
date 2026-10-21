@@ -43,7 +43,8 @@ test("the content beside a panel follows the panel's edge on every frame of a to
   // Half speed, so even a slow runner draws several frames of each flight.
   await seed(page, {
     settings: { appearance: { tabLayout: "vertical", sidebarOpen: true } },
-    storage: { "opencode.motion.v2": { speed: 0.5 } },
+    // Kit's spring, which this spec covers; the James option ships as the default.
+    storage: { "opencode.motion.v2": { speed: 0.5, "sidebars.low": 0 } },
   })
   await page.goto(sessionHref(fixture.targetID))
   await expect(page.getByRole("heading", { name: fixture.expected.targetTitle })).toBeVisible()

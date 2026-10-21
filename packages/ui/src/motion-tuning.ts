@@ -87,15 +87,17 @@ export const motionTuning = {
    * An alternative to a section's springs, offered beside the Snappy, Smooth and Calm presets rather than as a row.
    * Choosing it turns it on; choosing any other preset turns it off. Knobs can show only in one or the other with `when`.
    */
-  mode(id: string, meta: Meta) {
+  mode(id: string, meta: Meta & { value?: boolean }) {
+    const initial = meta.value ?? false
+
     const knob = register({
       kind: "mode",
       id,
       label: meta.label,
       group: meta.group,
       when: meta.when,
-      initial: false,
-      value: number(id, 0) === 1,
+      initial,
+      value: number(id, initial ? 1 : 0) === 1,
     })
 
     return () => knob.value

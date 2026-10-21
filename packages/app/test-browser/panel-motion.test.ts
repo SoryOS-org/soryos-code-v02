@@ -14,6 +14,8 @@ const cleanups: (() => void)[] = []
 const originals = { raf: globalThis.requestAnimationFrame, caf: globalThis.cancelAnimationFrame }
 
 beforeEach(() => {
+  // Kit's spring tests run with the James option off; its own tests turn it on.
+  setLow(false)
   frames = new Map()
   id = 0
   time = 0
@@ -366,4 +368,13 @@ it("swaps Kit's knobs for the James option's while its mode is on", () => {
   expect(shown()).toEqual(["Movement", "Fade", "Fade duration", "Panel shift", "Layout", "Layout open", "Layout close"])
   setLow(false)
   expect(shown()).toEqual(["Spring", "Motion"])
+})
+
+it("ships the James option as the default sidebar motion", () => {
+  const knob = motionTuning.list().find((item) => item.id === "sidebars.low")
+
+  expect(knob?.kind).toBe("mode")
+  expect(knob?.initial).toBe(true)
+  // The side panel shifts 30px by default; the left sidebar stays at 10px.
+  expect(motionTuning.list().find((item) => item.id === "sidebars.low.panelShift")?.initial).toBe(30)
 })
