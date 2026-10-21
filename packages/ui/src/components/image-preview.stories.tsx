@@ -118,6 +118,54 @@ export const FromMessage = {
   },
 }
 
+// A video in a pane opens into the preview still playing, and goes back when it closes.
+export const FromVideo = {
+  render: () => {
+    const dialog = useDialog()
+    let video
+
+    onMount(() => {
+      const canvas = document.createElement("canvas")
+      canvas.width = 640
+      canvas.height = 400
+      const ctx = canvas.getContext("2d")
+
+      const draw = (time) => {
+        ctx.fillStyle = "#1f2a44"
+        ctx.fillRect(0, 0, 640, 400)
+        ctx.fillStyle = "#ffd27a"
+        ctx.beginPath()
+        ctx.arc(320 + 200 * Math.sin(time / 700), 200, 60, 0, Math.PI * 2)
+        ctx.fill()
+        requestAnimationFrame(draw)
+      }
+
+      requestAnimationFrame(draw)
+      video.srcObject = canvas.captureStream(30)
+    })
+
+    const open = () => dialog.show(() => <mod.ImagePreview src="" alt="Orchard board tour" video={video} />)
+
+    return (
+      <div
+        data-story-pane
+        style={{ width: "640px", margin: "48px auto", display: "flex", "justify-content": "center" }}
+      >
+        <video
+          ref={video}
+          data-story-video
+          muted
+          autoplay
+          playsinline
+          controls
+          onDblClick={open}
+          style={{ width: "100%", "border-radius": "8px", background: "black" }}
+        />
+      </div>
+    )
+  },
+}
+
 // A bright, offline poster, so the image reads clearly against the dimmed page while it moves.
 function poster() {
   const canvas = document.createElement("canvas")

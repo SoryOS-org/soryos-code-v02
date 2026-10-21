@@ -118,14 +118,14 @@ export function ImagePreview(props: ImagePreviewProps) {
     maxScale: maxScale(fitRatio()),
   })
 
+  // The fitted size, read when the preview lays out rather than on every frame of a glide.
+  let size = { width: 0, height: 0 }
+
   const show = (next: ZoomView) => {
     setView(next)
 
     if (props.video) {
-      props.video.style.setProperty(
-        "object-view-box",
-        viewBox(next, { width: image.offsetWidth, height: image.offsetHeight }, natural()),
-      )
+      props.video.style.setProperty("object-view-box", viewBox(next, size, natural()))
 
       return
     }
@@ -340,8 +340,9 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     if (!video || !holder) return
 
-    if (holder.parentElement) holder.parentElement.moveBefore(video, holder)
-    else video.remove()
+    // A page that closed under the preview, such as its tab, has nowhere to take the video back: let it go.
+    if (holder.isConnected && holder.parentElement) holder.parentElement.moveBefore(video, holder)
+    else dispose(video)
     holder.remove()
     holder = undefined
     ;["left", "top", "width", "height", "opacity", "transform", "clip-path", "object-view-box"].forEach((property) =>
@@ -425,7 +426,8 @@ export function ImagePreview(props: ImagePreviewProps) {
 
   const measure = () => {
     if (!natural().width || !image.offsetWidth) return
-    setFitRatio(image.offsetWidth / natural().width)
+    size = { width: image.offsetWidth, height: image.offsetHeight }
+    setFitRatio(size.width / natural().width)
     follow(clampView(view(), bounds()))
 
     if (!props.video) return
@@ -741,6 +743,14 @@ function covered(rows: number, shows: (row: number) => boolean) {
   }
 
   return low
+}
+
+function dispose(video: HTMLVideoElement) {
+  video.pause()
+  video.remove()
+  video.removeAttribute("src")
+  video.srcObject = null
+  video.load()
 }
 
 function layout(element: HTMLElement, frame: Box, radius: number) {

@@ -59,3 +59,26 @@ story("the first Escape zooms the image preview back to fit and the next closes 
   await page.keyboard.press("Escape")
   await expect(preview).toHaveCount(0)
 })
+
+story(
+  "a video whose pane closes under the preview is let go on close instead of moved back",
+  async ({ mount, page }) => {
+    const errors: string[] = []
+    page.on("pageerror", (error) => errors.push(error.message))
+    await mount("components-image-preview--from-video")
+    const video = page.locator("[data-story-video]")
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.videoWidth)).toBeGreaterThan(0)
+    await video.dblclick()
+    const preview = page.locator('[data-component="image-preview"]')
+    await expect(preview).toHaveAttribute("data-stage", "rest")
+    await expect(preview.locator("video")).toHaveCount(1)
+
+    // The pane goes the way a closed tab does, while the preview still shows its video.
+    await page.locator("[data-story-pane]").evaluate((element) => element.remove())
+    await expect(preview.locator("video")).toHaveCount(1)
+    await page.keyboard.press("Escape")
+    await expect(preview).toHaveCount(0)
+    await expect(page.locator("video")).toHaveCount(0)
+    expect(errors).toEqual([])
+  },
+)
