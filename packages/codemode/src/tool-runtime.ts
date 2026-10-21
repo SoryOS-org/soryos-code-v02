@@ -192,8 +192,6 @@ export type Prepared<R = never> = {
 
 export type SearchEntry = {
   readonly description: ToolDescription
-  /** The path split into words, so `zones` matches `get_zones` as a word rather than as a substring of `timezones`. */
-  readonly pathWords: ReadonlyArray<string>
   readonly searchText: string
 }
 
@@ -211,24 +209,47 @@ const termForms = (term: string): Array<string> => {
   return forms
 }
 
+const documents = new WeakMap<SearchEntry, { words: Map<string, number>; length: number }>()
+
 const rank = (entries: ReadonlyArray<SearchEntry>, query: string): Array<SearchEntry> => {
   const terms = tokenize(query).map(termForms)
-  return entries
-    .map((entry) => {
-      const path = entry.description.path.toLowerCase()
-      const description = entry.description.description.toLowerCase()
-      const score = terms.reduce(
-        (total, forms) =>
-          total +
-          (forms.some((form) => path === form || path.endsWith(`.${form}`)) ? 20 : 0) +
-          (forms.some((form) => entry.pathWords.includes(form)) ? 12 : 0) +
-          (forms.some((form) => path.includes(form)) ? 8 : 0) +
-          (forms.some((form) => description.includes(form)) ? 4 : 0) +
-          (forms.some((form) => entry.searchText.includes(form)) ? 2 : 0),
-        0,
-      )
-      return { entry, score }
+  if (terms.length === 0)
+    return [...entries].sort((left, right) => compareText(left.description.path, right.description.path))
+  const frequency = terms.map(() => 0)
+  let totalLength = 0
+  const matches = entries.map((entry) => {
+    let document = documents.get(entry)
+    if (!document) {
+      const words = new Map<string, number>()
+      const add = (text: string, weight: number) => {
+        for (const word of tokenize(text)) words.set(word, (words.get(word) ?? 0) + weight)
+      }
+      add(entry.description.path, 3)
+      add(entry.description.description, 1)
+      add(entry.searchText, 0.25)
+      document = { words, length: [...words.values()].reduce((total, value) => total + value, 0) }
+      documents.set(entry, document)
+    }
+    totalLength += document.length
+    const weights = terms.map((forms, index) => {
+      const value = Math.max(...forms.map((form) => document.words.get(form) ?? 0))
+      if (value > 0) frequency[index]++
+      return value || (forms.some((form) => entry.searchText.includes(form)) ? 0.1 : 0)
     })
+    return { entry, document, weights }
+  })
+  const average = totalLength / Math.max(entries.length, 1)
+  return matches
+    .map(({ entry, document, weights }) => ({
+      entry,
+      score: weights.reduce(
+        (total, weight, index) =>
+          total +
+          (Math.log(1 + (entries.length - frequency[index] + 0.5) / (frequency[index] + 0.5)) * weight * 2.2) /
+            (weight + 1.2 * (0.25 + (0.75 * document.length) / Math.max(average, 1))),
+        0,
+      ),
+    }))
     .filter(({ score }) => terms.length === 0 || score > 0)
     .sort(
       (left, right) =>
@@ -286,7 +307,6 @@ export const searchSignature = (() => {
 
 const toSearchEntry = <R>(visible: VisibleTool<R>): SearchEntry => ({
   description: describeTool(visible),
-  pathWords: tokenize(visible.path),
   searchText: [
     visible.path,
     visible.tool.description,

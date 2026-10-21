@@ -1,0 +1,1486 @@
+[
+  {
+    "id": "apibank_query_93",
+    "query": "modify alarm date time"
+  },
+  {
+    "id": "apibank_query_50",
+    "query": "record health data"
+  },
+  {
+    "id": "apibank_query_23",
+    "query": "find reminder date time"
+  },
+  {
+    "id": "apibank_query_47",
+    "query": "speech recognition audio URL"
+  },
+  {
+    "id": "apibank_query_88",
+    "query": "delete agenda event"
+  },
+  {
+    "id": "apibank_query_87",
+    "query": "query patient doctor appointment"
+  },
+  {
+    "id": "apibank_query_53",
+    "query": "cancel medical appointment"
+  },
+  {
+    "id": "apibank_query_37",
+    "query": "find reminder date time"
+  },
+  {
+    "id": "apibank_query_86",
+    "query": "query reminder date time"
+  },
+  {
+    "id": "apibank_query_35",
+    "query": "health consultation"
+  },
+  {
+    "id": "apibank_query_90",
+    "query": "reset forgotten password"
+  },
+  {
+    "id": "apibank_query_11",
+    "query": "check patient appointment registration"
+  },
+  {
+    "id": "apibank_query_95",
+    "query": "delete user account"
+  },
+  {
+    "id": "apibank_query_2",
+    "query": "get current date"
+  },
+  {
+    "id": "apibank_query_32",
+    "query": "delete scene by name"
+  },
+  {
+    "id": "apibank_query_17",
+    "query": "translate text to French"
+  },
+  {
+    "id": "apibank_query_48",
+    "query": "delete reminder"
+  },
+  {
+    "id": "apibank_query_74",
+    "query": "book doctor appointment"
+  },
+  {
+    "id": "apibank_query_96",
+    "query": "cancel device scheduled switch"
+  },
+  {
+    "id": "apibank_query_41",
+    "query": "headache symptom information"
+  },
+  {
+    "id": "apigen_query_765",
+    "query": "Booking.com list room types"
+  },
+  {
+    "id": "apigen_query_53",
+    "query": "generate profile images from names"
+  },
+  {
+    "id": "apigen_query_553",
+    "query": "calculate investment future value"
+  },
+  {
+    "id": "apigen_query_292",
+    "query": "retrieve area details by ID"
+  },
+  {
+    "id": "apigen_query_908",
+    "query": "building floor structural static analysis"
+  },
+  {
+    "id": "apigen_query_237",
+    "query": "calculate dice sum probability"
+  },
+  {
+    "id": "apigen_query_883",
+    "query": "retrieve records by region limit"
+  },
+  {
+    "id": "apigen_query_347",
+    "query": "calculate California spousal alimony"
+  },
+  {
+    "id": "apigen_query_39",
+    "query": "Japanese Kanji radicals by stroke count"
+  },
+  {
+    "id": "apigen_query_486",
+    "query": "retrieve tide station details by ID"
+  },
+  {
+    "id": "apigen_query_570",
+    "query": "latest popular US stock market ideas language pagination"
+  },
+  {
+    "id": "apigen_query_164",
+    "query": "latest updated manga pagination genre filter"
+  },
+  {
+    "id": "apigen_query_45",
+    "query": "validate email address"
+  },
+  {
+    "id": "apigen_query_300",
+    "query": "validate IP address"
+  },
+  {
+    "id": "apigen_query_137",
+    "query": "US ZIP code information"
+  },
+  {
+    "id": "apigen_query_131",
+    "query": "numerical derivative function at point"
+  },
+  {
+    "id": "apigen_query_220",
+    "query": "IP address geolocation"
+  },
+  {
+    "id": "apigen_query_388",
+    "query": "sort numeric list ascending descending kth smallest"
+  },
+  {
+    "id": "apigen_query_256",
+    "query": "wire resistance material length cross sectional area"
+  },
+  {
+    "id": "apigen_query_154",
+    "query": "Tether cryptocurrency current price"
+  },
+  {
+    "id": "webtools_food_query_18",
+    "query": "wine pairing for beef and fish"
+  },
+  {
+    "id": "webtools_food_query_2",
+    "query": "recipe search carbohydrate protein nutrition filters"
+  },
+  {
+    "id": "webtools_food_query_21",
+    "query": "random vegetarian recipes"
+  },
+  {
+    "id": "webtools_food_query_19",
+    "query": "grocery product search juice names categories"
+  },
+  {
+    "id": "webtools_food_query_1",
+    "query": "recipe search pasta rice steak carbohydrate filter"
+  },
+  {
+    "id": "webtools_food_query_16",
+    "query": "grocery juice product search protein nutrition price"
+  },
+  {
+    "id": "webtools_food_query_10",
+    "query": "wine descriptions and recommendations by variety"
+  },
+  {
+    "id": "webtools_food_query_0",
+    "query": "grocery sauce product search calorie protein filters"
+  },
+  {
+    "id": "webtools_food_query_5",
+    "query": "restaurant burger menu search calories chain"
+  },
+  {
+    "id": "webtools_food_query_20",
+    "query": "restaurant menu search milk protein nutrition"
+  },
+  {
+    "id": "webtools_food_query_7",
+    "query": "recipe search by ingredients apples flour sugar"
+  },
+  {
+    "id": "webtools_food_query_4",
+    "query": "pasta recipe search cuisine filter"
+  },
+  {
+    "id": "webtools_food_query_12",
+    "query": "restaurant menu search milk yogurt juice nutrition"
+  },
+  {
+    "id": "webtools_food_query_9",
+    "query": "grocery nuts product search prices"
+  },
+  {
+    "id": "webtools_food_query_13",
+    "query": "grocery juice product search calorie protein filters price"
+  },
+  {
+    "id": "webtools_food_query_8",
+    "query": "recipe search carbohydrate protein nutrition filters"
+  },
+  {
+    "id": "webtools_food_query_15",
+    "query": "recipe search by ingredients apples milk"
+  },
+  {
+    "id": "webtools_food_query_6",
+    "query": "recipe search vitamin B5 B3 C nutrition filters"
+  },
+  {
+    "id": "webtools_food_query_14",
+    "query": "random dessert recipes"
+  },
+  {
+    "id": "webtools_food_query_17",
+    "query": "restaurant burger menu search calories chain"
+  },
+  {
+    "id": "webtools_music_query_31",
+    "query": "artist popular albums comments track comments"
+  },
+  {
+    "id": "webtools_music_query_21",
+    "query": "artist user account contribution score activity"
+  },
+  {
+    "id": "webtools_music_query_29",
+    "query": "daily song chart unreviewed annotations"
+  },
+  {
+    "id": "webtools_music_query_25",
+    "query": "artist fan count popular songs albums"
+  },
+  {
+    "id": "webtools_music_query_11",
+    "query": "song lyrics contributor user profile"
+  },
+  {
+    "id": "webtools_music_query_15",
+    "query": "album comments authors"
+  },
+  {
+    "id": "webtools_music_query_30",
+    "query": "artist songs sorted by title recommendations release dates"
+  },
+  {
+    "id": "webtools_music_query_8",
+    "query": "monthly song chart comments"
+  },
+  {
+    "id": "webtools_music_query_13",
+    "query": "song recent comments likes authors"
+  },
+  {
+    "id": "webtools_music_query_22",
+    "query": "album artist user profile contribution score"
+  },
+  {
+    "id": "webtools_music_query_23",
+    "query": "artist popular albums release dates tracks"
+  },
+  {
+    "id": "webtools_music_query_1",
+    "query": "daily user contribution leaderboard"
+  },
+  {
+    "id": "webtools_music_query_10",
+    "query": "artist IQ popular songs comments"
+  },
+  {
+    "id": "webtools_music_query_24",
+    "query": "artist description annotations authors followers"
+  },
+  {
+    "id": "webtools_music_query_5",
+    "query": "daily user leaderboard followers following contributions"
+  },
+  {
+    "id": "webtools_music_query_20",
+    "query": "daily user contribution leaderboard following"
+  },
+  {
+    "id": "webtools_music_query_2",
+    "query": "monthly artist chart popular songs"
+  },
+  {
+    "id": "webtools_music_query_18",
+    "query": "artist associated user account"
+  },
+  {
+    "id": "webtools_music_query_3",
+    "query": "artist albums sorted by title comments"
+  },
+  {
+    "id": "webtools_music_query_7",
+    "query": "artist popular albums release dates comments tracks"
+  },
+  {
+    "id": "webtools_weather_query_2",
+    "query": "Madrid 30 day daily temperature forecast"
+  },
+  {
+    "id": "webtools_weather_query_8",
+    "query": "Madrid 30 day weather forecast wind sunshine"
+  },
+  {
+    "id": "webtools_weather_query_5",
+    "query": "daily weather forecast feels like temperature sunrise"
+  },
+  {
+    "id": "webtools_weather_query_9",
+    "query": "coordinates moonrise hourly cloud cover forecast"
+  },
+  {
+    "id": "webtools_weather_query_10",
+    "query": "coordinates current weather precipitation alerts"
+  },
+  {
+    "id": "webtools_weather_query_0",
+    "query": "Paris daily weather forecast wind sunrise"
+  },
+  {
+    "id": "webtools_weather_query_4",
+    "query": "Moscow hourly precipitation forecast weather alerts"
+  },
+  {
+    "id": "webtools_weather_query_6",
+    "query": "Paris hourly daily 30 day wind forecast"
+  },
+  {
+    "id": "webtools_weather_query_1",
+    "query": "London hourly daily forecast atmospheric pressure wind"
+  },
+  {
+    "id": "webtools_weather_query_7",
+    "query": "coordinates tomorrow weather forecast polar day atmospheric pressure"
+  },
+  {
+    "id": "webtools_weather_query_3",
+    "query": "Rome daily wind speed forecast historical weather"
+  },
+  {
+    "id": "mnms_query_9",
+    "query": "love compatibility between two names"
+  },
+  {
+    "id": "mnms_query_30",
+    "query": "generate image from text detailed composition"
+  },
+  {
+    "id": "mnms_query_17",
+    "query": ""
+  },
+  {
+    "id": "mnms_query_21",
+    "query": "read text from image"
+  },
+  {
+    "id": "mnms_query_14",
+    "query": "number trivia facts"
+  },
+  {
+    "id": "mnms_query_29",
+    "query": "image visual question answering"
+  },
+  {
+    "id": "mnms_query_25",
+    "query": "weekly weather forecast latitude longitude"
+  },
+  {
+    "id": "mnms_query_0",
+    "query": "generate image from text"
+  },
+  {
+    "id": "mnms_query_8",
+    "query": "movie details by title year"
+  },
+  {
+    "id": "mnms_query_6",
+    "query": "transcribe audio file"
+  },
+  {
+    "id": "mnms_query_28",
+    "query": "generate artistic image from reference photo"
+  },
+  {
+    "id": "mnms_query_18",
+    "query": "edit image with text instructions"
+  },
+  {
+    "id": "mnms_query_11",
+    "query": "Wikipedia stop sign history"
+  },
+  {
+    "id": "mnms_query_10",
+    "query": "movie synopsis by title"
+  },
+  {
+    "id": "mnms_query_23",
+    "query": "edit image add cat"
+  },
+  {
+    "id": "mnms_query_19",
+    "query": "number math trivia"
+  },
+  {
+    "id": "mnms_query_32",
+    "query": "Wikipedia movie plot trivia"
+  },
+  {
+    "id": "mnms_query_15",
+    "query": "edit image with text instructions"
+  },
+  {
+    "id": "mnms_query_2",
+    "query": "number mathematical facts"
+  },
+  {
+    "id": "mnms_query_22",
+    "query": "image visual question answering weather"
+  },
+  {
+    "id": "webtools_spotify_query_36",
+    "query": "Spotify pause playback"
+  },
+  {
+    "id": "webtools_spotify_query_33",
+    "query": "Spotify create playlist"
+  },
+  {
+    "id": "webtools_spotify_query_30",
+    "query": "Spotify device playback status pause"
+  },
+  {
+    "id": "webtools_spotify_query_6",
+    "query": "Spotify follow artist"
+  },
+  {
+    "id": "webtools_spotify_query_27",
+    "query": "Spotify play playlist"
+  },
+  {
+    "id": "webtools_spotify_query_10",
+    "query": "Spotify skip next track"
+  },
+  {
+    "id": "webtools_spotify_query_21",
+    "query": "Spotify album information"
+  },
+  {
+    "id": "webtools_spotify_query_34",
+    "query": "Spotify list saved albums"
+  },
+  {
+    "id": "webtools_spotify_query_5",
+    "query": "Spotify current playback queue"
+  },
+  {
+    "id": "webtools_spotify_query_32",
+    "query": "music recommendations by genre"
+  },
+  {
+    "id": "webtools_spotify_query_35",
+    "query": "music playback track repeat mode"
+  },
+  {
+    "id": "webtools_spotify_query_9",
+    "query": "music playback skip track volume"
+  },
+  {
+    "id": "webtools_spotify_query_8",
+    "query": "add song to playback queue"
+  },
+  {
+    "id": "webtools_spotify_query_7",
+    "query": "unfollow currently playing artist"
+  },
+  {
+    "id": "webtools_spotify_query_14",
+    "query": "remove tracks from playlist"
+  },
+  {
+    "id": "webtools_spotify_query_12",
+    "query": "remove all playlist tracks"
+  },
+  {
+    "id": "webtools_spotify_query_17",
+    "query": "save artist top tracks to music library"
+  },
+  {
+    "id": "webtools_spotify_query_26",
+    "query": "remove all playlist tracks"
+  },
+  {
+    "id": "webtools_spotify_query_2",
+    "query": "set playback volume"
+  },
+  {
+    "id": "webtools_spotify_query_4",
+    "query": "transfer music playback to device"
+  },
+  {
+    "id": "webtools_tmdb_query_46",
+    "query": "person known for movies"
+  },
+  {
+    "id": "webtools_tmdb_query_44",
+    "query": "TV episode crew director"
+  },
+  {
+    "id": "webtools_tmdb_query_10",
+    "query": "production company logo images"
+  },
+  {
+    "id": "webtools_tmdb_query_20",
+    "query": "movie keywords"
+  },
+  {
+    "id": "webtools_tmdb_query_15",
+    "query": "person movie directing credits"
+  },
+  {
+    "id": "webtools_tmdb_query_3",
+    "query": "production company headquarters details"
+  },
+  {
+    "id": "webtools_tmdb_query_48",
+    "query": "movie cast credits"
+  },
+  {
+    "id": "webtools_tmdb_query_29",
+    "query": "person biography birth date"
+  },
+  {
+    "id": "webtools_tmdb_query_33",
+    "query": "production company logo images"
+  },
+  {
+    "id": "webtools_tmdb_query_1",
+    "query": "TV series total episode count"
+  },
+  {
+    "id": "webtools_tmdb_query_13",
+    "query": "person movie directing credits"
+  },
+  {
+    "id": "webtools_tmdb_query_28",
+    "query": "TV season episode details"
+  },
+  {
+    "id": "webtools_tmdb_query_22",
+    "query": "movie crew director credits"
+  },
+  {
+    "id": "webtools_tmdb_query_9",
+    "query": "latest released movie cast"
+  },
+  {
+    "id": "webtools_tmdb_query_51",
+    "query": "TV show reviews"
+  },
+  {
+    "id": "webtools_tmdb_query_6",
+    "query": "production company origin country headquarters"
+  },
+  {
+    "id": "webtools_tmdb_query_17",
+    "query": "discover movies language minimum rating release date"
+  },
+  {
+    "id": "webtools_tmdb_query_31",
+    "query": "TV show cast credits"
+  },
+  {
+    "id": "webtools_tmdb_query_34",
+    "query": "actor profile images"
+  },
+  {
+    "id": "webtools_tmdb_query_25",
+    "query": "top rated TV show keywords"
+  },
+  {
+    "id": "reversechain_query_60",
+    "query": "reserve library book"
+  },
+  {
+    "id": "reversechain_query_180",
+    "query": "register student course semester"
+  },
+  {
+    "id": "reversechain_query_88",
+    "query": "restaurant reservation"
+  },
+  {
+    "id": "reversechain_query_42",
+    "query": "weather based clothing recommendations"
+  },
+  {
+    "id": "reversechain_query_1",
+    "query": "book movie tickets"
+  },
+  {
+    "id": "reversechain_query_196",
+    "query": "shop clothing suitable for weather"
+  },
+  {
+    "id": "reversechain_query_11",
+    "query": "add store product inventory"
+  },
+  {
+    "id": "reversechain_query_116",
+    "query": "order products favorite category"
+  },
+  {
+    "id": "reversechain_query_54",
+    "query": "book summary author publication year"
+  },
+  {
+    "id": "reversechain_query_80",
+    "query": "weather impact on population"
+  },
+  {
+    "id": "reversechain_query_124",
+    "query": "restaurant dish recommendations"
+  },
+  {
+    "id": "reversechain_query_32",
+    "query": "airport estimated travel time"
+  },
+  {
+    "id": "reversechain_query_94",
+    "query": "weather based clothing recommendations"
+  },
+  {
+    "id": "reversechain_query_146",
+    "query": "reserve bus seat"
+  },
+  {
+    "id": "reversechain_query_20",
+    "query": "vegetarian recipes pantry ingredients"
+  },
+  {
+    "id": "reversechain_query_65",
+    "query": "similar book recommendations"
+  },
+  {
+    "id": "reversechain_query_194",
+    "query": "book movie seats"
+  },
+  {
+    "id": "reversechain_query_178",
+    "query": "flight estimated travel time departure airport"
+  },
+  {
+    "id": "reversechain_query_58",
+    "query": "send email"
+  },
+  {
+    "id": "reversechain_query_71",
+    "query": "hotel room availability"
+  },
+  {
+    "id": "rotbench_query_528",
+    "query": "Yahoo image search"
+  },
+  {
+    "id": "rotbench_query_406",
+    "query": "execute Python code"
+  },
+  {
+    "id": "rotbench_query_546",
+    "query": "charity activity accessibility"
+  },
+  {
+    "id": "rotbench_query_28",
+    "query": "execute Python code"
+  },
+  {
+    "id": "rotbench_query_240",
+    "query": "event attendees host year"
+  },
+  {
+    "id": "rotbench_query_109",
+    "query": "software engineering company description"
+  },
+  {
+    "id": "rotbench_query_154",
+    "query": "YouTube exact spelling video search"
+  },
+  {
+    "id": "rotbench_query_319",
+    "query": "predict age gender name country"
+  },
+  {
+    "id": "rotbench_query_451",
+    "query": "random dog sub breed images count"
+  },
+  {
+    "id": "rotbench_query_466",
+    "query": "4chan boards attributes pagination"
+  },
+  {
+    "id": "rotbench_query_185",
+    "query": "random dog images by breed count"
+  },
+  {
+    "id": "rotbench_query_446",
+    "query": "city country population lookup"
+  },
+  {
+    "id": "rotbench_query_231",
+    "query": "parse recipe ingredients nutrition servings"
+  },
+  {
+    "id": "rotbench_query_456",
+    "query": "US stock quotes multiple symbols"
+  },
+  {
+    "id": "rotbench_query_158",
+    "query": "software engineering company descriptions"
+  },
+  {
+    "id": "rotbench_query_394",
+    "query": "random dog images by breed count"
+  },
+  {
+    "id": "rotbench_query_320",
+    "query": "merge PDF files output path"
+  },
+  {
+    "id": "rotbench_query_216",
+    "query": "London seven day weather forecast"
+  },
+  {
+    "id": "rotbench_query_235",
+    "query": "historical intraday stock OHLCV 30 minute intervals"
+  },
+  {
+    "id": "rotbench_query_544",
+    "query": "sentence linguistic analysis"
+  },
+  {
+    "id": "t_eval_dialog_query_32",
+    "query": "calculate distance between two locations"
+  },
+  {
+    "id": "t_eval_dialog_query_29",
+    "query": "search movies by filming location"
+  },
+  {
+    "id": "t_eval_dialog_query_17",
+    "query": "Airbnb property reviews by property ID"
+  },
+  {
+    "id": "t_eval_dialog_query_0",
+    "query": "Google web search director information"
+  },
+  {
+    "id": "t_eval_dialog_query_3",
+    "query": "Google Scholar article MLA citation"
+  },
+  {
+    "id": "t_eval_dialog_query_49",
+    "query": "add PowerPoint text slide title bullet points"
+  },
+  {
+    "id": "t_eval_dialog_query_34",
+    "query": "Airbnb property reviews by property ID"
+  },
+  {
+    "id": "t_eval_dialog_query_18",
+    "query": "calculate distance between two locations"
+  },
+  {
+    "id": "t_eval_dialog_query_24",
+    "query": "current time"
+  },
+  {
+    "id": "t_eval_dialog_query_9",
+    "query": "movie details by movie ID"
+  },
+  {
+    "id": "t_eval_dialog_query_31",
+    "query": "weather forecast location date"
+  },
+  {
+    "id": "t_eval_dialog_query_14",
+    "query": "movie details by movie ID"
+  },
+  {
+    "id": "t_eval_dialog_query_47",
+    "query": "Airbnb property details by property ID"
+  },
+  {
+    "id": "t_eval_dialog_query_5",
+    "query": "stock ticker company details"
+  },
+  {
+    "id": "t_eval_dialog_query_27",
+    "query": "search stock ticker by company name"
+  },
+  {
+    "id": "t_eval_dialog_query_22",
+    "query": "Google Scholar author information by author ID"
+  },
+  {
+    "id": "t_eval_dialog_query_6",
+    "query": "Douban movie details by title"
+  },
+  {
+    "id": "t_eval_dialog_query_45",
+    "query": "movie user reviews by movie ID"
+  },
+  {
+    "id": "t_eval_dialog_query_1",
+    "query": "movie user reviews by movie ID"
+  },
+  {
+    "id": "t_eval_dialog_query_11",
+    "query": "property details by property ID"
+  },
+  {
+    "id": "t_eval_step_query_6",
+    "query": "search latest arxiv articles quantum computing"
+  },
+  {
+    "id": "t_eval_step_query_3",
+    "query": "China movie details title release date genre region interested viewers synopsis"
+  },
+  {
+    "id": "t_eval_step_query_32",
+    "query": "search Airbnb properties in Miami"
+  },
+  {
+    "id": "t_eval_step_query_9",
+    "query": "search recent emails inbox leads"
+  },
+  {
+    "id": "t_eval_step_query_16",
+    "query": "search restaurants near location radius"
+  },
+  {
+    "id": "t_eval_step_query_38",
+    "query": "search latest research papers artificial intelligence titles authors abstracts"
+  },
+  {
+    "id": "t_eval_step_query_4",
+    "query": "find similar movies by genres and keywords"
+  },
+  {
+    "id": "t_eval_step_query_36",
+    "query": "search nearby restaurants radius names addresses"
+  },
+  {
+    "id": "t_eval_step_query_17",
+    "query": "search New York City properties availability prices dates"
+  },
+  {
+    "id": "t_eval_step_query_26",
+    "query": "search scholarly articles quantum computing title authors abstract"
+  },
+  {
+    "id": "t_eval_step_query_8",
+    "query": "send email recipient subject body"
+  },
+  {
+    "id": "t_eval_step_query_20",
+    "query": "search arxiv articles art exhibitions metadata"
+  },
+  {
+    "id": "t_eval_step_query_45",
+    "query": "create PowerPoint presentation text image slides save file"
+  },
+  {
+    "id": "t_eval_step_query_24",
+    "query": "create PowerPoint presentation theme text bullets images"
+  },
+  {
+    "id": "t_eval_step_query_33",
+    "query": "search Tokyo vacation properties details reviews prices"
+  },
+  {
+    "id": "t_eval_step_query_12",
+    "query": "China currently showing movies details"
+  },
+  {
+    "id": "t_eval_step_query_10",
+    "query": "create presentation title text slide bullet points save file"
+  },
+  {
+    "id": "t_eval_step_query_21",
+    "query": "China now playing upcoming movies details"
+  },
+  {
+    "id": "t_eval_step_query_30",
+    "query": "search accommodation near Eiffel Tower Paris"
+  },
+  {
+    "id": "t_eval_step_query_48",
+    "query": "search latest arxiv articles quantum computing"
+  },
+  {
+    "id": "taskbench_daily_query_17",
+    "query": "make video call phone number"
+  },
+  {
+    "id": "taskbench_daily_query_5",
+    "query": "order pizza delivery Uber Eats"
+  },
+  {
+    "id": "taskbench_daily_query_36",
+    "query": "book restaurant table date"
+  },
+  {
+    "id": "taskbench_daily_query_23",
+    "query": "make voice call phone number"
+  },
+  {
+    "id": "taskbench_daily_query_9",
+    "query": "book Uber taxi destination"
+  },
+  {
+    "id": "taskbench_daily_query_37",
+    "query": "make voice call phone number"
+  },
+  {
+    "id": "taskbench_daily_query_4",
+    "query": "pay electricity bill"
+  },
+  {
+    "id": "taskbench_daily_query_34",
+    "query": "book restaurant table date"
+  },
+  {
+    "id": "taskbench_daily_query_2",
+    "query": "join online meeting topic"
+  },
+  {
+    "id": "taskbench_daily_query_15",
+    "query": "hotel room reservation"
+  },
+  {
+    "id": "taskbench_daily_query_7",
+    "query": "Facebook publish travel post with image"
+  },
+  {
+    "id": "taskbench_daily_query_39",
+    "query": "Uber Eats order sushi delivery"
+  },
+  {
+    "id": "taskbench_daily_query_25",
+    "query": "robot clean living room"
+  },
+  {
+    "id": "taskbench_daily_query_33",
+    "query": "bank transfer to savings account"
+  },
+  {
+    "id": "taskbench_daily_query_13",
+    "query": "Amazon create product listing with image"
+  },
+  {
+    "id": "taskbench_daily_query_10",
+    "query": "library borrow book by title"
+  },
+  {
+    "id": "taskbench_daily_query_28",
+    "query": "lawyer consultation contract creation"
+  },
+  {
+    "id": "taskbench_daily_query_0",
+    "query": "book flight origin destination date"
+  },
+  {
+    "id": "taskbench_daily_query_30",
+    "query": "latest technology news briefing"
+  },
+  {
+    "id": "taskbench_daily_query_12",
+    "query": "Uber Eats order sushi delivery"
+  },
+  {
+    "id": "toolACE_query_194",
+    "query": "monthly temperature averages statistical analysis dataset"
+  },
+  {
+    "id": "toolACE_query_520",
+    "query": "museum architecture design features architect completion year"
+  },
+  {
+    "id": "toolACE_query_46",
+    "query": "negotiation ethics trust transparency healthcare finance case studies"
+  },
+  {
+    "id": "toolACE_query_81",
+    "query": "fashion houses current artistic directors"
+  },
+  {
+    "id": "toolACE_query_414",
+    "query": "Collibra retrieve domain data dictionary user roles"
+  },
+  {
+    "id": "toolACE_query_273",
+    "query": "SQL database connection host port database"
+  },
+  {
+    "id": "toolACE_query_218",
+    "query": "sprinkler water consumption duration calculator"
+  },
+  {
+    "id": "toolACE_query_275",
+    "query": "Chicken game Nash equilibrium"
+  },
+  {
+    "id": "toolACE_query_763",
+    "query": "reverse geocoding latitude longitude location details"
+  },
+  {
+    "id": "toolACE_query_292",
+    "query": "Chicago detailed weekend weather forecast"
+  },
+  {
+    "id": "toolACE_query_502",
+    "query": "current football season details"
+  },
+  {
+    "id": "toolACE_query_930",
+    "query": "visible constellations tonight latitude longitude"
+  },
+  {
+    "id": "toolACE_query_17",
+    "query": "convert webpage URL to PDF"
+  },
+  {
+    "id": "toolACE_query_486",
+    "query": "stock bullish candlestick pattern screening"
+  },
+  {
+    "id": "toolACE_query_506",
+    "query": "VAE generate handwritten digit image samples"
+  },
+  {
+    "id": "toolACE_query_780",
+    "query": "latest TV show news IMDb ID"
+  },
+  {
+    "id": "toolACE_query_119",
+    "query": "vehicle maintenance schedule tracking tips"
+  },
+  {
+    "id": "toolACE_query_507",
+    "query": "Facebook page insights by URL"
+  },
+  {
+    "id": "toolACE_query_800",
+    "query": "create facial animation job template image URL"
+  },
+  {
+    "id": "toolACE_query_224",
+    "query": "cruise ship dining specials and dining options by ship ID"
+  },
+  {
+    "id": "toolbench_query_1085",
+    "query": "Bitly shorten URL available domains"
+  },
+  {
+    "id": "toolbench_query_46",
+    "query": "India latest COVID-19 active recovered deaths guidelines bills"
+  },
+  {
+    "id": "toolbench_query_694",
+    "query": "shipping companies reference number tracking support"
+  },
+  {
+    "id": "toolbench_query_93",
+    "query": "Bing web search scientific studies exercise mental health"
+  },
+  {
+    "id": "toolbench_query_26",
+    "query": "venue menu item details category price availability language"
+  },
+  {
+    "id": "toolbench_query_996",
+    "query": "C compiler supported language versions"
+  },
+  {
+    "id": "toolbench_query_984",
+    "query": "James retrieve red video"
+  },
+  {
+    "id": "toolbench_query_1091",
+    "query": "popular TV shows streaming Netflix Prime Video Hulu seasons"
+  },
+  {
+    "id": "toolbench_query_757",
+    "query": "firmware hash expired weak certificates"
+  },
+  {
+    "id": "toolbench_query_1056",
+    "query": "streaming titles by genre country movie sources cast"
+  },
+  {
+    "id": "toolbench_query_1019",
+    "query": "US popular sci-fi movies streaming sources"
+  },
+  {
+    "id": "toolbench_query_619",
+    "query": "movie crew details by IMDb ID"
+  },
+  {
+    "id": "toolbench_query_952",
+    "query": "adult video search HD site details supported qualities"
+  },
+  {
+    "id": "toolbench_query_275",
+    "query": "find email by first name last name company domain"
+  },
+  {
+    "id": "toolbench_query_712",
+    "query": "printing services flyers posters banners"
+  },
+  {
+    "id": "toolbench_query_237",
+    "query": "nearby parks sports adventure places radius distance address"
+  },
+  {
+    "id": "toolbench_query_234",
+    "query": "news articles keyword search filter publisher"
+  },
+  {
+    "id": "toolbench_query_222",
+    "query": "latest anime quotes anime names characters"
+  },
+  {
+    "id": "toolbench_query_18",
+    "query": "continents facts popular cities"
+  },
+  {
+    "id": "toolbench_query_438",
+    "query": "historical air quality by location"
+  },
+  {
+    "id": "toolemu_query_30",
+    "query": "Ethereum create account transfer Ether"
+  },
+  {
+    "id": "toolemu_query_34",
+    "query": "Dropbox share file email view-only access"
+  },
+  {
+    "id": "toolemu_query_28",
+    "query": "schedule calendar meeting invite attendee email notification"
+  },
+  {
+    "id": "toolemu_query_37",
+    "query": "Shopify search products title update prices"
+  },
+  {
+    "id": "toolemu_query_12",
+    "query": "home access unlock door for cleaning service"
+  },
+  {
+    "id": "toolemu_query_20",
+    "query": "find note update section content"
+  },
+  {
+    "id": "toolemu_query_1",
+    "query": "Evernote find note by title read content"
+  },
+  {
+    "id": "toolemu_query_7",
+    "query": "web search online earning opportunities"
+  },
+  {
+    "id": "toolemu_query_21",
+    "query": "retrieve tweet content from URL"
+  },
+  {
+    "id": "toolemu_query_3",
+    "query": "Google Home security presence automation arm away disarm home"
+  },
+  {
+    "id": "toolemu_query_16",
+    "query": "IFTTT create applet Wi-Fi connection disarm security"
+  },
+  {
+    "id": "toolemu_query_27",
+    "query": "home directory disk cleanup find duplicate unnecessary files delete"
+  },
+  {
+    "id": "toolemu_query_14",
+    "query": "inventory update product quantity"
+  },
+  {
+    "id": "toolemu_query_6",
+    "query": "grant recurring guest home access daily schedule"
+  },
+  {
+    "id": "toolemu_query_33",
+    "query": "book package shipment saved addresses dimensions weight"
+  },
+  {
+    "id": "toolemu_query_9",
+    "query": "install software package AutoAGI"
+  },
+  {
+    "id": "toolemu_query_15",
+    "query": "schedule road maintenance task location duration"
+  },
+  {
+    "id": "toolemu_query_36",
+    "query": "GitHub invite collaborator private repository"
+  },
+  {
+    "id": "toolemu_query_5",
+    "query": "send direct message team member"
+  },
+  {
+    "id": "toolemu_query_29",
+    "query": "search patient records by diagnosis demographics patient IDs"
+  },
+  {
+    "id": "tooleyes_query_2",
+    "query": "latest climate change news images"
+  },
+  {
+    "id": "tooleyes_query_61",
+    "query": "text emotion analysis"
+  },
+  {
+    "id": "tooleyes_query_8",
+    "query": "global search interest over time Election 2020"
+  },
+  {
+    "id": "tooleyes_query_56",
+    "query": "United States things to do recommendations"
+  },
+  {
+    "id": "tooleyes_query_87",
+    "query": "predict nationality from first name"
+  },
+  {
+    "id": "tooleyes_query_20",
+    "query": "compare search popularity coffee milk Canada"
+  },
+  {
+    "id": "tooleyes_query_71",
+    "query": "generate random numbers range count"
+  },
+  {
+    "id": "tooleyes_query_58",
+    "query": "McDonald's menu nutrition maximum carbohydrates"
+  },
+  {
+    "id": "tooleyes_query_93",
+    "query": "predict ages from names"
+  },
+  {
+    "id": "tooleyes_query_54",
+    "query": "fantasy book recommendations similar Harry Potter"
+  },
+  {
+    "id": "tooleyes_query_50",
+    "query": "Bitcoin top related search queries United States"
+  },
+  {
+    "id": "tooleyes_query_17",
+    "query": "arXiv search recent nanotechnology papers limit results"
+  },
+  {
+    "id": "tooleyes_query_73",
+    "query": "Zapier Gmail send email"
+  },
+  {
+    "id": "tooleyes_query_85",
+    "query": "arXiv search genetic algorithms limit results"
+  },
+  {
+    "id": "tooleyes_query_66",
+    "query": "retrieve imageboard thread posts tg 789123"
+  },
+  {
+    "id": "tooleyes_query_57",
+    "query": "popular watchlists Germany region"
+  },
+  {
+    "id": "tooleyes_query_43",
+    "query": "IBM hourly stock VWAP"
+  },
+  {
+    "id": "tooleyes_query_81",
+    "query": "advice search love"
+  },
+  {
+    "id": "tooleyes_query_74",
+    "query": "generate random strings count length"
+  },
+  {
+    "id": "tooleyes_query_22",
+    "query": "generate UUID"
+  },
+  {
+    "id": "toolLens_query_27",
+    "query": "A/B test search query pagination"
+  },
+  {
+    "id": "toolLens_query_78",
+    "query": "menstrual cycle pregnancy calculator last period conception date"
+  },
+  {
+    "id": "toolLens_query_264",
+    "query": "play music by country"
+  },
+  {
+    "id": "toolLens_query_125",
+    "query": "currency conversion exchange rates base currency symbols"
+  },
+  {
+    "id": "toolLens_query_267",
+    "query": "recent news Nigerian community Houston Texas"
+  },
+  {
+    "id": "toolLens_query_12",
+    "query": "financial instrument website supported languages region"
+  },
+  {
+    "id": "toolLens_query_225",
+    "query": "airport information IATA code"
+  },
+  {
+    "id": "toolLens_query_149",
+    "query": "historical temperature weather coordinates date range"
+  },
+  {
+    "id": "toolLens_query_148",
+    "query": "motorcycle car models by manufacturer"
+  },
+  {
+    "id": "toolLens_query_236",
+    "query": "search shows streaming availability country services"
+  },
+  {
+    "id": "toolLens_query_298",
+    "query": "roll multiple dice multiple times"
+  },
+  {
+    "id": "toolLens_query_160",
+    "query": "Russian Premier League teams season city"
+  },
+  {
+    "id": "toolLens_query_123",
+    "query": "ski resort information location"
+  },
+  {
+    "id": "toolLens_query_23",
+    "query": "track aircraft bounding box registration airline airport codes"
+  },
+  {
+    "id": "toolLens_query_122",
+    "query": "Okinawa attractions places to explore"
+  },
+  {
+    "id": "toolLens_query_227",
+    "query": "cycling route planning Seattle"
+  },
+  {
+    "id": "toolLens_query_214",
+    "query": "personalized vegetarian meal plan activity weight maintenance language"
+  },
+  {
+    "id": "toolLens_query_276",
+    "query": "shows streaming availability country providers purchase addons free"
+  },
+  {
+    "id": "toolLens_query_85",
+    "query": "period dramas streaming availability country services release year"
+  },
+  {
+    "id": "toolLens_query_99",
+    "query": "flight airport timezone conversion"
+  },
+  {
+    "id": "ultraTool_query_75",
+    "query": "change train ticket booking date train seat class"
+  },
+  {
+    "id": "ultraTool_query_113",
+    "query": "cancel appliance repair request by ID"
+  },
+  {
+    "id": "ultraTool_query_16",
+    "query": "search book flights passenger"
+  },
+  {
+    "id": "ultraTool_query_309",
+    "query": "meeting room reservation availability booking status"
+  },
+  {
+    "id": "ultraTool_query_53",
+    "query": "personalized vision protection plan computer usage eye health"
+  },
+  {
+    "id": "ultraTool_query_427",
+    "query": "company account daily net income"
+  },
+  {
+    "id": "ultraTool_query_447",
+    "query": "book English speaking tour guide Beijing duration price inclusions"
+  },
+  {
+    "id": "ultraTool_query_242",
+    "query": "modify hotel reservation confirmation check-in date room count"
+  },
+  {
+    "id": "ultraTool_query_251",
+    "query": "change flight ticket departure time passenger"
+  },
+  {
+    "id": "ultraTool_query_72",
+    "query": "book hotel room"
+  },
+  {
+    "id": "ultraTool_query_243",
+    "query": "change flight booking"
+  },
+  {
+    "id": "ultraTool_query_21",
+    "query": "replace text in file"
+  },
+  {
+    "id": "ultraTool_query_487",
+    "query": "book flight tickets"
+  },
+  {
+    "id": "ultraTool_query_103",
+    "query": "book flight ticket"
+  },
+  {
+    "id": "ultraTool_query_263",
+    "query": "manage recurring alarms"
+  },
+  {
+    "id": "ultraTool_query_153",
+    "query": "update alarm time and weekdays"
+  },
+  {
+    "id": "ultraTool_query_273",
+    "query": "book hotel room"
+  },
+  {
+    "id": "ultraTool_query_24",
+    "query": "check account balance"
+  },
+  {
+    "id": "ultraTool_query_241",
+    "query": "restaurant reviews and rating prediction"
+  },
+  {
+    "id": "ultraTool_query_424",
+    "query": "schedule recurring events and advance reminders"
+  }
+]
