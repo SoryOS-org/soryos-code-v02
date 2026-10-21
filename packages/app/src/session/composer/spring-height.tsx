@@ -52,7 +52,7 @@ export function ComposerMorph<T extends { key: string }>(props: {
   const paintFace = (item: Face<T>, shown: number) => {
     if (!item.el) return
     const p = Math.max(0, Math.min(1, item.presence.value))
-    styleFace(item.el, item.height, shown, p, item.leaving() ? 2 : 6)
+    styleFace(item.el, p, item.leaving() ? 2 : 6, item.height - shown)
   }
 
   const paint = (dt: number) => {
@@ -155,13 +155,12 @@ function tune(spring: Spring, options: DurationOptions) {
   return spring
 }
 
-function styleFace(el: HTMLElement, full: number, shown: number, p: number, dy: number, mask = true, box = el) {
-  box.style.opacity = `${(p * p).toFixed(4)}`
+function styleFace(el: HTMLElement, p: number, dy: number, hidden = 0, content = el) {
+  el.style.opacity = `${(p * p).toFixed(4)}`
   if (prefersReducedMotion()) return
-  el.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`
-  box.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
-  const hidden = mask ? Math.max(0, full - shown) : 0
-  el.style.maskImage =
+  content.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`
+  el.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
+  content.style.maskImage =
     hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
 }
 
@@ -200,7 +199,11 @@ export function Grow<T>(props: {
 
   return (
     <Show when={present()}>
-      <div ref={el} class={[props.class, props.card && "[&:not(:last-child)]:mb-2", surface].filter(Boolean).join(" ")}>
+      <div
+        ref={el}
+        inert={!props.when}
+        class={[props.class, props.card && "[&:not(:last-child)]:mb-2", surface].filter(Boolean).join(" ")}
+      >
         {(() => {
           const child = props.children
           return typeof child === "function" ? <Show when={item()} keyed>{child}</Show> : child
@@ -212,12 +215,13 @@ export function Grow<T>(props: {
 
 const growing = new WeakMap<HTMLElement, { spring: Spring; open: boolean; done?: () => void }>()
 
-function grow(el: HTMLElement, open: boolean, fade?: boolean, card?: boolean, done?: () => void) {
+function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean, done?: () => void) {
+  const reduced = prefersReducedMotion()
   const current = growing.get(el)
   if (current) {
     current.open = open
     current.done = done
-    tune(current.spring, open ? enter : exit)
+    tune(current.spring, reduced ? fade : open ? enter : exit)
     return
   }
 
@@ -225,18 +229,19 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, card?: boolean, do
   const prevMb =
     (!mb && el.previousElementSibling ? parseFloat(getComputedStyle(el.previousElementSibling).marginBottom) : 0) || 0
   const state = {
-    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, open ? enter : exit),
+    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, reduced ? fade : open ? enter : exit),
     open,
     done,
   }
   growing.set(el, state)
   el.toggleAttribute("data-moving", true)
   el.toggleAttribute("data-dock-border-underlay", !!card)
-  el.style.height = `${snap(state.spring.value)}px`
-  if (open && mb > 0) el.style.marginBottom = "0px"
-  if (open && prevMb > 0) el.style.marginTop = `${-prevMb}px`
-  if (fade && open && el.firstElementChild instanceof HTMLElement)
-    styleFace(el.firstElementChild, 0, 0, 0, 4, card, el)
+  if (!reduced) {
+    el.style.height = `${snap(state.spring.value)}px`
+    if (open && mb > 0) el.style.marginBottom = "0px"
+    if (open && prevMb > 0) el.style.marginTop = `${-prevMb}px`
+  }
+  if ((withFade || reduced) && open) el.style.opacity = "0"
 
   let full = 0
   frameLoop.addMeasured(
@@ -252,8 +257,8 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, card?: boolean, do
         growing.delete(el)
         return false
       }
+      const noMotion = prefersReducedMotion()
       const size = state.open ? full : 0
-      if (prefersReducedMotion()) state.spring.snap(size)
       state.spring.set(size).step(dt)
       if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
 
@@ -265,11 +270,15 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, card?: boolean, do
 
       const value = snap(Math.max(0, state.spring.value))
       const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
-      el.style.height = `${value}px`
-      if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
-      if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
-      if (fade && el.firstElementChild instanceof HTMLElement)
-        styleFace(el.firstElementChild, full, value, p, 4, card, el)
+      if (!noMotion) {
+        el.style.height = `${value}px`
+        if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
+        if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
+      }
+      if (withFade || noMotion) {
+        const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
+        styleFace(el, p, 4, card ? full - value : 0, child)
+      }
       return true
     },
   )
