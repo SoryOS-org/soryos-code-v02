@@ -1425,6 +1425,7 @@ export type VoiceModelsOutput = {
     readonly transports: ReadonlyArray<"webrtc" | "websocket">
     readonly available: boolean
     readonly integration?: string | undefined
+    readonly workspace?: string | undefined
   }>
   readonly default?: string | undefined
 }

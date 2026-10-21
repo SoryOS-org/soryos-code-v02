@@ -5440,7 +5440,7 @@
             }
           }
         },
-        "description": "List supported voice models, their transports, and whether the server has a usable API key for each provider.",
+        "description": "List supported voice models, their transports, whether the server has a usable API key for each provider or the connected OpenCode Console hosts the model, and the Console workspace a hosted model bills to.",
         "summary": "List voice models"
       }
     },
@@ -20702,6 +20702,16 @@
             "type": "boolean"
           },
           "integration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
             "anyOf": [
               {
                 "type": "string"

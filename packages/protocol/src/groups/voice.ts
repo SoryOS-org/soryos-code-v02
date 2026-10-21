@@ -13,6 +13,8 @@ export const VoiceModel = Schema.Struct({
   available: Schema.Boolean,
   /** The integration whose connection starts its sessions: the provider's stored key, or `opencode` when the connected OpenCode Console hosts it. */
   integration: Schema.optional(Schema.String),
+  /** The OpenCode Console workspace a hosted model's sessions bill to. */
+  workspace: Schema.optional(Schema.String),
 }).annotate({ identifier: "VoiceModel" })
 
 export const VoiceWebRTCTransportInput = Schema.Struct({
@@ -62,7 +64,7 @@ export const VoiceGroup = HttpApiGroup.make("server.voice")
         identifier: "experimental.voice.models",
         summary: "List voice models",
         description:
-          "List supported voice models, their transports, and whether the server has a usable API key for each provider.",
+          "List supported voice models, their transports, whether the server has a usable API key for each provider or the connected OpenCode Console hosts the model, and the Console workspace a hosted model bills to.",
       }),
     ),
   )

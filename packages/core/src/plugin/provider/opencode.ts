@@ -65,8 +65,13 @@ const RemoteResponse = Schema.Struct({
       Schema.Struct({ ...Mcp.RemoteConfig.fields, auth: Schema.Literal("console").pipe(Schema.optional) }),
     ),
   }).pipe(Schema.optional),
-  // Hosted voice models the Console starts for the caller's workspace, and the inference base that creates them.
-  voice: Schema.Struct({ baseURL: Schema.String, models: Schema.Array(Schema.String) }).pipe(Schema.optional),
+  // Hosted voice models the Console starts for the caller's workspace, the inference base that creates them, and the
+  // workspace's display name, which older Consoles omit.
+  voice: Schema.Struct({
+    baseURL: Schema.String,
+    models: Schema.Array(Schema.String),
+    workspace: Schema.String.pipe(Schema.optional),
+  }).pipe(Schema.optional),
   // Organization policy compiled for the authenticated caller; omitted when there is none.
   // `experimental.policies` remains accepted alongside top-level `policies`.
   policies: RemotePolicies,
@@ -331,6 +336,7 @@ export const OpencodePlugin = define<
       return {
         integration: "opencode",
         models: offer.models,
+        workspace: offer.workspace,
         session: (input) =>
           send("/live/sessions", { session: { ...input.session, model: input.model }, transport: input.transport }).pipe(
             Effect.flatMap((text) =>

@@ -2043,7 +2043,13 @@ describe("OpencodePlugin hosted voice", () => {
             return Response.json({
               providers: {},
               ...(state.offered
-                ? { voice: { baseURL: `${url.origin}/inference/openai/v1`, models: ["gpt-live-1"] } }
+                ? {
+                    voice: {
+                      baseURL: `${url.origin}/inference/openai/v1`,
+                      models: ["gpt-live-1"],
+                      workspace: "Anomaly",
+                    },
+                  }
                 : {}),
             })
           requests.push({
@@ -2091,7 +2097,7 @@ describe("OpencodePlugin hosted voice", () => {
           yield* connect(server)
           const live = Effect.map(voice.models(), (list) => list.models.find((item) => item.model === "gpt-live-1"))
 
-          expect((yield* live)?.integration).toBe("opencode")
+          expect(yield* live).toMatchObject({ integration: "opencode", workspace: "Anomaly" })
           expect(yield* voice.session(offer)).toEqual({
             transport: { type: "webrtc", sdp: "answer:console" },
             id: "sess_console",

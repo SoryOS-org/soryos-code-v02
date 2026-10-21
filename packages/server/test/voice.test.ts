@@ -16,7 +16,14 @@ const voice = makeLocationNode({
       models: () =>
         Effect.succeed({
           models: [
-            { model: "gpt-live-1", provider: "openai", transports: ["webrtc"], available: true },
+            {
+              model: "gpt-live-1",
+              provider: "openai",
+              transports: ["webrtc"],
+              available: true,
+              integration: "opencode",
+              workspace: "Anomaly",
+            },
             { model: "gpt-realtime-2.1", provider: "openai", transports: ["webrtc", "websocket"], available: true },
             { model: "grok-voice-3.0", provider: "xai", transports: ["websocket"], available: false },
             { model: "gemini-3.8-live", provider: "google", transports: ["websocket"], available: false },
@@ -72,7 +79,14 @@ it.live("routes experimental voice models and session endpoints", () =>
     expect(yield* Effect.promise(() => modelsRes.json())).toEqual({
       data: {
         models: [
-          { model: "gpt-live-1", provider: "openai", transports: ["webrtc"], available: true },
+          {
+            model: "gpt-live-1",
+            provider: "openai",
+            transports: ["webrtc"],
+            available: true,
+            integration: "opencode",
+            workspace: "Anomaly",
+          },
           { model: "gpt-realtime-2.1", provider: "openai", transports: ["webrtc", "websocket"], available: true },
           { model: "grok-voice-3.0", provider: "xai", transports: ["websocket"], available: false },
           { model: "gemini-3.8-live", provider: "google", transports: ["websocket"], available: false },

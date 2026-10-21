@@ -215,6 +215,7 @@ const withStoredKey = (requests: string[]) =>
 const hostedLive = (instructed: Voice.InstructInput[]): Voice.Host => ({
   integration: "opencode",
   models: ["gpt-live-1"],
+  workspace: "Anomaly",
   session: (input) =>
     Effect.succeed({
       transport: { type: "webrtc", sdp: input.transport.type === "webrtc" ? `answer:hosted:${input.transport.sdp}` : "" },
@@ -245,6 +246,7 @@ it.effect("starts a host's models and relays their instructions on it, even besi
       transports: ["webrtc"],
       available: true,
       integration: "opencode",
+      workspace: "Anomaly",
     })
     yield* voice.instruct({ id: "sess_hosted", instructions: "The screen shows ses_1." })
     expect(instructed).toEqual([{ id: "sess_hosted", instructions: "The screen shows ses_1." }])

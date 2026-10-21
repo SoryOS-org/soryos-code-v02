@@ -670,6 +670,7 @@ export type VoiceModel = {
   transports: Array<VoiceTransportType>
   available: boolean
   integration?: string | undefined
+  workspace?: string | undefined
 }
 
 export type VoiceTransport = VoiceWebRTCTransport | VoiceWebSocketTransport

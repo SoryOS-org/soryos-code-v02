@@ -21,6 +21,8 @@ export interface ModelInfo {
   readonly available: boolean
   /** The integration whose connection starts its sessions: the provider's for a stored key, or a host's. */
   readonly integration?: string
+  /** The workspace its sessions bill to, for display: set only when a host that names one runs it. */
+  readonly workspace?: string
 }
 
 export interface Models {
@@ -52,6 +54,8 @@ export interface InstructInput {
 export interface Host {
   readonly integration: string
   readonly models: readonly string[]
+  /** The workspace its sessions bill to, for display. */
+  readonly workspace?: string
   readonly session: (input: SessionInput) => Effect.Effect<Session, Error>
   readonly instruct: (input: InstructInput) => Effect.Effect<void, Error>
 }
@@ -101,6 +105,7 @@ export const layer = Layer.effect(
               transports: engine.transports,
               available: true,
               integration: host.integration,
+              ...(host.workspace === undefined ? {} : { workspace: host.workspace }),
             })
           : findConnection(engine.provider).pipe(
               Effect.map((connection) => ({
