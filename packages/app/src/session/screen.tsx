@@ -185,6 +185,8 @@ function SessionScreenContent(props: {
     },
     element: () => sidePresence,
     offset: 12,
+    neighbours: () => [[chat, "center"]],
+    resize: () => chat,
   })
 
   replayPanelToggle({
