@@ -32,9 +32,9 @@ import { prefersReducedMotion } from "@opencode/ui/motion"
 
 const fallbackItemSize = 60
 
-// Reserved below the last row: a 36px lane for the live status row and its background hint, an 8px gap, then a 36px
-// lane that the composer's activity pill floats in. Both come and go inside it, so neither moves the rows above.
-const tailSize = 80
+// Reserved below the last row: a 36px lane for the live status row and its background hint, an 8px gap, then a 28px
+// activity pill and its 10px composer gap. Both come and go inside it, so neither moves the rows above.
+const tailSize = 82
 
 const pendingMarkdown = '[data-component="markdown"]:not([data-markdown-ready])'
 
