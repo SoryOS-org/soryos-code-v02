@@ -896,7 +896,7 @@
         "@solid-primitives/resize-observer": "catalog:",
         "fuzzysort": "catalog:",
         "katex": "0.16.47",
-        "knobs": "npm:@kitlangton/knobs@0.2.0",
+        "knobs": "npm:@kitlangton/knobs@0.3.0",
         "marked": "catalog:",
         "marked-shiki": "catalog:",
         "motion": "12.34.5",
@@ -4092,7 +4092,7 @@
 
     "klona": ["klona@2.0.6", "", {}, "sha512-dhG34DXATL5hSxJbIexCft8FChFXtmskoZYnoPWjXQuebWYCNkVeV3KkGegCK9CP1oswI/vQibS2GY7Em/sJJA=="],
 
-    "knobs": ["@kitlangton/knobs@0.2.0", "", { "dependencies": { "@kitlangton/rolling-number": "^0.4.1" }, "peerDependencies": { "react": ">=18", "solid-js": ">=1.8" }, "optionalPeers": ["react", "solid-js"] }, "sha512-U00oAdO2U5LMZsRRe/+DN6qBcEd/RFjSQlZMjNobnNHvAfCyqLOUnCHt44KJWGk9qRj/JHyL3wJZTMKhoqROng=="],
+    "knobs": ["@kitlangton/knobs@0.3.0", "", { "dependencies": { "@kitlangton/rolling-number": "^0.4.1" }, "peerDependencies": { "react": ">=18", "solid-js": ">=1.8" }, "optionalPeers": ["react", "solid-js"] }, "sha512-zdaDcWFUpmntcsKv/VyVJyWKABodHbVFrreSwELNVvnxKJNe23vaAB6qgYNIjQpiUUfJdxkGnmAw41qmPkNfWQ=="],
 
     "lang-map": ["lang-map@0.4.0", "", { "dependencies": { "language-map": "^1.1.0" } }, "sha512-oiSqZIEUnWdFeDNsp4HId4tAxdFbx5iMBOwA3666Fn2L8Khj8NiD9xRvMsGmKXopPVkaDFtSv3CJOmXFUB0Hcg=="],
 

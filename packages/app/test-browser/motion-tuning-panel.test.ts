@@ -89,6 +89,44 @@ it("closes only from its own close button or Esc inside it, never from the app a
   expect(closed).toBe(2)
 })
 
+it("jumps with s from inside the panel, and leaves s and the backtick outside it alone", async () => {
+  const outside = document.createElement("button")
+  const container = document.createElement("div")
+  document.body.append(outside, container)
+  let closed = 0
+  cleanups.push(mountMotionPanel(container, { onClose: () => closed++ }))
+
+  const panel = await waitFor(() => container.querySelector<HTMLElement>(".knobs-panel") ?? undefined)
+
+  const press = (target: Element, key: string) =>
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }))
+
+  outside.focus()
+  press(outside, "s")
+  press(outside, "`")
+  expect(panel.classList.contains("knobs-hinting")).toBe(false)
+  expect(panel.closest("[hidden],[data-leaving]")).toBeNull()
+
+  const random = await waitFor(() => panel.querySelector<HTMLButtonElement>('button[aria-label="Random"]') ?? undefined)
+  random.focus()
+  press(random, "s")
+  expect(panel.classList.contains("knobs-hinting")).toBe(true)
+  const codes = [...panel.querySelectorAll(".knobs-hint")].map((el) => el.textContent ?? "")
+  expect(codes.length).toBeGreaterThan(0)
+
+  // Esc leaves hint mode, not the panel.
+  press(random, "Escape")
+  expect(panel.classList.contains("knobs-hinting")).toBe(false)
+  expect(closed).toBe(0)
+
+  const code = codes.find((item) => item.length === 2) ?? codes[0]!
+  press(random, "s")
+  ;[...code].forEach((key) => press(document.activeElement ?? random, key))
+  expect(panel.classList.contains("knobs-hinting")).toBe(false)
+  expect(document.activeElement).not.toBe(random)
+  expect(panel.contains(document.activeElement)).toBe(true)
+})
+
 async function waitFor<T>(find: () => T | undefined) {
   for (let i = 0; i < 200; i++) {
     const found = find()

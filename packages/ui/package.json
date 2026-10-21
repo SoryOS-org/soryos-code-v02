@@ -125,7 +125,7 @@
     "@solid-primitives/resize-observer": "catalog:",
     "fuzzysort": "catalog:",
     "katex": "0.16.47",
-    "knobs": "npm:@kitlangton/knobs@0.2.0",
+    "knobs": "npm:@kitlangton/knobs@0.3.0",
     "marked": "catalog:",
     "marked-shiki": "catalog:",
     "motion": "12.34.5",

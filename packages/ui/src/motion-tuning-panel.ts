@@ -118,6 +118,9 @@ export function mountMotionPanel(
         theme: "auto",
         title: options.title ?? "Knobs",
         onClose: options.onClose,
+        // The debug bar shows and hides this panel, and `s` jumps only with focus inside it, so the app keeps its keys.
+        toggleKey: false,
+        hints: "panel",
         tabs: sections,
         tab: section,
         onTab: (id) => (section = id),
