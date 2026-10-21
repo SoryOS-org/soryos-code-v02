@@ -32,7 +32,8 @@ export const isNativeCompaction = (
 
 /** A native compaction's window: canonical AI messages, stored as JSON. */
 export const NativeWindow = Schema.toCodecJson(Schema.Array(Message))
-const decodesWindow = (messages: unknown) => Option.isSome(Schema.decodeUnknownOption(NativeWindow)(messages))
+const decodeNativeWindow = Schema.decodeUnknownOption(NativeWindow)
+const decodesWindow = (messages: unknown) => Option.isSome(decodeNativeWindow(messages))
 
 // Like other native data, a window only replays on the model that made it. One that no longer decodes, for example
 // a malformed one from a compaction hook, is skipped the same way instead of failing the session.
@@ -44,7 +45,7 @@ const replayable = (message: SessionMessage.Info, boundary: Boundary) =>
     message.model.id === boundary.id &&
     decodesWindow(message.native.messages))
 
-export const latestCompaction = Effect.fnUntraced(function* (
+const latestCompaction = Effect.fnUntraced(function* (
   db: DatabaseService,
   sessionID: SessionSchema.ID,
   boundary: Boundary,
