@@ -222,9 +222,17 @@ SDK icon fields use `IconName` from `@opencode/ui/icons/catalog`, a dependency-f
 | [`Server`](src/sdk/registries.ts)       | window  | A source of servers, such as SSH hosts                                                      |
 | [`LinkHandler`](src/sdk/registries.ts)  | window  | Opens local links, such as file paths in messages, and says whether their target exists     |
 | [`TitlebarItem`](src/sdk/registries.ts) | window  | A titlebar pill, or the dev channel badge as a toggle                                       |
-| [`Slot`](src/sdk/registries.ts)         | window  | Content for `window.bottom`, `session.header`, `session.panel.end`, `session.panel.sidebar` |
+| [`Slot`](src/sdk/registries.ts)         | window  | Content for `window.bottom`, `session.header`, `session.location.workspace`, `session.location.menu`, `session.panel.end`, `session.panel.sidebar` |
 | [`Style`](src/sdk/registries.ts)        | window  | CSS imported with `?inline`                                                                 |
 | [`MenubarItem`](src/sdk/main.ts)        | main    | An item of the native app menu                                                              |
+
+`session.location.menu` contributes items after the project menu's location details. It receives the owning `screen`,
+the live `session`, and `shown`; keep data subscriptions active only while `shown` is true. Loading headers without an
+owning screen show the host's location details without this slot.
+
+`session.location.workspace` replaces the current location row with the same session context plus its `label` and
+`icon`. Without a contribution, the host keeps its static location row. Use it to attach location actions directly
+to the displayed repository or worktree instead of adding a second menu item.
 
 ### Host APIs
 

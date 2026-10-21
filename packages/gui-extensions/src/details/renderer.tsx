@@ -1,12 +1,10 @@
-import { createMemo, lazy, onCleanup, Show, Suspense } from "solid-js"
-import { createStore } from "solid-js/store"
-import { createKeyed, onIdle, Panel, Slot, Style, useDrawer, usePanel, type Setup } from "../sdk"
+import { lazy, onCleanup, Show, Suspense } from "solid-js"
+import { onIdle, Panel, Slot, Style, usePanel, type Setup } from "../sdk"
 import type Details from "./index"
 import { DetailsHeader, type DetailsMenus } from "./popover"
 
 const setup: Setup<typeof Details> = (ctx) => {
   const sessions = ctx.sessions
-  const changes = ctx.uses.changes
 
   const menus: DetailsMenus = new Set()
 
@@ -18,20 +16,41 @@ const setup: Setup<typeof Details> = (ctx) => {
     }),
   )
 
+  const LocationMenu = lazy(() => import("./location-menu"))
+  const LocationWorkspace = lazy(() => import("./location-workspace"))
+
   // Compile the panel while the app idles, so the first open renders at once.
-  onCleanup(onIdle(() => void DetailsPanel.preload()))
+  onCleanup(
+    onIdle(() => {
+      void DetailsPanel.preload()
+      void LocationMenu.preload()
+      void LocationWorkspace.preload()
+    }),
+  )
 
   ctx.add(Slot, {
     at: "session.header",
     order: 20,
     render: (input) => (
-      <DetailsHeader
-        menus={menus}
-        session={input.session}
-        screen={input.screen}
-        active={input.active}
-        panel={DetailsPanel}
-      />
+      <DetailsHeader menus={menus} session={input.session} active={input.active} panel={DetailsPanel} />
+    ),
+  })
+
+  ctx.add(Slot, {
+    at: "session.location.menu",
+    render: (input) => (
+      <Suspense>
+        <LocationMenu session={input.session} screen={input.screen} shown={input.shown} />
+      </Suspense>
+    ),
+  })
+
+  ctx.add(Slot, {
+    at: "session.location.workspace",
+    render: (input) => (
+      <Suspense>
+        <LocationWorkspace {...input} />
+      </Suspense>
     ),
   })
 
@@ -50,45 +69,12 @@ const setup: Setup<typeof Details> = (ctx) => {
     list: () => [],
     render: (props) => {
       const frame = usePanel()
-      const drawer = useDrawer()
-      const [store, setStore] = createStore({ dismissed: false })
-
-      // Review is optional: the changes row offers it only while the review extension is active.
-      const review = createMemo(() => {
-        const live = changes()
-
-        if (live.status !== "active") return
-
-        return {
-          details: () => live.value.details(props.session),
-          open: () => {
-            drawer?.close()
-            live.value.open(props.session)
-          },
-        }
-      })
-
-      // The changes row loads the session directory's changes only while the drawer shows.
-      createKeyed(changes, (service) =>
-        createKeyed(frame.visible, () => onCleanup(service.watch(props.screen, "details"))),
-      )
 
       return (
         <Show when={props.session.project}>
-          {(project) => (
-            <Suspense>
-              <DetailsPanel
-                mobile
-                shown={frame.visible()}
-                session={props.session}
-                project={project()}
-                diffs={project().vcs ? review()?.details() : []}
-                moveDismissed={store.dismissed}
-                onMoveDismiss={() => setStore("dismissed", true)}
-                onReview={review()?.open}
-              />
-            </Suspense>
-          )}
+          <Suspense>
+            <DetailsPanel mobile shown={frame.visible()} session={props.session} />
+          </Suspense>
         </Show>
       )
     },

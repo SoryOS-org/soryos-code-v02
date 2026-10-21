@@ -183,7 +183,12 @@ test("mobile extension drawers keep configured lists, retry, refresh, and MCP st
   await details.getByRole("button", { name: "MCP", exact: true }).click()
   const mcp = page.getByRole("dialog", { name: "MCP", exact: true })
   await expect(mcp.locator(".session-mcp-row")).toHaveCount(30)
-  await expect(mcp.getByRole("switch")).toHaveCount(0)
+  await expect(mcp.getByRole("switch")).toHaveCount(30)
+  const toggle = mcp.getByRole("switch", { name: "mcp-00", exact: true })
+  await expect(toggle).toBeChecked()
+  await toggle.press("Space")
+  await expect(toggle).not.toBeChecked()
+  await expect(toggle).toBeEnabled()
   await expect
     .poll(() =>
       mcp

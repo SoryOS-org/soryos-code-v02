@@ -16,8 +16,7 @@ type Surface = "popover" | "dialog"
 
 // A session in a worktree of the project. The harness answers the MCP list for each location directory and stores
 // connect/disconnect results per directory; `requests` records every MCP request and the directory it targeted.
-// The popover is the session details menu's MCP submenu, which shows state but does not toggle; the dialog (Ctrl+;) is
-// the app's own MCP toggle.
+// The popover is the session details' MCP list; the dialog (Ctrl+;) is the app's own MCP manager.
 async function open(
   page: Page,
   input: { surface: Surface } & Pick<MockServerConfig, "mcp" | "onMcpAction" | "integrations" | "onIntegrationOAuth">,
@@ -49,19 +48,15 @@ async function open(
 
   const panel =
     input.surface === "popover"
-      ? page.getByRole("menu", { name: "MCP", exact: true })
+      ? page.getByRole("dialog", { name: "MCP", exact: true })
       : page.getByRole("dialog", { name: "MCPs", exact: true })
 
   const show = async () => {
     if (input.surface === "dialog") return page.keyboard.press("Control+;")
     await page.getByRole("button", { name: "Session details", exact: true }).click()
-    const item = page.getByRole("menuitem", { name: "MCP", exact: true })
+    const item = page.getByRole("button", { name: "MCP", exact: true })
     await item.click()
     await expect(panel).toBeVisible()
-    // Straight across into the submenu, so the pointer never crosses the items below MCP.
-    const from = (await item.boundingBox())!
-    const to = (await panel.boundingBox())!
-    await page.mouse.move(to.x + to.width / 2, from.y + from.height / 2, { steps: 5 })
   }
 
   await show()
@@ -70,45 +65,50 @@ async function open(
   return { requests, panel, show, push: mock.push, toggle: panel.getByRole("switch") }
 }
 
-for (const shared of [true, false]) {
-  test(`toggles the workspace MCP when the default location ${shared ? "has" : "does not have"} the server`, async ({
-    page,
-  }) => {
-    const actions: Parameters<NonNullable<MockServerConfig["onMcpAction"]>>[0][] = []
+for (const surface of ["popover", "dialog"] as const) {
+  for (const shared of [true, false]) {
+    test(`toggles the workspace MCP from the ${surface} when the default location ${shared ? "has" : "does not have"} the server`, async ({
+      page,
+    }) => {
+      const actions: Parameters<NonNullable<MockServerConfig["onMcpAction"]>>[0][] = []
 
-    const view = await open(page, {
-      surface: "dialog",
-      mcp: (target) =>
-        !shared && target !== workspace ? [] : [{ name: "figma-desktop", status: { status: "disabled" } }],
-      onMcpAction: (action) => void actions.push(action),
+      const view = await open(page, {
+        surface,
+        mcp: (target) =>
+          !shared && target !== workspace ? [] : [{ name: "figma-desktop", status: { status: "disabled" } }],
+        onMcpAction: (action) => void actions.push(action),
+      })
+
+      await expect(view.toggle).not.toBeChecked()
+      await expect(view.toggle).toBeEnabled()
+      view.requests.length = 0
+
+      await view.panel.locator('[data-slot="switch-control"]').click()
+      await expect(view.toggle).toBeChecked()
+      await expect(view.toggle).toBeEnabled()
+      expect(actions).toEqual([{ server: "figma-desktop", action: "connect", directory: workspace }])
+      expect(view.requests).toContainEqual({
+        path: "/api/experimental/mcp/figma-desktop/connect",
+        directory: workspace,
+      })
+      expect(view.requests).toContainEqual({ path: "/api/mcp/resource", directory: workspace })
+      expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
+
+      view.requests.length = 0
+      await view.panel.locator('[data-slot="switch-control"]').click()
+      await expect(view.toggle).not.toBeChecked()
+      await expect(view.toggle).toBeEnabled()
+      expect(actions).toEqual([
+        { server: "figma-desktop", action: "connect", directory: workspace },
+        { server: "figma-desktop", action: "disconnect", directory: workspace },
+      ])
+      expect(view.requests).toContainEqual({
+        path: "/api/experimental/mcp/figma-desktop/disconnect",
+        directory: workspace,
+      })
+      expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
     })
-
-    await expect(view.toggle).not.toBeChecked()
-    await expect(view.toggle).toBeEnabled()
-    view.requests.length = 0
-
-    await view.panel.locator('[data-slot="switch-control"]').click()
-    await expect(view.toggle).toBeChecked()
-    await expect(view.toggle).toBeEnabled()
-    expect(actions).toEqual([{ server: "figma-desktop", action: "connect", directory: workspace }])
-    expect(view.requests).toContainEqual({ path: "/api/experimental/mcp/figma-desktop/connect", directory: workspace })
-    expect(view.requests).toContainEqual({ path: "/api/mcp/resource", directory: workspace })
-    expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
-
-    view.requests.length = 0
-    await view.panel.locator('[data-slot="switch-control"]').click()
-    await expect(view.toggle).not.toBeChecked()
-    await expect(view.toggle).toBeEnabled()
-    expect(actions).toEqual([
-      { server: "figma-desktop", action: "connect", directory: workspace },
-      { server: "figma-desktop", action: "disconnect", directory: workspace },
-    ])
-    expect(view.requests).toContainEqual({
-      path: "/api/experimental/mcp/figma-desktop/disconnect",
-      directory: workspace,
-    })
-    expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
-  })
+  }
 }
 
 test("the MCP popover shows a failed server and reconnects it from its details", async ({ page }) => {

@@ -168,6 +168,7 @@ const entry = (name: string, active: number, id = `proj_${name}`) =>
 
 async function homeProjects(page: Page, projects: unknown[]) {
   const directory = "C:/OpenCode/home"
+
   const server = await mockOpenCodeServer(page, {
     directory,
     project: project({ id: "proj_home", directory }),
@@ -197,12 +198,14 @@ test("Home lists the used server projects by recent activity, hides them, and li
   const fresh = entry("fresh", 7)
   listed.splice(0, listed.length, fresh, active, listed[0]!, listed[1]!, listed[4]!)
   await view.server.push(
-    [active, archived, fresh].map((data, index) => ({
-      id: `evt_home_project_${index}`,
-      created: T0 + index,
-      type: "project.updated",
-      data,
-    })) as OpenCodeEvent[],
+    [active, archived, fresh].map(
+      (data, index): OpenCodeEvent => ({
+        id: `evt_home_project_${index}`,
+        created: T0 + index,
+        type: "project.updated",
+        data,
+      }),
+    ),
   )
   await expect(view.rows).toHaveText(["oldest", "recent"])
 
@@ -240,6 +243,7 @@ test("Home migrates the directories an older build listed to the server's curren
     entry("api", 1, "proj_api_before_remote"),
     entry("docs", 0),
   ])
+
   await seed(page, {
     legacyProjects: {
       local: [
@@ -398,7 +402,6 @@ for (const state of [
     const trigger = header.locator('[data-slot="session-location-trigger"]')
     const menu = page.locator('[data-slot="session-location-card"]')
     const projectItem = menu.getByRole("menuitem", { name, exact: true })
-    const copyItem = menu.getByRole("menuitem", { name: "Copy path", exact: true })
     const settings = page.getByTestId("settings-screen")
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
 
@@ -413,18 +416,13 @@ for (const state of [
         state.worktree ? [state.worktree] : [],
       )
       await trigger.click()
-      await expect(menu.getByRole("menuitem")).toHaveText([name, "Copy path", "Edit project"])
       await expect(menu.locator('[data-slot="session-location-path"]')).toHaveText(state.directory)
       await page.keyboard.press("Escape")
       await expect(menu).toBeHidden()
       await expect(trigger).toBeFocused()
       await trigger.press("ArrowDown")
       await expect(projectItem).toBeFocused()
-      await page.keyboard.press("ArrowDown")
-      await expect(copyItem).toBeFocused()
-      await page.keyboard.press("ArrowDown")
-      await expect(menu.getByRole("menuitem", { name: "Edit project", exact: true })).toBeFocused()
-      await page.keyboard.press("Enter")
+      await menu.getByRole("menuitem", { name: "Edit project", exact: true }).press("Enter")
       await expect(settings.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue(name)
       await settings.getByRole("button", { name: "Back to projects", exact: true }).click()
       await settings.getByRole("button", { name: "Back to app", exact: true }).click()

@@ -4,6 +4,9 @@ import { Predicate } from "effect"
 import { createAnimatedPresence } from "@/runtime/animated-presence"
 import type { SessionUserActions } from "@opencode/session-ui/actions"
 import { Button } from "@opencode/ui/button"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Menu } from "@opencode/ui/menu"
 import { InlineInput } from "@opencode/ui/inline-input"
 import { Keybind } from "@opencode/ui/keybind"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
@@ -251,6 +254,8 @@ function MessageTimelineView(
   const [title, setTitle] = createStore({
     draft: "",
     editing: false,
+    menuOpen: false,
+    pendingRename: false,
   })
 
   let titleRef: HTMLInputElement | undefined
@@ -262,6 +267,8 @@ function MessageTimelineView(
         setTitle({
           draft: "",
           editing: false,
+          menuOpen: false,
+          pendingRename: false,
         }),
       { defer: true },
     ),
@@ -317,7 +324,7 @@ function MessageTimelineView(
 
   createEffect(() => {
     if (props.active !== false) return
-    setTitle({ draft: "", editing: false })
+    setTitle({ draft: "", editing: false, menuOpen: false, pendingRename: false })
   })
 
   const rowRenderer = createSessionTimelineRowRenderer({
@@ -511,6 +518,14 @@ function MessageTimelineView(
                     directory={sessionDirectory()}
                     compact={!!parentID()}
                     trailing={!!(parentID() || childTitle() || title.editing)}
+                    context={{
+                      get session() {
+                        return props.view
+                      },
+                      get screen() {
+                        return props.screen
+                      },
+                    }}
                   />
                   <Show when={parentID()}>
                     {(id) => (
@@ -612,6 +627,54 @@ function MessageTimelineView(
                     onBlur={() => void saveTitleEditor()}
                   />
                 </Show>
+              </Show>
+              <Show when={!parentID() && sessionID()} keyed>
+                {(id) => (
+                  <Menu
+                    gutter={6}
+                    placement="bottom-start"
+                    open={title.menuOpen}
+                    onOpenChange={(open) => setTitle("menuOpen", open)}
+                  >
+                    <Menu.Trigger
+                      as={IconButton}
+                      icon={<Icon name="outline-dots" />}
+                      variant="ghost-muted"
+                      size="large"
+                      class="shrink-0"
+                      aria-label={language.t("common.moreOptions")}
+                      aria-expanded={title.menuOpen}
+                    />
+                    <Menu.Portal>
+                      <Menu.Content
+                        class="session-options-menu w-max"
+                        style={{ "min-width": "0" }}
+                        onCloseAutoFocus={(event) => {
+                          if (!title.pendingRename) return
+                          event.preventDefault()
+                          setTitle("pendingRename", false)
+                          openTitleEditor()
+                        }}
+                      >
+                        <Menu.Item
+                          onSelect={() => {
+                            setTitle("pendingRename", true)
+                            setTitle("menuOpen", false)
+                          }}
+                        >
+                          {language.t("common.rename")}
+                        </Menu.Item>
+                        <Menu.Item onSelect={() => void props.action.export(id)}>
+                          {language.t("common.export")}…
+                        </Menu.Item>
+                        <Menu.Separator />
+                        <Menu.Item onSelect={() => props.action.showDelete(id)}>
+                          {language.t("common.delete")}…
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Portal>
+                  </Menu>
+                )}
               </Show>
             </SessionHeaderLayout>
           </SessionTitleHeader>

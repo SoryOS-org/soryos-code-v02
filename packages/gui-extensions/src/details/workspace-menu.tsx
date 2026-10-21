@@ -100,18 +100,18 @@ export function SessionWorkspaceMenu(props: {
       <Menu.GroupLabel>{ctx.t("move.menu")}</Menu.GroupLabel>
       <Show when={comparablePath(props.directory) !== comparablePath(props.project.worktree)}>
         <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move(props.project.worktree)}>
-          <Icon name="monitor" />
+          <Icon name="monitor" class="text-v2-icon-icon-muted" />
           {ctx.t("workspace.local")}
         </Menu.Item>
       </Show>
       <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move("create")}>
-        <Icon name="plus" />
+        <Icon name="plus" class="text-v2-icon-icon-muted" />
         {ctx.t("workspace.new")}
       </Menu.Item>
       <Show when={workspaces().length > 0}>
         <Menu.Sub gutter={0} overlap overflowPadding={24}>
-          <Menu.SubTrigger>
-            <Icon name="outline-worktree" />
+          <Menu.SubTrigger class="[&_[data-slot=menu-v2-item-chevron]]:text-v2-icon-icon-muted">
+            <Icon name="outline-worktree" class="text-v2-icon-icon-muted" />
             {ctx.t("workspace.existing")}
           </Menu.SubTrigger>
           <Menu.Portal>
@@ -119,7 +119,7 @@ export function SessionWorkspaceMenu(props: {
               <For each={workspaces()}>
                 {(workspace) => (
                   <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move(workspace)}>
-                    <Icon name="outline-worktree" />
+                    <Icon name="outline-worktree" class="text-v2-icon-icon-muted" />
                     <span class="min-w-0 flex-1 truncate">{getFilename(workspace)}</span>
                   </Menu.Item>
                 )}
@@ -134,9 +134,8 @@ export function SessionWorkspaceMenu(props: {
   if (props.sub)
     return (
       <Menu.Sub gutter={4} overflowPadding={24} onOpenChange={onOpenChange}>
-        <Menu.SubTrigger class="session-service-trigger" disabled={blocked()}>
+        <Menu.SubTrigger class="[&_[data-slot=menu-v2-item-chevron]]:text-v2-icon-icon-muted" disabled={blocked()}>
           {props.children}
-          <Icon name="chevron-down" size="small" class="ms-auto shrink-0 text-v2-icon-icon-muted" />
         </Menu.SubTrigger>
         <Menu.Portal>
           <Menu.SubContent class="w-[200px]">{items()}</Menu.SubContent>

@@ -24,7 +24,8 @@ for (const direction of ["ltr", "rtl"] as const) {
     await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
     await expect(review).toBeVisible()
     await expect(details).toBeVisible()
-    await expect(header.getByRole("button", { name: "More options", exact: true })).toHaveCount(0)
+    const options = header.getByRole("button", { name: "More options", exact: true })
+    await expect(options).toBeVisible()
     await expect(page.locator('[data-slot="titlebar-v2"]').getByRole("button", { name: "Status" })).toHaveCount(0)
     const titleBounds = await header.getByRole("heading").boundingBox()
     expect(titleBounds).not.toBeNull()
@@ -95,23 +96,22 @@ for (const direction of ["ltr", "rtl"] as const) {
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "false")
 
+    await options.click()
+    const actions = page.getByRole("menu").filter({ has: page.getByRole("menuitem", { name: "Rename", exact: true }) })
+    await expect(actions.getByRole("menuitem")).toHaveText(["Rename", "Export…", "Delete…"])
+    await expect(actions.locator("svg")).toHaveCount(0)
+    await actions.getByRole("menuitem", { name: "Rename", exact: true }).click()
+    await expect(header.getByRole("textbox")).toBeFocused()
+    await header.getByRole("textbox").press("Escape")
+
     await details.click()
-    const menu = page.getByRole("menu", { name: "Session details", exact: true })
-    await expect(menu.getByRole("menuitem", { name: "Export…", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: "Delete…", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: "MCP", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: "Plugins", exact: true })).toBeVisible()
-    await expect(menu.getByRole("menuitem", { name: "Server status", exact: true })).toHaveCount(0)
-
-    if (direction === "ltr") {
-      await expect
-        .poll(async () => {
-          const [button, card] = await Promise.all([details.boundingBox(), menu.boundingBox()])
-
-          return button && card ? Math.abs(button.x + button.width - card.x - card.width) : Infinity
-        })
-        .toBeLessThanOrEqual(1)
-    }
+    const menu = page.getByRole("dialog", { name: "Session details", exact: true })
+    await expect(menu.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible()
+    await expect(menu.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+    await expect(menu.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
+    await expect(menu).not.toContainText(fixture.project.name)
+    await expect(menu.getByText("No changes", { exact: true })).toHaveCount(0)
+    await expect(details.locator('use[href="#opencode-v2-icon-window-analytics"]')).toHaveCount(1)
 
     await page.keyboard.press("Escape")
     await expect(menu).toBeHidden()
@@ -139,8 +139,17 @@ test.describe("location", () => {
     await expect(trigger(page).locator('svg:has(use[href="#opencode-v2-icon-outline-worktree"])')).toBeVisible()
     await trigger(page).click()
     const card = page.locator('[data-slot="session-location-card"]')
-    await expect(card.locator('[data-slot="session-location-path"]')).toHaveText(worktree)
-    await card.getByRole("menuitem", { name: "Copy path", exact: true }).click()
+    const path = card.getByRole("menuitem", { name: worktree, exact: true })
+    await expect(path).toHaveText(worktree)
+    await expect(card.getByRole("menuitem", { name: "Copy path", exact: true })).toHaveCount(0)
+    // Select actual text on the first line, not the empty half of a wrapped path's bounding box.
+    await path.locator("bdi").dblclick({ position: { x: 32, y: 8 } })
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("")
+    await path.press("Enter")
+    const actions = page.getByRole("menu", { name: worktree, exact: true })
+    await expect(actions.getByRole("menuitem", { name: "Copy path", exact: true })).toBeFocused()
+    await page.screenshot({ path: test.info().outputPath("path-flyout.png"), animations: "disabled" })
+    await actions.getByRole("menuitem", { name: "Copy path", exact: true }).click()
     await expect(card).toBeHidden()
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(worktree)
   })
@@ -169,15 +178,37 @@ test.describe("location", () => {
     await expect(page.locator('[data-slot="session-location-card"]').getByText("apollo", { exact: true })).toBeVisible()
   })
 
-  test("shows the location bar under the mobile view tabs", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await openSession(page, workspace)
-    const bar = page.locator('[data-slot="session-location-bar"]')
-    await expect(bar.locator('[data-slot="session-location-worktree"]')).toHaveText("quiet-falcon")
-    await bar.locator('[data-slot="session-location-trigger"]').click()
-    await expect(page.locator('[data-slot="session-location-card"] [data-slot="session-location-path"]')).toHaveText(
-      worktree,
-    )
+  test.describe("touch", () => {
+    test.use({ hasTouch: true })
+
+    test("shows the location bar under the mobile view tabs and opens path actions on tap", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await openSession(page, workspace)
+      const bar = page.locator('[data-slot="session-location-bar"]')
+      await expect(bar.locator('[data-slot="session-location-worktree"]')).toHaveText("quiet-falcon")
+      await bar.locator('[data-slot="session-location-trigger"]').click()
+      await expect(page.locator('[data-slot="session-location-card"] [data-slot="session-location-path"]')).toHaveText(
+        worktree,
+      )
+      await page.getByRole("menuitem", { name: worktree, exact: true }).tap()
+      const actions = page.getByRole("menu", { name: worktree, exact: true })
+      await expect(actions.getByRole("menuitem", { name: "Copy path", exact: true })).toBeVisible()
+      await expect
+        .poll(() =>
+          actions.evaluate((element) => {
+            const bounds = element.getBoundingClientRect()
+
+            return (
+              bounds.left >= 16 &&
+              bounds.right <= innerWidth - 16 &&
+              bounds.top >= 16 &&
+              bounds.bottom <= innerHeight - 16
+            )
+          }),
+        )
+        .toBe(true)
+      await page.screenshot({ path: test.info().outputPath("path-flyout-mobile.png"), animations: "disabled" })
+    })
   })
 })
 

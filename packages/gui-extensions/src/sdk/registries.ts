@@ -582,6 +582,22 @@ export interface SlotMap {
     /** The timeline is the one on screen. */
     readonly active: boolean
   }
+  /** Items in the project/location menu, after its location details. Omitted on loading headers without a screen. */
+  readonly "session.location.menu": {
+    /** The menu's owning session screen; always present. */
+    readonly screen: SessionScreen
+    /** The session whose location is shown; reads follow moves without remounting. */
+    readonly session: MountedSession
+    /** Whether the project menu is open. Subscribe to location data only while true. */
+    readonly shown: boolean
+  }
+  /** Replaces the project menu's current location row. Without a contribution the host shows a static row. */
+  readonly "session.location.workspace": SlotMap["session.location.menu"] & {
+    /** The current worktree name, or the localized label for the local repository. */
+    readonly label: string
+    /** The location icon: monitor for the local repository, worktree for a worktree. */
+    readonly icon: IconName
+  }
   /** The actions at the end of the side region's tab strip. */
   readonly "session.panel.end": {
     /** The owning session screen; always present. */

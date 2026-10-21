@@ -89,7 +89,7 @@
 }
 
 .session-summary-heading {
-  color: var(--v2-text-text-muted);
+  color: var(--v2-text-text-faint);
   font-weight: 530;
 }
 
@@ -101,20 +101,6 @@
   white-space: nowrap;
   text-align: start;
 }
-.session-summary-heading .session-summary-label {
-  flex: 0 1 auto;
-}
-.session-summary-disclosure {
-  flex-shrink: 0;
-  color: var(--v2-icon-icon-muted);
-}
-.session-summary-heading[aria-expanded="false"] .session-summary-disclosure {
-  transform: rotate(-90deg);
-}
-.session-summary-heading[aria-expanded="false"]:dir(rtl) .session-summary-disclosure {
-  transform: rotate(90deg);
-}
-
 .session-service-menu {
   z-index: 60;
   width: 280px;
@@ -254,6 +240,19 @@
   color: var(--icon-warning-base);
 }
 
+.session-mcp-name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-mcp-name > .session-service-dot {
+  width: 6px;
+  height: 6px;
+}
+
 .session-mcp-trailing {
   display: flex;
   flex-shrink: 0;
@@ -266,11 +265,6 @@
 
 .session-mcp-failed {
   color: var(--v2-state-fg-danger);
-}
-
-.session-mcp-status {
-  color: var(--v2-text-text-muted);
-  white-space: nowrap;
 }
 
 div.session-mcp-row {
@@ -348,39 +342,4 @@ div.session-mcp-row {
   .session-service-config .session-service-config-arrow {
     transition: none;
   }
-}
-
-/* The popover shows the project and extension sections as one card. */
-.session-summary-popover [data-component="session-summary-panel"] {
-  gap: 0;
-  padding: 2px;
-  border-radius: 6px;
-  background: var(--v2-background-bg-base);
-  box-shadow: var(--v2-elevation-raised);
-}
-
-[data-color-scheme="dark"] .session-summary-popover [data-component="session-summary-panel"] {
-  background: var(--v2-background-bg-layer-01);
-}
-
-.session-summary-popover .session-summary-card {
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.session-summary-popover .session-summary-card[data-section="server"] {
-  margin-top: 2px;
-  padding-top: 2px;
-  border-top: 1px solid var(--v2-border-border-muted);
-}
-
-.session-summary-popover .session-summary-move {
-  margin-top: 2px;
-  padding: 2px;
-  border-radius: 4px;
-}
-
-.session-service-trigger [data-slot="menu-v2-item-chevron"] {
-  display: none;
 }

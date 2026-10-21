@@ -4,7 +4,7 @@ import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { Icon } from "@opencode/ui/icon"
-import { Menu } from "@opencode/ui/menu"
+import { Switch } from "@opencode/ui/switch"
 import { showToast } from "@opencode/ui/toast"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { TruncatedText } from "@opencode/ui/truncated-text"
@@ -31,8 +31,6 @@ type ServiceMenuProps = {
   shown: boolean
   open: boolean
   mobile?: boolean
-  /** Renders as a submenu of an enclosing `Menu`. */
-  sub?: boolean
   onOpenChange: (open: boolean) => void
 }
 
@@ -41,9 +39,10 @@ export function SessionServerPanel(props: {
   directory: string
   shown: boolean
   mobile?: boolean
-  sub?: boolean
 }) {
-  // A new scope whenever the directory or the details' visibility changes closes the open submenu.
+  const ctx = useExtension()
+  const name = () => (ctx.servers.list().length < 2 ? ctx.t("server") : props.session.server.name)
+  // A new scope whenever the location or visibility changes closes the service popover.
   const scope = createMemo(on([() => props.directory, () => props.shown], () => ({})))
   const [submenu, setSubmenu] = createSignal<{ readonly scope: object; readonly service: Service }>()
 
@@ -54,24 +53,32 @@ export function SessionServerPanel(props: {
   }
 
   return (
-    <Show when={props.directory} keyed>
-      {(directory) => (
-        <For each={services}>
-          {(service) => (
-            <ServiceMenu
-              session={props.session}
-              service={service}
-              directory={directory}
-              shown={props.shown}
-              open={open() === service.type}
-              mobile={props.mobile}
-              sub={props.sub}
-              onOpenChange={(value) => setSubmenu(value ? { scope: scope(), service: service.type } : undefined)}
-            />
-          )}
-        </For>
-      )}
-    </Show>
+    <section class="session-summary-card" data-section="server">
+      <h2 class="session-summary-row session-summary-heading">
+        <span dir="auto" class="session-summary-label">
+          {name()}
+        </span>
+      </h2>
+      <Show when={props.directory} keyed>
+        {(directory) => (
+          <div class="session-summary-rows">
+            <For each={services}>
+              {(service) => (
+                <ServiceMenu
+                  session={props.session}
+                  service={service}
+                  directory={directory}
+                  shown={props.shown}
+                  open={open() === service.type}
+                  mobile={props.mobile}
+                  onOpenChange={(value) => setSubmenu(value ? { scope: scope(), service: service.type } : undefined)}
+                />
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
+    </section>
   )
 }
 
@@ -187,6 +194,7 @@ function McpMenu(props: ServiceMenuProps) {
         <h3 class="session-service-title">{ctx.t("mcp.title")}</h3>
         <Index each={servers()}>
           {(server) => {
+            const enabled = () => server().status.status !== "disabled"
             const pending = () => toggle.isPending || server().status.status === "pending"
             // Status stays beside its control rather than competing with a long server name.
             const failed = () => server().status.status === "failed"
@@ -203,22 +211,40 @@ function McpMenu(props: ServiceMenuProps) {
               return ctx.t(status === "connected" ? "mcp.connected" : "mcp.disabled")
             }
 
+            const change = (value: boolean) => {
+              if (pending()) return
+              toggle.mutate({ name: server().name, enabled: value })
+            }
+
             const follow = () => {
               if (failed()) return showError(server().name)
-
-              if (signIn() && !pending()) toggle.mutate({ name: server().name, enabled: true })
+              change(server().status.status === "needs_auth" || !enabled())
             }
 
             return (
-              <div
-                class="session-mcp-row"
-                data-disabled={(!failed() && !signIn()) || pending() || undefined}
-                onClick={follow}
-              >
-                <span class="session-service-dot" data-status={server().status.status} aria-hidden="true" />
-                <TruncatedText text={server().name} class="session-summary-label" />
+              <div class="session-mcp-row" data-disabled={pending() || undefined} onClick={follow}>
+                <span class="session-mcp-name">
+                  <span class="session-service-dot" data-status={server().status.status} aria-hidden="true" />
+                  <TruncatedText text={server().name} class="session-summary-label" />
+                </span>
                 <span class="session-mcp-trailing" onClick={(event) => event.stopPropagation()}>
-                  <Show when={failed() || signIn()} fallback={<span class="session-mcp-status">{label()}</span>}>
+                  <Show
+                    when={failed() || signIn()}
+                    fallback={
+                      <Switch
+                        checked={enabled()}
+                        readOnly={pending()}
+                        aria-disabled={pending()}
+                        aria-busy={busy()}
+                        description={server().status.status === "pending" ? label() : undefined}
+                        class="[&_[data-slot=switch-description]]:sr-only"
+                        onChange={change}
+                      >
+                        <span class="sr-only">{server().name}</span>
+                        <span aria-hidden="true">{label()}</span>
+                      </Switch>
+                    }
+                  >
                     <Show when={failed()}>
                       <span class="session-mcp-failed">{ctx.t("failed")}</span>
                     </Show>
@@ -410,34 +436,6 @@ function ServicePopover(props: ServiceMenuProps & ServiceBodyProps & { empty: bo
       </button>
     )
   }
-
-  if (props.sub)
-    return (
-      <Menu.Sub
-        gutter={4}
-        overflowPadding={16}
-        onOpenChange={(open) => {
-          if (open && !props.loading) void props.retry()
-        }}
-      >
-        <Menu.SubTrigger class="session-service-trigger">
-          <Icon name={props.service.icon} />
-          {ctx.t(props.service.label)}
-          <Icon name="chevron-down" size="small" class="ms-auto shrink-0 text-v2-icon-icon-muted" />
-        </Menu.SubTrigger>
-        <Menu.Portal>
-          <Menu.SubContent
-            class="session-service-menu"
-            data-service={props.service.type}
-            data-empty={(props.ready && !props.error && props.empty) || undefined}
-            aria-busy={props.loading}
-            aria-label={ctx.t(props.service.label)}
-          >
-            <ServiceBody {...props} />
-          </Menu.SubContent>
-        </Menu.Portal>
-      </Menu.Sub>
-    )
 
   return (
     <Popover

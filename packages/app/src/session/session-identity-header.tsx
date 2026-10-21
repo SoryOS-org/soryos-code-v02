@@ -1,4 +1,5 @@
 import type { SessionInfo } from "@opencode/client/promise"
+import type { MountedSession, SessionScreen } from "@opencode/gui-extensions/sdk"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import { motionTuning } from "@opencode/ui/motion-tuning"
@@ -10,6 +11,8 @@ import {
 } from "@opencode/ui/project-avatar"
 import { useNavigate } from "@solidjs/router"
 import { createMemo, createSignal, For, Show, type ComponentProps, type JSX, type ParentProps } from "solid-js"
+import { createStore } from "solid-js/store"
+import { ExtensionSlot } from "@/runtime/extension/render"
 import { containsDirectory, getFilename } from "@opencode/util/path"
 import { useServer } from "@/runtime/server/current"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -90,6 +93,8 @@ export function SessionLocation(props: {
   compact?: boolean
   /** Adds the separator before the title or lineage that follows. */
   trailing?: boolean
+  /** Available after the owning session screen mounts; loading headers show location details only. */
+  context?: { session: MountedSession; screen: SessionScreen }
 }) {
   const server = useServer()
   const servers = useServers()
@@ -98,6 +103,7 @@ export function SessionLocation(props: {
   const layout = useLayout()
   const settingsSurface = useSettingsSurface()
   const navigate = useNavigate()
+  const [store, setStore] = createStore({ open: false })
 
   const projectName = createMemo(() => displayName(props.project ?? { worktree: props.directory ?? "" }))
 
@@ -123,6 +129,8 @@ export function SessionLocation(props: {
     platform.platform === "desktop" && !!platform.revealPath && servers.current(server.conn) && !!props.directory
 
   const onOpenChange = (open: boolean) => {
+    setStore("open", open)
+
     if (!open || !props.directory || !git()) return
     void server.ctx.data.location.vcs.sync({ directory: props.directory }).catch(() => undefined)
 
@@ -180,6 +188,12 @@ export function SessionLocation(props: {
     settingsSurface.openProject({ server: ServerConnection.key(server.conn), project: project.worktree })
   }
 
+  const workspace = () => (
+    <SessionLocationDetail icon={worktree() ? "outline-worktree" : "monitor"}>
+      {worktree() ?? language.t("session.new.workspace.local")}
+    </SessionLocationDetail>
+  )
+
   return (
     <>
       <Menu placement="bottom-start" gutter={4} modal={false} onOpenChange={onOpenChange}>
@@ -231,9 +245,31 @@ export function SessionLocation(props: {
               </bdi>
             </Menu.Item>
             <Show when={worktree() || git()}>
-              <SessionLocationDetail icon={worktree() ? "outline-worktree" : "monitor"}>
-                {worktree() ?? language.t("session.new.workspace.local")}
-              </SessionLocationDetail>
+              <Show when={props.context} fallback={workspace()}>
+                {(context) => (
+                  <ExtensionSlot
+                    at="session.location.workspace"
+                    fallback={workspace()}
+                    input={{
+                      get session() {
+                        return context().session
+                      },
+                      get screen() {
+                        return context().screen
+                      },
+                      get shown() {
+                        return store.open
+                      },
+                      get label() {
+                        return worktree() ?? language.t("session.new.workspace.local")
+                      },
+                      get icon() {
+                        return worktree() ? "outline-worktree" : "monitor"
+                      },
+                    }}
+                  />
+                )}
+              </Show>
             </Show>
             <Show when={git()}>
               <SessionLocationDetail icon="branch">
@@ -259,33 +295,58 @@ export function SessionLocation(props: {
                 </Show>
               </SessionLocationDetail>
             </Show>
+            <Show when={props.context}>
+              {(context) => (
+                <ExtensionSlot
+                  at="session.location.menu"
+                  input={{
+                    get session() {
+                      return context().session
+                    },
+                    get screen() {
+                      return context().screen
+                    },
+                    get shown() {
+                      return store.open
+                    },
+                  }}
+                />
+              )}
+            </Show>
+            <Menu.Separator />
             <SessionLocationDetail icon="server">
               <ServerLabel server={server.conn} hint />
             </SessionLocationDetail>
             <Show when={props.directory}>
               {(directory) => (
-                <>
-                  <Menu.Separator />
-                  <div
+                <Menu.Sub gutter={4} overflowPadding={16} overlap>
+                  <Menu.SubTrigger
                     data-slot="session-location-path"
-                    class="flex min-w-0 gap-2 px-3 py-1.5 text-[12px] leading-4 text-v2-text-text-muted"
+                    class="[&_[data-slot=menu-v2-item-chevron]]:text-v2-icon-icon-muted"
+                    style={{ height: "auto", "padding-block": "6px" }}
                   >
-                    <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
-                    <bdi dir="ltr" class="min-w-0 select-text break-all">
-                      {directory()}
-                    </bdi>
-                  </div>
-                  <Menu.Item onSelect={() => void copyPath()}>
-                    <Icon name="outline-copy" class="text-v2-icon-icon-muted" />
-                    {language.t("session.location.copyPath")}
-                  </Menu.Item>
-                  <Show when={canReveal()}>
-                    <Menu.Item onSelect={reveal}>
-                      <Icon name="outline-arrow-up-right" class="text-v2-icon-icon-muted" />
-                      {language.t(fileManagerApp(platform.os ?? "unknown").actionLabel)}
-                    </Menu.Item>
-                  </Show>
-                </>
+                    <span class="flex min-w-0 items-start gap-2 text-[12px] leading-4 text-v2-text-text-muted">
+                      <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
+                      <bdi dir="ltr" class="min-w-0 select-text break-all">
+                        {directory()}
+                      </bdi>
+                    </span>
+                  </Menu.SubTrigger>
+                  <Menu.Portal>
+                    <Menu.SubContent class="w-max max-w-[calc(100vw-32px)]" aria-label={directory()}>
+                      <Menu.Item onSelect={() => void copyPath()}>
+                        <Icon name="outline-copy" class="text-v2-icon-icon-muted" />
+                        {language.t("session.location.copyPath")}
+                      </Menu.Item>
+                      <Show when={canReveal()}>
+                        <Menu.Item onSelect={reveal}>
+                          <Icon name="outline-arrow-up-right" class="text-v2-icon-icon-muted" />
+                          {language.t(fileManagerApp(platform.os ?? "unknown").actionLabel)}
+                        </Menu.Item>
+                      </Show>
+                    </Menu.SubContent>
+                  </Menu.Portal>
+                </Menu.Sub>
               )}
             </Show>
             <Menu.Separator />

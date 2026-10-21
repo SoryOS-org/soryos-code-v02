@@ -1,73 +1,33 @@
+import { Popover } from "@kobalte/core/popover"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
-import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { createMemo, onCleanup, Show, Suspense, type Component, type ParentProps } from "solid-js"
-import { createStore } from "solid-js/store"
-import { Command, createKeyed, createVisitState, useExtension, type MountedSession, type SessionScreen } from "../sdk"
-import type Details from "./index"
+import { onCleanup, Show, Suspense, type Component, type ParentProps } from "solid-js"
+import { Command, createVisitState, useExtension, type MountedSession } from "../sdk"
 import type { DetailsPanelProps } from "./panel"
 
-/** Every mounted details menu, so a shortcut finds the one on screen. */
+/** Every mounted details popover, so a shortcut finds the one on screen. */
 export type DetailsMenus = Set<{ trigger: () => HTMLButtonElement | undefined; toggle: () => void }>
 
-/** The session details menu of one timeline header. Cached timelines each keep their own. */
+/** The session details popover of one timeline header. Cached timelines each keep their own. */
 export function DetailsHeader(props: {
   menus: DetailsMenus
   session: MountedSession
-  screen: SessionScreen
   active: boolean
   panel: Component<DetailsPanelProps>
 }) {
-  const changes = useExtension<typeof Details>().uses.changes
   const Panel = props.panel
   // Cached timelines stay mounted while hidden; routing away from the session closes its details.
   const [open, setOpen] = createVisitState(false)
-  const [store, setStore] = createStore({ dismissed: false })
-  const project = createMemo(() => props.session.project)
-
-  // Review is optional: the changes row offers it only while the review extension is active.
-  const review = createMemo(() => {
-    const live = changes()
-
-    if (live.status !== "active") return
-
-    return {
-      details: () => live.value.details(props.session),
-      open: () => {
-        setOpen(false)
-        live.value.open(props.session)
-      },
-    }
-  })
-
-  // The changes row loads the session directory's changes only while the details show.
-  createKeyed(changes, (service) =>
-    createKeyed(
-      () => open() && props.screen,
-      (screen) => onCleanup(service.watch(screen, "details")),
-    ),
-  )
 
   return (
-    <Show when={project()}>
-      {(project) => (
-        <DetailsPopover menus={props.menus} active={props.active} open={open()} onOpenChange={setOpen}>
-          <Suspense>
-            <Panel
-              menu
-              session={props.session}
-              shown={open()}
-              project={project()}
-              diffs={project().vcs ? review()?.details() : []}
-              moveDismissed={store.dismissed}
-              onMoveDismiss={() => setStore("dismissed", true)}
-              onReview={review()?.open}
-            />
-          </Suspense>
-        </DetailsPopover>
-      )}
+    <Show when={props.session.project}>
+      <DetailsPopover menus={props.menus} active={props.active} open={open()} onOpenChange={setOpen}>
+        <Suspense>
+          <Panel session={props.session} shown={open()} />
+        </Suspense>
+      </DetailsPopover>
     </Show>
   )
 }
@@ -79,7 +39,7 @@ function DetailsPopover(
   const keybinds = ctx.keybinds
 
   // Cached timelines remain mounted; only the visible details own the command. It leaves with this component.
-  // A shortcut opens the menu without its trigger, so the trigger is named as the anchor.
+  // A shortcut opens the popover without clicking its trigger.
   let trigger: HTMLButtonElement | undefined
   const self = { trigger: () => trigger, toggle: () => props.onOpenChange(!props.open) }
   props.menus.add(self)
@@ -93,7 +53,7 @@ function DetailsPopover(
           group: ctx.t("command.category.view"),
           section: "session",
           bind: "mod+shift+y",
-          // A detached timeline can stay active, so the shortcut toggles the menu whose trigger is on screen.
+          // A detached timeline can stay active, so the shortcut toggles the popover whose trigger is on screen.
           run: () => [...props.menus].find((menu) => menu.trigger()?.isConnected)?.toggle(),
         }
       : undefined,
@@ -102,14 +62,8 @@ function DetailsPopover(
   const keybind = () => [...keybinds.keybind(`${ctx.id}.toggle`)]
 
   return (
-    <Menu
-      placement="bottom-end"
-      gutter={4}
-      modal={false}
-      open={props.open}
-      onOpenChange={props.onOpenChange}
-      getAnchorRect={() => trigger?.getBoundingClientRect()}
-    >
+    <Popover placement="bottom-end" gutter={8} overflowPadding={16} open={props.open} onOpenChange={props.onOpenChange}>
+      <Popover.Anchor class="pointer-events-none absolute end-3 top-2.5 h-7 w-0" aria-hidden="true" />
       <Tooltip
         placement="bottom"
         value={
@@ -121,21 +75,25 @@ function DetailsPopover(
           </>
         }
       >
-        <Menu.Trigger
+        <Popover.Trigger
           ref={trigger}
           as={IconButton}
-          icon={<Icon name="outline-dots" />}
+          icon={<Icon name="window-analytics" />}
           variant="ghost-muted"
           size="large"
           state={props.open ? "pressed" : undefined}
           aria-label={ctx.t("title")}
+          aria-expanded={props.open}
         />
       </Tooltip>
-      <Menu.Portal>
-        <Menu.Content class="w-[280px]" aria-label={ctx.t("title")}>
+      <Popover.Portal>
+        <Popover.Content
+          class="session-summary-popover z-50 max-h-[calc(100dvh-96px)] overflow-y-auto border-0 bg-transparent p-1 outline-none"
+          aria-label={ctx.t("title")}
+        >
           {props.children}
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover>
   )
 }

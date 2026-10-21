@@ -300,6 +300,12 @@ function SessionScreenContent(props: {
             project={location.project()}
             directory={location.directory()}
             compact={!!session.data.info()?.parentID}
+            context={{
+              get session() {
+                return props.view()
+              },
+              screen: props.screen,
+            }}
           />
         </div>
       </Show>
