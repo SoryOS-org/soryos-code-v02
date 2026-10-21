@@ -98,8 +98,8 @@ export function derive(baseURL: string, remote: Snapshot, existing: readonly Mod
   const result = new Map(existing.map((model) => [model.id, model]))
   // Accounts limited to auto model selection (Copilot Free/Student) report every
   // model as unpickable. Honouring that flag for all of them would leave the
-  // provider with nothing to offer, so only apply it when the account
-  // actually exposes a pickable model.
+  // provider with nothing to offer, so fall back to the models those accounts
+  // can still call directly.
   const hasPicker = [...remote.values()].some((model) => model.model_picker_enabled)
 
   // Keep aliases and local metadata, but only when their advertised API model
@@ -129,6 +129,21 @@ function usable(model: RemoteModel): model is UsableModel {
     model.capabilities.limits.max_prompt_tokens !== undefined &&
     model.capabilities.supports.tool_calls !== undefined
   )
+}
+
+/**
+ * Whether Copilot serves this model straight from the OAuth token.
+ *
+ * Copilot meters the models it exposes through its own endpoints and serves the
+ * rest directly. The metered ones need the session token that `POST /auto`
+ * hands out, so on an account that only supports auto model selection they are
+ * not callable yet.
+ */
+function directlyCallable(model: RemoteModel) {
+  const prices = model.billing?.token_prices
+  const metered = prices !== undefined && prices.batch_size > 0
+  const routed = model.supported_endpoints?.includes("/responses") ?? false
+  return !metered && !routed
 }
 
 function build(id: Model.ID, remote: UsableModel, baseURL: string, hasPicker: boolean, previous?: Model.Info) {
@@ -191,9 +206,10 @@ function build(id: Model.ID, remote: UsableModel, baseURL: string, hasPicker: bo
       },
     ],
     status: "active",
-    // Without a picker to honour, every usable model stays selectable so an
-    // auto-only account is not left with an empty provider.
-    enabled: hasPicker ? remote.model_picker_enabled : true,
+    // Without a picker to honour, keep only the models the account can call
+    // directly, so an auto-only account is not left with an empty provider and
+    // is not offered models that fail at request time.
+    enabled: hasPicker ? remote.model_picker_enabled : directlyCallable(remote),
     limit: {
       context: remote.capabilities.limits.max_context_window_tokens ?? remote.capabilities.limits.max_prompt_tokens,
       input: remote.capabilities.limits.max_prompt_tokens,
