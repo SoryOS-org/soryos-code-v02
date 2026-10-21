@@ -67,6 +67,8 @@ export function BackgroundMoveHint(props: { keybind?: string[]; onMove?: () => v
 
 type MessageTimelineProps = {
   hideHeader?: boolean
+  /** Hands the header to the pane's window drag area. */
+  registerHeader?: (header: HTMLElement) => () => void
   active?: boolean
   session: TimelineSessionSource
   view: MountedSession
@@ -487,6 +489,7 @@ function MessageTimelineView(
         <Show when={!props.hideHeader}>
           <SessionTitleHeader>
             <SessionHeaderLayout
+              register={props.registerHeader}
               location={
                 <>
                   <SessionLocation

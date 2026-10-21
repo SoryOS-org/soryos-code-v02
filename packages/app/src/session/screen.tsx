@@ -41,6 +41,7 @@ import { TimelineSearchBar } from "./timeline/search-bar"
 import { createTimelineQuote, TimelineQuote } from "./timeline/quote"
 import { ActiveSessionComposerRegion, createActiveSessionRegion } from "./composer/region"
 import { SessionIdentityHeader, SessionLocation } from "./session-identity-header"
+import { createSessionHeaderDrag } from "./header/drag-area"
 import { useServer } from "@/runtime/server/current"
 import { SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
@@ -232,6 +233,8 @@ function SessionScreenContent(props: {
     return <SessionErrorFallback error={cause} sessionID={session.identity.params.id} />
   }
 
+  const headerDrag = createSessionHeaderDrag()
+
   const timelineView = createTimelineCache(
     session,
     (source, active) => {
@@ -246,6 +249,7 @@ function SessionScreenContent(props: {
         <MessageTimeline
           active={active()}
           hideHeader={!isDesktop()}
+          registerHeader={headerDrag.register}
           session={source}
           view={own()}
           screen={props.screen}
@@ -428,6 +432,7 @@ function SessionScreenContent(props: {
                 <ErrorBoundary fallback={sessionErrorFallback}>{sessionPanelContent()}</ErrorBoundary>
               </SessionPanelFrame>
             </Show>
+            <headerDrag.Area />
 
             <Show when={screen.panel.resizable()}>
               <div onPointerDown={() => screen.size.start()}>

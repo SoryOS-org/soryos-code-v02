@@ -9,7 +9,7 @@ import {
   ProjectAvatar,
 } from "@opencode/ui/project-avatar"
 import { useNavigate } from "@solidjs/router"
-import { createMemo, For, Show, type ComponentProps, type JSX, type ParentProps } from "solid-js"
+import { createMemo, For, onCleanup, onMount, Show, type ComponentProps, type JSX, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ExtensionSlot } from "@/runtime/extension/render"
 import { containsDirectory, getFilename } from "@opencode/util/path"
@@ -51,9 +51,21 @@ export function SessionTitleHeader(props: ParentProps) {
   )
 }
 
-export function SessionHeaderLayout(props: ParentProps<{ location: JSX.Element; actions?: JSX.Element }>) {
+export function SessionHeaderLayout(
+  props: ParentProps<{
+    location: JSX.Element
+    actions?: JSX.Element
+    /** Hands the header to the pane's window drag area; returns the unregister function. */
+    register?: (header: HTMLElement) => () => void
+  }>,
+) {
+  let root!: HTMLDivElement
+  onMount(() => {
+    if (props.register) onCleanup(props.register(root))
+  })
+
   return (
-    <div class="session-header-layout">
+    <div ref={root} class="session-header-layout">
       <div class="session-header-location">{props.location}</div>
       <div class="session-header-title">{props.children}</div>
       <Show when={props.actions}>
