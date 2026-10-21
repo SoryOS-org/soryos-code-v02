@@ -276,7 +276,6 @@ describe("AzurePlugin connecting", () => {
       ])
     }),
   )
-
 })
 
 describe("AzurePlugin startup", () => {
@@ -502,6 +501,44 @@ describe("AzurePlugin discovery", () => {
         ["gpt-5-mini", "gpt-5-mini", 400_000],
         ["gpt-5-nano", "nano-production", 300_000],
       ])
+    }),
+  )
+})
+
+describe("AzurePlugin sync failures", () => {
+  it.live("retries a deployment sync that failed while the network was down", () =>
+    Effect.gen(function* () {
+      let attempts = 0
+      const azure = yield* fakeAzure({
+        resource: () => {
+          attempts++
+          // The first answer stands in for a laptop that woke before its modem and VPN were up.
+          return attempts === 1
+            ? new Response("Service Unavailable", { status: 503 })
+            : resourceList(listed("prod-mini", "gpt-5-mini"))
+        },
+      })
+      yield* seedCatalog
+      yield* connect(keyCredential())
+      yield* addPlugin(azure.endpoints)
+
+      expect(yield* eventually(azureModelIDs, (ids) => ids.includes("prod-mini"))).toEqual(["prod-mini"])
+      // The second attempt is the retry: discovery never runs again for an unchanged connection.
+      expect(azure.requests).toHaveLength(2)
+    }),
+  )
+
+  it.live("leaves a failure that cannot pass alone instead of retrying it", () =>
+    Effect.gen(function* () {
+      const azure = yield* fakeAzure({ resource: unauthorized })
+      yield* seedCatalog
+      yield* connect(keyCredential())
+      yield* addPlugin(azure.endpoints)
+
+      // Past the second the first retry would wait, so a second request here would be a retried rejected key.
+      yield* Effect.promise(() => Bun.sleep(1200))
+      expect(azure.requests).toHaveLength(1)
+      expect(yield* azureModelIDs).toEqual(catalogIDs)
     }),
   )
 })

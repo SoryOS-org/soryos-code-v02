@@ -1,5 +1,5 @@
-import { Clock, Effect, FiberHandle, Option, Schema, Semaphore, Stream } from "effect"
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http"
+import { Cause, Clock, Effect, FiberHandle, Option, Schedule, Schema, Semaphore, Stream } from "effect"
+import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { ChildProcess } from "effect/process"
 import { define } from "@opencode/plugin/effect/plugin"
 import { Form } from "@opencode/schema/form"
@@ -50,6 +50,26 @@ const decodeManagementDeployment = Schema.decodeUnknownOption(
 )
 const ResourceQuery = Schema.Struct({ query: Schema.String })
 const Resources = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString })) })
+
+// A laptop can wake before its modem and VPN are up, and discovery otherwise runs only at startup and on an account
+// switch, so a single failed sync would leave the catalog-only list until the next restart. `exponential` widens the
+// gap 1, 2, 4, 8, 16, 30 s once `spaced` caps it, and `recurs` bounds the whole ladder at about two minutes.
+const syncSchedule = Schedule.max([
+  Schedule.min([Schedule.exponential("1 seconds"), Schedule.spaced("30 seconds")]),
+  Schedule.recurs(8),
+])
+
+// Azure answers a transport failure, a 408 or 429, or a 5xx other than 501 while it restarts or the network is down,
+// and a timed-out attempt may pass on the next one. A rejected key or an unmatchable body fails the same way however
+// often it is asked, so retrying it would only delay the warning.
+const isTransient = (cause: unknown) => {
+  if (Cause.isTimeoutError(cause)) return true
+  if (!HttpClientError.isHttpClientError(cause)) return false
+  if (cause.reason._tag === "TransportError") return true
+  if (cause.reason._tag !== "StatusCodeError") return false
+  const status = cause.reason.response.status
+  return status === 408 || status === 429 || (status >= 500 && status !== 501)
+}
 
 type Deployment = { readonly name: string; readonly model: string }
 
@@ -258,9 +278,21 @@ export function make(
       // models the resource can deploy rather than its deployments.
       // https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cognitiveservices/data-plane/OpenAIAuthoring/stable/2022-12-01/azureopenai.json
       const deployments = (url: string, resource: string, credential: Credential.Key | Credential.External) =>
-        credential.type === "external"
-          ? managementDeployments(resource).pipe(Effect.catch(() => resourceDeployments(url, credential)))
-          : resourceDeployments(url, credential)
+        Effect.retry(
+          credential.type === "external"
+            ? managementDeployments(resource).pipe(Effect.catch(() => resourceDeployments(url, credential)))
+            : resourceDeployments(url, credential),
+          // A switch interrupts discovery through the fiber handle, so a pending retry never answers the old
+          // connection. Only a failure that can pass is retried; the rest reaches the warning below at once.
+          syncSchedule.pipe(
+            Schedule.setInputType<unknown>(),
+            Schedule.while(({ input }) =>
+              isTransient(input)
+                ? Effect.logWarning("retrying Azure deployment sync", { cause: input }).pipe(Effect.as(true))
+                : Effect.succeed(false),
+            ),
+          ),
+        )
 
       // Local and quick, so a switch rebinds the provider before discovery for the new connection calls Azure.
       const rebind = () =>
@@ -421,7 +453,9 @@ export function make(
         Effect.forkScoped({ startImmediately: true }),
       )
       // Deployments load in the background so startup never waits on Azure; the catalog serves until they arrive.
-      // Later changes load when the connection changes, so a new deployment needs a reconnect or restart.
+      // A sync that failed while the network was down retries on its own, so a woken laptop lists its deployments
+      // once the network returns. Later changes load when the connection changes, so a new deployment needs a
+      // reconnect or restart.
       yield* refresh().pipe(Effect.forkScoped)
 
       // Entra bearer tokens are minted per request from the target URL's scope, so they are injected
