@@ -765,16 +765,16 @@ function TabGroupHeader(props: {
         <Show
           when={props.vertical}
           fallback={
-            // The badge's name lives on hover; the tooltip cannot wrap the
-            // button itself because its expanded state would suppress it.
-            <Tooltip placement="bottom" value={props.group.title}>
-              <span class="flex">
-                <ProjectAvatar
-                  fallback={props.group.project ? displayName(props.group.project) : props.group.title}
-                  src={getProjectAvatarSource(props.group.project?.id, props.group.project?.icon)}
-                  variant={props.group.variant ?? "gray"}
-                />
-              </span>
+            // The badge's name lives on hover. The tooltip wraps only the
+            // avatar mark, with a span trigger so it stays valid inside the
+            // button; wrapping the button itself would suppress the tooltip
+            // through its expanded disclosure state.
+            <Tooltip placement="bottom" value={props.group.title} triggerAs="span" class="flex">
+              <ProjectAvatar
+                fallback={props.group.project ? displayName(props.group.project) : props.group.title}
+                src={getProjectAvatarSource(props.group.project?.id, props.group.project?.icon)}
+                variant={props.group.variant ?? "gray"}
+              />
             </Tooltip>
           }
         >
