@@ -30,8 +30,10 @@ const selection = {
 } satisfies ModelSelection
 
 test.each([
-  { name: "a send pressed while agents and models load waits, then sends", agent: "build", toasts: [], sent: 1 },
-  { name: "a send asks for a selection only once loading finds none", agent: "", toasts: ["missing"], sent: 0 },
+  { name: "a send asks for a selection only once loading finds none", agent: "", toasts: ["missing"], left: "ship it" },
+  { name: "editing a held send cancels it and keeps the edit", edit: "ship i", toasts: [], left: "ship i" },
+  { name: "clearing a held send cancels it", edit: "", toasts: [], left: "" },
+  { name: "stopping a held send cancels it and keeps the prompt", stop: true, toasts: [], left: "ship it" },
 ])("$name", async (row) => {
   const state = createMemoryComposerState({ prompt: "ship it" }).capture()
   const sent: string[] = []
@@ -82,7 +84,7 @@ test.each([
     }),
     working: () => false,
     session: () => session,
-    interrupt: async () => undefined,
+    interrupt: async () => void sent.push("interrupt"),
     submitted() {},
     setEditor() {},
   }
@@ -109,15 +111,24 @@ test.each([
 
     expect(submission.held()).toBe(true)
     expect(toasts).toEqual([])
-    expect(sent).toEqual([])
 
-    setAgent(row.agent)
+    if (row.edit !== undefined) state.set([{ type: "text", content: row.edit, start: 0, end: row.edit.length }])
+
+    if (row.stop) await submission.stop()
+
+    // A cancelled hold settles before loading finishes, and loading afterwards sends nothing.
+    if (row.agent === undefined) {
+      await held
+      expect(submission.held()).toBe(false)
+    }
+
+    setAgent(row.agent ?? "build")
     await held
 
     expect(submission.held()).toBe(false)
     expect(toasts).toEqual(row.toasts)
-    expect(sent).toHaveLength(row.sent)
-    expect(text(state)).toBe(row.sent ? "" : "ship it")
+    expect(sent).toEqual([])
+    expect(text(state)).toBe(row.left)
     dispose()
   })
 })

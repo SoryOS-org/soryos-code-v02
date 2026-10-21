@@ -168,7 +168,7 @@ test("an existing session's model never shows a fallback while its agent loads",
   expect(await page.evaluate(() => [...(window.__chipTexts ?? [])])).toEqual(["OpenCode / Alpha"])
 })
 
-test("a send pressed while the Location's plugins activate waits and sends once its catalogs load", async ({
+test("a send pressed while the Location's plugins activate waits, Esc cancels it, and it sends once catalogs load", async ({
   page,
 }) => {
   const sessionID = "ses_plugins_booting"
@@ -191,6 +191,12 @@ test("a send pressed while the Location's plugins activate waits and sends once 
     await expect(editor).toBeEditable()
     await held.arrived
     await editor.fill("ship it")
+    await editor.press("Enter")
+    await expect(submit).toHaveAttribute("aria-busy", "true")
+    // Esc cancels the held send and keeps the prompt for the next press.
+    await editor.press("Escape")
+    await expect(submit).not.toHaveAttribute("aria-busy", "true")
+    await expect(editor).toHaveText("ship it")
     await editor.press("Enter")
     await expect(submit).toHaveAttribute("aria-busy", "true")
     await expect(toast).toHaveCount(0)
