@@ -42,3 +42,20 @@ async function clickPage(page: Page) {
 
   return text.evaluate((element) => element.hasAttribute("data-clicked"))
 }
+
+story("the first Escape zooms the image preview back to fit and the next closes it", async ({ mount, page }) => {
+  await mount("components-image-preview--from-message")
+  await open(page)
+  const preview = page.locator('[data-component="image-preview"]')
+  const level = page.locator('[data-slot="image-preview-zoom-level"]')
+  await expect(preview).toHaveAttribute("data-stage", "rest")
+  const fit = (await level.textContent()) ?? ""
+
+  await page.locator('[data-slot="image-preview-image"]').dblclick()
+  await expect(level).not.toHaveText(fit)
+  await page.keyboard.press("Escape")
+  await expect(level).toHaveText(fit)
+  await expect(preview).toHaveAttribute("data-stage", "rest")
+  await page.keyboard.press("Escape")
+  await expect(preview).toHaveCount(0)
+})

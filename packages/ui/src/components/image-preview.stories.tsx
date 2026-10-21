@@ -11,7 +11,8 @@ Use for full-size image inspection; keep images optimized.
 
 ### API
 - Required: \`src\`.
-- Optional: \`alt\` text, and \`origin\`, the image on the page that the preview grows out of and shrinks back into.
+- Optional: \`alt\` text, \`origin\`, the image on the page that the preview grows out of and shrinks back into, and
+  \`video\`, a video on the page that the preview borrows and shows instead, still playing.
 
 ### Variants and states
 - Single layout: the image fills the window without a panel, with zoom controls and a close action in one strip under it.
@@ -20,7 +21,8 @@ Use for full-size image inspection; keep images optimized.
 - Intended to be used via \`useDialog().show\`.
 - With an \`origin\`, the image flies from its place on the page to the preview while the page dims, and back on close.
 - Pinch or Cmd/Ctrl + wheel zooms at the cursor; wheel and drag pan while zoomed.
-- Double-click toggles between fit and 100%; Cmd/Ctrl + =, - and 0 zoom in, out and to fit.
+- Double-click toggles between fit and 100%; Cmd/Ctrl + =, - and 0 zoom in, out and to fit, as do 0 and a first Escape.
+- A video zooms inside its own frame, under its controls; Space plays and pauses it.
 - A click on the backdrop around the image closes it, unless it ends a pan.
 
 ### Accessibility

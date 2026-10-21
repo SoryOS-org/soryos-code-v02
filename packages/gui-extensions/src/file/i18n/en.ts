@@ -8,7 +8,6 @@ export default {
   "view.source": "Source",
   "view.openInBrowser": "Open in browser",
   "view.fullscreen": "Enter full screen",
-  "view.exitFullscreen": "Exit full screen",
   "view.binary": "Binary file · {{size}}",
   "view.loadFailed": "Couldn't load this file.",
   "view.table.rows.one": "{{count}} row",

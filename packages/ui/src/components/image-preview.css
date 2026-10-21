@@ -53,6 +53,32 @@
     user-select: none;
   }
 
+  /* A borrowed video flies itself and stays where it lands, over the preview, so its own controls keep working. Its
+     page styles and the popover it briefly becomes to refuse a double click's fullscreen must not move it. */
+  > video {
+    position: fixed;
+    z-index: 51;
+    right: auto;
+    bottom: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    border-radius: var(--radius-md);
+    transform-origin: 0 0;
+    pointer-events: auto;
+  }
+
+  &[data-stage="flying"] > video {
+    pointer-events: none;
+  }
+
+  canvas[data-slot="image-preview-image"] {
+    visibility: hidden;
+  }
+
   &[data-stage="pending"] :is([data-slot="image-preview-scrim"], [data-slot="image-preview-content"]) {
     opacity: 0;
   }

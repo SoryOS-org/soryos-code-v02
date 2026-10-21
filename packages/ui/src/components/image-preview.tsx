@@ -1,8 +1,7 @@
 import { Dialog as Kobalte, useDialogContext } from "@kobalte/core/dialog"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
-import { animate, type AnimationPlaybackControls } from "motion"
-import { createEffect, createMemo, createSignal, on, onCleanup } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from "solid-js"
 import { useDialogLayer } from "../context/dialog"
 import { useI18n } from "../context/i18n"
 import { Button } from "@opencode/ui/button"
@@ -19,16 +18,34 @@ import {
   type Box,
   type FlightFrame,
 } from "./image-flight"
-import { clampView, detailScale, FIT_VIEW, maxScale, panBy, wheelZoomFactor, zoomAt, type ZoomView } from "./image-zoom"
+import {
+  clampView,
+  detailScale,
+  FIT_VIEW,
+  maxScale,
+  panBy,
+  viewBox,
+  wheelZoomFactor,
+  zoomAt,
+  type ZoomView,
+} from "./image-zoom"
 
 export interface ImagePreviewProps {
   src: string
   alt?: string
   /** The image on the page that the preview grows out of and shrinks back into. */
   origin?: HTMLElement
+  /**
+   * A video on the page to show instead of the image. The preview borrows this element, so it keeps playing as it
+   * flies out of its place and back, and returns it once the close lands.
+   */
+  video?: HTMLVideoElement
 }
 
 const STEP = Math.SQRT2
+
+// How far up from its bottom edge a video keeps its own controls, whose drag scrubs rather than pans.
+const CONTROLS = 56
 
 // Without a flight (reduced motion, or no thumbnail to fly to), the preview only fades.
 const fade = { duration: 0.15, bounce: 0 }
@@ -46,8 +63,11 @@ export function ImagePreview(props: ImagePreviewProps) {
   let scrim!: HTMLDivElement
   let content!: HTMLDivElement
   let viewport!: HTMLDivElement
-  let image!: HTMLImageElement
-  let standIn!: HTMLImageElement
+  // For a video, an empty canvas of its size: the box it fits to in the window.
+  let image!: HTMLImageElement | HTMLCanvasElement
+  let standIn: HTMLImageElement | undefined
+  // Where a borrowed video was on the page, holding its size until it comes back.
+  let holder: HTMLElement | undefined
   let surface!: HTMLDivElement
   let edge!: HTMLDivElement
   let close: HTMLButtonElement | undefined
@@ -75,48 +95,77 @@ export function ImagePreview(props: ImagePreviewProps) {
   // Whether the press that ends in a click began on the backdrop around the image and stayed put. A pan captures the
   // pointer, so its click lands on the backdrop wherever it began.
   let backdrop = false
+  // Whether the pan under way has moved, so the click that ends it neither closes the preview nor plays the video.
+  let panned = false
   // Where an eased zoom is heading, so repeated steps build on the destination rather than the frame in flight.
-  let goal = FIT_VIEW
-  let animation: AnimationPlaybackControls | undefined
+  const [goal, setGoal] = createSignal(FIT_VIEW)
+  const glide = [1, 0, 0].map((value) => Spring.fromDuration(value, FLIGHT_SPRING))
+  let gliding: (() => void) | undefined
 
   const percent = createMemo(() => new Intl.NumberFormat(i18n.locale(), { style: "percent", maximumFractionDigits: 0 }))
 
+  const natural = () =>
+    image instanceof HTMLImageElement
+      ? { width: image.naturalWidth, height: image.naturalHeight }
+      : { width: image.width, height: image.height }
+
+  // A video zooms inside its own frame, so its controls stay where they are; an image zooms out across the window.
   const bounds = () => ({
     width: image.offsetWidth,
     height: image.offsetHeight,
-    viewportWidth: viewport.clientWidth,
-    viewportHeight: viewport.clientHeight,
+    viewportWidth: props.video ? image.offsetWidth : viewport.clientWidth,
+    viewportHeight: props.video ? image.offsetHeight : viewport.clientHeight,
     maxScale: maxScale(fitRatio()),
   })
 
-  // Pinch, wheel and drag follow the hand directly and take over from an eased zoom mid-flight.
-  const follow = (next: ZoomView) => {
-    animation?.stop()
-    animation = undefined
-    goal = next
+  const show = (next: ZoomView) => {
     setView(next)
+
+    if (props.video) {
+      props.video.style.setProperty(
+        "object-view-box",
+        viewBox(next, { width: image.offsetWidth, height: image.offsetHeight }, natural()),
+      )
+
+      return
+    }
+
+    image.style.transform = `translate(${next.x}px, ${next.y}px) scale(${next.scale})`
   }
 
-  const ease = (target: ZoomView) => {
-    animation?.stop()
-    goal = target
+  const settle = () => {
+    gliding?.()
+    gliding = undefined
+  }
 
-    if (prefersReducedMotion()) return setView(target)
-    const from = view()
-    animation = animate(0, 1, {
-      type: "spring",
-      visualDuration: 0.25,
-      bounce: 0,
-      onUpdate: (progress) =>
-        setView({
-          scale: from.scale + (target.scale - from.scale) * progress,
-          x: from.x + (target.x - from.x) * progress,
-          y: from.y + (target.y - from.y) * progress,
-        }),
+  // Pinch, wheel and drag follow the hand directly and take over from an eased zoom mid-flight.
+  const follow = (next: ZoomView) => {
+    settle()
+    setGoal(next)
+    show(next)
+  }
+
+  // Scale and offsets ride springs of one shape, so the point under the pointer stays put; a new target mid-glide
+  // keeps the velocity it has.
+  const ease = (target: ZoomView) => {
+    setGoal(target)
+
+    if (prefersReducedMotion()) return follow(target)
+
+    if (!gliding) [view().scale, view().x, view().y].forEach((value, index) => glide[index].snap(value))
+    ;[target.scale, target.x, target.y].forEach((value, index) => glide[index].set(value))
+    gliding ??= frameLoop.add((dt) => {
+      const [scale, x, y] = glide.map((spring) => spring.step(dt))
+      show({ scale, x, y })
+
+      if (!glide.every((spring) => spring.resting)) return true
+      gliding = undefined
+
+      return false
     })
   }
 
-  const step = (factor: number) => ease(zoomAt(goal, goal.scale * factor, CENTER, bounds()))
+  const step = (factor: number) => ease(zoomAt(goal(), goal().scale * factor, CENTER, bounds()))
 
   // Kobalte keeps the content mounted while an exit animation runs; the dialog stack waits for the flight too.
   const layer = useDialogLayer()
@@ -130,15 +179,19 @@ export function ImagePreview(props: ImagePreviewProps) {
   holdExit()
 
   const reveal = async () => {
-    await Promise.all([image.decode(), standIn.decode()]).catch(() => undefined)
+    if (image instanceof HTMLImageElement) await Promise.all([image.decode(), standIn?.decode()]).catch(() => undefined)
 
     if (stage() !== "pending" || !dialog.isOpen()) return
     const from = prefersReducedMotion() ? undefined : originFrame()
+
+    if (props.video) borrow(props.video)
     holdExit()
     dimTo(1, from ? FLIGHT_SPRING : fade)
 
     if (!from) {
       plain = true
+
+      if (props.video) place(fitted())
       paint()
       setStage("rest")
 
@@ -156,7 +209,9 @@ export function ImagePreview(props: ImagePreviewProps) {
   }
 
   const dismiss = () => {
-    animation?.stop()
+    // A video eases back to its whole frame on the way home; an image flies as it is shown.
+    if (props.video) ease(FIT_VIEW)
+    else settle()
 
     if (stage() === "pending") return
     const to = prefersReducedMotion() ? undefined : originFrame()
@@ -177,6 +232,8 @@ export function ImagePreview(props: ImagePreviewProps) {
     course.flight.to(to, KICK.close, FLIGHT_SPRING)
     course.landed = () => {
       showOrigin()
+
+      if (props.video) return giveBack()
       veil.omega = (2 * Math.PI) / (FLIGHT_SPRING.duration * 0.75)
       veil.set(0)
     }
@@ -211,20 +268,32 @@ export function ImagePreview(props: ImagePreviewProps) {
       if (course || !dim.resting || !veil.resting) return true
       stop = undefined
 
+      // A video that faded out rather than flying home goes back once it has.
+      if (!dialog.isOpen()) giveBack()
+
       return false
     })
   }
 
+  // The image flies as a stand-in over the preview; a video flies itself and stays where it lands.
+  const flyer = () => (props.video ? holder && props.video : standIn)
+
   const paint = () => {
+    const flying = flyer()
     scrim.style.opacity = String(dim.value)
-    standIn.style.opacity = String(plain ? dim.value : veil.value)
     surface.style.opacity = course ? "1" : "0"
+
+    if (flying) flying.style.opacity = String(plain ? dim.value : veil.value)
 
     if (course) {
       const frame = course.flight.frame()
       const style = flightStyle(course.at, frame)
-      standIn.style.transform = style.transform
-      standIn.style.clipPath = style.clipPath
+
+      if (flying) {
+        flying.style.transform = style.transform
+        flying.style.clipPath = style.clipPath
+      }
+
       // The shadow and the outline are leaf boxes, so sizing them every frame stays cheap; scaling them instead would
       // stretch their corners and shadow.
       layout(surface, frame.surface, frame.surfaceRadius)
@@ -239,14 +308,45 @@ export function ImagePreview(props: ImagePreviewProps) {
   }
 
   const place = (box: Box) => {
-    Object.assign(standIn.style, {
-      left: `${box.x}px`,
-      top: `${box.y}px`,
-      width: `${box.width}px`,
-      height: `${box.height}px`,
-    })
+    const flying = flyer()
+
+    if (flying)
+      Object.assign(flying.style, {
+        left: `${box.x}px`,
+        top: `${box.y}px`,
+        width: `${box.width}px`,
+        height: `${box.height}px`,
+      })
 
     return box
+  }
+
+  // Moves the video into the preview, leaving a box of its size in its place to fly back to.
+  const borrow = (video: HTMLVideoElement) => {
+    const rect = video.getBoundingClientRect()
+    holder = document.createElement("div")
+    Object.assign(holder.style, {
+      flex: "none",
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      borderRadius: getComputedStyle(video).borderTopLeftRadius,
+    })
+    video.before(holder)
+    root.moveBefore(video, null)
+  }
+
+  const giveBack = () => {
+    const video = props.video
+
+    if (!video || !holder) return
+
+    if (holder.parentElement) holder.parentElement.moveBefore(video, holder)
+    else video.remove()
+    holder.remove()
+    holder = undefined
+    ;["left", "top", "width", "height", "opacity", "transform", "clip-path", "object-view-box"].forEach((property) =>
+      video.style.removeProperty(property),
+    )
   }
 
   // The image as shown now, zoomed and panned and cropped to the viewport. There is no panel: the image is the surface.
@@ -254,16 +354,16 @@ export function ImagePreview(props: ImagePreviewProps) {
     const shown = image.getBoundingClientRect()
     const clip = intersect(shown, viewport.getBoundingClientRect())
     const cropped = clip.width < shown.width - 0.5 || clip.height < shown.height - 0.5
-    const radius = cropped ? 0 : parseFloat(getComputedStyle(image).borderTopLeftRadius) * view().scale
+    const radius = cropped ? 0 : parseFloat(getComputedStyle(image).borderTopLeftRadius) * scale()
 
     return { image: shown, clip, radius, surface: clip, surfaceRadius: radius, lift: 1 }
   }
 
   // The origin's frame, cropped to the part the page shows, or nothing when it is gone or out of sight.
   const originFrame = () => {
-    const origin = props.origin
+    const origin = home()
 
-    if (!origin?.isConnected || !image.naturalWidth) return
+    if (!origin?.isConnected || !natural().width) return
     const rect = origin.getBoundingClientRect()
 
     if (!rect.width || !rect.height) return
@@ -272,37 +372,38 @@ export function ImagePreview(props: ImagePreviewProps) {
 
     if (!visible) return
     const style = getComputedStyle(origin)
-    // An image's outline is often an overlay, since an inset shadow does not paint over an <img>.
-    edge.style.boxShadow =
-      [style.boxShadow, getComputedStyle(origin, "::after").boxShadow].find((shadow) => shadow !== "none") ?? "none"
+    // An image's outline is often an overlay, since an inset shadow does not paint over an <img>. A video brings its
+    // own.
+    edge.style.boxShadow = props.video
+      ? "none"
+      : ([style.boxShadow, getComputedStyle(origin, "::after").boxShadow].find((shadow) => shadow !== "none") ?? "none")
 
-    return elementFrame(
-      rect,
-      { width: image.naturalWidth, height: image.naturalHeight },
-      style.objectFit,
-      parseFloat(style.borderTopLeftRadius) || 0,
-      visible,
-    )
+    return elementFrame(rect, natural(), style.objectFit, parseFloat(style.borderTopLeftRadius) || 0, visible)
   }
 
-  // The image's fitted layout box, wherever zoom has moved it.
+  // The image's fitted layout box, wherever zoom has moved it. A video zooms inside its box, which stays put.
   const fitted = (): Box => {
     const shown = image.getBoundingClientRect()
+    const offset = props.video ? CENTER : view()
 
     return {
-      x: shown.x + shown.width / 2 - view().x - image.offsetWidth / 2,
-      y: shown.y + shown.height / 2 - view().y - image.offsetHeight / 2,
+      x: shown.x + shown.width / 2 - offset.x - image.offsetWidth / 2,
+      y: shown.y + shown.height / 2 - offset.y - image.offsetHeight / 2,
       width: image.offsetWidth,
       height: image.offsetHeight,
     }
   }
 
-  const hideOrigin = () => props.origin?.setAttribute("data-image-preview-origin", "")
-  const showOrigin = () => props.origin?.removeAttribute("data-image-preview-origin")
+  const scale = () => (props.video ? 1 : view().scale)
+  const home = () => holder ?? props.origin ?? props.video
+  const hideOrigin = () => home()?.setAttribute("data-image-preview-origin", "")
+  const showOrigin = () => home()?.removeAttribute("data-image-preview-origin")
 
   onCleanup(() => {
     stop?.()
+    settle()
     showOrigin()
+    giveBack()
   })
 
   createEffect(
@@ -315,16 +416,24 @@ export function ImagePreview(props: ImagePreviewProps) {
     ),
   )
 
+  // From the center of the box zoom is measured in: the window's for an image, the frame's for a video.
   const point = (event: MouseEvent) => {
-    const rect = viewport.getBoundingClientRect()
+    const rect = (props.video ? image : viewport).getBoundingClientRect()
 
     return { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 }
   }
 
   const measure = () => {
-    if (!image.naturalWidth) return
-    setFitRatio(image.offsetWidth / image.naturalWidth)
+    if (!natural().width || !image.offsetWidth) return
+    setFitRatio(image.offsetWidth / natural().width)
     follow(clampView(view(), bounds()))
+
+    if (!props.video) return
+
+    // A video is ready as soon as the preview has laid out its box.
+    if (stage() === "pending") return void reveal()
+
+    if (holder && !course) place(fitted())
   }
 
   createResizeObserver(() => [viewport, image], measure)
@@ -337,14 +446,64 @@ export function ImagePreview(props: ImagePreviewProps) {
     ),
   )
 
-  onCleanup(() => animation?.stop())
+  const detail = (event: MouseEvent) => {
+    if (goal().scale > 1) return ease(FIT_VIEW)
+    ease(zoomAt(goal(), detailScale(fitRatio()), point(event), bounds()))
+  }
+
+  const grab = (event: PointerEvent, target: HTMLElement) => {
+    if (event.button !== 0 || view().scale <= 1) return
+    event.preventDefault()
+    target.setPointerCapture(event.pointerId)
+    setDrag({ id: event.pointerId, x: event.clientX, y: event.clientY })
+  }
+
+  const pan = (event: PointerEvent) => {
+    const current = drag()
+
+    if (current?.id !== event.pointerId) return
+    backdrop = false
+    panned = true
+    setDrag({ id: current.id, x: event.clientX, y: event.clientY })
+    follow(panBy(view(), { x: event.clientX - current.x, y: event.clientY - current.y }, bounds()))
+  }
+
+  const release = (event: PointerEvent) => {
+    if (drag()?.id === event.pointerId) setDrag(undefined)
+  }
+
+  if (props.video) {
+    const video = props.video
+    makeEventListener(video, "pointerdown", (event: PointerEvent) => {
+      panned = false
+
+      if (holder && event.clientY < video.getBoundingClientRect().bottom - CONTROLS) grab(event, video)
+    })
+    makeEventListener(video, "pointermove", pan)
+    makeEventListener(video, "pointerup", release)
+    makeEventListener(video, "pointercancel", release)
+    makeEventListener(video, "dblclick", (event: MouseEvent) => holder && detail(event))
+    makeEventListener(
+      video,
+      "click",
+      (event: MouseEvent) => {
+        if (!panned) return
+        panned = false
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      },
+      { capture: true },
+    )
+  }
 
   // The preview owns zoom gestures while it is open: the page behind must neither scroll nor zoom the whole window.
   makeEventListener(
     window,
     "wheel",
     (event: WheelEvent) => {
-      const inside = event.target instanceof Node && viewport.contains(event.target)
+      const inside =
+        event.target instanceof Node && (viewport.contains(event.target) || (!!holder && event.target === props.video))
+
       const zoom = event.ctrlKey || event.metaKey
 
       if (!inside && !zoom) return
@@ -380,8 +539,18 @@ export function ImagePreview(props: ImagePreviewProps) {
     window,
     "keydown",
     (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return
-      const action = shortcut(event.key)
+      const bare = !event.metaKey && !event.ctrlKey && !event.altKey
+
+      if (bare && event.key === " " && props.video && holder) {
+        event.preventDefault()
+        event.stopPropagation()
+
+        if (props.video.paused) return void props.video.play().catch(() => undefined)
+
+        return props.video.pause()
+      }
+
+      const action = bare ? (event.key === "0" ? "fit" : undefined) : event.altKey ? undefined : shortcut(event.key)
 
       if (!action) return
       event.preventDefault()
@@ -398,6 +567,8 @@ export function ImagePreview(props: ImagePreviewProps) {
       ref={root}
       data-component="image-preview"
       data-stage={stage()}
+      // Zoomed in, the first Escape zooms back out; the dialog stack leaves it to the preview.
+      data-owns-escape={goal().scale > 1 ? "" : undefined}
       style={{ "--image-preview-exit": `${exit()}ms` }}
     >
       <div ref={scrim} data-slot="image-preview-scrim" />
@@ -408,6 +579,15 @@ export function ImagePreview(props: ImagePreviewProps) {
           // Open with focus on Close, as before, rather than on the zoom controls that precede it.
           event.preventDefault()
           close?.focus()
+        }}
+        onEscapeKeyDown={(event) => {
+          if (goal().scale <= 1) return
+          event.preventDefault()
+          ease(FIT_VIEW)
+        }}
+        // A borrowed video sits over the preview rather than in it; using its controls keeps the preview open.
+        onInteractOutside={(event) => {
+          if (props.video && event.target === props.video) event.preventDefault()
         }}
         onPointerDown={(event: PointerEvent) => {
           backdrop = event.target === content || event.target === viewport
@@ -423,44 +603,38 @@ export function ImagePreview(props: ImagePreviewProps) {
           data-slot="image-preview-body"
           data-zoomed={view().scale > 1 ? "" : undefined}
           data-dragging={drag() ? "" : undefined}
-          onDblClick={(event) => {
-            if (goal.scale > 1) return ease(FIT_VIEW)
-            ease(zoomAt(goal, detailScale(fitRatio()), point(event), bounds()))
-          }}
-          onPointerDown={(event) => {
-            if (event.button !== 0 || view().scale <= 1) return
-            event.preventDefault()
-            viewport.setPointerCapture(event.pointerId)
-            setDrag({ id: event.pointerId, x: event.clientX, y: event.clientY })
-          }}
-          onPointerMove={(event) => {
-            const current = drag()
-
-            if (current?.id !== event.pointerId) return
-            backdrop = false
-            setDrag({ id: current.id, x: event.clientX, y: event.clientY })
-            follow(panBy(view(), { x: event.clientX - current.x, y: event.clientY - current.y }, bounds()))
-          }}
-          onPointerUp={(event) => {
-            if (drag()?.id === event.pointerId) setDrag(undefined)
-          }}
-          onPointerCancel={(event) => {
-            if (drag()?.id === event.pointerId) setDrag(undefined)
-          }}
+          onDblClick={detail}
+          onPointerDown={(event) => grab(event, viewport)}
+          onPointerMove={pan}
+          onPointerUp={release}
+          onPointerCancel={release}
         >
-          <img
-            ref={image}
-            src={props.src}
-            alt={props.alt ?? i18n.t("ui.imagePreview.alt")}
-            data-slot="image-preview-image"
-            draggable={false}
-            onLoad={() => {
-              measure()
-              void reveal()
-            }}
-            onError={() => void reveal()}
-            style={{ transform: `translate(${view().x}px, ${view().y}px) scale(${view().scale})` }}
-          />
+          <Show
+            when={props.video}
+            fallback={
+              <img
+                ref={(element) => (image = element)}
+                src={props.src}
+                alt={props.alt ?? i18n.t("ui.imagePreview.alt")}
+                data-slot="image-preview-image"
+                draggable={false}
+                onLoad={() => {
+                  measure()
+                  void reveal()
+                }}
+                onError={() => void reveal()}
+              />
+            }
+          >
+            {(video) => (
+              <canvas
+                ref={(element) => (image = element)}
+                data-slot="image-preview-image"
+                width={video().videoWidth}
+                height={video().videoHeight}
+              />
+            )}
+          </Show>
         </div>
         <div data-slot="image-preview-controls">
           <IconButton
@@ -499,7 +673,9 @@ export function ImagePreview(props: ImagePreviewProps) {
         </div>
       </Kobalte.Content>
       <div data-slot="image-preview-surface" ref={surface} />
-      <img data-slot="image-preview-flight" src={props.src} alt="" aria-hidden="true" ref={standIn} />
+      <Show when={!props.video}>
+        <img data-slot="image-preview-flight" src={props.src} alt="" aria-hidden="true" ref={standIn} />
+      </Show>
       <div data-slot="image-preview-edge" ref={edge} />
     </div>
   )

@@ -858,7 +858,7 @@ test("image files load into the review panel and keep it painted while loading",
   ).toEqual([])
 })
 
-test("video files stream into the viewer behind a loading state, expand into the theatre overlay, and collapse on Escape without remounting", async ({
+test("video files stream into the viewer behind a loading state, open into the preview, and come back on Escape without remounting", async ({
   page,
 }) => {
   const directory = "C:/OpenCode/ReviewVideo"
@@ -915,7 +915,7 @@ test("video files stream into the viewer behind a loading state, expand into the
   const stage = panel.locator('[data-slot="artifact-stage"]')
   const video = stage.locator('video[data-slot="artifact-media"]')
   const fullscreen = stage.getByRole("button", { name: "Enter full screen", exact: true })
-  const exitFullscreen = stage.getByRole("button", { name: "Exit full screen", exact: true })
+  const preview = page.locator('[data-component="image-preview"]')
   const loading = stage.getByRole("status", { name: "Loading", exact: true })
 
   await ranged.promise
@@ -928,7 +928,6 @@ test("video files stream into the viewer behind a loading state, expand into the
   await expect(toolbar).toContainText("0:01")
   await expect(toolbar).toContainText("38.4 MB")
   await expect(panel.getByText(/Binary file/)).toHaveCount(0)
-  await expect(fullscreen).toHaveAttribute("aria-pressed", "false")
   const inlineBounds = (await stage.boundingBox())!
   expect(inlineBounds.width).toBeLessThan(1000)
 
@@ -936,26 +935,23 @@ test("video files stream into the viewer behind a loading state, expand into the
     element.dataset.e2eProbe = "retained"
   })
 
+  // The preview borrows the same element, so playback never restarts.
   await fullscreen.click()
-  await expect(exitFullscreen).toHaveAttribute("aria-pressed", "true")
-  await expect(stage).toHaveAttribute("data-expanded", "")
-  expect(await stage.evaluate((element) => element.matches(":popover-open"))).toBe(true)
+  await expect(preview).toHaveAttribute("data-stage", "rest")
+  await expect(preview.locator('video[data-e2e-probe="retained"]')).toBeVisible()
+  await expect(video).toHaveCount(0)
   expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
-  expect(await video.evaluate((element) => element.dataset.e2eProbe)).toBe("retained")
-  await expect.poll(() => stage.boundingBox()).toEqual({ x: 0, y: 0, width: 1440, height: 900 })
 
   await page.keyboard.press("Escape")
-  await expect(fullscreen).toHaveAttribute("aria-pressed", "false")
-  await expect(stage).not.toHaveAttribute("data-expanded")
-  expect(await stage.evaluate((element) => element.matches(":popover-open"))).toBe(false)
-  expect(await video.evaluate((element) => element.dataset.e2eProbe)).toBe("retained")
+  await expect(preview).toHaveCount(0)
+  await expect(video).toHaveAttribute("data-e2e-probe", "retained")
   await expect.poll(() => stage.boundingBox()).toEqual(inlineBounds)
 
   await video.dblclick()
-  await expect(exitFullscreen).toHaveAttribute("aria-pressed", "true")
+  await expect(preview).toHaveAttribute("data-stage", "rest")
   await page.mouse.click(8, 8)
-  await expect(fullscreen).toHaveAttribute("aria-pressed", "false")
-  expect(await video.evaluate((element) => element.dataset.e2eProbe)).toBe("retained")
+  await expect(preview).toHaveCount(0)
+  await expect(video).toHaveAttribute("data-e2e-probe", "retained")
 
   // Chromium's controls also answer a double click with native fullscreen, which covers the backdrop. Opting out with
   // controlslist="nofullscreen" would end their click-to-play as well.

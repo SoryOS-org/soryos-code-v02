@@ -58,6 +58,29 @@ export function detailScale(fitRatio: number) {
   return actual >= 1.5 ? actual : 2
 }
 
+/**
+ * The `object-view-box` that shows `view` of media fitted at `size`, for media that must zoom inside its own box, such
+ * as a video under its controls. The inset is in the media's natural pixels.
+ */
+export function viewBox(
+  view: ZoomView,
+  size: { width: number; height: number },
+  natural: { width: number; height: number },
+) {
+  if (view.scale <= 1) return "none"
+
+  const edge = (offset: number, fitted: number) => 0.5 - 0.5 / view.scale - offset / (view.scale * fitted)
+
+  const inset = [
+    edge(view.y, size.height) * natural.height,
+    edge(-view.x, size.width) * natural.width,
+    edge(-view.y, size.height) * natural.height,
+    edge(view.x, size.width) * natural.width,
+  ]
+
+  return `inset(${inset.map((value) => `${Math.max(0, Math.round(value * 100) / 100)}px`).join(" ")})`
+}
+
 /** The zoom factor for one wheel event, bounded so a coarse mouse-wheel notch is a step rather than a jump. */
 export function wheelZoomFactor(deltaY: number) {
   return Math.exp(-clamp(deltaY, -30, 30) / 100)

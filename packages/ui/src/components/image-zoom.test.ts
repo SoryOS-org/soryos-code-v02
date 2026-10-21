@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { clampView, detailScale, FIT_VIEW, maxScale, panBy, wheelZoomFactor, zoomAt } from "./image-zoom"
+import { clampView, detailScale, FIT_VIEW, maxScale, panBy, viewBox, wheelZoomFactor, zoomAt } from "./image-zoom"
 
 // A 1000×500 image fitted into a 1000×600 viewport at half its natural size.
 const bounds = { width: 1000, height: 500, viewportWidth: 1000, viewportHeight: 600, maxScale: maxScale(0.5) }
@@ -77,5 +77,20 @@ describe("wheelZoomFactor", () => {
   test("bounds a coarse mouse-wheel notch", () => {
     expect(wheelZoomFactor(-400)).toBe(wheelZoomFactor(-100))
     expect(wheelZoomFactor(-400)).toBeLessThan(1.5)
+  })
+})
+
+describe("viewBox", () => {
+  // An 800×450 video fitted at half its natural 1600×900.
+  const size = { width: 800, height: 450 }
+  const natural = { width: 1600, height: 900 }
+
+  test("shows the whole frame at fit", () => {
+    expect(viewBox(FIT_VIEW, size, natural)).toBe("none")
+  })
+
+  test("shows the middle half at 2x, and more of the left once panned right", () => {
+    expect(viewBox({ scale: 2, x: 0, y: 0 }, size, natural)).toBe("inset(225px 400px 225px 400px)")
+    expect(viewBox({ scale: 2, x: 200, y: 0 }, size, natural)).toBe("inset(225px 600px 225px 200px)")
   })
 })
