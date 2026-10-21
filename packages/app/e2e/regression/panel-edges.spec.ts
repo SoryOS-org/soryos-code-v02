@@ -50,7 +50,7 @@ test("the content beside a panel follows the panel's edge on every frame of a to
 
   const sidebar = page
     .locator(
-      '[data-slot="vertical-tabs-sidebar"] button[aria-controls="vertical-tabs-sidebar"], main button[aria-controls="vertical-tabs-sidebar"]',
+      '[data-slot="vertical-tabs-sidebar"] button[aria-controls="vertical-tabs-sidebar"], [data-slot="collapsed-sidebar-toggle"] button[aria-controls="vertical-tabs-sidebar"]',
     )
     .locator("visible=true")
     .first()
