@@ -63,6 +63,10 @@ export function createHomeSessionSearchController(home: HomeController, sessions
   const open = createMemo(() => state.focused && query().length > 0)
 
   const placeholder = createMemo(() => {
+    // Server grouping lists every server, so neither a project nor the focused
+    // server scopes the search.
+    if (sessions.data.grouping() === "server") return language.t("home.sessions.search.placeholder")
+
     const project = home.project.selected()
 
     if (project) return language.t("home.sessions.search.placeholder.scoped", { scope: displayName(project) })
@@ -130,7 +134,7 @@ export function createHomeSessionSearchController(home: HomeController, sessions
   }
 
   function select(record: HomeSessionRecord, options?: { background?: boolean }) {
-    sessions.session.open(record.session, options)
+    sessions.session.open(record, options)
 
     if (!options?.background) close()
   }

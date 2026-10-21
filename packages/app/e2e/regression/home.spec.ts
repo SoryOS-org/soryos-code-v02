@@ -1,6 +1,16 @@
 import { expect, test, type Page } from "@playwright/test"
-import { expectPath, holdRoute, NO_PROVIDER, project, REMOTE_SERVER, seed, sessionHref } from "../utils/app"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import {
+  expectPath,
+  holdRoute,
+  NO_PROVIDER,
+  project,
+  REMOTE_SERVER,
+  seed,
+  SERVER,
+  session,
+  sessionHref,
+} from "../utils/app"
+import { mockOpenCodeServer, mockServers } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { mockRemoteServer } from "../utils/workspace"
 import { APP_READY_TIMEOUT, expectAppVisible } from "../utils/waits"
@@ -308,6 +318,59 @@ for (const state of [
     ).toBeVisible()
   })
 }
+
+test("Home groups sessions by server when several servers are connected", async ({ page }) => {
+  const directoryA = "C:/group/a"
+  const directoryB = "/group/b"
+  const now = Date.now()
+  const serverA = session({ id: "ses_group_a", directory: directoryA, title: "Server A session", created: now })
+  const serverB = session({ id: "ses_group_b", directory: directoryB, title: "Server B session", created: now })
+
+  await mockServers(page, {
+    [SERVER]: {
+      directory: directoryA,
+      project: project({ id: "proj_group_a", directory: directoryA }),
+      provider: NO_PROVIDER,
+      sessions: [serverA],
+      pageMessages: () => ({ items: [] }),
+    },
+    [REMOTE_SERVER]: {
+      directory: directoryB,
+      project: project({ id: "proj_group_b", directory: directoryB }),
+      provider: NO_PROVIDER,
+      sessions: [serverB],
+      pageMessages: () => ({ items: [] }),
+    },
+  })
+  await seed(page, {
+    servers: [{ url: REMOTE_SERVER, name: "Build server" }],
+    projects: {
+      local: [{ worktree: directoryA, expanded: true }],
+      [REMOTE_SERVER]: [{ worktree: directoryB, expanded: true }],
+    },
+    lastProject: { local: directoryA },
+  })
+  await page.goto("/")
+
+  const groups = page.locator('[data-component="home-session-group"]')
+  const local = page.locator('[data-component="home-session-group"][data-group-id="today"]')
+
+  await expect(local).toContainText("Today")
+  await expect(row(page, serverA.title)).toBeVisible()
+  await expect(row(page, serverB.title)).toHaveCount(0)
+
+  await page.getByRole("button", { name: "Group sessions", exact: true }).click()
+  await page.getByRole("menuitemradio", { name: "By server", exact: true }).click()
+
+  await expect(groups).toHaveText([new URL(SERVER).host, "Build server"])
+  await expect(row(page, serverA.title)).toBeVisible()
+  await expect(row(page, serverB.title)).toBeVisible()
+
+  await page.getByRole("button", { name: "Group sessions", exact: true }).click()
+  await page.getByRole("menuitemradio", { name: "By date", exact: true }).click()
+  await expect(local).toContainText("Today")
+  await expect(row(page, serverB.title)).toHaveCount(0)
+})
 
 test("the project menu path arrow has a glyph when the page has an older icon sprite", async ({ page }) => {
   await mockStressTimeline(page)

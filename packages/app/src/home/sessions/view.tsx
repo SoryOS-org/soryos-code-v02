@@ -21,6 +21,7 @@ import {
   HomeSessionStatusController,
   homeSessionSearchKey,
   type HomeSessionGroup,
+  type HomeSessionGrouping,
   type HomeSessionRecord,
   type OpenSessionOptions,
 } from "./controller"
@@ -54,7 +55,9 @@ export type HomeSessionsViewProps = {
   location: (record: HomeSessionRecord) => { worktree: string; branch: string | undefined }
   onRevealLocations: (record?: HomeSessionRecord) => void
   showProjectName: boolean
-  server: ServerConnection.Key
+  grouping: HomeSessionGrouping
+  canGroupByServer: boolean
+  onSetGrouping: (grouping: HomeSessionGrouping) => void
   canCreateSession: boolean
   searchValue: string
   searchPlaceholder: string
@@ -66,8 +69,8 @@ export type HomeSessionsViewProps = {
   titleOpacity: (id: HomeSessionGroup["id"]) => number
   isOpenTab: (record: HomeSessionRecord) => boolean
   onCreateSession: () => void
-  onOpenSession: (session: SessionInfo, options?: OpenSessionOptions) => void
-  onArchiveSession: (session: SessionInfo) => Promise<void>
+  onOpenSession: (record: HomeSessionRecord, options?: OpenSessionOptions) => void
+  onArchiveSession: (record: HomeSessionRecord) => Promise<void>
   onRenameSession: (server: ServerConnection.Key, session: SessionInfo, title: string) => Promise<boolean>
   onExportSession: (server: ServerConnection.Key, session: SessionInfo) => Promise<void>
   onDeleteSession: (server: ServerConnection.Key, session: SessionInfo) => void
@@ -117,18 +120,32 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
           hoveredSession={hover.sessionID}
           onHoverSession={(sessionID) => setHover("sessionID", sessionID)}
         />
-        <Show when={props.groups.length > 0 && props.canCreateSession}>
-          <div class="pointer-events-none absolute right-0 top-[68px] z-20 flex md:top-[84px] lg:top-[108px]">
-            <Button
-              data-action="home-new-session"
-              variant="ghost-muted"
-              size="normal"
-              icon="edit"
-              class="pointer-events-auto h-7 px-2 [font-weight:530]"
-              onClick={props.onCreateSession}
-            >
-              {props.language.t("command.session.new")}
-            </Button>
+        <Show when={props.groups.length > 0}>
+          <div
+            class={`
+              pointer-events-none absolute right-0 top-[68px] z-20 flex items-center gap-1
+              md:top-[84px] lg:top-[108px]
+            `}
+          >
+            <Show when={props.canGroupByServer}>
+              <HomeSessionGroupingMenu
+                grouping={props.grouping}
+                language={props.language}
+                onSelect={props.onSetGrouping}
+              />
+            </Show>
+            <Show when={props.canCreateSession}>
+              <Button
+                data-action="home-new-session"
+                variant="ghost-muted"
+                size="normal"
+                icon="edit"
+                class="pointer-events-auto h-7 px-2 [font-weight:530]"
+                onClick={props.onCreateSession}
+              >
+                {props.language.t("command.session.new")}
+              </Button>
+            </Show>
           </div>
         </Show>
       </div>
@@ -164,12 +181,15 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
                 {(group, index) => (
                   <>
                     <HomeSessionGroupHeader
+                      id={group().id}
                       title={group().title}
                       titleOpacity={props.titleOpacity(group().id)}
                       onSetRef={(element) => props.onSetHeader(group().id, element)}
                       elevated={index === 0}
                     />
                     <div
+                      data-component="home-session-group-list"
+                      data-group-id={group().id}
                       class={`flex min-w-0 flex-col gap-px pt-2 md:pt-4 ${index === props.groups.length - 1 ? "" : "mb-6"}`}
                     >
                       {/* Rows key by session ID: session.sync replaces the
@@ -202,13 +222,12 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
 }
 
 function HomeSessionLeadingController(props: {
-  server: HomeSessionsViewProps["server"]
   isOpenTab: HomeSessionsViewProps["isOpenTab"]
   record: HomeSessionRecord
 }) {
   return (
     <HomeSessionStatusController
-      server={props.server}
+      server={props.record.server}
       record={props.record}
       isOpenTab={props.isOpenTab}
       render={(state) => (
@@ -448,7 +467,7 @@ function HomeSessionSearchResultRow(
         props.onSearchSelect(props.record, { background: true })
       }}
     >
-      <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
+      <HomeSessionLeadingController isOpenTab={props.isOpenTab} record={props.record} />
       <div data-slot="home-session-labels" class="flex min-w-0 flex-1 items-center gap-1.5">
         <HomeSessionTitle title={title()} showProjectName={!!showProjectName()} search />
         <Show when={showProjectName()}>
@@ -469,7 +488,45 @@ function HomeSessionSearchResultRow(
   )
 }
 
+function HomeSessionGroupingMenu(props: {
+  grouping: HomeSessionGrouping
+  language: ReturnType<typeof useLanguage>
+  onSelect: (grouping: HomeSessionGrouping) => void
+}) {
+  const title = () => props.language.t("home.sessions.grouping.title")
+
+  return (
+    <Menu placement="bottom-end" gutter={6}>
+      <Menu.Trigger
+        as={IconButton}
+        data-action="home-session-grouping"
+        variant="ghost-muted"
+        size="normal"
+        class="pointer-events-auto"
+        icon={<Icon name="sidebar" />}
+        aria-label={title()}
+      />
+      <Menu.Portal>
+        <Menu.Content>
+          <Menu.Group>
+            <Menu.GroupLabel>{title()}</Menu.GroupLabel>
+            <Menu.RadioGroup value={props.grouping} onChange={props.onSelect}>
+              <Menu.RadioItem value="date" closeOnSelect>
+                {props.language.t("home.sessions.grouping.date")}
+              </Menu.RadioItem>
+              <Menu.RadioItem value="server" closeOnSelect>
+                {props.language.t("home.sessions.grouping.server")}
+              </Menu.RadioItem>
+            </Menu.RadioGroup>
+          </Menu.Group>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu>
+  )
+}
+
 function HomeSessionGroupHeader(props: {
+  id: HomeSessionGroup["id"]
   title: string
   titleOpacity: number
   onSetRef: (element: HTMLDivElement) => void
@@ -478,6 +535,8 @@ function HomeSessionGroupHeader(props: {
   return (
     <div
       ref={props.onSetRef}
+      data-component="home-session-group"
+      data-group-id={props.id}
       class={`
         pointer-events-none sticky top-[68px] flex h-7 min-w-0 items-center justify-between
         bg-v2-background-bg-base ps-1.5 md:ps-3 md:top-[84px] lg:top-[108px]
@@ -555,7 +614,7 @@ function HomeSessionRow(
 
     if (!current || current.renaming) return
     props.setRowUI("editor", { ...current, renaming: true })
-    const saved = await props.onRenameSession(props.server, props.record.session, current.draft)
+    const saved = await props.onRenameSession(props.record.server, props.record.session, current.draft)
     // Disabling the input during the request drops focus to the body; restore
     // it unless the user focused another control while the rename was pending.
     const restore = document.activeElement === document.body || document.activeElement === renameInput()
@@ -598,7 +657,7 @@ function HomeSessionRow(
             class="flex h-10 min-w-0 w-full flex-1 items-center py-3 ps-1.5 pe-3 md:ps-3 md:pe-10"
             classList={{ "gap-1.5": props.desktop, "gap-2": !props.desktop }}
           >
-            <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
+            <HomeSessionLeadingController isOpenTab={props.isOpenTab} record={props.record} />
             <div data-slot="home-session-labels" class="contents">
               <InlineInput
                 data-component="home-session-rename"
@@ -713,15 +772,15 @@ function HomeSessionRow(
               }
             }
 
-            props.onOpenSession(props.record.session, { background: isBackgroundOpen(event) })
+            props.onOpenSession(props.record, { background: isBackgroundOpen(event) })
           }}
           onAuxClick={(event) => {
             if (!isBackgroundOpen(event)) return
             event.preventDefault()
-            props.onOpenSession(props.record.session, { background: true })
+            props.onOpenSession(props.record, { background: true })
           }}
         >
-          <HomeSessionLeadingController server={props.server} isOpenTab={props.isOpenTab} record={props.record} />
+          <HomeSessionLeadingController isOpenTab={props.isOpenTab} record={props.record} />
           <div
             data-slot="home-session-labels"
             class="min-w-0 flex-1 items-center gap-1.5"
@@ -780,11 +839,11 @@ function HomeSessionRow(
             }}
           >
             <Menu.Item onSelect={openEditor}>{props.language.t("common.rename")}</Menu.Item>
-            <Menu.Item onSelect={() => void props.onExportSession(props.server, props.record.session)}>
+            <Menu.Item onSelect={() => void props.onExportSession(props.record.server, props.record.session)}>
               {props.language.t("common.export")}…
             </Menu.Item>
             <Menu.Separator />
-            <Menu.Item onSelect={() => props.onDeleteSession(props.server, props.record.session)}>
+            <Menu.Item onSelect={() => props.onDeleteSession(props.record.server, props.record.session)}>
               {props.language.t("common.delete")}…
             </Menu.Item>
           </Menu.Content>
@@ -807,7 +866,7 @@ function HomeSessionRow(
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
-                void props.onArchiveSession(props.record.session)
+                void props.onArchiveSession(props.record)
               }}
             />
           </Tooltip>

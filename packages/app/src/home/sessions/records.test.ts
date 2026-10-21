@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionInfo } from "@opencode/client/promise"
 import type { LocalProject } from "@/shell/state/layout"
+import { ServerKey } from "@/runtime/server/persistence"
 import { buildHomeSessionRecords, homeSessionLocation } from "./records"
 
 const session = (id: string, directory: string, projectID: string) =>
@@ -21,6 +22,7 @@ describe("buildHomeSessionRecords", () => {
       sessions: () => sessions,
       projectDirectories: () => undefined,
       projects: () => [opened],
+      server: ServerKey.make("local"),
     })
 
     expect(records.map((record) => record.session.id)).toEqual(["a", "b"])
@@ -32,6 +34,7 @@ describe("buildHomeSessionRecords", () => {
       sessions: () => sessions,
       projectDirectories: () => ["/repo/a"],
       projects: () => [opened],
+      server: ServerKey.make("local"),
     })
 
     expect(records.map((record) => record.session.id)).toEqual(["a"])
@@ -42,6 +45,7 @@ describe("buildHomeSessionRecords", () => {
       sessions: () => [session("w", "/repo/a/.worktrees/feature", "project-a")],
       projectDirectories: () => undefined,
       projects: () => [{ ...opened, name: "Project A" }],
+      server: ServerKey.make("local"),
     })
 
     expect(records[0]?.project).toMatchObject({ id: "project-a", worktree: "/repo/a" })
@@ -55,6 +59,7 @@ describe("buildHomeSessionRecords", () => {
       sessions: () => [session("n", "/repo/a/packages/app", "project-a")],
       projectDirectories: () => undefined,
       projects: () => [opened, nested],
+      server: ServerKey.make("local"),
     })
 
     expect(records[0]?.project.worktree).toBe("/repo/a/packages/app")
@@ -70,6 +75,7 @@ describe("buildHomeSessionRecords", () => {
       sessions: () => [at("ses_z", 2), at("ses_old", 1), at("ses_a", 2)],
       projectDirectories: () => undefined,
       projects: () => [opened],
+      server: ServerKey.make("local"),
     })
 
     expect(records.map((record) => record.session.id)).toEqual(["ses_a", "ses_z", "ses_old"])

@@ -2,8 +2,11 @@ import type { SessionInfo } from "@opencode/client/promise"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Button } from "@opencode/ui/button"
 import { DialogFooter, DialogHeader, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
-import { skipToken, useQuery, useQueryClient } from "@tanstack/solid-query"
+import { useQueries, useQueryClient } from "@tanstack/solid-query"
 import { type Accessor, createEffect, createMemo, type JSX, startTransition, untrack } from "solid-js"
+import { Schema } from "effect"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
 import { notifySessionTabsRemoved } from "@/shell/titlebar/session-events"
 import { useCommand } from "@/shell/commands/command"
 import {
@@ -14,7 +17,7 @@ import {
 } from "@/home/sessions/index"
 import type { LocalProject } from "@/shell/state/layout"
 import { useLanguage } from "@/runtime/i18n/language"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, serverName } from "@/runtime/server/registry"
 import { sessionHasOpenTab, useTabs } from "@/shell/tabs/tabs"
 import { errorMessage } from "@/shell/layout/helpers"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
@@ -26,7 +29,7 @@ import { sessionLabel, sessionTitle } from "@/session/title"
 import { showToast } from "@/shell/notifications/toast"
 import { archiveHomeSession } from "./archive"
 import type { HomeController } from "../model"
-import { buildHomeSessionRecords, homeProjectForSession, homeSessionLocation, type HomeSessionRecord } from "./records"
+import { buildHomeSessionRecords, homeSessionLocation, type HomeSessionRecord } from "./records"
 
 export type { HomeSessionRecord } from "./records"
 
@@ -34,10 +37,18 @@ export type { HomeSessionRecord } from "./records"
 const selectSessions = (sessions: SessionInfo[]) => () => sessions
 
 export type HomeSessionGroup = {
-  id: "today" | "yesterday" | "older"
+  id: string
   title: string
   sessions: HomeSessionRecord[]
 }
+
+export type HomeSessionGrouping = "date" | "server"
+
+// Sessions are keyed by server only in server grouping; the date view keeps the
+// focused server's list with a stable persisted preference for both modes.
+const HomeSessionsSchema = Persistence.struct({
+  grouping: Schema.Literals(["date", "server"]),
+})
 
 export type OpenSessionOptions = { background?: boolean }
 
@@ -49,6 +60,12 @@ export function createHomeSessionsController(home: HomeController) {
   const platform = usePlatform()
   const queryClient = useQueryClient()
 
+  const [preferences, setPreferences] = persisted(Persist.global("home.sessions"), HomeSessionsSchema, {
+    grouping: "date",
+  })
+
+  const grouping = () => preferences.grouping
+
   const projectDirectories = createMemo(() => {
     const selected = home.selection.value().directory
 
@@ -58,91 +75,144 @@ export function createHomeSessionsController(home: HomeController) {
     return project ? directories(project) : [selected]
   })
 
-  const sessionLoad = useQuery(() => {
-    const ctx = home.server.focusedContext()
+  // Home lists every visible server, so each server keeps its own indexed query
+  // and its own directory filter. Date grouping keeps the focused server only.
+  const connections = createMemo(() => {
+    if (grouping() === "server") return home.server.list()
     const conn = home.server.focused()
 
-    return {
-      queryKey: ["home-sessions", conn] as const,
-      enabled: !!ctx && ctx.sdk.connection.status() === "connected",
-      queryFn: ctx
-        ? ({ signal }) => loadHomeSessionIndex((input, options) => ctx.sdk.api.session.list(input, options), signal)
-        : skipToken,
-      retry: false,
-      staleTime: 30_000,
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      select: selectSessions,
-    }
+    return conn ? [conn] : []
   })
 
-  const indexedSessions = createMemo(() => {
-    const ctx = home.server.focusedContext()
-    const conn = home.server.focused()
+  const sessionLoad = useQueries(() => ({
+    queries: connections().map((conn) => {
+      const ctx = home.server.context(conn)
 
-    if (!ctx || !conn) return []
+      return {
+        queryKey: ["home-sessions", conn] as const,
+        enabled: ctx.sdk.connection.status() === "connected",
+        queryFn: ({ signal }: { signal?: AbortSignal }) =>
+          loadHomeSessionIndex((input, options) => ctx.sdk.api.session.list(input, options), signal),
+        retry: false,
+        staleTime: 30_000,
+        refetchOnMount: true,
+        refetchOnReconnect: true,
+        select: selectSessions,
+      }
+    }),
+  }))
 
-    return retainHomeSessions(
-      ctx.data.session.apply(
-        mergeHomeSessionIndex(sessionLoad.isPending ? [] : (sessionLoad.data?.() ?? []), ctx.data.session.list()),
-      ),
-      HOME_SESSION_LIMIT,
-      Date.now(),
-    )
-  })
+  const indexedSessions = createMemo(() =>
+    connections().map((conn, index) => {
+      const ctx = home.server.context(conn)
+      const query = sessionLoad[index]
 
-  const allRecords = createMemo(() =>
-    buildHomeSessionRecords({
-      sessions: indexedSessions,
-      projectDirectories,
-      projects: home.project.list,
-      resolveProject: (session) => home.server.focusedContext()?.projects.forSession(session),
+      return {
+        conn,
+        ctx,
+        sessions: retainHomeSessions(
+          ctx.data.session.apply(
+            mergeHomeSessionIndex(query?.isPending ? [] : (query?.data?.() ?? []), ctx.data.session.list()),
+          ),
+          HOME_SESSION_LIMIT,
+          Date.now(),
+        ),
+      }
     }),
   )
 
-  const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
-  const groups = createMemo(() => groupSessions(records(), language))
+  const allRecords = createMemo(() => {
+    // Server grouping is a cross-server view, so a project selection on one
+    // server must not silently filter that server only.
+    const directories = grouping() === "server" ? () => undefined : projectDirectories
+
+    return indexedSessions().flatMap(({ conn, ctx, sessions }) =>
+      buildHomeSessionRecords({
+        sessions: () => sessions,
+        projectDirectories: directories,
+        projects: () => home.project.forServer(conn),
+        server: ServerConnection.key(conn),
+        resolveProject: (session) => ctx.projects.forSession(session),
+      }),
+    )
+  })
+
+  // Cap each server before merging so one busy server cannot hide the others.
+  const records = createMemo(() =>
+    connections().flatMap((conn) =>
+      allRecords()
+        .filter((record) => record.server === ServerConnection.key(conn))
+        .slice(0, HOME_SESSION_LIMIT),
+    ),
+  )
+
+  const groups = createMemo(() => groupSessions(records(), grouping(), language, serverNameOf))
   const prefetched = new Set<string>()
 
-  const location = (record: HomeSessionRecord) => {
-    const branch = home.server.focusedContext()?.data.location.vcs.info(record.session.location)?.branch.current
+  function serverNameOf(server: ServerConnection.Key) {
+    const conn = home.server.list().find((item) => ServerConnection.key(item) === server)
 
-    return homeSessionLocation(record.session.location.directory, branch)
+    return conn ? serverName(conn) : server
   }
+
+  const connection = (record: HomeSessionRecord) =>
+    home.server.list().find((conn) => ServerConnection.key(conn) === record.server)
+
+  const context = (record: HomeSessionRecord) => {
+    const conn = connection(record)
+
+    return conn ? home.server.context(conn) : undefined
+  }
+
+  const location = (record: HomeSessionRecord) =>
+    homeSessionLocation(
+      record.session.location.directory,
+      context(record)?.data.location.vcs.info(record.session.location)?.branch.current,
+    )
 
   const syncLocations = (record?: HomeSessionRecord) => {
     if (platform.platform !== "desktop") return
-    const ctx = home.server.focusedContext()
-
-    if (!ctx) return
 
     if (record) {
-      void ctx.data.location.vcs.sync(record.session.location).catch(() => undefined)
+      void context(record)
+        ?.data.location.vcs.sync(record.session.location)
+        .catch(() => undefined)
 
       return
     }
 
     const locations = new Map(
-      records().map((record) => [pathKey(record.session.location.directory), record.session.location] as const),
+      records().flatMap((item) => {
+        const ctx = context(item)
+
+        if (!ctx) return []
+        const key = `${item.server}\0${pathKey(item.session.location.directory)}`
+
+        return [[key, { ctx, location: item.session.location }] as const]
+      }),
     )
 
-    void Promise.allSettled(Array.from(locations.values(), (location) => ctx.data.location.vcs.sync(location)))
+    void Promise.allSettled(Array.from(locations.values(), (item) => item.ctx.data.location.vcs.sync(item.location)))
   }
 
   createEffect(() => {
-    const ctx = home.server.focusedContext()
-    const conn = home.server.focused()
+    // Prefetch the two newest rows per server; an offline server has no query
+    // result and keeps showing its cached sessions.
+    connections().forEach((conn) => {
+      const ctx = home.server.context(conn)
+      const key = ServerConnection.key(conn)
 
-    if (!ctx || !conn) return
-    records()
-      .slice(0, 2)
-      .forEach((record) => {
-        const key = `${ServerConnection.key(conn)}\0${record.session.id}`
+      records()
+        .filter((record) => record.server === key)
+        .slice(0, 2)
+        .forEach((record) => {
+          const id = `${key}\0${record.session.id}`
 
-        if (prefetched.has(key)) return
-        prefetched.add(key)
-        void untrack(() => ctx.data.session.sync(record.session.id)).catch(() => {})
-      })
+          if (prefetched.has(id)) return
+          prefetched.add(id)
+          void untrack(() => ctx.data.session.sync(record.session.id)).catch(() => {})
+        })
+    })
   })
 
   command.register("home.palette", () => [
@@ -298,13 +368,24 @@ export function createHomeSessionsController(home: HomeController) {
   }
 
   return {
+    server: {
+      count: () => home.server.list().length,
+    },
     copy: {
       language,
     },
     data: {
       records,
       groups,
-      loading: () => sessionLoad.isPending,
+      grouping,
+      setGrouping: (value: HomeSessionGrouping) => setPreferences("grouping", value),
+      // A disconnected server never fetches, so its query stays pending forever;
+      // only a connected server can keep the list loading.
+      loading: () =>
+        connections().some(
+          (conn, index) =>
+            home.server.context(conn).sdk.connection.status() === "connected" && !!sessionLoad[index]?.isPending,
+        ),
       searchRecords: allRecords,
     },
     platform: {
@@ -315,13 +396,14 @@ export function createHomeSessionsController(home: HomeController) {
       sync: syncLocations,
     },
     session: {
-      showProjectName: () => !home.project.selected(),
+      showProjectName: () => grouping() === "server" || !home.project.selected(),
       server: () => home.selection.value().server,
       canCreate: () => !!home.project.newSession(),
       lookup: async (sessionID: string) => {
+        const conn = home.server.focused()
         const ctx = home.server.focusedContext()
 
-        if (!ctx) return
+        if (!conn || !ctx) return
         const result = await ctx.sdk.api.session.get({ sessionID })
 
         if (result.time.archived) return
@@ -330,42 +412,38 @@ export function createHomeSessionsController(home: HomeController) {
           sessions: () => [result],
           projectDirectories,
           projects: home.project.list,
+          server: ServerConnection.key(conn),
           resolveProject: ctx.projects.forSession,
         })[0]
       },
       create: home.project.openNewSession,
-      open: (session: SessionInfo, options?: OpenSessionOptions) => {
-        const project = homeProjectForSession(session, home.project.list())
-        const conn = home.server.focused()
+      open: (record: HomeSessionRecord, options?: OpenSessionOptions) => {
+        const conn = connection(record)
+        const ctx = conn ? home.server.context(conn) : undefined
 
-        if (!conn) return
-        const connKey = ServerConnection.key(conn)
-        const directory = project?.worktree ?? session.location.directory
-        const ctx = home.server.focusedContext()
+        if (!conn || !ctx) return
+        const directory = record.project?.worktree ?? record.session.location.directory
 
-        if (!ctx) return
-
-        if (!options?.background) void ctx.data.session.message.sync(session.id).catch(() => undefined)
+        if (!options?.background) void ctx.data.session.message.sync(record.session.id).catch(() => undefined)
         // Commit cache/project changes with navigation instead of rebuilding
         // the outgoing Home list before leaving it.
         void startTransition(() => {
-          const tab = tabs.addSessionTab({ server: connKey, sessionId: session.id })
+          const tab = tabs.addSessionTab({ server: record.server, sessionId: record.session.id })
 
           if (!options?.background) tabs.select(tab)
-          ctx.data.session.remember(session)
+          ctx.data.session.remember(record.session)
           ctx.projects.open(directory)
 
           if (!options?.background) ctx.projects.touch(directory)
         })
       },
-      archive: async (session: SessionInfo) => {
-        const conn = home.server.focused()
-        const ctx = home.server.focusedContext()
+      archive: async (record: HomeSessionRecord) => {
+        const ctx = context(record)
 
-        if (!conn || !ctx) return
+        if (!ctx) return
         await archiveHomeSession({
-          server: ServerConnection.key(conn),
-          session,
+          server: record.server,
+          session: record.session,
           // TODO: Restore archiving when the V2 client exposes a session archive API.
           archive: async (_sessionID) => Promise.reject(new Error("Session archiving is unavailable")),
           remove() {},
@@ -382,11 +460,7 @@ export function createHomeSessionsController(home: HomeController) {
         dialog.show(() => <DeleteDialog server={server} session={session} />),
     },
     tab: {
-      isOpen: (record: HomeSessionRecord) => {
-        const server = home.selection.value().server
-
-        return !!server && sessionHasOpenTab(tabs.store, server, record.session)
-      },
+      isOpen: (record: HomeSessionRecord) => sessionHasOpenTab(tabs.store, record.server, record.session),
     },
   }
 }
@@ -396,7 +470,7 @@ function directories(project: LocalProject) {
 }
 
 export function homeSessionSearchKey(record: HomeSessionRecord) {
-  return `${pathKey(record.session.location.directory)}:${record.session.id}`
+  return `${record.server}\0${pathKey(record.session.location.directory)}:${record.session.id}`
 }
 
 // Calendar day in the local time zone, comparable as a number.
@@ -404,11 +478,26 @@ function localDay(date: Date) {
   return date.getFullYear() * 10_000 + date.getMonth() * 100 + date.getDate()
 }
 
-function groupSessions(records: HomeSessionRecord[], language: ReturnType<typeof useLanguage>): HomeSessionGroup[] {
+function groupSessions(
+  records: HomeSessionRecord[],
+  grouping: HomeSessionGrouping,
+  language: ReturnType<typeof useLanguage>,
+  serverName: (server: ServerConnection.Key) => string,
+): HomeSessionGroup[] {
+  if (grouping === "server")
+    return [...Map.groupBy(records, (record) => record.server)].map(([server, sessions]) => ({
+      id: server,
+      title: serverName(server),
+      sessions,
+    }))
+
   const now = new Date()
   const today = localDay(now)
   const yesterday = localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
-  const day = (record: HomeSessionRecord) => localDay(new Date(record.session.time.updated ?? record.session.time.created))
+
+  const day = (record: HomeSessionRecord) =>
+    localDay(new Date(record.session.time.updated ?? record.session.time.created))
+
   const todaySessions = records.filter((record) => day(record) === today)
   const yesterdaySessions = records.filter((record) => day(record) === yesterday)
   const olderSessions = records.filter((record) => day(record) !== today && day(record) !== yesterday)
@@ -419,9 +508,9 @@ function groupSessions(records: HomeSessionRecord[], language: ReturnType<typeof
       : language.t("home.sessions.group.older")
 
   return [
-    { id: "today" as const, title: language.t("home.sessions.group.today"), sessions: todaySessions },
-    { id: "yesterday" as const, title: language.t("home.sessions.group.yesterday"), sessions: yesterdaySessions },
-    { id: "older" as const, title: olderTitle, sessions: olderSessions },
+    { id: "today", title: language.t("home.sessions.group.today"), sessions: todaySessions },
+    { id: "yesterday", title: language.t("home.sessions.group.yesterday"), sessions: yesterdaySessions },
+    { id: "older", title: olderTitle, sessions: olderSessions },
   ].filter((group) => group.sessions.length > 0)
 }
 

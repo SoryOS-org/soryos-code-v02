@@ -1,5 +1,6 @@
 import type { SessionInfo } from "@opencode/client/promise"
 import type { LocalProject } from "@/shell/state/layout"
+import type { ServerConnection } from "@/runtime/server/registry"
 import { displayName } from "@opencode/ui/project-avatar"
 import { compareSessionTime } from "@/shell/layout/helpers"
 import { pathKey } from "@/workspaces/path-key"
@@ -9,6 +10,9 @@ export type HomeSessionRecord = {
   session: SessionInfo
   project: LocalProject
   projectName: string
+  // Home lists sessions from every visible server, so each row keeps the server
+  // it belongs to for actions, tabs, and grouping.
+  server: ServerConnection.Key
 }
 
 export function homeSessionLocation(directory: string, branch?: string) {
@@ -19,6 +23,7 @@ export function buildHomeSessionRecords(input: {
   sessions: () => SessionInfo[]
   projectDirectories: () => string[] | undefined
   projects: () => LocalProject[]
+  server: ServerConnection.Key
   resolveProject?: (session: SessionInfo) => LocalProject | undefined
 }) {
   const selected = input.projectDirectories()
@@ -38,7 +43,7 @@ export function buildHomeSessionRecords(input: {
           expanded: false,
         }
 
-      return { session, project, projectName: displayName(project) }
+      return { session, project, projectName: displayName(project), server: input.server }
     })
 }
 
