@@ -22,16 +22,16 @@ const normalizedHeaders = (headers: Headers.Headers) =>
 
 const retryAfterMs = (headers: Record<string, string>) => {
   const millis = Number(headers["retry-after-ms"])
-  if (Number.isFinite(millis)) return Math.max(0, millis)
+  if (Number.isFinite(millis)) return Math.max(0, Math.ceil(millis))
 
   const value = headers["retry-after"]
   if (!value) return undefined
 
   const seconds = Number(value)
-  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
+  if (Number.isFinite(seconds)) return Math.max(0, Math.ceil(seconds * 1000))
 
   const date = Date.parse(value)
-  if (!Number.isNaN(date)) return Math.max(0, date - Date.now())
+  if (!Number.isNaN(date)) return Math.max(0, Math.ceil(date - Date.now()))
   return undefined
 }
 
