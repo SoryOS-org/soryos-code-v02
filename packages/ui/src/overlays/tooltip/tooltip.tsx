@@ -13,10 +13,12 @@ export interface TooltipProps extends ComponentProps<typeof Root> {
   inactive?: boolean
   forceOpen?: boolean
   triggerTabIndex?: number
+  /** The trigger wrapper's element type; spans keep tooltips valid inside buttons. */
+  triggerAs?: "div" | "span"
 }
 
 export function Tooltip(props: TooltipProps) {
-  let ref: HTMLDivElement | undefined
+  let ref: HTMLElement | undefined
 
   const [state, setState] = createStore({
     open: false,
@@ -33,6 +35,7 @@ export function Tooltip(props: TooltipProps) {
     "inactive",
     "forceOpen",
     "triggerTabIndex",
+    "triggerAs",
     "ignoreSafeArea",
     "value",
   ])
@@ -124,7 +127,7 @@ export function Tooltip(props: TooltipProps) {
         >
           <Trigger
             ref={ref}
-            as="div"
+            as={local.triggerAs ?? "div"}
             tabIndex={local.triggerTabIndex}
             data-component="tooltip-v2-trigger"
             class={local.class}
