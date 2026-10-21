@@ -17,6 +17,7 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "generate:css-orb": "bun src/session/agent-glyph/generate-css-agent-orb.ts",
     "serve": "vite preview",
     "test": "bun run test:unit && bun run test:browser",
     "test:unit": "bun test --conditions=solid --only-failures --isolate --preload ./happydom.ts ./src",

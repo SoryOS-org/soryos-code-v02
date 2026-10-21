@@ -3,12 +3,6 @@
 }
 
 [data-slot="session-activity-chip"] {
-  transition:
-    padding-inline 150ms ease-out,
-    gap 150ms ease-out,
-    border-radius 150ms ease-out,
-    min-height 150ms ease-out;
-
   &[data-orb="true"] {
     position: relative;
     height: 28px;
@@ -52,15 +46,6 @@
   &[data-orb="false"] [data-component="css-agent-orb"] > span::after {
     animation-play-state: paused;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-slot="session-activity-chip"] {
-    transition: none;
-  }
-}
-:root[data-motion="reduce"] [data-slot="session-activity-chip"] {
-  transition: none;
 }
 
 [data-slot="session-activity-summary"] {

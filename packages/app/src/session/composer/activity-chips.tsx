@@ -3,12 +3,12 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
+import { Dynamic } from "solid-js/web"
 import { useLanguage } from "@/runtime/i18n/language"
 import en from "@/runtime/i18n/en"
 import { useSettings } from "@/settings/model"
-import { CssAgentOrb } from "@/session/agent-glyph/css-agent-orb"
 import "./activity-chips.css"
 
 const chip = motionTuning.choice("activity.chip", {
@@ -243,15 +243,22 @@ export function SessionActivityChips(props: {
   )
 }
 
-// Keep both identities mounted so reversing the experiment crossfades without a blank frame.
+// Load on first opt-in, then retain both identities for an interruptible crossfade.
 function ActivityGlyph(props: { muted?: boolean }) {
+  const enabled = createMemo((previous) => previous || experiment.chip === "orb", false)
+  const [orb] = createResource(enabled, async () => {
+    const { CssAgentOrb } = await import("@/session/agent-glyph/css-agent-orb")
+    return CssAgentOrb
+  })
+  // Guard the first read so loading this experiment never suspends the composer or hides today's glyph.
+  const loaded = () => orb.state === "ready"
   return (
-    <span data-slot="activity-glyph" data-orb={experiment.chip === "orb"} aria-hidden="true">
+    <span data-slot="activity-glyph" data-orb={experiment.chip === "orb" && loaded()} aria-hidden="true">
       <span data-slot="activity-glyph-today">
         <SessionProgressIndicatorV2 class={props.muted ? "shrink-0 text-v2-icon-icon-muted" : "shrink-0"} />
       </span>
       <span data-slot="activity-glyph-orb">
-        <CssAgentOrb />
+        <Show when={loaded() && orb.latest}>{(component) => <Dynamic component={component()} />}</Show>
       </span>
     </span>
   )
