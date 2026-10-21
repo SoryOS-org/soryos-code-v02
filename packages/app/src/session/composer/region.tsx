@@ -442,7 +442,7 @@ export function ActiveSessionComposerRegion(props: {
       above={
         <Show when={!missing() && !props.session.data.isChild()}>
           <SessionActivityChips subagents={subagents()} shells={shells()} onOpen={open} onStop={stop} />
-          <SessionQueuePanel queue={props.model.queue} />
+          <SessionQueuePanel queue={props.model.queue} hidden={props.model.region.state.blocked()} />
         </Show>
       }
       composer={

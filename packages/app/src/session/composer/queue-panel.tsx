@@ -20,14 +20,14 @@ type QueueRow = ReturnType<SessionQueueView["rows"]>[number]
 // Pullout above the composer listing the prompts queued behind the current
 // turn. The panel slides under the composer card (negative margin, opaque
 // composer background) so the two read as one attached surface.
-export function SessionQueuePanel(props: { queue: SessionQueueView }) {
+export function SessionQueuePanel(props: { queue: SessionQueueView; hidden?: boolean }) {
   const language = useLanguage()
   // A removed prompt stays drawn in its slot while it closes; the last prompts stay while the emptied panel closes.
   const [shown, setShown] = createSignal(props.queue.rows())
   const live = createMemo(() => props.queue.rows().map((row) => row.id))
   const appearing = new Set<string>()
   let lastLive = props.queue.rows()
-  const open = () => live().length > 0
+  const open = () => !props.hidden && live().length > 0
   const count = () => (open() ? live().length : shown().length)
   let listRef!: HTMLDivElement
 
@@ -41,7 +41,7 @@ export function SessionQueuePanel(props: { queue: SessionQueueView }) {
 
         // An in-place edit or reorder replaces row IDs without changing the row count.
         if (next.length === prevLive.length && prevLive.length > 0) return setShown(next)
-        if (prevLive.length > 0)
+        if (prevLive.length > 0 && !props.hidden)
           next.forEach((row) => !prevLive.some((item) => item.id === row.id) && appearing.add(row.id))
         setShown(keepLeaving(untrack(shown), next))
       },
@@ -50,7 +50,7 @@ export function SessionQueuePanel(props: { queue: SessionQueueView }) {
   )
 
   return (
-    <Grow when={open()} fade class="relative z-0" onClosed={() => setShown([])}>
+    <Grow when={open()} fade class="relative z-0" onClosed={() => setShown(props.queue.rows())}>
       <div
         data-component="session-queue-panel"
         inert={!open()}

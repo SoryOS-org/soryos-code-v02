@@ -3,7 +3,7 @@ import { SessionPermissionDock } from "@/session/requests/session-permission-doc
 import { SessionQuestionDock } from "@/session/requests/session-question-dock"
 import { SessionWebSearchDock } from "@/session/requests/session-websearch-dock"
 import type { SessionComposerRegionController } from "./session-composer-region-controller"
-import { ComposerMorph } from "./spring-height"
+import { ComposerMorph, Grow } from "./spring-height"
 
 type SessionComposerRegionState = Pick<
   SessionComposerRegionController["state"],
@@ -27,13 +27,7 @@ export function SessionComposerRegion(props: {
     const question = controller.state.questionRequest()
     const permission = controller.state.permissionRequest()
     const composer = controller.showComposer() && !controller.child() && !controller.state.blocked()
-    const parts = [
-      websearch && `w:${websearch.id}`,
-      question && `q:${question.id}`,
-      permission && `p:${permission.id}`,
-      composer && "composer",
-    ].filter(Boolean)
-    return { key: parts.join("|") || "none", single: parts.length === 1, websearch, question, permission, composer }
+    return { key: composer ? "composer" : "docks", websearch, question, permission, composer }
   })
 
   return (
@@ -53,32 +47,26 @@ export function SessionComposerRegion(props: {
           {props.above}
           <ComposerMorph face={face()}>
             {(current) => (
-              <div class="flex flex-col gap-2" classList={{ "mb-2": controller.child() && current().key !== "none" }}>
-                <Show when={current().websearch}>
+              <div class="flex flex-col">
+                <Grow when={current().websearch} fade card class={controller.child() ? "mb-2" : undefined}>
                   <SessionWebSearchDock model={controller.state.websearch} onSubmit={controller.onResponseSubmit} />
-                </Show>
-                <Show when={current().question} keyed>
-                  {(request) => (
-                    <div>
-                      <SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
-                    </div>
-                  )}
-                </Show>
+                </Grow>
+                <Grow when={current().question} fade card class={controller.child() ? "mb-2" : undefined}>
+                  {(request) => <SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />}
+                </Grow>
 
-                <Show when={current().permission} keyed>
+                <Grow when={current().permission} fade card class={controller.child() ? "mb-2" : undefined}>
                   {(request) => (
-                    <div>
-                      <SessionPermissionDock
-                        request={request}
-                        responding={controller.state.permissionResponding()}
-                        onDecide={(response) => {
-                          controller.onResponseSubmit()
-                          controller.state.decide(response)
-                        }}
-                      />
-                    </div>
+                    <SessionPermissionDock
+                      request={request}
+                      responding={controller.state.permissionResponding()}
+                      onDecide={(response) => {
+                        controller.onResponseSubmit()
+                        controller.state.decide(response)
+                      }}
+                    />
                   )}
-                </Show>
+                </Grow>
 
                 <Show when={current().composer}>
                   <div

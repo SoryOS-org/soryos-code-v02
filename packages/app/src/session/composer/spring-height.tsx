@@ -1,10 +1,12 @@
-import { createEffect, createSignal, For, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js"
 import { frameLoop, observeReducedMotion, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
 
 const enter: DurationOptions = { duration: 0.4, bounce: 0 }
 const exit: DurationOptions = { duration: 0.3, bounce: 0 }
 const fade: DurationOptions = { duration: 0.15, bounce: 0 }
-export const snap = (px: number, dpr = window.devicePixelRatio || 1) => Math.round(px * dpr) / dpr
+const snap = (px: number, dpr = window.devicePixelRatio || 1) => Math.round(px * dpr) / dpr
+const surface =
+  "data-[moving]:overflow-clip data-[dock-border-underlay]:rounded-xl data-[dock-border-underlay]:bg-v2-background-bg-base [[data-color-scheme=dark]_&[data-dock-border-underlay]]:bg-v2-background-bg-layer-01"
 
 type Face<T> = {
   key: string
@@ -19,7 +21,7 @@ type Face<T> = {
 
 // The composer and the docks that stand in for it as one surface: a new face grows the region to its height on one
 // spring while the old face hands over in place. Faces present on mount rest immediately.
-export function ComposerMorph<T extends { key: string; single?: boolean }>(props: {
+export function ComposerMorph<T extends { key: string }>(props: {
   face: T
   children: (face: Accessor<T>) => JSX.Element
 }) {
@@ -33,7 +35,8 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
     stop?.()
     stop = undefined
     height = undefined
-    ;["data-moving", "data-single", "data-dock-border-underlay"].forEach((attr) => root?.removeAttribute(attr))
+    root?.removeAttribute("data-moving")
+    root?.removeAttribute("data-dock-border-underlay")
     root?.style.removeProperty("height")
     list.forEach((item) =>
       ["opacity", "transform", "filter", "mask-image"].forEach((prop) => item.el?.style.removeProperty(prop)),
@@ -43,31 +46,22 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
   }
 
   const measure = () => {
-    for (const item of untrack(faces)) if (item.el) item.height = item.el.offsetHeight
+    for (const item of untrack(faces)) if (item.el) item.height = item.el.getBoundingClientRect().height
   }
 
-  const styleFace = (item: Face<T>, shown: number, reduced: boolean) => {
-    const el = item.el
-    if (!el) return
+  const paintFace = (item: Face<T>, shown: number) => {
+    if (!item.el) return
     const p = Math.max(0, Math.min(1, item.presence.value))
-    el.style.opacity = `${(p * p).toFixed(4)}`
-    if (reduced) return
-    const dy = (1 - p) * (item.leaving() ? 2 : 6)
-    el.style.transform = `translateY(${dy.toFixed(2)}px) scale(${(1 - (1 - p) * 0.02).toFixed(4)})`
-    el.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
-    const hidden = Math.max(0, item.height - shown)
-    el.style.maskImage =
-      hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
+    styleFace(item.el, item.height, shown, p, item.leaving() ? 2 : 6)
   }
 
   const paint = (dt: number) => {
     const list = untrack(faces)
     const entering = list.find((item) => !item.leaving())
     if (!root || !height || !entering) return false
-    const reduced = prefersReducedMotion()
 
     if (entering.el && height.target !== entering.height) height.set(entering.height)
-    if (reduced) height.snap(entering.height)
+    if (prefersReducedMotion()) height.snap(entering.height)
     height.step(dt)
     if (Math.abs(height.value - height.target) < 0.5 && Math.abs(height.velocity) < 5) height.snap(height.target)
     list.forEach((item) => {
@@ -79,7 +73,7 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
     if (height.resting && list.every((item) => item.presence.resting)) return settle(list)
     const shown = snap(height.value)
     root.style.height = `${shown}px`
-    list.forEach((item) => styleFace(item, shown, reduced))
+    list.forEach((item) => paintFace(item, shown))
     return true
   }
 
@@ -92,9 +86,9 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
         if (current?.key === next.key) return current.set(next)
         if (!root || performance.now() - born < 250) return setFaces([face(next, 1)])
 
-        const from = height ? height.value : root.offsetHeight
+        const from = height ? height.value : root.getBoundingClientRect().height
         const reduced = prefersReducedMotion()
-        const back = list.find((item) => item.key === next.key)
+        const back = next.key === "composer" ? list.find((item) => item.key === next.key) : undefined
         const entering = back ?? face(next, 0)
         const active = list.filter((item) => item === entering || item.presence.value >= 0.01)
 
@@ -112,12 +106,10 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
         tune(height, enter)
         const shown = snap(height.value)
         const nextFaces = back ? active : [...active, entering]
-        const single = nextFaces.every((item) => item.value().single !== false)
         root.toggleAttribute("data-moving", true)
-        root.toggleAttribute("data-single", single)
-        root.toggleAttribute("data-dock-border-underlay", single)
+        root.toggleAttribute("data-dock-border-underlay", true)
         root.style.height = `${shown}px`
-        nextFaces.forEach((item) => styleFace(item, shown, reduced))
+        nextFaces.forEach((item) => paintFace(item, shown))
         setFaces(nextFaces)
         stop ??= frameLoop.addMeasured(measure, paint)
       },
@@ -129,22 +121,18 @@ export function ComposerMorph<T extends { key: string; single?: boolean }>(props
   onCleanup(() => stop?.())
 
   return (
-    <div
-      ref={root}
-      data-slot="composer-morph"
-      class="relative z-10 flex flex-col data-[moving]:overflow-clip data-[single]:rounded-xl data-[single]:bg-v2-background-bg-base [[data-color-scheme=dark]_&[data-single]]:bg-v2-background-bg-layer-01"
-    >
+    <div ref={root} data-slot="composer-morph" class={`relative z-10 flex flex-col ${surface}`}>
       <For each={faces()}>
         {(item) => (
           <div
             ref={(el) => {
               item.el = el
-              if (height) styleFace(item, snap(height.value), prefersReducedMotion())
+              if (height) paintFace(item, snap(height.value))
             }}
             data-slot="composer-face"
             inert={item.leaving()}
             aria-hidden={item.leaving() || undefined}
-            class="shrink-0 origin-top"
+            class="shrink-0"
             classList={{ "pointer-events-none absolute inset-x-0 top-0": item.leaving() }}
           >
             {props.children(item.value)}
@@ -167,22 +155,34 @@ function tune(spring: Spring, options: DurationOptions) {
   return spring
 }
 
-// Mounts its children when `when` turns true and grows them in; when it turns false they close and unmount.
-export function Grow(props: {
-  when: boolean
+function styleFace(el: HTMLElement, full: number, shown: number, p: number, dy: number, mask = true, box = el) {
+  box.style.opacity = `${(p * p).toFixed(4)}`
+  if (prefersReducedMotion()) return
+  el.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`
+  box.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
+  const hidden = mask ? Math.max(0, full - shown) : 0
+  el.style.maskImage =
+    hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
+}
+
+// Mounts its children when `when` turns truthy and grows them in; when it turns falsy they close and unmount.
+export function Grow<T>(props: {
+  when: T | undefined | null | false
   appear?: boolean
   fade?: boolean
+  card?: boolean
   class?: string
   onClosed?: () => void
-  children: JSX.Element
+  children: JSX.Element | ((item: NonNullable<T>) => JSX.Element)
 }) {
-  const [present, setPresent] = createSignal(props.when)
+  const [present, setPresent] = createSignal(!!props.when)
+  const item = createMemo((prev?: NonNullable<T>) => (props.when ? (props.when as NonNullable<T>) : prev))
   let el: HTMLDivElement | undefined
-  let entering = props.when && !!props.appear
+  let entering = !!props.when && !!props.appear
 
   createEffect(
     on(
-      () => [props.when, present()] as const,
+      () => [!!props.when, present()] as const,
       ([when, shown], prev) => {
         if (when && !shown) {
           entering = true
@@ -190,7 +190,7 @@ export function Grow(props: {
         }
         if (!el || (!entering && (!prev || prev[0] === when))) return
         entering = false
-        grow(el, when, props.fade, () => {
+        grow(el, when, props.fade, props.card, () => {
           setPresent(false)
           props.onClosed?.()
         })
@@ -200,8 +200,11 @@ export function Grow(props: {
 
   return (
     <Show when={present()}>
-      <div ref={el} class={props.class}>
-        {props.children}
+      <div ref={el} class={[props.class, props.card && "[&:not(:last-child)]:mb-2", surface].filter(Boolean).join(" ")}>
+        {(() => {
+          const child = props.children
+          return typeof child === "function" ? <Show when={item()} keyed>{child}</Show> : child
+        })()}
       </div>
     </Show>
   )
@@ -209,7 +212,7 @@ export function Grow(props: {
 
 const growing = new WeakMap<HTMLElement, { spring: Spring; open: boolean; done?: () => void }>()
 
-function grow(el: HTMLElement, open: boolean, fade?: boolean, done?: () => void) {
+function grow(el: HTMLElement, open: boolean, fade?: boolean, card?: boolean, done?: () => void) {
   const current = growing.get(el)
   if (current) {
     current.open = open
@@ -218,32 +221,37 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, done?: () => void)
     return
   }
 
+  const mb = parseFloat(getComputedStyle(el).marginBottom) || 0
+  const prevMb =
+    (!mb && el.previousElementSibling ? parseFloat(getComputedStyle(el.previousElementSibling).marginBottom) : 0) || 0
   const state = {
-    spring: Spring.fromDuration(open ? 0 : el.offsetHeight, open ? enter : exit),
+    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, open ? enter : exit),
     open,
     done,
   }
   growing.set(el, state)
-  el.style.overflow = "clip"
+  el.toggleAttribute("data-moving", true)
+  el.toggleAttribute("data-dock-border-underlay", !!card)
   el.style.height = `${snap(state.spring.value)}px`
-  const inner = () => (el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el)
-
-  if (fade && open) {
-    const node = inner()
-    node.style.opacity = "0"
-    node.style.filter = "blur(4px)"
-  }
+  if (open && mb > 0) el.style.marginBottom = "0px"
+  if (open && prevMb > 0) el.style.marginTop = `${-prevMb}px`
+  if (fade && open && el.firstElementChild instanceof HTMLElement)
+    styleFace(el.firstElementChild, 0, 0, 0, 4, card, el)
 
   let full = 0
   frameLoop.addMeasured(
     () => {
       const child = el.firstElementChild
       if (!(child instanceof HTMLElement)) return
-      const margin = parseFloat(getComputedStyle(child).marginBottom)
+      const margin = parseFloat(getComputedStyle(child).marginBottom) || 0
       if (margin < 0) el.style.overflowClipMargin = `${-margin}px`
-      full = child.offsetHeight + margin
+      full = child.getBoundingClientRect().height + margin
     },
     (dt) => {
+      if (!el.isConnected) {
+        growing.delete(el)
+        return false
+      }
       const size = state.open ? full : 0
       if (prefersReducedMotion()) state.spring.snap(size)
       state.spring.set(size).step(dt)
@@ -256,13 +264,12 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, done?: () => void)
       }
 
       const value = snap(Math.max(0, state.spring.value))
-      el.style.height = `${value}px`
-      if (!fade) return true
       const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
-      const node = inner()
-      node.style.opacity = `${(p * p).toFixed(4)}`
-      node.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
-      node.style.transform = `translateY(${((value - full) * 0.5).toFixed(2)}px) scale(${(0.97 + 0.03 * p).toFixed(4)})`
+      el.style.height = `${value}px`
+      if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
+      if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
+      if (fade && el.firstElementChild instanceof HTMLElement)
+        styleFace(el.firstElementChild, full, value, p, 4, card, el)
       return true
     },
   )
@@ -270,9 +277,13 @@ function grow(el: HTMLElement, open: boolean, fade?: boolean, done?: () => void)
 
 function finish(el: HTMLElement, open: boolean, done?: () => void) {
   const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : undefined
-  ;["height", "overflow", "overflow-clip-margin", "opacity", "filter", "transform", "mask-image"].forEach((prop) => {
-    el.style.removeProperty(prop)
-    child?.style.removeProperty(prop)
-  })
+  el.removeAttribute("data-moving")
+  el.removeAttribute("data-dock-border-underlay")
+  ;["height", "margin-top", "margin-bottom", "overflow-clip-margin", "opacity", "filter", "transform", "mask-image"].forEach(
+    (prop) => {
+      el.style.removeProperty(prop)
+      child?.style.removeProperty(prop)
+    },
+  )
   if (!open) done?.()
 }
