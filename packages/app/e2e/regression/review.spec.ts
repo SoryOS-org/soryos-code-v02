@@ -363,8 +363,14 @@ test("context closes the side region only when its button opened it", async ({ p
     .click()
   await expect(context).toHaveAttribute("aria-selected", "true")
   await expect(newTab).toHaveCount(0)
+  // The New tab view now lists the closed Review under "Recently closed" too; reopening it brings back the same tab.
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toContainText("Review")
+  await panel
+    .getByRole("region", { name: "Recently closed", exact: true })
+    .getByRole("button", { name: /^Review/ })
+    .click()
+  await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
   await context.click()
   await contextButton.click()
   await expect(context).toHaveCount(0)
@@ -504,7 +510,9 @@ test("file tree expands Windows paths and scrolls long names in both directions"
   await expect(longRow).toBeVisible()
   await expect(content).toHaveAttribute("title", longFilename)
   await expect.poll(() => content.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0)
-  await expect.poll(() => longRow.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
+  await expect
+    .poll(() => longRow.evaluate((element) => element.scrollWidth - element.clientWidth))
+    .toBeLessThanOrEqual(0)
   await expect(content).toHaveCSS("text-overflow", "clip")
   await expect(status).toHaveText("A")
   await expect.poll(() => statusInset(status, "right")).toBeLessThanOrEqual(24)
@@ -1260,7 +1268,10 @@ test("names a single change source and keeps the review header rows at 48px", as
   await expect(region).toHaveAttribute("aria-expanded", "false")
   await region.click()
   await expect(panel.getByRole("tab")).toHaveCount(0)
-  await expect(panel.getByRole("button", { name: /^Review/ })).toBeVisible()
+  // Its launchers, then the closed Review under "Recently closed".
+  const closed = panel.getByRole("region", { name: "Recently closed", exact: true })
+  await expect(panel.getByRole("button", { name: /^Review/ }).first()).toBeVisible()
+  await expect(closed.getByRole("button", { name: /^Review/ })).toBeVisible()
 })
 
 for (const direction of ["ltr", "rtl"] as const) {

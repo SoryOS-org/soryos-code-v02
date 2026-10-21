@@ -65,8 +65,8 @@ story.beforeEach(async ({ mount, page }) => {
       LanguageProvider: language.LanguageProvider,
       ExtensionHostProvider: host.ExtensionHostProvider,
       useExtensionHost: host.useExtensionHost,
-      createRegion: (region: Omit<Parameters<typeof panels.createRegion>[0], "closed">) =>
-        panels.createRegion({ ...region, closed: closedTabs }),
+      createRegion: (region: Omit<Parameters<typeof panels.createRegion>[0], "closed" | "open">) =>
+        panels.createRegion({ ...region, closed: closedTabs, open() {} }),
       definitions: [
         { ...browser.default, renderer: () => import(modules.browserRenderer) },
         { ...file.default, renderer: () => import(modules.fileRenderer) },
@@ -93,7 +93,9 @@ story.beforeEach(async ({ mount, page }) => {
         reopenSession: () => void
         reopenSide: () => void
         switchSession: () => void
-        side: () => { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void } | undefined
+        side: () =>
+          | { keys: () => readonly string[]; active: () => string | undefined; select: (key: string) => void }
+          | undefined
         shortcut: (shortcut: Accessor<string>) => void
       }) => {
         const command = commands.useCommand()

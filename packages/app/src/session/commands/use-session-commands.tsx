@@ -406,7 +406,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
         keybind: settings.keybinds.get("tab.reopenClosed") ?? "mod+shift+t",
         hidden: true,
         when: inSide,
-        onSelect: actions.region.reopen,
+        onSelect: () => actions.region.reopen(),
       }),
       cycle &&
         fileCommand({

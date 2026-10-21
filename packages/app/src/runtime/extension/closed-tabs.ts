@@ -1,22 +1,138 @@
+import { createSignal } from "solid-js"
+import { createStore } from "solid-js/store"
 import { createEventListener } from "@solid-primitives/event-listener"
+import type { Panel, PanelProps, SessionRef } from "@opencode/gui-extensions/sdk"
 import { adjacentTabKey } from "@/shell/titlebar/tab-order"
 
-/** Side tabs the user closed in this window, newest last, each with how its panel brings it back. */
-export function createClosedTabs(limit = 25) {
-  const stack: { session: string; reopen: () => void }[] = []
+/** The most closed tabs a session keeps. */
+export const CLOSED_TABS_LIMIT = 30
 
+/** A side tab the user closed, as the new tab view lists it and ⌘⇧T brings it back. */
+export type ClosedSideTab = {
+  /** `${extension}:${tab id}`. */
+  readonly key: string
+  readonly title: string
+  /** An icon name; stored, so check it before drawing. */
+  readonly icon?: string
+  /** The workspace file the tab showed, if any. */
+  readonly file?: string
+  /** A muted detail after the title. */
+  readonly detail?: string
+  /** What the panel's `restore` needs. */
+  readonly data?: string
+  /** When it closed, in milliseconds since the epoch. */
+  readonly closed: number
+}
+
+/** Where a session's closed tabs live, newest first. */
+export type ClosedTabsStore = {
+  list(session: SessionRef): readonly ClosedSideTab[]
+  write(session: SessionRef, entries: readonly ClosedSideTab[]): void
+}
+
+/** Each session's closed side tabs, newest first, up to `CLOSED_TABS_LIMIT`. In memory unless given a store. */
+export function createClosedTabs(store: ClosedTabsStore = memoryStore()) {
   return {
-    push(session: string, reopen: () => void) {
-      stack.push({ session, reopen })
-
-      if (stack.length > limit) stack.shift()
+    /** Reactive. */
+    list: store.list,
+    push(session: SessionRef, entry: Omit<ClosedSideTab, "closed">) {
+      store.write(
+        session,
+        [{ ...entry, closed: Date.now() }, ...store.list(session).filter((item) => item.key !== entry.key)].slice(
+          0,
+          CLOSED_TABS_LIMIT,
+        ),
+      )
     },
-    reopen(session: string) {
-      const index = stack.findLastIndex((entry) => entry.session === session)
+    /** Removes and returns the entry under `key`, or the newest one. */
+    take(session: SessionRef, key?: string) {
+      const entries = store.list(session)
+      const entry = key === undefined ? entries[0] : entries.find((item) => item.key === key)
 
-      if (index !== -1) stack.splice(index, 1)[0]?.reopen()
+      if (entry)
+        store.write(
+          session,
+          entries.filter((item) => item !== entry),
+        )
+
+      return entry
     },
   }
+}
+
+export type ClosedTabs = ReturnType<typeof createClosedTabs>
+
+/** How a closing tab lists, or nothing when its panel says it cannot come back. Transient tabs list only when asked. */
+export function closedEntry(key: string, panel: Panel, input: PanelProps): Omit<ClosedSideTab, "closed"> | undefined {
+  const info = panel.closed?.(input)
+
+  if (info === false) return
+
+  if (!info && (panel.transient || input.tab.transient)) return
+
+  return {
+    key,
+    title: info?.title ?? input.tab.title,
+    icon: info?.icon ?? panel.mobile?.icon,
+    file: input.tab.file,
+    detail: info?.detail,
+    data: info?.data,
+  }
+}
+
+function memoryStore(): ClosedTabsStore {
+  const [entries, setEntries] = createStore<Record<string, readonly ClosedSideTab[]>>({})
+
+  return {
+    list: (session) => entries[session.key] ?? [],
+    write: (session, next) => setEntries(session.key, next),
+  }
+}
+
+export type ClosedTabsModifier = "alt" | "shift" | "ctrl" | "meta"
+
+/**
+ * Dev builds only, while the design is evaluated: the held key that turns the side panel's "+" into a "Recently closed"
+ * menu, from `localStorage["opencode.dev.closedTabsModifier"]`. Off unless set.
+ */
+export function closedTabsModifier(): ClosedTabsModifier | undefined {
+  if (!import.meta.env.DEV) return
+  const value = localStorage.getItem("opencode.dev.closedTabsModifier")
+
+  return value === "alt" || value === "shift" || value === "ctrl" || value === "meta" ? value : undefined
+}
+
+/** Whether the swap waits for the pointer to rest on "+", or shows whenever the key is down. Hover unless the dev flag says "global". */
+export function closedTabsSwap(): "hover" | "global" {
+  return import.meta.env.DEV && localStorage.getItem("opencode.dev.closedTabsSwap") === "global" ? "global" : "hover"
+}
+
+/** Whether an input event carries the modifier. */
+export function hasModifier(event: KeyboardEvent | MouseEvent, modifier: ClosedTabsModifier) {
+  if (modifier === "shift") return event.shiftKey
+
+  if (modifier === "ctrl") return event.ctrlKey
+
+  if (modifier === "meta") return event.metaKey
+
+  return event.altKey
+}
+
+/**
+ * Whether the modifier is held, from every key and pointer event's modifier state rather than counting presses, so key
+ * repeat, a press made while another window had focus, and a release made elsewhere all settle. Leaving the window
+ * releases it, since its keyup goes to another window.
+ */
+export function createModifierHeld(modifier: ClosedTabsModifier) {
+  const [held, setHeld] = createSignal(false)
+  const update = (event: KeyboardEvent | MouseEvent) => setHeld(hasModifier(event, modifier))
+
+  createEventListener(window, ["keydown", "keyup"], update, { capture: true })
+  createEventListener(window, ["pointermove", "pointerdown"], update, { capture: true, passive: true })
+  createEventListener(window, "blur", () => setHeld(false))
+  createEventListener(document, "visibilitychange", () => document.hidden && setHeld(false))
+
+  return held
 }
 
 /**

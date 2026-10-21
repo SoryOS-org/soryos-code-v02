@@ -11,6 +11,7 @@ import { Persist, persisted, removePersisted } from "@/runtime/persistence/stora
 import { Persistence } from "@/runtime/persistence/schema"
 import { TabStorage } from "@/shell/tabs/schema"
 import { createScrollPersistence, type SessionScroll } from "./scroll"
+import type { ClosedSideTab } from "@/runtime/extension/closed-tabs"
 import { SessionStateKey } from "@/runtime/server/scope"
 import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./helpers"
 import { requireServerKey } from "@/shell/routes/session"
@@ -106,8 +107,20 @@ const sessionTabsSchema = Persistence.struct({
   ),
 })
 
+const closedTabSchema = Schema.Struct({
+  key: Schema.String,
+  title: Schema.String,
+  icon: Schema.optional(Schema.String),
+  file: Schema.optional(Schema.String),
+  detail: Schema.optional(Schema.String),
+  data: Schema.optional(Schema.String),
+  closed: Schema.Finite,
+})
+
 const sessionViewSchema = Persistence.struct({
   scroll: Persistence.record(Schema.Struct({ x: Schema.Finite, y: Schema.Finite })),
+  // Side tabs the user closed, newest first, for the new tab view's "Recently closed".
+  closed: Persistence.optional(Persistence.array(closedTabSchema)),
   // Review state from before extensions. An extension copies each session's entry out once; nothing writes these
   // any more, and they stay so layout rewrites cannot drop a session's entry before it is copied.
   reviewOpen: Schema.optional(Persistence.array(Schema.String)),
@@ -257,6 +270,17 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           })
 
           if (preview) setEphemeral("sessionTabPreview", session, preview.value)
+
+          // A tab that opens again leaves "Recently closed".
+          const closed = store.sessionView[session]?.closed
+
+          if (closed?.some((entry) => placed.all.includes(entry.key)))
+            setStore(
+              "sessionView",
+              session,
+              "closed",
+              closed.filter((entry) => !placed.all.includes(entry.key)),
+            )
 
           if (target && placed.all.some((tab) => !previous.all.includes(tab)))
             setEphemeral("sessionTabTarget", session, undefined)
@@ -588,6 +612,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             setEphemeral("sessionTabPreview", to, ephemeral.sessionTabPreview[from])
             scroll.drop([to])
             setStore("sessionView", to, {
+              closed: store.sessionView[from]?.closed?.map((entry) => ({ ...entry })),
               scroll: Object.fromEntries(
                 Object.entries(store.sessionView[from]?.scroll ?? {}).map(([key, value]) => [
                   key,
@@ -597,6 +622,17 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             })
             prune(usage.active ?? to)
           })
+        },
+        /** The side tabs closed in a session, newest first. Reactive. */
+        closed(session: string): readonly ClosedSideTab[] {
+          return store.sessionView[session]?.closed ?? []
+        },
+        setClosed(session: string, entries: readonly ClosedSideTab[]) {
+          usage.used.set(session, Date.now())
+
+          if (store.sessionView[session]) return setStore("sessionView", session, "closed", [...entries])
+          setStore("sessionView", session, { scroll: {}, closed: [...entries] })
+          prune(usage.active ?? session)
         },
         scroll(session: string, tab: string) {
           return scroll.scroll(session, tab)

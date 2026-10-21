@@ -3,6 +3,7 @@ import { tabKey } from "../utils/app"
 import { fileDiff, openSession } from "../utils/workspace"
 import { openReviewLauncher } from "../utils/side-panel"
 import { expectSessionTitle } from "../utils/waits"
+import { base64Encode } from "@opencode/util/encode"
 
 test("review and terminal tabs follow the session tab and the terminal stays mounted", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -151,3 +152,65 @@ function sideContentOffset(page: Page, direction: "ltr" | "rtl") {
     return direction === "rtl" ? Math.abs(frame.right - content.right) : Math.abs(frame.left - content.left)
   }, direction)
 }
+
+test("the new tab view lists recently closed tabs, expands to the rest, and keeps them across a reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const directory = "C:/OpenCode/RecentlyClosed"
+  const key = `local\u0000${base64Encode(directory)}/ses_recentlyclosed`
+
+  // Twelve files closed earlier, newest first, as the app stores them beside the strip.
+  const closed = Array.from({ length: 12 }, (_, index) => ({
+    key: `file://src/closed-${String(index).padStart(2, "0")}.ts`,
+    title: `closed-${String(index).padStart(2, "0")}.ts`,
+    file: `src/closed-${String(index).padStart(2, "0")}.ts`,
+    closed: 1_000 - index,
+  }))
+
+  await openSession(page, {
+    name: "RecentlyClosed",
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+    seed: {
+      panes: { ses_recentlyclosed: { review: true } },
+      storage: {
+        "opencode.global.dat:layout": {
+          sessionTabs: { [key]: { all: ["file://README.md"], active: "file://README.md" } },
+          sessionView: { [key]: { scroll: {}, closed } },
+        },
+      },
+    },
+  })
+
+  const panel = page.locator("#review-panel")
+  const recent = panel.getByRole("region", { name: "Recently closed", exact: true })
+  const rows = recent.locator('[data-slot="side-recently-closed-row"]')
+  const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
+
+  // The latest ten, then all of them once expanded.
+  await panel.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(rows).toHaveCount(10)
+  await expect(rows.first()).toContainText("closed-00.ts")
+  await recent.getByRole("button", { name: "Show more", exact: true }).click()
+  await expect(rows).toHaveCount(12)
+  await recent.getByRole("button", { name: "Show less", exact: true }).click()
+  await expect(rows).toHaveCount(10)
+
+  // Closing the last tab closes the region; it opens on its launchers with that tab listed first.
+  const readme = panel.getByRole("tab", { name: "README.md" })
+  await readme.click()
+  await readme.locator("..").getByRole("button", { name: "Close tab" }).click()
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await toggle.click()
+  await expect(panel.getByRole("tab")).toHaveCount(0)
+  await expect(rows.first()).toContainText("README.md")
+
+  // The list survives a reload, and reopening a row brings its tab back and takes it off the list.
+  await page.reload()
+  await expect(rows.first()).toContainText("README.md")
+  await rows.first().click()
+  await expect(panel.getByRole("tab", { name: "README.md" })).toHaveAttribute("aria-selected", "true")
+  await panel.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(rows.first()).toContainText("closed-00.ts")
+  await expect(recent).not.toContainText("README.md")
+})

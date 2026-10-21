@@ -342,12 +342,6 @@ const setup: Setup<typeof File> = (ctx) => {
     close(input) {
       tabs.get(input.screen)?.delete(input.tab.id)
     },
-    reopen(input) {
-      const session = input.session
-      const key = `file:${input.tab.id}`
-
-      return isFileTab(input.tab.id) ? () => layout.open(key, session, { tab: "select" }) : undefined
-    },
     render: (props) => {
       const panel = usePanel()
 

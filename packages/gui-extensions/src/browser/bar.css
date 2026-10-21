@@ -211,51 +211,6 @@
   }
 }
 
-/* A side panel tab the new tab page offers. */
-[data-component="browser-launcher-row"] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  height: 41px;
-  padding-inline: 14px;
-  border: 0.5px solid var(--v2-border-border-base);
-  border-radius: 8px;
-  background: var(--v2-background-bg-base);
-  color: var(--v2-text-text-base);
-  font-size: 13px;
-  font-weight: 440;
-  line-height: var(--line-height-compact);
-  letter-spacing: -0.04px;
-  text-align: start;
-  cursor: default;
-
-  &:hover {
-    background: var(--v2-overlay-simple-overlay-hover);
-  }
-
-  [data-slot="browser-launcher-row-text"] {
-    display: flex;
-    flex: 1 1 0;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  [data-slot="browser-launcher-row-title"] {
-    flex: none;
-  }
-
-  [data-slot="browser-launcher-row-description"] {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--v2-text-text-muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
 /* Suggestions read the address at full strength; the new tab page mutes it. */
 [data-component="browser-suggestions"] [data-slot="browser-page-row-url"] {
   color: var(--v2-text-text-base);

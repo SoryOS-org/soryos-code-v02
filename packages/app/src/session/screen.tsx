@@ -84,6 +84,7 @@ function SessionScreenContent(props: {
     screen: props.screen,
     tabs: session.layout.tabs,
     closed: attachment.closed,
+    open: (key) => attachment.openTab(key, props.view()),
     side: () => session.layout.view().side,
     // Closing the last tab closes the side region, which opens with a new tab next time. The user's own hand closed
     // it, so it goes at once.

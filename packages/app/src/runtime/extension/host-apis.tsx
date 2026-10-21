@@ -46,7 +46,7 @@ import { formatKeybindParts, useCommand } from "@/shell/commands/command"
 import { createMediaQuery } from "@solid-primitives/media"
 import { useIsRouting, useLocation } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
-import { createClosedTabs } from "./closed-tabs"
+import { closedEntry, createClosedTabs } from "./closed-tabs"
 import { panelsMoving } from "@/shell/panel-motion"
 import { createEmbeds } from "./embeds"
 import { useExtensionHost, type HostApiFactories } from "./host"
@@ -651,7 +651,19 @@ export function createExtensionAttachment(apis: HostApis) {
 
   // Writes made before a session's location is known wait for it rather than being dropped.
   const located = createLocatedWrites()
-  const closed = createClosedTabs()
+  // Kept per session beside its strip, so the new tab view still lists them after a reload.
+  const closed = createClosedTabs({
+    list(session) {
+      const value = stateKey(session)
+
+      return value ? layout.panel.closed(value) : []
+    },
+    write(session, entries) {
+      const value = stateKey(session)
+
+      if (value) layout.panel.setClosed(value, entries)
+    },
+  })
 
   const open = (key: string, session: SessionRef, options?: OpenOptions) => {
     const item = provider(key)
@@ -703,9 +715,14 @@ export function createExtensionAttachment(apis: HostApis) {
     const all = layout.panel.state(value).all
     const view = mountedSession(session)
     const currentScreen = screen()
-    const reopen = view && tab && currentScreen && item?.value.reopen?.({ tab, session: view, screen: currentScreen })
+    const entry =
+      view &&
+      tab &&
+      currentScreen &&
+      item &&
+      closedEntry(key, item.value, { tab, session: view, screen: currentScreen })
 
-    if (reopen) closed.push(session.key, reopen)
+    if (entry) closed.push(session, entry)
     batch(() => {
       layout.panel.close(value, key)
 
@@ -877,6 +894,8 @@ export function createExtensionAttachment(apis: HostApis) {
     /** The routed `MountedSession`. */
     current,
     closed,
+    /** Opens and selects a side tab by key, as a reopened closed tab comes back. */
+    openTab: (key: string, session: SessionRef) => open(key, session, { tab: "select" }),
     region(value: Region) {
       setRegion(() => value)
 

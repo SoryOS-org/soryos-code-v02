@@ -14,15 +14,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createMemo, For, on, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { Browser } from "@opencode/plugin-browser/rpc"
-import {
-  createKeyed,
-  useExtension,
-  usePanel,
-  type PanelTab,
-  type MountedSession,
-  type SessionPanelMenuItem,
-  type SessionScreen,
-} from "../sdk"
+import { createKeyed, useExtension, usePanel, type PanelTab, type MountedSession, type SessionScreen } from "../sdk"
 import { addressParts, connection, loopback, resolveAddress, searches } from "./address"
 import { commentNote, pageNote } from "./comment"
 import { bare, completes, highlight, suggest, type Visit } from "./history"
@@ -199,8 +191,6 @@ export default function SessionBrowserPane(props: {
   const listed = () => suggestions().length > 0 && !store.dismissed
   const chosen = () => (listed() ? suggestions()[store.active] : undefined)
   const recent = () => props.model.visits().slice(0, RECENT)
-  // The side panel's other new tab choices; picking one replaces this tab.
-  const launchers = () => extension.layout.side.menu().filter((item) => !item.primary && !item.opened)
 
   // A loopback address opens on the machine that runs the server; the system browser here reaches it only when the
   // server runs here too.
@@ -900,7 +890,7 @@ export default function SessionBrowserPane(props: {
         <Show when={empty() && !failed() && !suspended()}>
           <div dir="auto" class="size-full overflow-y-auto">
             <Show
-              when={launchers().length > 0 || recent().length > 0}
+              when={recent().length > 0}
               fallback={
                 <div class="mx-auto flex max-w-[360px] flex-col items-center gap-4 px-6 pt-20 text-center">
                   <Icon name="outline-globe" size="large" class="text-v2-icon-icon-muted" />
@@ -915,26 +905,15 @@ export default function SessionBrowserPane(props: {
                 </div>
               }
             >
-              {/* As designed: the other tabs the side panel offers, then the pages the browser showed last. */}
-              <div class="mx-auto flex w-full max-w-[608px] flex-col gap-12 px-6 pt-12 pb-10">
-                <Show when={launchers().length > 0}>
-                  <div class="flex flex-col gap-3">
-                    <For each={launchers()}>
-                      {(item) => <LauncherRow item={item} keys={item.keybind ? keybinds.keybind(item.keybind) : []} />}
-                    </For>
-                  </div>
-                </Show>
-                {/* One visit is enough to list; the list stops at a handful. */}
-                <Show when={recent().length > 0}>
-                  <div class="flex flex-col gap-4">
-                    <div class="text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-                      {extension.t("home.recent")}
-                    </div>
-                    <div class="flex flex-col gap-2">
-                      <For each={recent()}>{(visit) => <PageRow visit={visit} onClick={() => go(visit.url)} />}</For>
-                    </div>
-                  </div>
-                </Show>
+              {/* The pages the browser showed last; the side panel's new tab view offers the other tabs. One visit is
+                  enough to list; the list stops at a handful. */}
+              <div class="mx-auto flex w-full max-w-[608px] flex-col gap-4 px-6 pt-12 pb-10">
+                <div class="text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+                  {extension.t("home.recent")}
+                </div>
+                <div class="flex flex-col gap-2">
+                  <For each={recent()}>{(visit) => <PageRow visit={visit} onClick={() => go(visit.url)} />}</For>
+                </div>
               </div>
             </Show>
           </div>
@@ -1066,26 +1045,6 @@ export default function SessionBrowserPane(props: {
         {picking() ? extension.t("inspect.active") : ""}
       </p>
     </aside>
-  )
-}
-
-/** A side panel tab the new tab page offers: its icon, title, detail and shortcut. */
-function LauncherRow(props: { item: SessionPanelMenuItem; keys: readonly string[] }) {
-  return (
-    <button type="button" data-component="browser-launcher-row" onClick={() => props.item.run()}>
-      <span data-slot="browser-launcher-row-text">
-        <Show when={props.item.icon}>
-          {(icon) => <Icon name={icon()} size="small" class="text-v2-icon-icon-muted" />}
-        </Show>
-        <span data-slot="browser-launcher-row-title">{props.item.title}</span>
-        <Show when={props.item.description}>
-          {(description) => <span data-slot="browser-launcher-row-description">{description()}</span>}
-        </Show>
-      </span>
-      <Show when={props.keys.length > 0}>
-        <Keybind keys={[...props.keys]} variant="neutral" />
-      </Show>
-    </button>
   )
 }
 

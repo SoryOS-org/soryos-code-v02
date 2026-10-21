@@ -34,7 +34,7 @@ import { useExtensionHost } from "./host"
 import { Contribution } from "./render"
 import { useExtensionAttachment } from "./attachment"
 import { legacyKeys, panelKey } from "./panel-keys"
-import type { createClosedTabs } from "./closed-tabs"
+import { closedEntry, type ClosedTabs } from "./closed-tabs"
 
 type Tabs = Accessor<{
   tabs(): SessionTabs
@@ -112,7 +112,9 @@ export function createRegion(input: {
   view: Accessor<MountedSession>
   screen: SessionScreen
   tabs: Tabs
-  closed: ReturnType<typeof createClosedTabs>
+  closed: ClosedTabs
+  /** Opens and selects a stored tab by key, as a reopened tab whose panel has no `restore` comes back. */
+  open: (key: string) => void
   /** Whether the side region is open, and the user's toggle for it. */
   side: Accessor<{ opened(): boolean; toggle(): void }>
   /** Runs when a close leaves no stored tab, in the same batch as the close. */
@@ -367,9 +369,9 @@ export function createRegion(input: {
     close(key: string) {
       const entry = byKey().get(key)
       const last = stored().length === 1 && stored()[0] === key
-      const reopen = entry?.provider.reopen?.(panelInput(input.view, input.screen, { tab: entry.tab }))
+      const closed = entry && closedEntry(key, entry.provider, panelInput(input.view, input.screen, { tab: entry.tab }))
 
-      if (reopen) input.closed.push(input.view().key, reopen)
+      if (closed) input.closed.push(input.view(), closed)
       batch(() => {
         input.tabs().close(key)
 
@@ -383,7 +385,28 @@ export function createRegion(input: {
           }),
         )
     },
-    reopen: () => input.closed.reopen(input.view().key),
+    /** The session's closed tabs that are not open again, newest first. */
+    recent: createMemo(() => {
+      const open = new Set(stored())
+
+      return input.closed.list(input.view()).filter((entry) => !open.has(entry.key))
+    }),
+    /** Brings back the closed tab under `key`, or the newest one. */
+    reopen(key?: string) {
+      const entry = input.closed.take(input.view(), key)
+
+      if (!entry) return
+      const extension = entry.key.slice(0, entry.key.indexOf(":"))
+      const provider = providers().find((item) => item.extension === extension)?.value
+
+      if (!provider?.restore) return input.open(entry.key)
+      provider.restore({
+        session: input.view(),
+        screen: input.screen,
+        id: entry.key.slice(extension.length + 1),
+        data: entry.data,
+      })
+    },
   }
 }
 

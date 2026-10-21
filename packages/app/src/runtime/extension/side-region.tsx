@@ -39,6 +39,8 @@ import { createSessionPanelMenu } from "./panel-menu"
 import { RegionContent, type Region, type RegionPane } from "./panels"
 import { ExtensionSlot } from "./render"
 import { createTabStripScroll } from "./tab-strip-scroll"
+import { closedTabsModifier, type ClosedSideTab } from "./closed-tabs"
+import { ClosedTabsSection, NewTabButton } from "./closed-tabs-view"
 import type { PaneDrag } from "./pane-drag"
 
 const PANE_HEIGHT_MIN = 120
@@ -209,6 +211,18 @@ export function PaneTabs(props: {
   // The next tab this pane's "+" menu opens lands in this pane.
   const target = () => tabs().target(props.pane.id)
 
+  const closed = {
+    get entries() {
+      return props.region.recent()
+    },
+    onReopen: (key: string) => {
+      target()
+      props.region.reopen(key)
+    },
+  }
+
+  const modifier = closedTabsModifier()
+
   // Without a new tab item, "+" opens a host-owned new tab view listing the launchers. It shows while the session and
   // the pane's selection are the ones it opened over, so a tab that opens and selects itself replaces it.
   const [adding, setAdding] = createSignal<{ session: string; over: string | undefined }>()
@@ -313,15 +327,29 @@ export function PaneTabs(props: {
                     </Show>
                   }
                 >
-                  <Tooltip value={language.t("session.tab.add")} placement="bottom" class="flex items-center">
-                    <IconButton
-                      icon={<Icon name="plus" />}
-                      variant="ghost-muted"
-                      size="large"
-                      onClick={() => setAdding({ session: props.view.key, over: props.pane.active() })}
-                      aria-label={language.t("session.tab.add")}
-                    />
-                  </Tooltip>
+                  <Show
+                    when={modifier}
+                    fallback={
+                      <Tooltip value={language.t("session.tab.add")} placement="bottom" class="flex items-center">
+                        <IconButton
+                          icon={<Icon name="plus" />}
+                          variant="ghost-muted"
+                          size="large"
+                          onClick={() => setAdding({ session: props.view.key, over: props.pane.active() })}
+                          aria-label={language.t("session.tab.add")}
+                        />
+                      </Tooltip>
+                    }
+                  >
+                    {(key) => (
+                      <NewTabButton
+                        modifier={key()}
+                        entries={closed.entries}
+                        onReopen={closed.onReopen}
+                        onNewTab={() => setAdding({ session: props.view.key, over: props.pane.active() })}
+                      />
+                    )}
+                  </Show>
                 </Show>
               }
             >
@@ -357,7 +385,7 @@ export function PaneTabs(props: {
 
       <Show when={newTab()}>
         <Tabs.Content value="new" class="flex flex-col h-full overflow-hidden contain-strict">
-          <Launchers items={launchers()} onChoose={target} />
+          <Launchers items={launchers()} onChoose={target} closed={closed} />
         </Tabs.Content>
       </Show>
       <Show when={props.placeholder && !newTab() && props.pane.active() === undefined}>
@@ -377,7 +405,7 @@ export function PaneTabs(props: {
                 </div>
               }
             >
-              <Launchers items={launchers()} onChoose={target} />
+              <Launchers items={launchers()} onChoose={target} closed={closed} />
             </Show>
           </Show>
         </Tabs.Content>
@@ -497,12 +525,17 @@ function AddMenu(props: { items: readonly SessionPanelMenuItem[]; onChoose: () =
   )
 }
 
-/** The + menu items as rows, in the empty side region and the new tab view. */
-function Launchers(props: { items: readonly SessionPanelMenuItem[]; onChoose: () => void }): JSX.Element {
+/** The + menu items as rows, then the session's recently closed tabs, in the empty side region and the new tab view. */
+function Launchers(props: {
+  items: readonly SessionPanelMenuItem[]
+  onChoose: () => void
+  closed: { entries: readonly ClosedSideTab[]; onReopen: (key: string) => void }
+}): JSX.Element {
   return (
     <div class="flex-1 min-h-0 overflow-y-auto px-6">
-      <div class="mx-auto flex max-w-[560px] flex-col gap-3 pt-12">
+      <div class="mx-auto flex max-w-[560px] flex-col gap-3 pt-12 pb-10">
         <For each={props.items}>{(item) => <LauncherRow item={item} onChoose={props.onChoose} />}</For>
+        <ClosedTabsSection entries={props.closed.entries} onReopen={props.closed.onReopen} />
       </div>
     </div>
   )

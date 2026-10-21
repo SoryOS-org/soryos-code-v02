@@ -247,6 +247,18 @@ export interface PanelProps {
   readonly screen: SessionScreen
 }
 
+/** How a closed side tab lists under "Recently closed", from `Panel.closed`. */
+export type ClosedPanelTab = {
+  /** The row's title; the tab's title by default. */
+  readonly title?: string
+  /** The row's icon; the panel's mobile icon by default. A tab with a `file` shows its file icon. */
+  readonly icon?: IconName
+  /** A muted detail after the title, e.g. a page's host. A tab with a `file` shows its folder. */
+  readonly detail?: string
+  /** What `restore` needs to bring the tab back, e.g. a URL. */
+  readonly data?: string
+}
+
 /** A panel: the tabs an extension shows in a session's side region. */
 export interface Panel {
   /** The panel's id, unique within the extension. Its mobile view's key is `${extension}:${id}`. */
@@ -315,11 +327,28 @@ export interface Panel {
    */
   close?(input: PanelProps): void
   /**
-   * Read as the user closes a tab: how ⌘⇧T in the side panel brings it back, or nothing if it cannot come back.
+   * Read as the user closes a tab, for the new tab view's "Recently closed" list and ⌘⇧T. Return how the row reads and
+   * the data `restore` needs, or `false` when the tab cannot come back. Without it, a tab that is not `transient`
+   * lists under its title and reopens under the same key. The host stores the entry, so keep `data` small.
    *
    * @param input - The closing tab, routed session and owning screen. Capture what reopening needs now.
    */
-  reopen?(input: PanelProps): (() => void) | undefined
+  closed?(input: PanelProps): ClosedPanelTab | false | undefined
+  /**
+   * Brings back a tab `closed` listed. Without it, the host opens the same key again.
+   *
+   * @param input - The routed session, owning screen, the closed tab's id and the `data` `closed` returned.
+   */
+  restore?(input: {
+    /** The routed session the tab closed in. */
+    readonly session: MountedSession
+    /** The session screen that owns the panel. */
+    readonly screen: SessionScreen
+    /** The closed tab's id. */
+    readonly id: string
+    /** What `closed` returned as `data`. */
+    readonly data?: string
+  }): void
   /**
    * Runs when the tab becomes selected. `restored` is true for the selection the side region mounts with, e.g. the
    * tab selected before a reload, and false for every later selection change.

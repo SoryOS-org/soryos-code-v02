@@ -171,19 +171,18 @@ const setup: Setup<typeof definition> = (ctx) => {
     const view = sessions.current()
     const value = model()
 
-    // Only once the desktop's pane answers: an empty side region runs it, and lists the other items until then.
+    // Only once the desktop's pane answers.
     if (!view || !value?.available(view) || !value.attached(view)) return undefined
 
-    // The new tab: its page lists the other items.
+    // A launcher of the side panel's new tab view, between Review and Terminal.
     return {
       menu: "session.panel",
       id: "open",
-      title: ctx.t("tab.new"),
+      title: ctx.t("tab.title"),
       icon: "globe",
       // mod+t opens a browser tab only inside the pane, so advertise it only while the pane is on screen.
       keybind: value.pane()?.visible() ? "browser.newTab" : undefined,
-      order: 40,
-      primary: true,
+      order: 15,
       run: () => value.open(view),
     }
   })
@@ -264,12 +263,16 @@ const setup: Setup<typeof definition> = (ctx) => {
       </Show>
     ),
     close: (input) => model()?.closeTab(input.session, input.tab.id),
-    // A blank new tab does not come back.
-    reopen(input) {
-      const session = input.session
-      const url = model()?.tab(session, input.tab.id)?.url
+    // A blank new tab does not come back; a page comes back as a new tab on its address.
+    closed(input) {
+      const url = model()?.tab(input.session, input.tab.id)?.url
 
-      return url && url !== "about:blank" ? () => model()?.openURL(session, url) : undefined
+      if (!url || url === "about:blank") return false
+
+      return { icon: "globe", detail: URL.canParse(url) ? new URL(url).host : undefined, data: url }
+    },
+    restore: (input) => {
+      if (input.data) model()?.openURL(input.session, input.data)
     },
     focus: (input) => model()?.focusTab(input.session, input.tab.id),
     // A blank tab starts in its address field, like a browser's new tab.
