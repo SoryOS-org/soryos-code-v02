@@ -1,6 +1,12 @@
-/* Desktop controls use the default cursor; the pointer cursor is reserved for links. */
+/* Desktop controls and drag handles use the default cursor; the pointer cursor is reserved for links. */
 :where(
   .cursor-pointer:not(a):not([role="link"]),
+  .cursor-grab,
+  .cursor-grabbing,
+  .active\:cursor-grabbing:active,
+  .knobs-panel > header,
+  [data-slot="image-preview-body"][data-zoomed],
+  [data-slot="image-preview-body"][data-dragging],
   .session-service-config,
   [data-component="timeline-detail-control"] input[type="range"],
   .project-settings-server-link,
