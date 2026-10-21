@@ -31,6 +31,8 @@ const radius = 6
 
 const grid = (value: number) => Math.round(value * 64) / 64
 
+const edges = ["top", "bottom", "left", "right"] as const
+
 /**
  * Experiment: one hover pill glides behind the sidebar's rows, instead of each row lighting its own background. It
  * targets the row nearest the pointer, so crossing a gap between rows holds it rather than dropping it.
@@ -50,12 +52,14 @@ function Pill() {
   let bottom!: HTMLDivElement
   let pointer: { x: number; y: number } | undefined
   // The hovered row's edges relative to the sidebar, from the last frame's read phase.
-  let hit: { top: number; bottom: number } | undefined
+  let hit: { top: number; bottom: number; left: number; right: number } | undefined
   let frame: (() => void) | undefined
 
   const motion = {
     top: Spring.fromDuration(0, tuning()),
     bottom: Spring.fromDuration(0, tuning()),
+    left: Spring.fromDuration(0, tuning()),
+    right: Spring.fromDuration(0, tuning()),
     opacity: Spring.fromDuration(0, { duration: 0.15, bounce: 0 }),
   }
 
@@ -73,29 +77,33 @@ function Pill() {
       const spring = tuning()
       const reduced = prefersReducedMotion()
 
-      if (hit) {
+      const target = hit
+
+      edges.forEach((edge) => {
+        motion[edge].omega = (2 * Math.PI) / spring.duration
+        motion[edge].zeta = 1 - spring.bounce
+
+        if (!target) return
+
         // Appearing from hidden starts on the row rather than sweeping in from where it left.
-        if (motion.opacity.value === 0 || reduced) {
-          motion.top.snap(hit.top)
-          motion.bottom.snap(hit.bottom)
-        }
-
-        motion.top.set(hit.top)
-        motion.bottom.set(hit.bottom)
-      }
-
-      motion.opacity.set(hit ? 1 : 0)
-
-      ;[motion.top, motion.bottom].forEach((edge) => {
-        edge.omega = (2 * Math.PI) / spring.duration
-        edge.zeta = 1 - spring.bounce
+        if (motion.opacity.value === 0 || reduced) motion[edge].snap(target[edge])
+        motion[edge].set(target[edge])
       })
+
+      motion.opacity.set(target ? 1 : 0)
 
       const y0 = grid(motion.top.step(dt))
       const y1 = grid(motion.bottom.step(dt))
       top.style.transform = `translateY(${y0}px)`
       bottom.style.transform = `translateY(${y1 - radius * 2}px)`
       fill.style.transform = `translateY(${y0 + radius}px) scaleY(${Math.max(0, y1 - y0 - radius * 2)})`
+
+      const x0 = grid(motion.left.step(dt))
+      const width = `${grid(motion.right.step(dt)) - x0}px`
+      pill.style.transform = `translateX(${x0}px)`
+
+      // Only Home beside the sidebar toggle is narrower, so width changes only on the way to or from it.
+      if (pill.style.width !== width) pill.style.width = width
       pill.style.opacity = String(motion.opacity.step(dt))
 
       if (Object.values(motion).some((item) => !item.resting)) return true
@@ -108,18 +116,36 @@ function Pill() {
       frame ??= frameLoop.addMeasured(read, write)
     }
 
+    // While the pointer rests inside, rows that open, close, resize or finish a drag move the pill to the row now under it.
+    const resize = new ResizeObserver(wake)
+    const mutation = new MutationObserver(wake)
+
     makeEventListener(root, "pointermove", (event) => {
       if (event.pointerType === "touch") return
+
+      if (!pointer)
+        root.querySelectorAll("[data-titlebar-tab-list]").forEach((list) => {
+          resize.observe(list)
+          mutation.observe(list, { childList: true, subtree: true, attributeFilter: ["data-dragging"] })
+        })
+
       pointer = { x: event.clientX, y: event.clientY }
       wake()
     })
     makeEventListener(root, "pointerleave", () => {
       pointer = undefined
+      resize.disconnect()
+      mutation.disconnect()
       wake()
     })
+    makeEventListener(root, "pointerup", wake)
     // Rows that scroll under a resting pointer move the pill with them.
     makeEventListener(root, "scroll", wake, { capture: true, passive: true })
-    onCleanup(() => frame?.())
+    onCleanup(() => {
+      frame?.()
+      resize.disconnect()
+      mutation.disconnect()
+    })
   })
 
   // Opaque slices, so the caps can overlap the middle without darkening it; the group fades as one.
@@ -128,7 +154,7 @@ function Pill() {
       ref={pill}
       data-slot="sidebar-hover-pill"
       aria-hidden="true"
-      class="pointer-events-none absolute inset-x-0 top-0 -z-10 opacity-0"
+      class="pointer-events-none absolute left-0 top-0 -z-10 opacity-0"
     >
       <div ref={top} class="absolute inset-x-0 top-0 h-3 rounded-[6px]" />
       <div ref={fill} class="absolute inset-x-0 top-0 h-px origin-top" />
@@ -158,11 +184,13 @@ function nearest(root: HTMLElement, pointer: { x: number; y: number }) {
 
   if (!first || !last || pointer.y < first.top || pointer.y > last.bottom) return
 
-  if (pointer.x < first.left || pointer.x > first.right) return
+  if (pointer.x < Math.min(...boxes.map((item) => item.left))) return
+
+  if (pointer.x > Math.max(...boxes.map((item) => item.right))) return
 
   const distance = (row: { top: number; bottom: number }) => Math.max(row.top - pointer.y, pointer.y - row.bottom, 0)
   // A tie in a gap goes to the lower row, as clicks do.
   const row = boxes.reduce((best, item) => (distance(item) <= distance(best) ? item : best))
 
-  return { top: row.top - box.top, bottom: row.bottom - box.top }
+  return { top: row.top - box.top, bottom: row.bottom - box.top, left: row.left - box.left, right: row.right - box.left }
 }
