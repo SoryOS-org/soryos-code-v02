@@ -127,6 +127,30 @@ story("keeps Markdown sanitization and link protections after Mermaid renders", 
   expect(result.afterInvalid).toBe(result.before)
 })
 
+for (const cached of [false, true]) {
+  story(`decorates known inline paths before insertion with cached Markdown ${cached}`, async ({ page }) => {
+    const initial = await page.evaluate(
+      async ({ fixture, cached }) => {
+        const { mountMarkdown } = await import(fixture)
+
+        return mountMarkdown({
+          text: "`src/file.ts` and `src/file.ts` and `missing.ts` and [`src/file.ts`](https://example.com)",
+          cached,
+          synchronousFiles: true,
+        })
+      },
+      { fixture, cached },
+    )
+
+    expect(initial).toEqual([
+      { text: "src/file.ts", kind: "path" },
+      { text: "src/file.ts", kind: "path" },
+      { text: "missing.ts", kind: null },
+      { text: "src/file.ts", kind: null },
+    ])
+  })
+}
+
 story("mounts cached completed Markdown with sanitized HTML and decorations", async ({ page }) => {
   await page.evaluate(
     async ({ fixture, text }) => {
@@ -546,7 +570,7 @@ story("renders the trailing chunk while the stream is paused", async ({ page }) 
 story("keeps live elements and selection when a stream completes and later changes", async ({ page }) => {
   await page.evaluate(async (fixture) => {
     const { mountMarkdown } = await import(fixture)
-    await mountMarkdown({ text: "Hello **world**", streaming: true })
+    await mountMarkdown({ text: "Hello **world**", streaming: true, synchronousFiles: true })
   }, fixture)
   const harness = page.getByTestId("markdown-fixture")
   const markdown = harness.locator('[data-component="markdown"]')
@@ -571,8 +595,9 @@ story("keeps live elements and selection when a stream completes and later chang
   await expect(markdown).toHaveAttribute("data-markdown-ready", "")
   await expect(paragraph).toHaveAttribute("data-retained", "true")
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("world")
-  await harness.getByLabel("Markdown text").fill("Changed **content**")
-  await expect(paragraph).toHaveText("Changed content")
+  await harness.getByLabel("Markdown text").fill("Changed **content** in `new/file.ts` and `new/file.ts`")
+  await expect(paragraph).toHaveText("Changed content in new/file.ts and new/file.ts")
+  await expect(markdown.locator('code[data-inline-code-kind="path"]')).toHaveText(["new/file.ts", "new/file.ts"])
   await expect(paragraph).toHaveAttribute("data-retained", "true")
   await expect(markdown.locator("[data-markdown-word]")).toHaveCount(0)
   await harness.getByRole("button", { name: "Toggle Markdown" }).click()

@@ -28,6 +28,7 @@ export async function mountMarkdown(options: {
   streaming?: boolean
   cached?: boolean
   images?: boolean
+  synchronousFiles?: boolean
 }) {
   if (options.cached) await preloadMarkdown(options.text, "markdown-test")
   const host = document.createElement("div")
@@ -57,7 +58,9 @@ export async function mountMarkdown(options: {
           readImage={(path, signal) =>
             options.images ? readLocalImage(api, "C:/project", path, signal) : Promise.resolve(undefined)
           }
-          localFileExists={(path) => Promise.resolve(existingFiles.has(path))}
+          localFileExists={(path) =>
+            options.synchronousFiles ? existingFiles.has(path) : Promise.resolve(existingFiles.has(path))
+          }
         >
           <Show when={visible()}>
             <Markdown
@@ -71,4 +74,10 @@ export async function mountMarkdown(options: {
       </DialogProvider>
     )
   }, host)
+
+  // Capture before Promise callbacks run: eventual assertions cannot catch a flash on insertion.
+  return Array.from(host.querySelectorAll<HTMLElement>(":not(pre) > code"), (node) => ({
+    text: node.textContent,
+    kind: node.dataset.inlineCodeKind ?? null,
+  }))
 }

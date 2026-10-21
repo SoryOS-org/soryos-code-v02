@@ -397,7 +397,7 @@ function markInlineCode(
   live: boolean,
   localFileExists?: MarkdownLocalFileExists,
 ) {
-  const checked = new Set<string>()
+  const checked = new Map<string, boolean | Promise<boolean>>()
 
   for (const code of source.querySelectorAll<HTMLElement>(":not(pre) > code")) {
     delete code.dataset.inlineCodeKind
@@ -407,10 +407,27 @@ function markInlineCode(
     if (kind === "url") code.dataset.inlineCodeKind = kind
 
     // Code inside a link already goes where the link does.
-    if (kind !== "path" || live || !localFileExists || code.closest("a") || checked.has(text)) continue
+    if (kind !== "path" || live || !localFileExists || code.closest("a")) continue
 
-    checked.add(text)
-    void Promise.resolve(localFileExists(text))
+    const previous = checked.get(text)
+
+    if (previous !== undefined) {
+      if (previous === true) code.dataset.inlineCodeKind = "path"
+
+      continue
+    }
+
+    const exists = localFileExists(text)
+    checked.set(text, exists)
+
+    // Decorate the source before it is inserted or copied into a live Markdown renderer.
+    if (exists === true || exists === false) {
+      if (exists) code.dataset.inlineCodeKind = "path"
+
+      continue
+    }
+
+    void exists
       .then((exists) => {
         if (!exists) return
         target.querySelectorAll<HTMLElement>(":not(pre) > code").forEach((node) => {

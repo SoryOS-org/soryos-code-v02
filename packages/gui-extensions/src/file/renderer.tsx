@@ -30,6 +30,7 @@ import {
   type PanelTab,
   type MountedSession,
   type SessionScreen,
+  type ServerRef,
   type Setup,
   onIdle,
 } from "../sdk"
@@ -60,6 +61,8 @@ const DEFAULT_LINE_HEIGHT = 24
 type Handoff = { sessions: Record<string, Record<string, LineRange | null>> }
 
 type StyleLoad = { loaded?: Promise<void> }
+
+type LinkCheck = { result: boolean | Promise<boolean>; expires: number; known?: true }
 
 const setup: Setup<typeof File> = (ctx) => {
   const sessions = ctx.sessions
@@ -516,24 +519,74 @@ const setup: Setup<typeof File> = (ctx) => {
     return files.resolve(resolveArtifactPath(dir, value) ?? value)
   }
 
+  // Screens survive tab switches, unlike Markdown and MountedSession objects. Weak client keys also drop results
+  // from an old server connection without retaining its controller.
+  const linkChecks = new WeakMap<SessionScreen, WeakMap<ServerRef["client"], Map<string, LinkCheck>>>()
+
   // Messages style a path as a link only when this says the file exists.
   const linkExists = (link: Link): boolean | Promise<boolean> => {
     const session = sessions.current()
-    const files = ctx.screen.current()?.file
+    const screen = ctx.screen.current()
+    const files = screen?.file
 
-    if (!session || !files || (link.session && link.session.key !== session.key)) return false
+    if (!session || !screen || !files || (link.session && link.session.key !== session.key)) return false
 
-    return import("./resolve-link")
-      .then(({ checkFileLinkExists, parseFileLink }) => {
-        if (link.base === undefined) return checkFileLinkExists({ files, href: link.href, signal: ctx.signal })
+    const clients = linkChecks.get(screen) ?? new WeakMap<ServerRef["client"], Map<string, LinkCheck>>()
+    linkChecks.set(screen, clients)
+    const client = session.server.client
+    const checks = clients.get(client) ?? new Map<string, LinkCheck>()
+    clients.set(client, checks)
+    const root = files.root
+    const key = JSON.stringify([session.key, root, link.base ?? null, link.href])
+    const cached = checks.get(key)
+
+    if (cached && cached.expires > Date.now()) return cached.known ?? cached.result
+
+    const current = () =>
+      !ctx.signal.aborted &&
+      sessions.current()?.key === session.key &&
+      files.root === root &&
+      session.server.client === client
+
+    const pending = import("./resolve-link")
+      .then(async ({ checkFileLinkExists, parseFileLink }) => {
+        if (!current()) return false
 
         // A link in a previewed document opens relative to it, so only that path counts.
         const path = parseFileLink(link.href).path
-        const direct = path.startsWith("//") || path.startsWith("~") ? undefined : resolve(files, path, link.base)
 
-        return direct ? files.exists(direct) : false
+        const direct =
+          link.base === undefined || path.startsWith("//") || path.startsWith("~")
+            ? undefined
+            : resolve(files, path, link.base)
+
+        const exists = await (link.base === undefined
+          ? checkFileLinkExists({ files, href: link.href, signal: ctx.signal })
+          : direct
+            ? files.exists(direct)
+            : false)
+
+        if (!current()) return false
+
+        if (checks.get(key)?.result === pending)
+          checks.set(key, { result: exists, expires: Date.now() + (exists ? 60_000 : 5_000) })
+
+        return exists
       })
       .catch(() => false)
+      .finally(() => {
+        // Aborted, failed or no-longer-current checks are retryable, not cached negatives.
+        if (checks.get(key)?.result === pending) checks.delete(key)
+      })
+
+    // Revalidate known paths without bringing back their plain-code flash. Expired negatives await a fresh check.
+    const known = cached?.result === true ? true : undefined
+    checks.delete(key)
+    checks.set(key, { result: pending, expires: Infinity, known })
+
+    while (checks.size > 512) checks.delete(checks.keys().next().value!)
+
+    return known ?? pending
   }
 
   // Opens files the agent references as side panel tabs, inside or outside the workspace, or as
