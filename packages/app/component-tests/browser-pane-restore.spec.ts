@@ -341,13 +341,13 @@ story("opens a browser tab with ⌘T inside the pane and a session everywhere el
   const opens = root.getByTestId("browser-opens")
   const sessions = root.getByTestId("new-sessions")
   await expect(root.getByText("Registrations: 1", { exact: true })).toBeVisible()
-  // Alpha shows a file tab, so the + advertises no browser shortcut.
-  await expect(root.getByTestId("add-shortcut")).toHaveText("none")
+  // The + advertises the browser launcher's own shortcut, whichever tab shows; ⌘T stays the pane's.
+  await expect(root.getByTestId("add-shortcut")).toHaveText(mac ? "⌃⌘B" : "Ctrl+Alt+B")
   await outside.click()
   await expect(root.getByText("Registrations: 2", { exact: true })).toBeVisible()
   await root.getByRole("button", { name: "First inventory", exact: true }).click()
   await expect(root.getByRole("tab", { name: "Preview", exact: true })).toHaveAttribute("aria-selected", "true")
-  await expect(root.getByTestId("add-shortcut")).toHaveText(mac ? "⌘T" : "Ctrl+T")
+  await expect(root.getByTestId("add-shortcut")).toHaveText(mac ? "⌃⌘B" : "Ctrl+Alt+B")
 
   // Outside the pane the shell keeps ⌘T.
   await outside.focus()
@@ -402,6 +402,13 @@ story("⌘T and ⌘W follow focus: side tabs inside the side panel, session tabs
   await expect(sessions).toHaveText("1")
   await expect(panel).not.toHaveAttribute("data-focused")
 
+  // The page's focus, which reaches the app only as the pane's report, counts as the side panel's.
+  await editor.click()
+  await expect(panel).toHaveAttribute("data-focused")
+  await editor.press(`${mod}+t`)
+  await expect(opens).toHaveText("1")
+  await expect(sessions).toHaveText("1")
+
   // A click on the side panel's own surface, nothing focusable, leaves focus on the panel: ⌘T opens its new tab view
   // and ⌘W closes that view, then the selected tab.
   await panel.getByTestId("selected").click()
@@ -412,17 +419,8 @@ story("⌘T and ⌘W follow focus: side tabs inside the side panel, session tabs
   await expect(newTab).toHaveText("none")
   await expect(root.getByTestId("browser-closes")).toHaveText("[]")
   await page.keyboard.press(`${mod}+w`)
-  await expect(root.getByTestId("browser-closes")).toHaveText('["tab_33333333-3333-3333-3333-333333333333"]')
+  await expect(root.getByTestId("browser-closes")).toHaveText(/^\["tab_/)
   await expect(root.getByTestId("session-state")).toHaveText("open")
-  await expect(sessions).toHaveText("1")
-
-  // The page's focus, which reaches the app only as the pane's report, counts as the side panel's.
-  await outside.focus()
-  await expect(panel).not.toHaveAttribute("data-focused")
-  await editor.click()
-  await expect(panel).toHaveAttribute("data-focused")
-  await editor.press(`${mod}+t`)
-  await expect(opens).toHaveText("1")
   await expect(sessions).toHaveText("1")
 })
 

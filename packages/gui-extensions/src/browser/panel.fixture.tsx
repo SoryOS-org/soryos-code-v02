@@ -992,12 +992,14 @@ export function mountBrowserRegion(input: RegionHost) {
         },
         true,
       )
-      // As chromium.ts reports the native page taking keyboard focus.
-      win.addEventListener("focus", () => {
-        const binding = latest()?.binding
+      // As chromium.ts reports the native page taking keyboard focus, which arrives over IPC after the click.
+      win.addEventListener("focus", () =>
+        setTimeout(() => {
+          const binding = latest()?.binding
 
-        if (binding) listeners.forEach((listener) => listener({ binding, event: { type: "focused", tabID } }))
-      })
+          if (binding) listeners.forEach((listener) => listener({ binding, event: { type: "focused", tabID } }))
+        }),
+      )
     }
 
     // Mounts once every extension is active, as the session screen does.
