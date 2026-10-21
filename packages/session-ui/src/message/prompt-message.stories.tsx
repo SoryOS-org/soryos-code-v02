@@ -1,4 +1,4 @@
-import { createMemo, For } from "solid-js"
+import { createMemo, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionMessageUser } from "@opencode/client/promise"
 import type { SessionUserActions } from "../actions"
@@ -16,10 +16,16 @@ export const Pending = {
   render: () => {
     const statuses = ["delivered", "starting", "steering", "stranded", "queued"] as const
 
-    const [state, setState] = createStore<{ status: (typeof statuses)[number]; voice: boolean; text: boolean }>({
+    const [state, setState] = createStore<{
+      status: (typeof statuses)[number]
+      voice: boolean
+      text: boolean
+      grouped: boolean
+    }>({
       status: "steering",
       voice: false,
       text: true,
+      grouped: false,
     })
 
     const message = createMemo<SessionMessageUser>(() => ({
@@ -86,8 +92,27 @@ export const Pending = {
             />{" "}
             Prompt text
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={state.grouped}
+              onChange={(event) => setState("grouped", event.currentTarget.checked)}
+            />{" "}
+            Grouped prompts
+          </label>
         </div>
         <CurrentSessionProviders document={document()}>
+          <Show when={state.grouped && state.text}>
+            <CurrentUserMessageDisplay
+              sessionID={CURRENT_SESSION_ID}
+              message={{ ...message(), id: "msg_pending_prompt_above" }}
+              text="Keep the earlier prompt in the same run."
+              agent="build"
+              model={STORY_MODEL}
+              actions={actions}
+              run={{ above: false, below: true }}
+            />
+          </Show>
           <CurrentUserMessageDisplay
             sessionID={CURRENT_SESSION_ID}
             message={message()}
@@ -96,6 +121,7 @@ export const Pending = {
             model={STORY_MODEL}
             voice={state.voice}
             actions={actions}
+            run={{ above: state.grouped && state.text, below: false }}
           />
         </CurrentSessionProviders>
       </section>

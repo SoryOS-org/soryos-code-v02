@@ -311,16 +311,10 @@ export function CurrentUserMessageDisplay(props: {
     () => !!props.run?.above && !!props.text && attachments().length === 0 && references().length === 0,
   )
 
-  // A run of waiting steers wears one badge, on its first steer.
-  const badge = createMemo(() => waiting() && !props.run?.above)
-  // Once shown, the badge stays mounted so it can fade out on delivery.
-  const badged = createMemo((shown: boolean) => shown || badge(), false)
-
   const runPose = () => ({
     meta: folded() ? 0 : 1,
     top: meetsAbove() ? 1 : 0,
     bottom: folded() ? 1 : 0,
-    badge: badge() ? 1 : 0,
   })
 
   // The first paint is the resting pose; the spring's first write lands a frame later.
@@ -334,7 +328,6 @@ export function CurrentUserMessageDisplay(props: {
       el.style.setProperty("--user-run-meta", `${value.meta}`)
       el.style.setProperty("--user-run-top", `${value.top}`)
       el.style.setProperty("--user-run-bottom", `${value.bottom}`)
-      el.style.setProperty("--user-run-badge", `${value.badge}`)
       el.toggleAttribute("data-run-meta-hidden", value.meta === 0)
     },
     userRunSpring,
@@ -521,23 +514,9 @@ export function CurrentUserMessageDisplay(props: {
         "--user-run-meta": `${restingPose.meta}`,
         "--user-run-top": `${restingPose.top}`,
         "--user-run-bottom": `${restingPose.bottom}`,
-        "--user-run-badge": `${restingPose.badge}`,
       }}
       data-timeline-part-id={props.text ? `${props.message.id}:text:0` : undefined}
     >
-      <Show when={badged()}>
-        <div
-          data-slot="user-message-pending"
-          role="img"
-          aria-label={i18n.t("ui.message.pending")}
-          aria-hidden={badge() ? undefined : "true"}
-          style={{ "pointer-events": badge() ? undefined : "none" }}
-        >
-          <Tooltip appearance="compact" value={i18n.t("ui.message.pending")} placement="top" gutter={4}>
-            <Icon name="outline-steer" size="small" />
-          </Tooltip>
-        </div>
-      </Show>
       {renderAttachments()}
       <Show
         when={props.text}
@@ -572,6 +551,11 @@ export function CurrentUserMessageDisplay(props: {
           <span data-slot="user-message-meta-wrap">
             <Show when={metaHead()}>
               <span data-slot="user-message-meta" class="text-12-regular text-text-weak cursor-default">
+                <Show when={waiting()}>
+                  <span data-slot="user-message-pending" aria-hidden="true">
+                    <Icon name="outline-steer" size="small" />
+                  </span>
+                </Show>
                 {metaHead()}
               </span>
             </Show>

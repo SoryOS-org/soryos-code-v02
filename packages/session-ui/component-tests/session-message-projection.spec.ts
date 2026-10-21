@@ -1,14 +1,14 @@
 import { expect, story } from "../../storybook/playwright/story"
 
-story("badges pending steers without marking delivered, starting, or queued prompts", async ({ mount }) => {
+story("marks pending metadata without badging delivered, starting, or queued prompts", async ({ mount, page }) => {
   const timeline = await mount("current-prompt-message--pending")
-  const badge = timeline.getByRole("img", { name: "Pending", exact: true })
+  const indicator = timeline.locator('[data-slot="user-message-meta"] [data-slot="user-message-pending"]')
   const text = timeline.locator('[data-slot="user-message-text"]')
 
   for (const status of ["steering", "stranded", "starting", "queued", "delivered"]) {
     await timeline.getByLabel("Delivery state").selectOption(status)
     const pending = status === "steering" || status === "stranded"
-    await expect(badge).toHaveCount(pending ? 1 : 0)
+    await expect(indicator).toHaveCount(pending ? 1 : 0)
 
     const colors = await timeline.evaluate((element, pending) => {
       const probe = document.createElement("span")
@@ -29,38 +29,44 @@ story("badges pending steers without marking delivered, starting, or queued prom
   await timeline.getByLabel("Voice message", { exact: true }).check()
   const voice = timeline.getByRole("img", { name: "Voice", exact: true })
   await expect(voice).toBeVisible()
-  await expect(badge).toBeVisible()
+  await expect(indicator).toBeVisible()
+  await expect(indicator).toHaveAttribute("aria-hidden", "true")
 
   await expect(voice.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-wave-audio")
-  await expect(badge.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
+  await expect(indicator.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
 
-  for (const marker of [voice, badge]) {
-    await expect(marker).toHaveCSS("width", "20px")
-    await expect(marker).toHaveCSS("height", "20px")
-    await expect(marker.locator('[data-slot="icon-svg"]')).toHaveCSS("width", "14px")
-    await expect(marker.locator('[data-slot="icon-svg"]')).toHaveCSS("height", "14px")
-  }
+  await expect(voice).toHaveCSS("width", "20px")
+  await expect(voice).toHaveCSS("height", "20px")
+  await expect(voice.locator('[data-slot="icon-svg"]')).toHaveCSS("width", "14px")
+  await expect(voice.locator('[data-slot="icon-svg"]')).toHaveCSS("height", "14px")
 
-  const badgeColors = await badge.evaluate((element) => {
+  const faint = await indicator.evaluate((element) => {
     const probe = document.createElement("span")
-    probe.style.color = "var(--v2-icon-icon-muted)"
-    probe.style.backgroundColor = "var(--v2-background-bg-layer-02)"
+    probe.style.color = "var(--v2-icon-icon-faint)"
     element.append(probe)
-    const colors = { color: getComputedStyle(probe).color, background: getComputedStyle(probe).backgroundColor }
+    const color = getComputedStyle(probe).color
     probe.remove()
 
-    return colors
+    return color
   })
 
-  await expect(badge).toHaveCSS("color", badgeColors.color)
-  await expect(badge).toHaveCSS("background-color", badgeColors.background)
-  const boxes = await Promise.all([voice.boundingBox(), badge.boundingBox()])
-  expect(boxes[0]!.x + boxes[0]!.width).toBeLessThanOrEqual(boxes[1]!.x)
+  await expect(indicator).toHaveCSS("color", faint)
+  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText(/^Pending/)
+  await timeline.getByLabel("Grouped prompts", { exact: true }).check()
+  await expect(timeline.locator('[data-run-folded] [data-slot="user-message-copy-wrapper"]')).toBeHidden()
+  await expect(
+    timeline.locator('[data-component="user-message"]:not([data-run-folded]) [data-slot="user-message-pending"]'),
+  ).toBeVisible()
+  await expect(timeline.getByRole("img", { name: "Pending", exact: true })).toHaveCount(0)
+  await timeline.getByLabel("Grouped prompts", { exact: true }).uncheck()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(indicator).toBeVisible()
+  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText("Pending")
   await timeline.getByLabel("Prompt text", { exact: true }).uncheck()
   await expect(timeline.getByText("notes.json", { exact: true })).toBeVisible()
-  await expect(badge).toBeVisible()
+  await expect(indicator).toBeVisible()
   await timeline.getByRole("button", { name: "Move to queue", exact: true }).click()
-  await expect(badge).toHaveCount(0)
+  await expect(indicator).toHaveCount(0)
 })
 
 // Moved from packages/app/e2e/regression/session-timeline-collapse-state.spec.ts
