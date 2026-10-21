@@ -507,12 +507,15 @@ export const Terminal = (props: TerminalProps) => {
         handleLinkClick,
       })
 
-      if (local.autoFocus === true) {
+      // onAutoFocus consumes the request, which flips autoFocus, so read it once.
+      const autoFocus = local.autoFocus === true
+
+      if (autoFocus) {
         focusTerminal()
         local.onAutoFocus?.()
       }
 
-      if (local.autoFocus !== true) {
+      if (!autoFocus) {
         const restoreFocus = () => {
           const current = document.activeElement
 
