@@ -2,6 +2,8 @@
 
 Code Mode search should put useful tools near the beginning of its first page. This benchmark measures ranking, independently of tool execution or an agent's eventual task completion. It imports the actual `tool-runtime.ts`, including catalog preparation, search input/output validation, exact-path handling, and pagination.
 
+The original evaluation below concerns candidate `df794fb409`. The final source also includes the separately evaluated [post-review revision](#post-review-revision), which preserves useful path-token prefixes. Both sets of results are retained rather than replacing the original evidence.
+
 ## Reproduce
 
 From `packages/codemode`, with the workspace's Bun dependencies installed:
@@ -95,7 +97,7 @@ The preparer pins [cloudflare/api-schemas](https://github.com/cloudflare/api-sch
 
 The inspiring PR passes this independent quality check as well. The candidate improves latest MRR by 12.1% relatively, on a catalog size closer to the original motivating Cloudflare evaluation. API summaries have high lexical overlap with their descriptions; this measures endpoint lookup, not arbitrary user requests.
 
-## Resource tradeoff
+## Original resource tradeoff
 
 Search caches weighted word counts per catalog entry. This costs memory and makes the first search slower; subsequent searches avoid repeated text processing. Empty queries retain alphabetical browsing without building the word cache.
 
@@ -118,3 +120,44 @@ Medians of three fresh processes per configuration, alternating baseline/candida
 | 37,292 tools | Retained heap increase | 39.46 MiB | 126.28 MiB |
 
 Peak process RSS is approximately 195→202 MiB at 3k and 480→752 MiB at 37k, including the benchmark fixture and transient allocations. The retained-cache premium is about 6.9 MiB at 3k and 86.8 MiB at 37k. The host is shared, so timings are descriptive rather than a general performance claim. A first run overlapping package checks was retained separately and excluded from this table; the complete suite was rerun after checks finished. Retrieval quality, with these costs disclosed, is the proposed improvement.
+
+## Post-review revision
+
+An independent reviewer identified partial-name regressions: `channel` preferred `post_message` over `list_channels`, and `repo` preferred `search_code` over `list_repositories`. The original implementation retained substring eligibility but weakened its ranking too much. The revision gives a query matching the beginning of a path word the existing path-field weight. It does not promote suffix matches such as `zone` in `timezones`, add synonyms, or change BM25 parameters. The regression test covers nine singular, plural, and abbreviated queries. It fails before the revision and passes afterward.
+
+The original heldout results are no longer an untouched test of this revision. Before any new scores, the revised algorithm was frozen and a new task set selected: positions 20–39 in each source's original SHA256(ID) ordering, giving 325 unused task IDs from 18 sources. Seven RotBench IDs repeat original task text verbatim; input-only exact deduplication, also frozen before scoring, defines the primary 318 text-novel tasks. All 325 remain a sensitivity check. These are new tasks, not unseen source domains.
+
+The same local `gpt-6.1-sol` medium prompt generated one search query per task, without catalog, labels, or evaluation feedback. Eleven batches emitted 11 agent messages and no tool calls. No score-driven retries or post-evaluation tuning occurred. `fixtures/tool-search-review-queries.json` contains the frozen queries; `fixtures/tool-search-review-evidence.json` records the complete protocol, excluded IDs, source scores, comparisons, and resource samples.
+
+```sh
+uv run --with pyarrow==24.0.0 python script/prepare-search-benchmark.py --partition review --output /tmp/opencode-review-data
+bun script/bench-search.ts --data /tmp/opencode-review-data/benchmark.json --split review-heldout --output /tmp/review-result.json
+```
+
+Omit `--split` to score all 325. The same `--runtime` option evaluates historical/baseline revisions.
+
+| New task evaluation              |   MRR@10 | Recall@10 |  NDCG@10 |
+| -------------------------------- | -------: | --------: | -------: |
+| Inspiring PR parent, 318         | 0.173212 |  0.221331 | 0.156625 |
+| Latest baseline, 318             | 0.182505 |  0.217505 | 0.160410 |
+| Initial published candidate, 318 | 0.269939 |  0.297379 | 0.231285 |
+| Final review revision, 318       | 0.264522 |  0.291247 | 0.225257 |
+| Latest baseline, all 325         | 0.178574 |  0.212821 | 0.156955 |
+| Final review revision, all 325   | 0.258824 |  0.284974 | 0.220405 |
+
+Final versus latest primary MRR improves **44.9%**, recall **33.9%**, and NDCG **40.4%**. The paired MRR difference is +0.08202, with task-bootstrap 95% interval [+0.05128, +0.11371] and source-bootstrap interval [+0.03902, +0.12832]. Seventy-eight tasks improve and 33 regress. Thirteen sources improve, one ties, and four regress: APIBank, ReverseChain, T-Eval Dialog, and TaskBench Daily. The inspiring PR's MRR point estimate also improves on these new tasks, but its interval crosses zero and recall declines slightly; the original historical gates remain the stronger validation.
+
+The review correction itself is not an aggregate improvement over the initial candidate: MRR decreases by 0.00542 on the new tasks (95% interval [-0.01918, +0.00826]). It restores meaningful partial-name behavior while retaining a substantial gain over latest. Previously evaluated 300 tasks now score MRR 0.340269, recall 0.380452, NDCG 0.303180. Cloudflare scores MRR 0.874678, recall 0.980269, NDCG 0.899888. No results were dropped to improve these figures.
+
+The final revision also costs more than the baseline, including warmed searches. A new complete three-process-per-configuration run, using the same protocol and CPU affinity, gives:
+
+| Catalog      | Metric                 |    Latest | Final revision |
+| ------------ | ---------------------- | --------: | -------------: |
+| 3,000 tools  | First search           |   28.8 ms |        61.8 ms |
+| 3,000 tools  | Median warm query      |   6.93 ms |        7.44 ms |
+| 3,000 tools  | Retained heap increase |  3.91 MiB |      11.59 MiB |
+| 37,292 tools | First search           |  265.1 ms |       590.7 ms |
+| 37,292 tools | Median warm query      | 100.97 ms |      118.61 ms |
+| 37,292 tools | Retained heap increase | 39.46 MiB |     136.15 MiB |
+
+Peak RSS is approximately 194→224 MiB at 3k and 494→800 MiB at 37k. A preliminary overlapping run was interrupted and retained but is not used here; all twelve final samples were rerun after other team CPU work finished. The shared host still limits timing generality. This is a relevance improvement with explicit latency and memory costs, not a performance improvement.

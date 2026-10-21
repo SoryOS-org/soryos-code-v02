@@ -209,7 +209,7 @@ const termForms = (term: string): Array<string> => {
   return forms
 }
 
-const documents = new WeakMap<SearchEntry, { words: Map<string, number>; length: number }>()
+const documents = new WeakMap<SearchEntry, { words: Map<string, number>; path: Array<string>; length: number }>()
 
 const rank = (entries: ReadonlyArray<SearchEntry>, query: string): Array<SearchEntry> => {
   const terms = tokenize(query).map(termForms)
@@ -221,18 +221,29 @@ const rank = (entries: ReadonlyArray<SearchEntry>, query: string): Array<SearchE
     let document = documents.get(entry)
     if (!document) {
       const words = new Map<string, number>()
-      const add = (text: string, weight: number) => {
-        for (const word of tokenize(text)) words.set(word, (words.get(word) ?? 0) + weight)
+      const path = tokenize(entry.description.path)
+      const add = (tokens: Array<string>, weight: number) => {
+        for (const word of tokens) words.set(word, (words.get(word) ?? 0) + weight)
       }
-      add(entry.description.path, 3)
-      add(entry.description.description, 1)
-      add(entry.searchText, 0.25)
-      document = { words, length: [...words.values()].reduce((total, value) => total + value, 0) }
+      add(path, 3)
+      add(tokenize(entry.description.description), 1)
+      add(tokenize(entry.searchText), 0.25)
+      document = {
+        words,
+        path,
+        length: [...words.values()].reduce((total, value) => total + value, 0),
+      }
       documents.set(entry, document)
     }
     totalLength += document.length
     const weights = terms.map((forms, index) => {
-      const value = Math.max(...forms.map((form) => document.words.get(form) ?? 0))
+      const value = Math.max(
+        ...forms.map(
+          (form) =>
+            (document.words.get(form) ?? 0) +
+            document.path.reduce((total, word) => total + (word !== form && word.startsWith(form) ? 3 : 0), 0),
+        ),
+      )
       if (value > 0) frequency[index]++
       return value || (forms.some((form) => entry.searchText.includes(form)) ? 0.1 : 0)
     })

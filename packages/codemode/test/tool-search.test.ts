@@ -16,6 +16,31 @@ const paths = async (runtime: ToolRuntime.ToolRuntime, query: string, namespace?
 }
 
 describe("tool search relevance", () => {
+  test("partial and singular path words outrank incidental description matches", async () => {
+    const prepared = ToolRuntime.prepare({
+      slack: {
+        list_channels: tool("List public channels"),
+        post_message: tool("Post a message to a channel"),
+      },
+      github: {
+        list_repositories: tool("List repositories for a user"),
+        search_code: tool("Search code in a repo"),
+      },
+      cloudflare: {
+        zones: tool("List configured zones"),
+        timezones: tool("List supported timezones"),
+        dns_records: tool("List records in a zone"),
+      },
+    })
+    const runtime = ToolRuntime.make(prepared, undefined)
+    for (const query of ["channel", "channels", "chan"])
+      expect((await paths(runtime, query))[0]).toBe("tools.slack.list_channels")
+    for (const query of ["repo", "repos", "repositor"])
+      expect((await paths(runtime, query))[0]).toBe("tools.github.list_repositories")
+    for (const query of ["zone", "zones", "zon"])
+      expect((await paths(runtime, query))[0]).toBe("tools.cloudflare.zones")
+  })
+
   test("a discriminating capability outranks a common action name", async () => {
     const prepared = ToolRuntime.prepare({
       directory: {
