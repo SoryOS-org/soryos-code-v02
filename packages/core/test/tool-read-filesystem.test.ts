@@ -379,6 +379,58 @@ describe("ReadToolFileSystem", () => {
     }),
   )
 
+  it.live("keeps UTF-8 and CRLF intact after skipping a chunk-sized prefix", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "unicode-boundary.txt")
+      yield* files.writeFileString(file, `${"a".repeat(256 * 1024 - 3)}\n🙂 café\r\nlast`)
+
+      const result = yield* ReadToolFileSystem.read(environment, absolute(file), "unicode-boundary.txt", {
+        offset: 2,
+        limit: 1,
+      })
+
+      expect(result).toMatchObject({
+        type: "text-page",
+        content: "🙂 café",
+        offset: 2,
+        truncated: true,
+        next: 3,
+      })
+    }),
+  )
+
+  it.live("reports the total line count after skipping several chunks", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "large-range.txt")
+      yield* files.writeFileString(file, `${"line\n".repeat(120_000)}last`)
+
+      const error = yield* ReadToolFileSystem.read(environment, absolute(file), "large-range.txt", {
+        offset: 120_002,
+        limit: 1,
+      }).pipe(Effect.flip)
+
+      expect(error).toBeInstanceOf(ReadToolFileSystem.OffsetOutOfRangeError)
+      expect(error).toMatchObject({ offset: 120_002, lines: 120_001 })
+    }),
+  )
+
+  it.live("checks discarded prefix chunks for null bytes", () =>
+    Effect.gen(function* () {
+      const { environment, files, directory } = yield* fixture
+      const file = path.join(directory, "large-nul-prefix.txt")
+      yield* files.writeFileString(file, `first\0\n${"line\n".repeat(120_000)}last`)
+
+      const error = yield* ReadToolFileSystem.read(environment, absolute(file), "large-nul-prefix.txt", {
+        offset: 120_002,
+        limit: 1,
+      }).pipe(Effect.flip)
+
+      expect(error).toBeInstanceOf(ReadToolFileSystem.BinaryFileError)
+    }),
+  )
+
   it.effect("reads PDFs as bounded media", () =>
     Effect.gen(function* () {
       const { environment, files, directory } = yield* fixture
