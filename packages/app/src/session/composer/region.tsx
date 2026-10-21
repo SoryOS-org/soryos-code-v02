@@ -450,12 +450,16 @@ export function ActiveSessionComposerRegion(props: {
           when={missing()}
           keyed
           fallback={
-            <Composer
-              model={props.model.composer}
-              borderUnderlay
-              readOnly={props.model.queue.undoing()}
-              suggestionBoundary={props.suggestionBoundary}
-            />
+            // The container for the composer's `cqw` caps: only the composer re-evaluates as a panel beside it
+            // animates the chat's width.
+            <div class="@container">
+              <Composer
+                model={props.model.composer}
+                borderUnderlay
+                readOnly={props.model.queue.undoing()}
+                suggestionBoundary={props.suggestionBoundary}
+              />
+            </div>
           }
         >
           {(current) => (
