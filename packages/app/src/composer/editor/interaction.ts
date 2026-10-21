@@ -69,6 +69,8 @@ export function createComposerEditor(input: {
   searchContextFiles: (query: string, signal?: AbortSignal) => ComposerSuggestion[] | Promise<ComposerSuggestion[]>
   /** Reads reactively, so newly found sessions refresh the list without waiting on file search. */
   searchSessions?: (query: string) => ComposerSuggestion[]
+  /** Whether the session search for this query has yet to settle; reads reactively. */
+  sessionsPending?: (query: string) => boolean
   openAttachment?: (attachment: ComposerAttachment, origin?: HTMLElement) => void
   /** An object URL for the image file at this path, which a path attachment references without its bytes. */
   readImage?: (path: string) => Promise<string | undefined>
@@ -158,23 +160,27 @@ export function createComposerEditor(input: {
     )
   }
 
-  const [found, setFound] = createSignal<ComposerSuggestion[]>([])
-  const fileSearch = { query: "", abort: new AbortController() }
-  onCleanup(() => fileSearch.abort.abort())
+  const [found, setFound] = createStore<{ query: string; files: ComposerSuggestion[] }>({ query: "", files: [] })
+  let fileQuery: string | undefined
+  let fileAbort = new AbortController()
+  onCleanup(() => fileAbort.abort())
 
-  // Debounced and abortable: each keystroke replaces the pending file search instead of queueing behind it.
-  const findFiles = (query: string) => {
-    if (query === fileSearch.query) return
-    fileSearch.abort.abort()
+  // Debounced and abortable: each keystroke or close replaces the pending file search instead of queueing behind it.
+  const findFiles = (query?: string) => {
+    if (query === fileQuery) return
+    fileAbort.abort()
     const abort = new AbortController()
-    Object.assign(fileSearch, { query, abort })
+    fileQuery = query
+    fileAbort = abort
+
+    if (query === undefined) return
 
     if (!query.trim() || /\s/.test(query)) return
 
     const timer = setTimeout(
       () =>
         void Promise.resolve(input.searchContextFiles(query, abort.signal)).then(
-          (files) => !abort.signal.aborted && setFound(files),
+          (files) => !abort.signal.aborted && setFound({ query, files }),
           () => undefined,
         ),
       150,
@@ -185,21 +191,27 @@ export function createComposerEditor(input: {
 
   const contextList = useFilteredList<ComposerSuggestion>({
     items: (query) => {
+      if (state.popover.type !== "context") {
+        findFiles(undefined)
+
+        return []
+      }
+
+      findFiles(query)
+
+      const sessions = input.searchSessions?.(query) ?? []
+
+      // Only session titles contain spaces; fuzzy matches elsewhere would keep the popover over prose.
+      if (/\s/.test(query)) return sessions
+
       const fixed = input.context().filter((item) => item.kind !== "file")
       const recent = input.context().filter((item) => item.kind === "file" && item.recent)
 
       const seen = new Set(recent.map((item) => item.id))
 
-      findFiles(query)
+      const files = found.query === query ? found.files : []
 
-      const files = query.trim() && !/\s/.test(query) ? found() : []
-
-      return [
-        ...fixed,
-        ...(input.searchSessions?.(query) ?? []),
-        ...recent,
-        ...files.filter((item) => !seen.has(item.id)),
-      ]
+      return [...fixed, ...sessions, ...recent, ...files.filter((item) => !seen.has(item.id))]
     },
     key: (item) => item.id,
     filterKeys: ["label"],
@@ -460,6 +472,8 @@ export function createComposerEditor(input: {
   // A space ends the mention once nothing matches, so `@` can still start ordinary prose.
   createEffect(() => {
     if (state.popover.type !== "context" || !/\s/.test(state.popover.query)) return
+
+    if (input.sessionsPending?.(state.popover.query)) return
 
     if (contextList.grouped.state === "ready" && contextList.flat().length === 0) dispatch({ type: "popover.close" })
   })

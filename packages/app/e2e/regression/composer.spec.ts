@@ -70,9 +70,21 @@ test("a bare @ lists sessions, and a multi-word title matches while file search 
   await expect(view.editor.locator('[data-mention="session"]')).toHaveText("@OPENCODE CONSOLE")
   files.release()
 
+  // Prose after a completed mention neither reopens the popover nor lets it take Enter.
+  await view.editor.pressSequentially("on code")
+  await expect(suggestions).toBeHidden()
   await view.editor.press("Enter")
   await expect.poll(() => prompts.length).toBe(1)
-  expect(prompts[0]?.text).toBe(`Compare with @session:${target} `)
+  expect(prompts[0]?.text).toBe(`Compare with @session:${target} on code`)
+
+  // A space after a full title ends a typed mention, so the rest stays prose.
+  await view.editor.pressSequentially("@home")
+  await expect(suggestions.getByRole("button", { name: /HOME/ })).toBeVisible()
+  await view.editor.pressSequentially(" now")
+  await expect(suggestions).toBeHidden()
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts.length).toBe(2)
+  expect(prompts[1]?.text).toBe("@home now")
 })
 
 test("a catalog refresh cannot replace an existing session's model", async ({ page }) => {
