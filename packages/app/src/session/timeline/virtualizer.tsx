@@ -535,49 +535,51 @@ export function createTimelineVirtualizer(input: Input) {
 
   const updateVisibleTurns = () => {
     if (!active()) return
+    const root = listRoot()
+
+    if (!root?.isConnected) return
+    const bounds = root.getBoundingClientRect()
     const header = input.showHeader() ? viewport.headerHeight : 0
-    const top = viewport.top + header
-    const bottom = viewport.top + viewport.height
+    const top = bounds.top + header
+    const bottom = bounds.top + root.clientHeight - bottomInset()
     const list = rows()
 
     const visible = virtualizer.getVirtualItems().flatMap((item) => {
-      if (item.end <= top || item.start >= bottom) return []
       const row = list[item.index]
 
       if (!row || Predicate.isTagged(row, "TurnGap") || Predicate.isTagged(row, "TurnDivider")) return []
+      const element = virtualizer.elementsCache.get(item.key)
 
-      return [{ item, row }]
+      if (!element?.isConnected) return []
+      const box = element.getBoundingClientRect()
+
+      if (box.bottom <= top || box.top >= bottom) return []
+
+      return [{ element, row }]
     })
-
-    const root = listRoot()
-    let rootTop: number | undefined
 
     const prompts = visible.flatMap((entry) => {
       if (!Predicate.isTagged(entry.row, "UserMessage")) return []
 
-      if (entry.item.start >= top && entry.item.end <= bottom) return [entry.row.userMessageID]
-
-      if (!root?.isConnected) return []
-      const element = virtualizer.elementsCache.get(entry.item.key)
-
-      // Bubble bounds exclude the invisible copy controls beneath a prompt.
-      const bubbles = element?.querySelectorAll<HTMLElement>(
+      // Virtual measurements may still describe the previous layout after wrapping or resizing. Highlight the
+      // rendered bubbles, not estimated row bounds or the invisible copy controls beneath a prompt.
+      const bubbles = entry.element.querySelectorAll<HTMLElement>(
         '[data-slot="user-message-text"], [data-slot="user-message-attachments"], [data-slot="user-message-comments"]',
       )
-
-      if (!bubbles) return []
-      rootTop ??= root.getBoundingClientRect().top
 
       return [...bubbles].some((bubble) => {
         const box = bubble.getBoundingClientRect()
 
-        return box.height > 0 && box.bottom > rootTop! + header && box.top < rootTop! + viewport.height
+        return box.height > 0 && box.bottom > top && box.top < bottom
       })
         ? [entry.row.userMessageID]
         : []
     })
 
-    const ids = new Set(prompts.length ? prompts : visible[0] ? [visible[0].row.userMessageID] : [])
+    // A clipped prompt can leave only its invisible copy controls in view. The reply-only fallback must come from
+    // conversation content, not from that prompt's remaining row box.
+    const preceding = visible.find((entry) => !Predicate.isTagged(entry.row, "UserMessage"))?.row.userMessageID
+    const ids = new Set(prompts.length ? prompts : preceding ? [preceding] : [])
 
     if (
       viewport.visibleUserMessageIDs.size === ids.size &&

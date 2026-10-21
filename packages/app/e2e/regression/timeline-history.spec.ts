@@ -155,33 +155,6 @@ test.describe("timeline history", () => {
     await expect(page.locator("#message-msg_00001_turn_a_user")).toBeInViewport()
     await expect.poll(activeIndexes).toEqual([0, 1])
 
-    // The 48px header and floating composer delimit which prompts are actually visible.
-    await page.setViewportSize({ width: 820, height: 500 })
-    await turns.nth(0).click()
-    const firstPrompt = page.locator('#message-msg_00000_turn_a_user [data-slot="user-message-text"]')
-    const secondPrompt = page.locator('#message-msg_00001_turn_a_user [data-slot="user-message-text"]')
-    const visibleArea = page.locator('[data-slot="session-timeline-visible"]')
-    await expect
-      .poll(async () => {
-        const prompt = await firstPrompt.boundingBox()
-        const area = await visibleArea.boundingBox()
-
-        return !!prompt && !!area && prompt.y >= area.y + 48 && prompt.y + prompt.height <= area.y + area.height
-      })
-      .toBe(true)
-    await expect
-      .poll(async () => {
-        const prompt = await secondPrompt.boundingBox()
-        const area = await visibleArea.boundingBox()
-
-        return !!prompt && !!area && prompt.y >= area.y + area.height
-      })
-      .toBe(true)
-    await expect.poll(activeIndexes).toEqual([0])
-    await page.setViewportSize({ width: 1400, height: 900 })
-    await turns.nth(0).click()
-    await expect.poll(activeIndexes).toEqual([0, 1])
-
     // A reply-only turn is not highlighted while a different prompt remains visible.
     const replyID = renderedPartID("prt_00000_turn_text")
     await timelineScroller(page).evaluate((scroller, id) => {
@@ -266,6 +239,145 @@ test.describe("timeline history", () => {
     await turns.nth(39).click()
     await expect(page.locator(`#message-${turnID(39)}`)).toBeInViewport()
     await expect(page.locator(`#message-${turnID(5)}`)).not.toBeInViewport()
+  })
+
+  test("keeps navigator highlights inside the reading viewport and previews readable without fades", async ({
+    page,
+  }) => {
+    const prompt =
+      "Let's create a follow up here, and add a setting to the experimental tab that enables or disables it. It should be on by default. Do it in a separate branch based on the latest origin/beta."
+    const response =
+      "The setting is ready on a separate branch. It defaults to enabled and remembers your preference across reloads. Disabling it removes the navigator and stops its background requests. The existing navigation shortcuts remain available."
+    await setupTimeline(page, {
+      messages: Array.from({ length: 6 }, (_, index) => [
+        userMessage([userText(index === 2 ? prompt : `Prompt ${index}`)], { id: `msg_polish_${index}_user` }),
+        assistantMessage(
+          [
+            textPart(
+              `prt_polish_${index}`,
+              index === 2
+                ? response
+                : [0, 5].includes(index)
+                  ? Array.from({ length: 30 }, () => `Reply ${index}. More context for scrolling.`).join("\n\n")
+                  : `Reply ${index}.`,
+            ),
+          ],
+          {
+            id: `msg_polish_${index}_reply`,
+            parentID: `msg_polish_${index}_user`,
+          },
+        ),
+      ]).flat(),
+      settings: { showTurnNavigator: true },
+      reducedMotion: true,
+      viewport: { width: 820, height: 650 },
+    })
+    const navigator = page.locator('[data-component="session-turn-navigator"]')
+    const turns = navigator.locator("[data-turn]")
+    const preview = navigator.locator('[data-slot="session-turn-navigator-preview"]')
+    const scroller = timelineScroller(page)
+    await expect(turns).toHaveCount(6)
+
+    // Leave only the prompt's metadata below the sticky header, then move it behind the composer.
+    for (const edge of ["header", "composer"] as const) {
+      await turns.nth(2).click()
+      await expect
+        .poll(() =>
+          scroller.evaluate((root) => {
+            const prompt = root.querySelector<HTMLElement>('#message-msg_polish_2_user [data-slot="user-message-text"]')
+
+            if (!prompt) return false
+            const header = parseFloat(getComputedStyle(root).getPropertyValue("--sticky-accordion-top")) || 0
+            const offset = prompt.getBoundingClientRect().top - root.getBoundingClientRect().top - header
+
+            return offset >= 15 && offset <= 18
+          }),
+        )
+        .toBe(true)
+      await scroller.hover()
+      const delta = await scroller.evaluate((root, edge) => {
+        const prompt = root.querySelector<HTMLElement>('#message-msg_polish_2_user [data-slot="user-message-text"]')
+
+        if (!prompt) throw new Error("Expected the prompt bubble")
+        const view = root.getBoundingClientRect()
+        const box = prompt.getBoundingClientRect()
+        const header = parseFloat(getComputedStyle(root).getPropertyValue("--sticky-accordion-top")) || 0
+        const inset = parseFloat(getComputedStyle(root).getPropertyValue("--session-timeline-inset")) || 0
+        return edge === "header" ? box.bottom - view.top - header + 8 : box.top - view.bottom + inset - 8
+      }, edge)
+      await page.mouse.wheel(0, delta)
+      await expect
+        .poll(() =>
+          scroller.evaluate((root, edge) => {
+            const prompt = root.querySelector<HTMLElement>('#message-msg_polish_2_user [data-slot="user-message-text"]')
+
+            if (!prompt) return true
+            const box = prompt.getBoundingClientRect()
+            const view = root.getBoundingClientRect()
+            const header = parseFloat(getComputedStyle(root).getPropertyValue("--sticky-accordion-top")) || 0
+            const inset = parseFloat(getComputedStyle(root).getPropertyValue("--session-timeline-inset")) || 0
+
+            return edge === "header" ? box.bottom <= view.top + header : box.top >= view.bottom - inset
+          }, edge),
+        )
+        .toBe(true)
+      await expect
+        .poll(() =>
+          scroller.evaluate((root) => {
+            const view = root.getBoundingClientRect()
+            const header = parseFloat(getComputedStyle(root).getPropertyValue("--sticky-accordion-top")) || 0
+            const inset = parseFloat(getComputedStyle(root).getPropertyValue("--session-timeline-inset")) || 0
+            const visible = [...root.querySelectorAll<HTMLElement>('[data-timeline-row="UserMessage"]')]
+              .filter((row) =>
+                [...row.querySelectorAll<HTMLElement>('[data-slot="user-message-text"]')].some((bubble) => {
+                  const box = bubble.getBoundingClientRect()
+                  return box.height > 0 && box.bottom > view.top + header + 0.5 && box.top < view.bottom - inset - 0.5
+                }),
+              )
+              .map((row) => row.dataset.messageId)
+            const highlighted = [
+              ...document.querySelectorAll<HTMLElement>(
+                '[data-component="session-turn-navigator"] [data-state="active"]',
+              ),
+            ].map((tick) => tick.dataset.turn)
+
+            return {
+              extra: highlighted.filter((id) => !visible.includes(id)),
+              missing: visible.filter((id) => !highlighted.includes(id)),
+            }
+          }),
+        )
+        .toEqual({ extra: [], missing: [] })
+      await expect
+        .poll(() =>
+          navigator
+            .locator('[data-state="active"]')
+            .evaluateAll((ticks) => ticks.map((tick) => tick.getAttribute("data-turn"))),
+        )
+        .not.toContain("msg_polish_2_user")
+    }
+
+    await turns.nth(2).hover()
+    await expect(preview).toContainText(prompt)
+    await expect(preview).toContainText(response)
+    await expect(preview).toHaveCSS("opacity", "1")
+    const texts = preview.locator("p")
+    await expect(texts.nth(0)).toHaveCSS("mask-image", "none")
+    await expect(texts.nth(1)).toHaveCSS("mask-image", "none")
+    await expect
+      .poll(() =>
+        texts.evaluateAll((elements) =>
+          elements.every((element) => {
+            const end = document.createRange()
+            end.selectNodeContents(element)
+
+            return [...end.getClientRects()].every(
+              (rect) => rect.bottom <= element.getBoundingClientRect().bottom + 0.5,
+            )
+          }),
+        ),
+      )
+      .toBe(true)
   })
 
   test("mounts every part once and in order while paging to the start", async ({ page }) => {

@@ -7,8 +7,8 @@ import { useServerSDK } from "@/runtime/server/client"
 
 const turnPageLimit = 200
 
-// Previews fade out after a few lines; keep only enough text to fill them.
-const previewLength = 400
+// Bound preview work without cutting short the text that fits in the card.
+const previewLength = 800
 
 // Keep index loading clear of session entry, tab switch rendering and the timeline's own history requests.
 const railDelay = 1000
@@ -29,11 +29,11 @@ const waveRadius = 48
 
 const tickWidths = { default: 7, active: 12, peak: 22 }
 
-// The prompt's first line sits level with its tick: card padding, bubble padding, then half a 16px line.
-const previewAnchor = 20
+// The prompt's first line sits level with its tick: 12px card padding, then half a 20px line.
+const previewAnchor = 22
 
 // The preview at its tallest, with both texts clamped. Clamping to it keeps the card still while a reply loads.
-const previewMaxHeight = 142
+const previewMaxHeight = 212
 
 type TurnNavigatorProps = {
   sessionID: string
@@ -361,7 +361,7 @@ function TurnRail(props: TurnNavigatorProps & { index?: Map<string, string>; roo
                     ticks.set(id, { element, scale })
                     onCleanup(() => ticks.delete(id))
                   }}
-                  class="block h-0.5 shrink-0 origin-left bg-(--tick-color) rtl:origin-right"
+                  class="pointer-events-none block h-0.5 shrink-0 origin-left bg-(--tick-color) rtl:origin-right"
                   style={{
                     width: `${tickWidths.peak}px`,
                     opacity: hovered(id) ? 1 : "var(--tick-opacity)",
@@ -377,25 +377,23 @@ function TurnRail(props: TurnNavigatorProps & { index?: Map<string, string>; roo
       <div
         ref={card}
         data-slot="session-turn-navigator-preview"
-        class="pointer-events-none invisible absolute start-12 top-0 w-[320px] max-w-[calc(100vw-5rem)] rounded-lg bg-v2-background-bg-base p-2 opacity-0"
+        class="pointer-events-none invisible absolute start-12 top-0 w-[384px] max-w-[calc(100cqw-4rem)] rounded-lg bg-v2-background-bg-base p-3 opacity-0"
         style={{ "box-shadow": "var(--v2-elevation-raised)" }}
       >
         <Show when={preview()}>
           {(item) => (
             <>
-              <div class="rounded-md bg-v2-background-bg-layer-02 px-2 py-1">
-                <p
-                  dir="auto"
-                  class="max-h-12 overflow-hidden text-[13px] font-medium leading-text-compact text-v2-text-text-base [mask-image:linear-gradient(to_bottom,#000_32px,transparent_48px)]"
-                >
-                  {item().prompt}
-                </p>
-              </div>
+              <p
+                dir="auto"
+                class="line-clamp-4 break-words text-[13px] font-medium leading-text-base text-v2-text-text-base"
+              >
+                {item().prompt}
+              </p>
               <Show when={item().response}>
                 {(text) => (
                   <p
                     dir="auto"
-                    class="mt-1.5 max-h-16 overflow-hidden px-2 text-[13px] leading-text-compact text-v2-text-text-muted [mask-image:linear-gradient(to_bottom,#000_48px,transparent_64px)]"
+                    class="mt-2 line-clamp-5 break-words text-[13px] leading-text-base text-v2-text-text-muted"
                   >
                     {text()}
                   </p>
