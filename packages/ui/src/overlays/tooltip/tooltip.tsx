@@ -18,7 +18,7 @@ export interface TooltipProps extends ComponentProps<typeof Root> {
 }
 
 export function Tooltip(props: TooltipProps) {
-  let ref: HTMLDivElement | undefined
+  let ref: HTMLElement | undefined
 
   const [state, setState] = createStore({
     open: false,
