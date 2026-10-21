@@ -28,11 +28,11 @@ export function fromRow(row: typeof SessionTable.$inferSelect): SessionSchema.In
         : undefined,
     agent: row.agent ? Agent.ID.make(row.agent) : undefined,
     model: row.model
-      ? {
+      ? Model.Ref.make({
           id: Model.ID.make(row.model.id),
           providerID: Provider.ID.make(row.model.providerID),
-          variant: Model.VariantID.make(row.model.variant ?? "default"),
-        }
+          ...(row.model.variant ? { variant: Model.VariantID.make(row.model.variant) } : {}),
+        })
       : undefined,
     cost: Money.USD.make(row.cost),
     tokens: {

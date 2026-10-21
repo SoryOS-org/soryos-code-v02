@@ -1190,7 +1190,7 @@ describe("Session.create", () => {
       expect(
         yield* db.select().from(EventTable).where(eq(EventTable.aggregate_id, created.id)).all().pipe(Effect.orDie),
       ).toHaveLength(2)
-      expect(yield* session.get(created.id)).toMatchObject({ model })
+      expect((yield* session.get(created.id)).model).toEqual(model)
     }),
   )
 
@@ -1199,6 +1199,8 @@ describe("Session.create", () => {
       const session = yield* Session.Service
       const model = Model.Ref.make({ id: Model.ID.make("sonnet"), providerID: Provider.ID.anthropic })
       const created = yield* session.create({ location, model })
+      expect(created.model?.variant).toBeUndefined()
+      expect((yield* session.get(created.id)).model).toEqual(model)
 
       yield* session.switchModel({
         sessionID: created.id,
