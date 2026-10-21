@@ -20,7 +20,8 @@ async function trace(page: Page, toggle: Locator, before: string, after: string)
           const edge = (a ?? b)!.right
 
           if (out.length && edge !== out.at(-1)!.edge) changed = now
-          out.push({ edge, gap: a && b && b.left - a.right })
+          // A settled-closed panel leaves the row, so the gap only holds while it has width.
+          out.push({ edge, gap: a && b && b.width > 0 ? b.left - a.right : undefined })
 
           if (changed === undefined ? now - start < 10_000 : now - changed < 300) return requestAnimationFrame(tick)
           resolve(out)
