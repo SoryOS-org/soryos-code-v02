@@ -65,6 +65,7 @@ export function Icon(props: IconProps) {
         iconName() === "arrow-right" ||
         iconName() === "outline-arrow-left" ||
         iconName() === "outline-arrow-right" ||
+        iconName() === "outline-chevron-right" ||
         iconName() === "chevron-left" ||
         iconName() === "chevron-right"
           ? ""

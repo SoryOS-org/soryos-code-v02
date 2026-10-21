@@ -1,5 +1,6 @@
 import "@pierre/trees/web-components"
 import { FileTree, type FileTreeDirectoryHandle, type FileTreeItemHandle } from "@pierre/trees"
+import { getIcon } from "@opencode/ui/icons/catalog"
 import { createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import type { ChangeKind } from "../review/contract"
 import { createKeyed, useExtension, type FileNode, type MountedSession, type SessionScreen } from "../sdk"
@@ -44,8 +45,14 @@ const TREE_UNSAFE_CSS = `
     border-inline-start: 1px solid var(--trees-indent-guide-bg);
     margin-inline-end: var(--trees-item-row-gap);
   }
-  :host(:dir(rtl)) [data-type="item"][aria-expanded="false"] [data-item-section="icon"] > svg:first-child {
+  [data-type="item"][aria-expanded="false"] [data-item-section="icon"] > svg:first-child {
+    transform: translateY(var(--trees-icon-nudge));
+  }
+  [data-type="item"][aria-expanded="true"] [data-item-section="icon"] > svg:first-child {
     transform: translateY(var(--trees-icon-nudge)) rotate(90deg);
+  }
+  :host(:dir(rtl)) [data-type="item"][aria-expanded="false"] [data-item-section="icon"] > svg:first-child {
+    transform: translateY(var(--trees-icon-nudge)) rotate(180deg);
   }
   button[data-type="item"] { box-shadow: none !important; cursor: inherit; font-weight: 500; }
   button[data-type="item"]:hover, button[data-type="item"][data-item-context-hover="true"] {
@@ -246,7 +253,13 @@ export default function PierreFileTree(props: {
             )
           }
         : "default",
-      icons: "complete",
+      icons: {
+        set: "complete",
+        spriteSheet: `<svg data-icon-sprite aria-hidden="true" width="0" height="0" xmlns="http://www.w3.org/2000/svg"><symbol id="outline-chevron-right" viewBox="${getIcon("outline-chevron-right").viewBox}" fill="none">${getIcon("outline-chevron-right").body}</symbol></svg>`,
+        remap: {
+          "file-tree-icon-chevron": { name: "outline-chevron-right", width: 16, height: 16, viewBox: "0 0 16 16" },
+        },
+      },
       itemHeight: FILE_TREE_ROW_HEIGHT,
       middleTruncate: false,
       stickyFolders: false,

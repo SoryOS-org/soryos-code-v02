@@ -138,6 +138,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/>`,
   },
+  "outline-chevron-right": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M6.5 11L9.5 8L6.5 5" stroke="currentColor"/>`,
+  },
   "outline-dots": {
     viewBox: "0 0 16 16",
     body: `<path d="M2.5 7.5H3.5V8.5H2.5V7.5Z" stroke="currentColor"/><path d="M7.5 7.5H8.5V8.5H7.5V7.5Z" stroke="currentColor"/><path d="M12.5 7.5H13.5V8.5H12.5V7.5Z" stroke="currentColor"/>`,
