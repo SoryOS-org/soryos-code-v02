@@ -5,7 +5,7 @@ import { DESKTOP_MENU } from "./desktop-menu"
 const root = path.resolve(import.meta.dir, "../../../..")
 
 const sources = (dir: string) =>
-  Array.from(new Bun.Glob("**/*.{ts,tsx}").scanSync(path.join(root, dir))).filter(
+  Array.from(new Bun.Glob("**/*.{ts,tsx}").scanSync(path.join(root, dir)), (file) => file.replaceAll("\\", "/")).filter(
     (file) => !file.includes(".test.") && !file.startsWith("runtime/i18n/"),
   )
 
