@@ -68,7 +68,21 @@ const POP = 26
 const SLIP = 60
 const HOLE_MAGNET = 24
 
-type Phase = "hidden" | "drag" | "snap" | "show" | "idle" | "hop" | "carry" | "return" | "pack"
+type Phase = "hidden" | "drag" | "snap" | "show" | "idle" | "hop" | "carry" | "return" | "pack" | "game"
+
+/** The lodger curled up as the brick breaker ball. Positions are the ball's centre, relative to the new session panel. */
+export type LodgerBall = {
+  radius: () => number
+  at: () => { x: number; y: number }
+  place: (
+    x: number,
+    y: number,
+    pose: { look: number; lookAngle: number; stretch: number; angle: number; squint: number; curl: number },
+  ) => void
+  blink: () => void
+  /** Uncurls and hops back to its perch beside the pin board. */
+  done: () => void
+}
 
 type LetterPose = {
   x: number
@@ -105,6 +119,7 @@ export function NewSessionWordmark(props: {
   onOpen?: () => void
   onClose?: () => void
   onFlat?: () => void
+  onPlay?: (ball: LodgerBall) => void
 }) {
   // Read once: the lodger stays mounted after handing over to the pin board, and can be dragged back into the hole.
   const lodger = !props.pins
@@ -131,6 +146,7 @@ export function NewSessionWordmark(props: {
             onOpen={() => props.onOpen?.()}
             onClose={() => props.onClose?.()}
             onFlat={() => props.onFlat?.()}
+            onPlay={props.onPlay}
           />
         </Show>
       </div>
@@ -149,6 +165,7 @@ function WordmarkLodger(props: {
   onOpen: () => void
   onClose: () => void
   onFlat: () => void
+  onPlay?: (ball: LodgerBall) => void
 }) {
   let stage!: HTMLDivElement
   let svg!: SVGSVGElement
@@ -171,6 +188,7 @@ function WordmarkLodger(props: {
         props.onOpen,
         props.onClose,
         props.onFlat,
+        props.onPlay,
       ),
     ),
   )
@@ -249,6 +267,7 @@ function mountLodger(
   onOpen: () => void,
   onClose: () => void,
   onFlat: () => void,
+  onPlay?: (ball: LodgerBall) => void,
 ) {
   const still = prefersReducedMotion()
   const poses: LetterPose[] = LETTERS.map(() => ({ x: 0, y: 0, sx: 1, sy: 1, opacity: 1 }))
@@ -279,13 +298,20 @@ function mountLodger(
     pinY: PIN_SLOT.y,
     pinRot: 0,
     pinScale: 1,
+    ball: 0,
+    stretch: 0,
+    angle: 0,
+    dur: 0.34,
+    arc: 10,
   }
   const pointer = { x: HOLE.x, y: HOLE.y, inside: false, downX: HOLE.x, downY: HOLE.y }
   const impacts: { at: number; amp: number }[] = []
   const timers = { raf: 0, blink: 0, last: 0 }
   const panel = parts.box.closest<HTMLElement>('[data-component="new-session"]') ?? document.documentElement
   // The lodger's screen rect, read on resize and pointer entry so pointer moves never force a layout.
-  const rect = { left: 0, top: 0, scale: 1 }
+  const rect = { left: 0, top: 0, scale: 1, px: 0, py: 0 }
+  // The composer, in lodger units while carrying; dropping the lodger on it starts the brick breaker.
+  const drop = { el: undefined as HTMLElement | undefined, l: 0, t: 0, r: 0, b: 0, over: false }
   // Last written DOM values, so frames and pointer moves only touch what changed.
   const written = new Map<string, string>()
   const put = (key: string, write: (value: string) => void, value: string) => {
@@ -298,6 +324,9 @@ function mountLodger(
     rect.left = r.left
     rect.top = r.top
     rect.scale = r.width / W || 1
+    const p = panel.getBoundingClientRect()
+    rect.px = r.left - p.left
+    rect.py = r.top - p.top
   }
 
   // Snaps the flat wordmark stage to the exact integer-pitch footprint and rounded origin used by `NewSessionPinBoard`.
@@ -352,7 +381,7 @@ function mountLodger(
     if (c.phase === "return") returnHome(c.now - c.t0)
     if (c.phase === "pack") pack(c.now - c.t0)
     render()
-    if (c.phase !== "hidden" && c.phase !== "idle") timers.raf = requestAnimationFrame(frame)
+    if (c.phase !== "hidden" && c.phase !== "idle" && c.phase !== "game") timers.raf = requestAnimationFrame(frame)
   }
 
   const dragOut = (dt: number) => {
@@ -430,6 +459,8 @@ function mountLodger(
       neck: 0,
       notch: 0,
       pinOpacity: 0,
+      ball: 0,
+      stretch: 0,
       eyes: c.near * 0.55,
     })
     look()
@@ -542,6 +573,8 @@ function mountLodger(
       neck: 0,
       notch: 0,
       pinOpacity: 0,
+      ball: 0,
+      stretch: 0,
     })
     look()
     render()
@@ -577,17 +610,69 @@ function mountLodger(
     c.pinY = PIN_SLOT.y
     c.pinRot = 0
     c.pinScale = 1 + magnet * 0.25
+    // Over the composer it curls up and peers down at it, and the composer sinks a little under it.
+    drop.over =
+      !!onPlay && !!drop.el && pointer.x > drop.l && pointer.x < drop.r && pointer.y > drop.t && pointer.y < drop.b
+    c.ball += ((drop.over ? 0.85 : 0) - c.ball) * (1 - Math.exp(-dt * 14))
+    if (!drop.over) return
+    c.lookX = 0
+    c.lookY = 0.6
+    c.squint = 0.8
+    c.rot *= 0.4
+  }
+
+  const play = () => {
+    drop.over = false
+    render()
+    if (!onPlay) return
+    Object.assign(c, { phase: "game", rot: 0, crouch: 0, wide: 1, squint: 1 })
+    placeGrip("none")
+    measure()
+    onPlay(ball)
+  }
+
+  const ball: LodgerBall = {
+    radius: () => 5 * rect.scale,
+    at: () => ({ x: rect.px + c.x * rect.scale, y: rect.py + (c.y - 5) * rect.scale }),
+    place: (x, y, pose) => {
+      c.now = performance.now() / 1000
+      c.x = (x - rect.px) / rect.scale
+      c.y = (y - rect.py) / rect.scale + 5
+      c.lookX = Math.cos(pose.lookAngle) * pose.look
+      c.lookY = Math.sin(pose.lookAngle) * pose.look * 0.6
+      c.stretch = pose.stretch
+      c.angle = pose.angle
+      c.squint = pose.squint
+      c.ball = pose.curl
+      render()
+    },
+    blink: () => blinkOnce(),
+    done: () => {
+      measure()
+      Object.assign(c, {
+        phase: "return",
+        fromX: c.x,
+        fromY: c.y,
+        t0: performance.now() / 1000,
+        stretch: 0,
+        squint: 1,
+        dur: 0.7,
+        arc: 36,
+      })
+      wake()
+    },
   }
 
   const returnHome = (t: number) => {
-    const u = seg(t, 0, 0.34)
+    const u = seg(t, 0, c.dur)
     c.x = lerp(c.fromX, HOME, easeOut(u))
-    c.y = lerp(c.fromY, GROUND, u) - Math.sin(Math.PI * u) * 10
+    c.y = lerp(c.fromY, GROUND, u) - Math.sin(Math.PI * u) * c.arc
     c.rot = lerp(c.rot, 0, u)
     c.crouch = 0
     c.wide = 1
     c.pinOpacity = 0
-    if (t < 0.34) return
+    c.ball = Math.min(c.ball, 1 - easeInOut(u))
+    if (t < c.dur) return
     tap(0.25)
     settleIdle()
   }
@@ -773,8 +858,34 @@ function mountLodger(
     const opacity = (el: SVGElement) => (value: string) => {
       el.style.opacity = value
     }
-    put("critter", attr(parts.critter, "transform"), `translate(${c.x} ${c.y}) rotate(${c.rot} 0 -5) scale(${sx} ${sy})`)
+    // Stretching along an angle and rotating back keeps the eyes upright while the ball squashes on impact.
+    const stretch = c.stretch
+      ? ` rotate(${c.angle} 0 -5) scale(${1 + c.stretch} ${1 - c.stretch * 0.8}) rotate(${-c.angle} 0 -5)`
+      : ""
+    put(
+      "critter",
+      attr(parts.critter, "transform"),
+      `translate(${c.x} ${c.y})${stretch} rotate(${c.rot} 0 -5) scale(${sx} ${sy})`,
+    )
     put("body", opacity(parts.body), `${c.body}`)
+    put(
+      "curl",
+      (value) => {
+        const width = 12 - 2 * Number(value)
+        parts.body.setAttribute("x", `${-width / 2}`)
+        parts.body.setAttribute("width", `${width}`)
+        parts.body.setAttribute("rx", `${1.5 + 3.5 * Number(value)}`)
+      },
+      `${Math.round(c.ball * 100) / 100}`,
+    )
+    if (drop.el)
+      put("drop", (value) => drop.el?.toggleAttribute("data-lodger-over", value === "1"), drop.over ? "1" : "0")
+    // Carried, returning, or in play, the lodger crosses the composer, so it is lifted above it.
+    put(
+      "lifted",
+      (value) => parts.box.parentElement?.toggleAttribute("data-lifted", value === "1"),
+      c.phase === "carry" || c.phase === "return" || c.phase === "game" ? "1" : "0",
+    )
     put("eyes", opacity(parts.eyes), `${c.eyes}`)
     put(
       "look",
@@ -847,6 +958,17 @@ function mountLodger(
     event.stopPropagation()
     parts.grip.setPointerCapture(event.pointerId)
     measure()
+    if (c.phase === "idle") {
+      drop.el = panel.querySelector<HTMLElement>('[data-slot="new-session-composer"]') ?? undefined
+      const r = drop.el?.querySelector('[data-component="composer"]')?.getBoundingClientRect()
+      if (r) {
+        const p = panel.getBoundingClientRect()
+        drop.l = (r.left - p.left - rect.px) / rect.scale
+        drop.r = (r.right - p.left - rect.px) / rect.scale
+        drop.t = (r.top - p.top - rect.py) / rect.scale
+        drop.b = (r.bottom - p.top - rect.py) / rect.scale
+      }
+    }
     toUnits(event)
     Object.assign(pointer, { downX: pointer.x, downY: pointer.y })
     c.phase = c.phase === "hidden" ? "drag" : "carry"
@@ -868,6 +990,8 @@ function mountLodger(
       wake()
       return
     }
+    if (drop.over && !still) return play()
+    drop.over = false
     const dropX = HOME + (pointer.x - pointer.downX)
     const dropY = GROUND + (pointer.y - pointer.downY) - 5
     if (
@@ -877,7 +1001,7 @@ function mountLodger(
     )
       return startPack()
     if (still) return settleIdle()
-    Object.assign(c, { phase: "return", fromX: c.x, fromY: c.y, t0: performance.now() / 1000 })
+    Object.assign(c, { phase: "return", fromX: c.x, fromY: c.y, t0: performance.now() / 1000, dur: 0.34, arc: 10 })
     wake()
   }
 

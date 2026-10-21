@@ -31,8 +31,9 @@ import { Persistence } from "@/runtime/persistence/schema"
 import { useSettings } from "@/settings/model"
 import type { NewSessionWorkspaceController } from "./workspace/controller"
 import { NewSessionBranch } from "./workspace/selector"
-import { NewSessionPinBoard } from "./pin-board"
-import { NewSessionWordmark } from "./wordmark"
+import { NewSessionBrickBreaker } from "./brick-breaker"
+import { NewSessionPinBoard, type PinBoardHandle } from "./pin-board"
+import { NewSessionWordmark, type LodgerBall } from "./wordmark"
 
 const providerTipDismissalDuration = 30 * 24 * 60 * 60 * 1000
 
@@ -61,11 +62,16 @@ export function NewSessionView(props: {
   const [wordmark, setWordmark] = createStore({
     box: undefined as HTMLDivElement | undefined,
     mode: "flat" as "flat" | "open" | "closing",
+    game: false,
   })
+  // Imperative handles for the brick breaker; they are not reactive state.
+  const handles: { board?: PinBoardHandle; ball?: LodgerBall } = {}
+  let panel!: HTMLDivElement
 
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
       <div
+        ref={panel}
         data-component="new-session"
         class="relative isolate flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
       >
@@ -81,6 +87,10 @@ export function NewSessionView(props: {
               onOpen={() => setWordmark("mode", "open")}
               onClose={() => setWordmark("mode", "closing")}
               onFlat={() => setWordmark("mode", "flat")}
+              onPlay={(ball) => {
+                handles.ball = ball
+                setWordmark("game", true)
+              }}
             />
             <div class="mt-8 flex flex-col gap-3">
               <div data-slot="new-session-composer">
@@ -119,6 +129,21 @@ export function NewSessionView(props: {
               sound={settings.sounds.interfaceEnabled}
               entrance="chain"
               closing={wordmark.mode === "closing"}
+              ref={(board) => (handles.board = board)}
+            />
+          )}
+        </Show>
+        <Show when={wordmark.game && handles.board && handles.ball && { board: handles.board, ball: handles.ball }}>
+          {(game) => (
+            <NewSessionBrickBreaker
+              panel={panel}
+              board={game().board}
+              ball={game().ball}
+              sound={settings.sounds.interfaceEnabled}
+              onDone={() => {
+                setWordmark("game", false)
+                props.composer.restoreFocus()
+              }}
             />
           )}
         </Show>

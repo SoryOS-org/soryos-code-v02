@@ -149,6 +149,22 @@ export const PinSound = {
     pebble(a, a.context.currentTime, { freq: 1100, q: 2.2, gain: 0.14, decay: 0.05, pan: panOf(x, width), thud: 95 })
   },
 
+  /** The brick breaker ball smashing pins: a clack whose ring climbs the scale with each hit before the paddle. */
+  brick(x: number, width: number, combo: number) {
+    const a = audio()
+    if (!a) return
+    const at = a.context.currentTime
+    pebble(a, at, { freq: 1300, q: 2, gain: 0.1, decay: 0.04, pan: panOf(x, width), thud: 110 })
+    pebble(a, at + 0.004, { freq: note(Math.min(14, combo)), q: 16, gain: 0.06, decay: 0.09, pan: panOf(x, width) })
+  },
+
+  /** The brick breaker ball landing on the paddle: a soft, low knock. */
+  paddle(x: number, width: number) {
+    const a = audio()
+    if (!a) return
+    pebble(a, a.context.currentTime, { freq: 520, q: 1.4, gain: 0.12, decay: 0.05, pan: panOf(x, width), thud: 72 })
+  },
+
   /** A loose pin bouncing off the composer or the floor. */
   bounce(x: number, width: number, speed: number) {
     const a = audio()
