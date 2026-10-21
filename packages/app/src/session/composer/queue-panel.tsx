@@ -10,9 +10,10 @@ import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Spinner } from "@opencode/ui/spinner"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { prefersReducedMotion } from "@opencode/ui/motion"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { SessionQueueView } from "./queue"
-import { Grow } from "./spring-height"
+import { fadeIn, Grow, queueStagger } from "./spring-height"
 import "./queue-panel.css"
 
 type QueueRow = ReturnType<SessionQueueView["rows"]>[number]
@@ -39,11 +40,37 @@ export function SessionQueuePanel(props: { queue: SessionQueueView; hidden?: boo
         lastLive = next
         if (next.length === 0) return
 
-        // An in-place edit or reorder replaces row IDs without changing the row count.
-        if (next.length === prevLive.length && prevLive.length > 0) return setShown(next)
+        // An in-place edit or reorder replaces row IDs without changing the row count. A refresh that keeps the same
+        // rows must not drop a row that is still closing.
+        const same = next.length === prevLive.length && next.every((row, index) => row.id === prevLive[index]?.id)
+        if (next.length === prevLive.length && prevLive.length > 0 && !same) return setShown(next)
         if (prevLive.length > 0 && !props.hidden)
           next.forEach((row) => !prevLive.some((item) => item.id === row.id) && appearing.add(row.id))
         setShown(keepLeaving(untrack(shown), next))
+      },
+      { defer: true },
+    ),
+  )
+
+  // When the panel opens with prompts already queued, such as after a dock closes, its rows can cascade in.
+  createEffect(
+    on(
+      open,
+      (now, was) => {
+        const step = queueStagger()
+        if (!now || was !== false || step <= 0 || prefersReducedMotion()) return
+        queueMicrotask(() =>
+          listRef
+            .querySelectorAll('[data-component="session-queue-row"]')
+            .forEach((row, index) =>
+              row.animate([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "none" }], {
+                duration: fadeIn().duration * 1000,
+                delay: index * step * 1000,
+                easing: "cubic-bezier(0.2, 0, 0, 1)",
+                fill: "backwards",
+              }),
+            ),
+        )
       },
       { defer: true },
     ),

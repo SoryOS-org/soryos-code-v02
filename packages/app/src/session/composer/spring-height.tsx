@@ -1,8 +1,28 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js"
 import { frameLoop, observeReducedMotion, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
+import { motionTuning } from "@opencode/ui/motion-tuning"
 
-const enter: DurationOptions = { duration: 0.4, bounce: 0 }
-const exit: DurationOptions = { duration: 0.3, bounce: 0 }
+const group = "Composer docks"
+const presets = {
+  snappy: { duration: 0.3, bounce: 0 },
+  smooth: { duration: 0.4, bounce: 0 },
+  calm: { duration: 0.55, bounce: 0 },
+}
+// Opening and closing share one height spring, so a dock leaves the way it came.
+const morph = motionTuning.spring("docks.morph", { label: "Height", group, shipped: "smooth", presets })
+export const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, shipped: "smooth", presets })
+const fadeOut = motionTuning.spring("docks.fade-out", { label: "Fade out", group, shipped: "smooth", presets })
+const blur = motionTuning.number("docks.blur", { label: "Blur", group, value: 4, min: 0, max: 16, step: 0.5, unit: "px" })
+export const queueStagger = motionTuning.number("docks.stagger", {
+  label: "Queue row stagger",
+  group,
+  value: 0,
+  min: 0,
+  max: 0.12,
+  step: 0.005,
+  unit: "s",
+  time: "duration",
+})
 const fade: DurationOptions = { duration: 0.15, bounce: 0 }
 const snap = (px: number, dpr = window.devicePixelRatio || 1) => Math.round(px * dpr) / dpr
 const surface =
@@ -52,7 +72,7 @@ export function ComposerMorph<T extends { key: string }>(props: {
   const paintFace = (item: Face<T>, shown: number) => {
     if (!item.el) return
     const p = Math.max(0, Math.min(1, item.presence.value))
-    styleFace(item.el, p, item.leaving() ? 2 : 6, item.height - shown)
+    styleFace(item.el, p, { dy: item.leaving() ? 2 : 6, out: item.leaving(), hidden: item.height - shown })
   }
 
   const paint = (dt: number) => {
@@ -97,13 +117,13 @@ export function ComposerMorph<T extends { key: string }>(props: {
           item.leave(true)
           if (item.el?.contains(document.activeElement) && document.activeElement instanceof HTMLElement)
             document.activeElement.blur()
-          tune(item.presence, reduced ? fade : exit).set(0)
+          tune(item.presence, reduced ? fade : fadeOut()).set(0)
         })
         entering.set(next)
         entering.leave(false)
-        tune(entering.presence, reduced ? fade : enter).set(1)
-        height ??= Spring.fromDuration(from, enter)
-        tune(height, enter)
+        tune(entering.presence, reduced ? fade : fadeIn()).set(1)
+        height ??= Spring.fromDuration(from, morph())
+        tune(height, morph())
         const shown = snap(height.value)
         const nextFaces = back ? active : [...active, entering]
         root.toggleAttribute("data-moving", true)
@@ -155,11 +175,15 @@ function tune(spring: Spring, options: DurationOptions) {
   return spring
 }
 
-function styleFace(el: HTMLElement, p: number, dy: number, hidden = 0, content = el) {
-  el.style.opacity = `${(p * p).toFixed(4)}`
+// A face coming in eases its opacity in late; a face going out fades with its presence, so it stays visible while the
+// height closes over it instead of vanishing in the first frames.
+function styleFace(el: HTMLElement, p: number, input: { dy: number; out: boolean; hidden?: number; content?: HTMLElement }) {
+  const content = input.content ?? el
+  const hidden = input.hidden ?? 0
+  el.style.opacity = `${(input.out ? p : p * p).toFixed(4)}`
   if (prefersReducedMotion()) return
-  content.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`
-  el.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
+  content.style.transform = `translateY(${((1 - p) * input.dy).toFixed(2)}px)`
+  el.style.filter = p < 0.999 && blur() > 0 ? `blur(${((1 - p) * blur()).toFixed(2)}px)` : ""
   content.style.maskImage =
     hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
 }
@@ -213,7 +237,7 @@ export function Grow<T>(props: {
   )
 }
 
-const growing = new WeakMap<HTMLElement, { spring: Spring; open: boolean; done?: () => void }>()
+const growing = new WeakMap<HTMLElement, { spring: Spring; presence: Spring; open: boolean; done?: () => void }>()
 
 function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean, done?: () => void) {
   const reduced = prefersReducedMotion()
@@ -221,7 +245,8 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
   if (current) {
     current.open = open
     current.done = done
-    tune(current.spring, reduced ? fade : open ? enter : exit)
+    tune(current.spring, reduced ? fade : morph())
+    tune(current.presence, reduced ? fade : open ? fadeIn() : fadeOut())
     return
   }
 
@@ -229,7 +254,8 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
   const prevMb =
     (!mb && el.previousElementSibling ? parseFloat(getComputedStyle(el.previousElementSibling).marginBottom) : 0) || 0
   const state = {
-    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, reduced ? fade : open ? enter : exit),
+    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, reduced ? fade : morph()),
+    presence: Spring.fromDuration(open ? 0 : 1, reduced ? fade : open ? fadeIn() : fadeOut()),
     open,
     done,
   }
@@ -261,8 +287,12 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
       const size = state.open ? full : 0
       state.spring.set(size).step(dt)
       if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
+      const shown = state.open ? 1 : 0
+      state.presence.set(shown).step(dt)
+      if (Math.abs(state.presence.value - shown) < 0.01 && Math.abs(state.presence.velocity) < 0.05)
+        state.presence.snap(shown)
 
-      if (state.spring.resting) {
+      if (state.spring.resting && (!withFade || state.presence.resting)) {
         growing.delete(el)
         finish(el, state.open, state.done)
         return false
@@ -270,6 +300,7 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
 
       const value = snap(Math.max(0, state.spring.value))
       const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
+      const presence = Math.max(0, Math.min(1, state.presence.value))
       if (!noMotion) {
         el.style.height = `${value}px`
         if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
@@ -277,7 +308,7 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
       }
       if (withFade || noMotion) {
         const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
-        styleFace(el, p, 4, card ? full - value : 0, child)
+        styleFace(el, presence, { dy: 4, out: !state.open, hidden: card ? full - value : 0, content: child })
       }
       return true
     },

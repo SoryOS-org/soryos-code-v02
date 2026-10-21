@@ -125,7 +125,7 @@ export function SessionPreview(props: SessionPreviewProps) {
   )
 }
 
-function createPromptController(input: {
+export function createPromptController(input: {
   initial: string
   placeholder: string
   status: () => SessionStatus
