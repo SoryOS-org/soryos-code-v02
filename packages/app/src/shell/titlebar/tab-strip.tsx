@@ -34,7 +34,7 @@ import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
 import { groupTabsByProject, reorderGroupedStrip, tabGroupVariant, type StripItem, type TabGroup } from "./tab-groups"
 import type { SessionInfo } from "@opencode/client/promise"
 
-export const TabGroupsViewSchema = Schema.Struct({
+export const TabGroupsViewSchema = Persistence.struct({
   collapsed: Persistence.record(Persistence.fallback(Schema.Boolean, () => false)),
 })
 
@@ -315,21 +315,14 @@ export function TitlebarTabStrip(props: {
 
   const grouped = () => settings.appearance.tabGroups() === "project"
 
-  const [storedGroups, setStoredGroups, , groupsReady] = persisted(
+  const [storedGroups, setStoredGroups] = persisted(
     Persist.window("tabs.groups"),
     TabGroupsViewSchema,
     { collapsed: {} },
   )
-  // Reads stay non-reactive until the stored collapse state hydrates, so a
-  // toggle cannot race the loaded value the way a direct store read would.
-  const [groupsView] = createResource(
-    () => groupsReady.promise ?? Promise.resolve(),
-    (promise) => promise.then(() => storedGroups),
-    { initialValue: storedGroups },
-  )
-  const isGroupCollapsed = (id: string) => groupsView().collapsed[id] ?? false
+  const isGroupCollapsed = (id: string) => storedGroups.collapsed[id] ?? false
   const toggleGroupCollapsed = (id: string) =>
-    setStoredGroups("collapsed", id, !(groupsView().collapsed[id] ?? false))
+    setStoredGroups("collapsed", id, !(storedGroups.collapsed[id] ?? false))
 
   const groupOf = (tab: Tab) => {
     const conn = global.servers.list().find((item) => ServerConnection.key(item) === tab.server)
@@ -729,7 +722,7 @@ function TabGroupHeader(props: {
   dragging?: boolean
   onToggle: () => void
 }) {
-  const header = (
+  return (
     <button
       type="button"
       data-component="titlebar-tab-group"
@@ -790,8 +783,6 @@ function TabGroupHeader(props: {
       </Show>
     </button>
   )
-
-  return header
 }
 
 function useTabShortcut(index: () => number, onSelect: () => void) {

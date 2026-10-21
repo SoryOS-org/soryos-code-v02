@@ -94,28 +94,27 @@ export function reorderGroupedStrip(input: {
     .slice(start, end + 1)
     .filter((item): item is Extract<StripItem, { kind: "tab" }> => item.kind === "tab")
 
-  if (segment.some((item) => item.key !== source.key && item.group !== source.group)) {
-    const previous = candidate[input.to - 1]?.kind === "tab" ? candidate[input.to - 1] : undefined
-    const next = candidate[input.to + 1]?.kind === "tab" ? candidate[input.to + 1] : undefined
+  const neighbor = (offset: -1 | 1) => {
+    const item = candidate[input.to + offset]
 
-    if (
-      !(previous && previous.kind === "tab" && previous.group === source.group) &&
-      !(next && next.kind === "tab" && next.group === source.group)
-    )
-      return
+    return item?.kind === "tab" ? item : undefined
+  }
+  const previous = neighbor(-1)
+  const next = neighbor(1)
+
+  if (segment.some((item) => item.key !== source.key && item.group !== source.group)) {
+    if (previous?.group !== source.group && next?.group !== source.group) return
   }
 
-  const previous = candidate[input.to - 1]?.kind === "tab" ? candidate[input.to - 1] : undefined
-  const next = candidate[input.to + 1]?.kind === "tab" ? candidate[input.to + 1] : undefined
   const keys = input.keys.filter((key) => key !== source.key)
 
-  if (next && next.kind === "tab") {
+  if (next) {
     keys.splice(keys.indexOf(next.key), 0, source.key)
 
     return keys
   }
 
-  if (previous && previous.kind === "tab") {
+  if (previous) {
     keys.splice(keys.indexOf(previous.key) + 1, 0, source.key)
 
     return keys

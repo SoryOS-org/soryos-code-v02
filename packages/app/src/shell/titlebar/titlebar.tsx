@@ -24,28 +24,6 @@ import { tabKey, useTabs } from "@/shell/tabs/tabs"
 import type { ComposerState } from "@/composer/persistence"
 import "./titlebar.css"
 import { TitlebarRightMount } from "@/shell/titlebar/right-slot"
-
-function VerticalTabGroupsToggle() {
-  const language = useLanguage()
-  const settings = useSettings()
-  const grouped = () => settings.appearance.tabGroups() === "project"
-  const label = () => language.t(grouped() ? "titlebar.tabGroups.disable" : "titlebar.tabGroups.enable")
-
-  return (
-    <Tooltip placement="right" value={label()}>
-      <IconButton
-        data-action="vertical-tab-groups"
-        variant="ghost-muted"
-        size="small"
-        class="size-7 shrink-0"
-        icon={<Icon name="folder" class="text-v2-icon-icon-muted" />}
-        aria-label={label()}
-        aria-pressed={grouped()}
-        onClick={() => settings.appearance.setTabGroups(grouped() ? "off" : "project")}
-      />
-    </Tooltip>
-  )
-}
 import { MobileDrawer, MobileDrawerContent, MobileDrawerLabel, MobileDrawerTrigger } from "@/shell/mobile-drawer"
 import { sessionTabTitle } from "./tab-title"
 import { SessionTabAvatar } from "@/shell/layout/session-tab-avatar"
@@ -850,6 +828,28 @@ function ChannelIndicator(props: { horizontal?: boolean; sidebar?: boolean }) {
           draggable={false}
         />
       </Dynamic>
+    </Tooltip>
+  )
+}
+
+function VerticalTabGroupsToggle() {
+  const language = useLanguage()
+  const settings = useSettings()
+  const grouped = () => settings.appearance.tabGroups() === "project"
+  const label = () => language.t(grouped() ? "titlebar.tabGroups.disable" : "titlebar.tabGroups.enable")
+
+  return (
+    <Tooltip placement="right" value={label()}>
+      <IconButton
+        data-action="vertical-tab-groups"
+        variant="ghost-muted"
+        size="small"
+        class="size-7 shrink-0"
+        icon={<Icon name="folder" class="text-v2-icon-icon-muted" />}
+        aria-label={label()}
+        aria-pressed={grouped()}
+        onClick={() => settings.appearance.setTabGroups(grouped() ? "off" : "project")}
+      />
     </Tooltip>
   )
 }

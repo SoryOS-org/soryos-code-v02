@@ -3,7 +3,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Button } from "@opencode/ui/button"
 import { DialogFooter, DialogHeader, DialogTitleGroup, Dialog } from "@opencode/ui/dialog"
 import { skipToken, useQuery, useQueryClient } from "@tanstack/solid-query"
-import { type Accessor, createEffect, createMemo, type JSX, createResource, startTransition, untrack } from "solid-js"
+import { type Accessor, createEffect, createMemo, type JSX, startTransition, untrack } from "solid-js"
 import { notifySessionTabsRemoved } from "@/shell/titlebar/session-events"
 import { useCommand } from "@/shell/commands/command"
 import {
@@ -53,17 +53,10 @@ export function createHomeSessionsController(home: HomeController) {
   const platform = usePlatform()
   const queryClient = useQueryClient()
 
-  const [storedView, setStoredView, , viewReady] = persisted(
+  const [storedView, setStoredView] = persisted(
     Persist.global("home.sessions"),
     HomeSessionsViewSchema,
     { grouping: "date", collapsed: {} },
-  )
-  // Reads stay non-reactive until the stored preference hydrates, so a toggle
-  // cannot race the loaded value the way a direct store read would.
-  const [view] = createResource(
-    () => viewReady.promise ?? Promise.resolve(),
-    (promise) => promise.then(() => storedView),
-    { initialValue: storedView },
   )
 
   const projectDirectories = createMemo(() => {
@@ -119,7 +112,7 @@ export function createHomeSessionsController(home: HomeController) {
 
   const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
   // Selecting a project already scopes the list to it, so project grouping only applies to the all-projects view.
-  const byProject = createMemo(() => view().grouping === "project" && !home.project.selected())
+  const byProject = createMemo(() => storedView.grouping === "project" && !home.project.selected())
   const groups = createMemo(() =>
     byProject() ? groupHomeSessionsByProject(records()) : groupSessions(records(), language),
   )
@@ -331,9 +324,9 @@ export function createHomeSessionsController(home: HomeController) {
     grouping: {
       byProject,
       available: () => !home.project.selected(),
-      toggle: () => setStoredView("grouping", view().grouping === "project" ? "date" : "project"),
-      collapsed: (id: string) => view().collapsed[id] ?? false,
-      toggleCollapsed: (id: string) => setStoredView("collapsed", id, !(view().collapsed[id] ?? false)),
+      toggle: () => setStoredView("grouping", storedView.grouping === "project" ? "date" : "project"),
+      collapsed: (id: string) => storedView.collapsed[id] ?? false,
+      toggleCollapsed: (id: string) => setStoredView("collapsed", id, !(storedView.collapsed[id] ?? false)),
     },
     platform: {
       desktop: platform.platform === "desktop",
