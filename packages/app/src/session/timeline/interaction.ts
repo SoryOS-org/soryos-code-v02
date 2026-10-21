@@ -6,6 +6,7 @@ import { createStore } from "solid-js/store"
 import { frameLoop } from "@opencode/ui/motion"
 import { useLayout } from "@/shell/state/layout"
 import type { SessionModel } from "../model"
+import { snap } from "../composer/spring-height"
 import { useSessionHashScroll } from "../use-session-hash-scroll"
 import { createTimelineModel } from "./model"
 
@@ -360,7 +361,7 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     () => state.refs.dock,
     (_rect, _element, entry) => {
       // The activity pill floats above the region out of flow, so only the docks, queue and composer count here.
-      const next = Math.ceil(entry.borderBoxSize[0]?.blockSize ?? 0)
+      const next = snap(entry.borderBoxSize[0]?.blockSize ?? 0)
 
       if (next === state.inset) return
       const delta = next - state.inset

@@ -7,6 +7,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { DockPrompt } from "@opencode/session-ui/dock-prompt"
 import { Icon } from "@opencode/ui/icon"
 import { TextInput } from "@opencode/ui/text-input"
+import { frameLoop } from "@opencode/ui/motion"
 import { useSpring } from "@opencode/ui/motion-spring"
 import { showToast } from "@/shell/notifications/toast"
 import type { FormAnswer, FormInfo, FormMultiselectField, FormStringField } from "@opencode/client/promise"
@@ -172,21 +173,16 @@ export const SessionQuestionDock: Component<{ request: FormInfo; onSubmit: () =>
     const top =
       head instanceof HTMLElement && head.classList.contains("sticky") ? head.getBoundingClientRect().bottom : 0
 
-    if (!top) {
-      root.style.removeProperty("--question-prompt-max-height")
-
-      return
-    }
+    if (!top) return
 
     const dock = root.closest('[data-component="session-composer-dock"]')
 
     if (!(dock instanceof HTMLElement)) return
 
     const dockBottom = dock.getBoundingClientRect().bottom
-    const below = Math.max(0, dockBottom - root.getBoundingClientRect().bottom)
+    const below = dock.querySelector("[data-moving]") ? 0 : Math.max(0, dockBottom - root.getBoundingClientRect().bottom)
     const gap = 8
-    const max = Math.max(240, Math.floor(dockBottom - top - gap - below))
-    root.style.setProperty("--question-prompt-max-height", `${max}px`)
+    return Math.max(240, Math.floor(dockBottom - top - gap - below))
   }
 
   const clamp = (i: number) => Math.max(0, Math.min(count() - 1, i))
@@ -217,14 +213,19 @@ export const SessionQuestionDock: Component<{ request: FormInfo; onSubmit: () =>
   }
 
   onMount(() => {
-    let raf: number | undefined
+    let stop: (() => void) | undefined
+    let max: number | undefined
 
     const update = () => {
-      if (raf !== undefined) cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        raf = undefined
-        measure()
-      })
+      stop ??= frameLoop.addMeasured(
+        () => (max = measure()),
+        () => {
+          stop = undefined
+          if (max) root?.style.setProperty("--question-prompt-max-height", `${max}px`)
+          else root?.style.removeProperty("--question-prompt-max-height")
+          return false
+        },
+      )
     }
 
     update()
@@ -235,9 +236,7 @@ export const SessionQuestionDock: Component<{ request: FormInfo; onSubmit: () =>
     const scroller = document.querySelector(".scroll-view__viewport")
     createResizeObserver([dock, scroller], update)
 
-    onCleanup(() => {
-      if (raf !== undefined) cancelAnimationFrame(raf)
-    })
+    onCleanup(() => stop?.())
 
     focus(pickFocus())
   })

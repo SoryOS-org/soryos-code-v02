@@ -1,13 +1,12 @@
 [data-component="dock-prompt"][data-kind="question"] {
   --v2-question-answer-bg-selected: light-dark(#f5f8ff, #7698fd26);
 
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-block-size: 0;
   max-block-size: var(--question-prompt-max-height, 100dvh);
   font-family: var(--v2-font-family-sans);
+
+  [data-color-scheme="dark"] & [data-slot="question-option"]:not([data-picked="true"]) {
+    background-color: var(--v2-background-bg-layer-02);
+  }
 
   [data-slot="question-body"] {
     display: flex;
@@ -16,9 +15,6 @@
     flex: 1;
     min-block-size: 0;
     padding: 8px;
-    background-color: var(--v2-background-bg-base);
-    border-radius: 10px;
-    box-shadow: var(--v2-elevation-raised);
   }
 
   [data-slot="question-header"] {
@@ -394,15 +390,8 @@
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding-block: 16px 8px;
+    padding-block: 7px 8px;
     padding-inline: 12px;
-    margin-block-start: -9px;
-    border: 0.5px solid var(--v2-border-border-base);
-    border-start-start-radius: 0;
-    border-start-end-radius: 0;
-    border-end-start-radius: 10px;
-    border-end-end-radius: 10px;
-    background-color: var(--v2-background-bg-layer-01);
 
     > [data-component="button-v2"][data-variant="ghost"] {
       color: var(--v2-text-text-muted);
