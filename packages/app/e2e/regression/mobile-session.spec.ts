@@ -328,7 +328,7 @@ test.describe("touch", () => {
     await projects.click()
     const picker = page.getByRole("dialog", { name: "Projects", exact: true })
     await expect(picker.getByRole("button", { name: "All projects", exact: true })).toBeVisible()
-    await picker.getByRole("button", { name: new RegExp(` ${fixture.project.name}$`) }).click()
+    await picker.getByRole("button", { name: fixture.project.name, exact: true }).click()
     await expect(picker).toBeHidden()
     await expect(projects).toContainText(fixture.project.name)
 

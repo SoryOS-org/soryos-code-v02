@@ -4,6 +4,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -188,6 +189,7 @@ export function SessionLocation(props: {
             fallback={projectName()}
             src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
             variant={getProjectAvatarVariant(props.project?.icon?.color)}
+            generated={getProjectAvatarGenerated(props.project)}
           />
           <bdi dir="auto" data-slot="session-location-project" class="min-w-0 truncate">
             {projectName()}
@@ -219,6 +221,7 @@ export function SessionLocation(props: {
                 fallback={projectName()}
                 src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
                 variant={getProjectAvatarVariant(props.project?.icon?.color)}
+                generated={getProjectAvatarGenerated(props.project)}
               />
               <bdi dir="auto" class="min-w-0 truncate font-[530]">
                 {projectName()}

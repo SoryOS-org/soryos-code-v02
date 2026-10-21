@@ -4,6 +4,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -361,6 +362,7 @@ function ProjectList(props: { model: StartModel; server: StartServer }) {
             fallback={displayName(item.project)}
             src={getProjectAvatarSource(item.project.id, item.project.icon)}
             variant={getProjectAvatarVariant(item.project.icon?.color)}
+            generated={getProjectAvatarGenerated(item.project)}
           />
           <Tooltip value={item.project.worktree} placement="left" class="flex min-w-0 flex-1" openDelay={800}>
             <span class="flex min-w-0 items-baseline gap-1.5">

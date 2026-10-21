@@ -7,6 +7,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { getFilename } from "@opencode/util/path"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -302,6 +303,7 @@ function NewSessionLocation(props: {
               fallback={displayName(props.project)}
               src={getProjectAvatarSource(props.project.id, props.project.icon)}
               variant={getProjectAvatarVariant(props.project.icon?.color)}
+              generated={getProjectAvatarGenerated(props.project)}
             />
             <span class="min-w-0 truncate">{displayName(props.project)}</span>
             <Show when={worktree()}>

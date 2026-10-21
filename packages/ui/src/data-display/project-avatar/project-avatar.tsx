@@ -1,5 +1,23 @@
-import { type ComponentProps, splitProps, Show } from "solid-js"
+import {
+  type ComponentProps,
+  createContext,
+  createEffect,
+  createMemo,
+  onCleanup,
+  onMount,
+  splitProps,
+  Show,
+  useContext,
+} from "solid-js"
+import { attachGeneratedAvatar } from "./animation"
+import {
+  generateProjectIcon,
+  GENERATED_PROJECT_ICON_STYLE,
+  type GeneratedProjectIcon,
+} from "./generated"
 import "./project-avatar.css"
+
+export { generateProjectIcon, GENERATED_PROJECT_ICON_STYLE, type GeneratedProjectIcon } from "./generated"
 
 const segmenter =
   typeof Intl !== "undefined" && "Segmenter" in Intl
@@ -69,6 +87,33 @@ export function getProjectAvatarVariant(key?: string): ProjectAvatarVariant {
   return "gray"
 }
 
+/**
+ * Keeps each project's generated avatar once it has been drawn, so it stays identical after restarts and after the
+ * generator's defaults change. Without a store, avatars are derived from their key every time.
+ */
+export type ProjectIconStore = {
+  get: (key: string) => GeneratedProjectIcon | undefined
+  remember: (key: string, icon: GeneratedProjectIcon) => void
+}
+
+const ProjectIconStoreContext = createContext<ProjectIconStore>()
+
+export const ProjectIconStoreProvider = ProjectIconStoreContext.Provider
+
+/**
+ * The key that seeds the generated default avatar: the project ID, or the directory for projects without one. There
+ * is none when the project shows a chosen or discovered image or a chosen color.
+ */
+export function getProjectAvatarGenerated(project?: {
+  id?: string
+  worktree?: string
+  icon?: { color?: string; url?: string; override?: string }
+}) {
+  if (!project || getProjectAvatarSource(project.id, project.icon) || project.icon?.color) return
+
+  return project.id && project.id !== "global" ? project.id : project.worktree || undefined
+}
+
 export const displayName = (project: { name?: string; worktree: string }) => {
   const trimmed = project.worktree.replace(/[/\\]+$/, "")
   const filename = trimmed.slice(Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\")) + 1)
@@ -81,10 +126,23 @@ export interface ProjectAvatarProps extends ComponentProps<"div"> {
   src?: string
   variant?: ProjectAvatarStyle
   unread?: boolean
+  /** Seeds the generated default avatar shown when there is no image; see getProjectAvatarGenerated. */
+  generated?: string
 }
 
 export function ProjectAvatar(props: ProjectAvatarProps) {
-  const [split, rest] = splitProps(props, ["fallback", "src", "variant", "unread", "class", "classList", "style"])
+  const [split, rest] = splitProps(props, [
+    "fallback",
+    "src",
+    "variant",
+    "unread",
+    "generated",
+    "class",
+    "classList",
+    "style",
+  ])
+
+  const generated = () => (split.src || split.variant === "outline" ? undefined : split.generated)
 
   return (
     <div
@@ -101,8 +159,16 @@ export function ProjectAvatar(props: ProjectAvatarProps) {
         data-slot="project-avatar-surface"
         data-variant={split.variant ?? "gray"}
         data-has-image={split.src ? "" : undefined}
+        data-generated={generated() ? "" : undefined}
       >
-        <Show when={split.src} fallback={first(split.fallback)}>
+        <Show
+          when={split.src}
+          fallback={
+            <Show when={generated()} fallback={first(split.fallback)}>
+              {(key) => <GeneratedAvatar seed={key()} />}
+            </Show>
+          }
+        >
           {(value) => <img src={value()} draggable={false} data-slot="project-avatar-image" />}
         </Show>
       </div>
@@ -111,4 +177,33 @@ export function ProjectAvatar(props: ProjectAvatarProps) {
       </Show>
     </div>
   )
+}
+
+function GeneratedAvatar(props: { seed: string }) {
+  const store = useContext(ProjectIconStoreContext)
+
+  const stored = () => {
+    const icon = store?.get(props.seed)
+
+    // An icon from another generator style is replaced, so every project shows the current style.
+    return icon?.style === GENERATED_PROJECT_ICON_STYLE ? icon : undefined
+  }
+
+  const icon = createMemo(() => stored() ?? generateProjectIcon(props.seed))
+  let canvas!: HTMLCanvasElement
+
+  onMount(() => {
+    const avatar = attachGeneratedAvatar(canvas, icon)
+
+    onCleanup(avatar.dispose)
+    createEffect(() => {
+      icon()
+      avatar.refresh()
+    })
+    createEffect(() => {
+      if (store && !stored()) store.remember(props.seed, icon())
+    })
+  })
+
+  return <canvas ref={canvas} data-slot="project-avatar-generated" aria-hidden="true" />
 }

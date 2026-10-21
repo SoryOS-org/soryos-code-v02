@@ -4,6 +4,7 @@ import { Popover } from "@kobalte/core/popover"
 import { ScrollView } from "@opencode/ui/scroll-view"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -705,6 +706,7 @@ function HomeProjectAvatar(props: { project: LocalProject; outline?: boolean }) 
       fallback={name()}
       src={props.outline ? undefined : getProjectAvatarSource(props.project.id, props.project.icon)}
       variant={props.outline ? "outline" : getProjectAvatarVariant(props.project.icon?.color)}
+      generated={props.outline ? undefined : getProjectAvatarGenerated(props.project)}
     />
   )
 }

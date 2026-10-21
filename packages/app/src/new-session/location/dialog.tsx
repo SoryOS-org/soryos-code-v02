@@ -5,6 +5,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -320,6 +321,7 @@ function NewSessionLocationDialog(props: {
                         fallback={displayName(project())}
                         src={getProjectAvatarSource(project().id, project().icon)}
                         variant={getProjectAvatarVariant(project().icon?.color)}
+                        generated={getProjectAvatarGenerated(project())}
                       />
                       <span class="min-w-0 truncate">{displayName(project())}</span>
                       <ServerTag server={project().server} />
@@ -466,6 +468,7 @@ function ProjectRow(props: { project: PromptProject; path: string; onDrill?: () 
           fallback={displayName(props.project)}
           src={getProjectAvatarSource(props.project.id, props.project.icon)}
           variant={getProjectAvatarVariant(props.project.icon?.color)}
+          generated={getProjectAvatarGenerated(props.project)}
         />
         <div class="command-palette-row-text">
           <span class="new-session-location-name">
