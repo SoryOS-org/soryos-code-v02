@@ -29,6 +29,7 @@ import { isProjectDirectory, workspaceDirectories } from "@/workspaces/paths"
 import { sessionHref } from "@/shell/routes/session"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTitle } from "./title"
+import { SessionHeaderSeparator } from "./header/separator"
 import { SessionWorkingIndicator } from "./header/session-working-indicator"
 import { CollapsedSidebarToggleSpace } from "@/shell/sidebar-toggle"
 import "./session-identity-header.css"
@@ -341,13 +342,7 @@ export function SessionLocation(props: {
         </Menu.Portal>
       </Menu>
       <Show when={props.trailing}>
-        <span
-          data-slot="session-title-separator"
-          class="session-location-separator shrink-0 text-[11px] font-medium text-v2-text-text-faint"
-          aria-hidden="true"
-        >
-          /
-        </span>
+        <SessionHeaderSeparator />
       </Show>
     </>
   )
@@ -408,32 +403,20 @@ export function SessionAncestorTrail(props: {
                 data-session-id={ancestor.id}
                 title={ancestor.title}
                 class="max-w-[min(200px,40vw)] shrink-0 truncate text-[13px] font-[530] leading-4 tracking-[-0.04px] text-v2-text-text-faint transition-colors hover:text-v2-text-text-muted"
-                classList={{ "ps-1": index() === 0, "ps-2": index() > 0 }}
+                classList={{ "ps-1": index() === 0 }}
                 onClick={() => open(props.sessionID, ancestor.id)}
               >
                 <bdi dir="auto">{ancestor.title}</bdi>
               </button>
               <Show when={index() < ancestors().length - 1}>
-                <span
-                  data-slot="session-title-separator"
-                  class="-translate-y-[0.5px] shrink-0 ps-2 pe-1 text-[11px] font-medium text-v2-text-text-faint"
-                  aria-hidden="true"
-                >
-                  /
-                </span>
+                <SessionHeaderSeparator before={0} after={0} />
               </Show>
             </>
           )}
         </For>
       </div>
       <Show when={props.trailing}>
-        <span
-          data-slot="session-title-separator"
-          class="-translate-y-[0.5px] shrink-0 ps-2 pe-1 text-[11px] font-medium text-v2-text-text-faint"
-          aria-hidden="true"
-        >
-          /
-        </span>
+        <SessionHeaderSeparator before={0} />
       </Show>
     </div>
   )

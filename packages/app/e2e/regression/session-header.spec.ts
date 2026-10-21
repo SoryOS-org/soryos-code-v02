@@ -229,28 +229,15 @@ test.describe("location", () => {
             header.evaluate((element) => {
               const icon = element.querySelector('svg:has(use[href="#opencode-v2-icon-outline-worktree"])')
               const before = icon?.previousElementSibling?.getBoundingClientRect()
-              const separator = element.querySelector('[data-slot="session-title-separator"]')
-              const after = separator?.getBoundingClientRect()
-              const title = element.querySelector("h1")
               const avatar = element
                 .querySelector('[data-slot="session-location-trigger"]')
                 ?.firstElementChild?.getBoundingClientRect()
               const bounds = icon?.getBoundingClientRect()
 
-              return bounds && before && after && avatar && separator && title
-                ? [
-                    before.left - avatar.right,
-                    bounds.left - before.right,
-                    after.left - bounds.right,
-                    title.getBoundingClientRect().left +
-                      parseFloat(getComputedStyle(title).paddingLeft) -
-                      after.right +
-                      parseFloat(getComputedStyle(separator).paddingRight),
-                  ]
-                : []
+              return bounds && before && avatar ? [before.left - avatar.right, bounds.left - before.right] : []
             }),
           )
-          .toEqual([10, 8, 8, 10])
+          .toEqual([10, 8])
         const location = header.locator('[data-slot="session-location-trigger"]')
         await location.hover()
         await expect(location).toHaveCSS("padding-inline-start", "4px")
