@@ -126,7 +126,7 @@ export function ServerHealthIndicator(props: {
                     "size-1.5 rounded-full shrink-0 my-[3.5px]": true,
                     "bg-icon-success-base": props.health?.healthy === true,
                     "bg-icon-critical-base": props.health?.healthy === false,
-                    "bg-border-weak-base": props.health === undefined,
+                    "bg-v2-icon-icon-faint": props.health === undefined,
                   }}
                 />
               }

@@ -270,7 +270,7 @@ export default function TerminalPanel(props: { model: TerminalModel; session: Mo
         fallback={
           <div class="flex flex-col h-full pointer-events-none">
             <Show when={mobile()}>
-              <div class="h-10 flex items-center gap-2 px-2 border-b border-border-weaker-base bg-v2-background-bg-base overflow-hidden">
+              <div class="h-10 flex items-center gap-2 px-2 border-b border-v2-border-border-base bg-v2-background-bg-base overflow-hidden">
                 <For each={handoff()}>
                   {(title) => (
                     <div class="px-2 py-1 rounded-md bg-surface-base text-14-regular text-text-weak truncate max-w-40">
@@ -310,7 +310,7 @@ export default function TerminalPanel(props: { model: TerminalModel; session: Mo
               handleTerminalDragEnd()
             }}
           >
-            <div class="h-[49px] shrink-0 flex border-b border-border-weaker-base">
+            <div class="h-[49px] shrink-0 flex border-b border-v2-border-border-base">
               <Tabs
                 variant="panel"
                 value={terminal().active()}

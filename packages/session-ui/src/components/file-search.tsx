@@ -19,7 +19,7 @@ export function FileSearchBar(props: {
   return (
     <Portal>
       <div
-        class="fixed z-50 flex h-8 items-center gap-2 rounded-md border border-border-base bg-background-base px-3 shadow-md"
+        class="fixed z-50 flex h-8 items-center gap-2 rounded-md border border-v2-border-border-base bg-background-base px-3 shadow-md"
         style={{
           top: `${props.pos.top}px`,
           right: `${props.pos.right}px`,

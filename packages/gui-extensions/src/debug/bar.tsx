@@ -150,7 +150,7 @@ function ToggleCell(props: {
       aria-label={`${props.label}: ${props.value}`}
       aria-pressed={props.active}
       classList={{
-        "flex min-w-0 items-center font-mono uppercase hover:bg-surface-raised-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-border-focus": true,
+        "flex min-w-0 items-center font-mono uppercase hover:bg-surface-raised-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus": true,
         "min-h-[20px] w-fit justify-start rounded px-1.5 py-0.5 text-left": !!props.inline,
         "min-h-[42px] w-full flex-col justify-center rounded-[8px] px-0.5 py-1 text-center": !props.inline,
         "bg-surface-raised-base text-text-strong": props.active,
@@ -582,7 +582,7 @@ export default function DebugBar(props: {
       classList={{
         "pointer-events-auto hidden overflow-hidden text-text-strong md:block": true,
         "mt-[-6px] w-full shrink-0 px-3 py-1": !!props.inline,
-        "fixed bottom-3 right-3 z-50 w-[308px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-border-base bg-surface-raised-stronger-non-alpha p-0.5 shadow-[var(--shadow-lg-border-base)] sm:bottom-4 sm:right-4 sm:w-[324px]":
+        "fixed bottom-3 right-3 z-50 w-[308px] max-w-[calc(100vw-1.5rem)] rounded-xl border border-v2-border-border-base bg-surface-raised-stronger-non-alpha p-0.5 shadow-[var(--shadow-lg-border-base)] sm:bottom-4 sm:right-4 sm:w-[324px]":
           !props.inline,
       }}
     >
@@ -729,7 +729,7 @@ export default function DebugBar(props: {
                 <a
                   href="/components"
                   classList={{
-                    "flex min-h-[20px] w-fit items-center rounded px-1.5 py-0.5 font-mono uppercase hover:bg-surface-raised-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-border-focus": true,
+                    "flex min-h-[20px] w-fit items-center rounded px-1.5 py-0.5 font-mono uppercase hover:bg-surface-raised-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus": true,
                     "bg-surface-raised-base text-text-strong": router.path().startsWith("/components"),
                   }}
                 >

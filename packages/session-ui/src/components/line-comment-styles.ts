@@ -162,7 +162,7 @@ export const lineCommentStyles = `
   padding: 8px;
   border-radius: var(--radius-md);
   background: var(--surface-base);
-  border: 1px solid var(--border-base);
+  border: 1px solid var(--v2-border-border-base);
   color: var(--text-strong);
   font-family: var(--font-family-sans);
   font-size: var(--font-size-small);
@@ -181,7 +181,7 @@ export const lineCommentStyles = `
   max-height: 180px;
   overflow: auto;
   padding: 4px;
-  border: 1px solid var(--border-base);
+  border: 1px solid var(--v2-border-border-base);
   border-radius: var(--radius-md);
   background: var(--surface-base);
 }
@@ -241,7 +241,7 @@ export const lineCommentStyles = `
 }
 
 [data-component="line-comment"] [data-slot="line-comment-action"] {
-  border: 1px solid var(--border-base);
+  border: 1px solid var(--v2-border-border-base);
   background: var(--surface-base);
   color: var(--text-strong);
   border-radius: var(--radius-md);

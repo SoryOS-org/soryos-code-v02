@@ -319,7 +319,7 @@ function SessionSurfaceState(props: SessionPreviewProps & { onReset: () => void 
                 <Show when={state.reviewOpened}>
                   <aside
                     id="review-panel"
-                    class="min-w-0 flex-1 flex flex-col gap-2 border-l border-border-weak-base md:max-w-[52%]"
+                    class="min-w-0 flex-1 flex flex-col gap-2 border-l border-v2-border-border-base md:max-w-[52%]"
                   >
                     <div class="min-h-0 flex-1" />
                   </aside>
@@ -347,7 +347,7 @@ function SessionSurfaceHeader(props: {
   const language = useLanguage()
 
   return (
-    <header class="flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-border-weak-base px-4 py-2">
+    <header class="flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-v2-border-border-base px-4 py-2">
       <div class="flex min-w-0 items-center gap-3">
         <span class="flex size-8 shrink-0 items-center justify-center rounded-md bg-background-stronger text-icon-base">
           <Icon name="folder" />

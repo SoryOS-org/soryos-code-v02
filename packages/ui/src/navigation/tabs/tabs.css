@@ -30,7 +30,7 @@
       display: block;
       flex-grow: 1;
       height: 100%;
-      border-bottom: 1px solid var(--border-weak-base);
+      border-bottom: 1px solid var(--v2-border-border-base);
       background-color: var(--background-base);
     }
 
@@ -55,8 +55,8 @@
     white-space: nowrap;
     flex-shrink: 0;
     max-width: 280px;
-    border-bottom: 1px solid var(--border-weak-base);
-    border-inline-end: 1px solid var(--border-weak-base);
+    border-bottom: 1px solid var(--v2-border-border-base);
+    border-inline-end: 1px solid var(--v2-border-border-base);
     background-color: var(--background-base);
 
     [data-slot="tabs-trigger"] {
@@ -153,7 +153,7 @@
       --tabs-review-fade: 16px;
       gap: var(--tabs-review-gap);
       background-color: var(--background-stronger);
-      border-bottom: 1px solid var(--border-weaker-base);
+      border-bottom: 1px solid var(--v2-border-border-base);
 
       &::after {
         display: none;
@@ -228,7 +228,7 @@
       &:has([data-selected]) {
         color: var(--text-strong);
         background-color: var(--surface-base-active);
-        border-color: var(--border-weak-base);
+        border-color: var(--v2-border-border-base);
 
         &::after {
           opacity: 1;
@@ -319,7 +319,7 @@
       padding-left: 24px;
       padding-right: 24px;
       gap: 12px;
-      border-bottom: 1px solid var(--border-weak-base);
+      border-bottom: 1px solid var(--v2-border-border-base);
       background-color: transparent;
 
       &::after {
@@ -441,7 +441,7 @@
   right: 0;
   top: calc((var(--tabs-bar-height, 48px) - var(--tabs-compact-pill-height, 24px)) / 2);
   height: var(--tabs-compact-pill-height, 24px);
-  border: 1px solid var(--border-weak-base);
+  border: 1px solid var(--v2-border-border-base);
   border-radius: var(--tabs-compact-pill-radius, 6px);
   background-color: var(--surface-base-active);
 }
@@ -570,7 +570,7 @@
   min-width: 0;
   gap: 8px;
   box-sizing: border-box;
-  border-bottom: 1px solid var(--border-weaker-base, var(--v2-border-border-weak));
+  border-bottom: 0.5px solid var(--v2-border-border-base);
   background-color: var(--v2-background-bg-base);
 }
 

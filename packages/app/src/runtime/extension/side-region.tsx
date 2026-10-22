@@ -139,7 +139,7 @@ export function SideRegion(props: {
                     class="relative min-h-0 min-w-0 bg-v2-background-bg-base"
                     classList={{
                       "flex-1": panes().length === 1 || index() === 0,
-                      "shrink-0 border-t border-border-weaker-base": index() > 0,
+                      "shrink-0 border-t border-v2-border-border-base": index() > 0,
                     }}
                     style={index() > 0 ? { height: `${lowerHeight()}px` } : undefined}
                   >
