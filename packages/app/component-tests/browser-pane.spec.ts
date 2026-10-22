@@ -123,6 +123,25 @@ story("never flies a still of a page the tab has navigated away from", async ({ 
   await expect(still).toBeVisible()
 })
 
+story("refreshes page stills by the window's focus, not the document's", async ({ page }) => {
+  const root = page.getByTestId("browser-pane-fixture")
+  const captures = async () => Number((await root.getByText(/^Captures: \d+$/).textContent())?.split(": ")[1])
+  await page.clock.install()
+  await expect(root.getByText(/^Captures: [1-9]/)).toBeVisible()
+
+  // Main reports the window unfocused while this document keeps focus: stills follow the window, so they stop.
+  await root.getByRole("button", { name: "Blur window", exact: true }).click()
+  const paused = await captures()
+  await page.clock.runFor(120_000)
+  expect(await captures()).toBe(paused)
+
+  // Focus coming back to the window, even straight into the embed, which never focuses this document, takes a fresh
+  // still at once.
+  await root.getByRole("button", { name: "Focus window", exact: true }).click()
+  await page.clock.runFor(10)
+  await expect(root.getByText(`Captures: ${paused + 1}`, { exact: true })).toBeVisible()
+})
+
 story("keeps a still of the page under floating content that covers it", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   const still = root.locator("#browser-panel img")

@@ -20,6 +20,7 @@ import {
   setZoomFactor,
   updateTitlebar,
   windowAppearance,
+  wireFocus,
   wireFullscreen,
   wireZoom,
 } from "./appearance"
@@ -172,6 +173,7 @@ export const makeMainWindows = Effect.fn("Window.make")(function* () {
     wireWindowRecovery(win, id, () => relaunchHandler())
     register(win, id)
     wireFullscreen(win)
+    wireFocus(win)
 
     if (!early) loadWindow(win, "index.html")
     wireZoom(win)

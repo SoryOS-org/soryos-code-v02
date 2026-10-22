@@ -174,7 +174,15 @@ export function mountBrowserPane(input: PaneHost) {
 
     const current = () => tabs.find((tab) => tab.title === store.session) ?? tabs[0]
 
-    const bridge: Pick<Bridge, "embed" | "capture"> = {
+    // Main's window focus reports, which focus moving into an embed does not end.
+    const windowFocus = new Set<Parameters<Bridge["on"]>[0]>()
+
+    const bridge: Pick<Bridge, "embed" | "capture" | "on"> = {
+      on: (listener) => {
+        windowFocus.add(listener)
+
+        return () => windowFocus.delete(listener)
+      },
       embed: (id, layout) => setStore("layouts", id, layout),
       capture: async () => {
         setStore("captures", (count) => count + 1)
@@ -192,7 +200,7 @@ export function mountBrowserPane(input: PaneHost) {
       },
     }
 
-    // SAFETY: the host embeds call only `embed` and `capture` on their bridge (`runtime/extension/embeds.tsx`).
+    // SAFETY: the host embeds call only `embed`, `capture` and `on` on their bridge (`runtime/extension/embeds.tsx`).
     const embeds = input.createEmbeds({
       bridge: bridge as Bridge,
       zoom: () => 1,
@@ -490,6 +498,13 @@ export function mountBrowserPane(input: PaneHost) {
             <button onClick={() => held.splice(0).forEach((resolve) => resolve())}>Release capture</button>
             <button onClick={() => setStore("covered", (covered) => !covered)}>Toggle popover</button>
             <button onClick={() => setStore("moving", (moving) => !moving)}>Toggle panel motion</button>
+            <For each={[false, true]}>
+              {(focused) => (
+                <button onClick={() => windowFocus.forEach((listener) => listener({ type: "focus", focused }))}>
+                  {focused ? "Focus window" : "Blur window"}
+                </button>
+              )}
+            </For>
             <button onClick={pick}>Pick element</button>
             <button onClick={() => setStore("history", { visits })}>Seed history</button>
             <button onClick={() => emit(store.session, { type: "page", tabID: current().id, icon, zoom: store.zoom })}>

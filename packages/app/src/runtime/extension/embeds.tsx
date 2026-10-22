@@ -75,6 +75,8 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   // The kept still's JPEG length, and how long to wait before the next still.
   let bytes = 0
   let pause = 3000
+  // Whether the window has focus, as main reports it: focus inside an embed blurs this document but not the window.
+  let focused = document.hasFocus()
   const canvas = document.createElement("canvas")
   canvas.width = canvas.height = 1
   const paint = canvas.getContext("2d", { willReadFrequently: true })
@@ -105,7 +107,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
     clearTimeout(warming)
     // Reduced motion lands panels at once, so no flight needs a still.
     warming = setTimeout(() => {
-      if (onscreen && !props.input.moving() && !prefersReducedMotion() && document.hasFocus()) take()
+      if (onscreen && !props.input.moving() && !prefersReducedMotion() && focused) take()
     }, delay)
   }
 
@@ -410,8 +412,20 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   onCleanup(() => appearance.disconnect())
   createEventListener(window.matchMedia("(prefers-color-scheme: dark)"), "change", () => schedule(300))
   createEventListener(document, "visibilitychange", () => setStore("visible", document.visibilityState === "visible"))
+
   // Stills pause while the window is in the background; the page may have moved on since the last one.
-  createEventListener(window, "focus", () => warm(0))
+  const refocus = (next: boolean) => {
+    focused = next
+
+    if (focused) warm(0)
+  }
+
+  createEventListener(window, "focus", () => refocus(true))
+  onCleanup(
+    props.bridge.on((message) => {
+      if (message.type === "focus") refocus(message.focused)
+    }),
+  )
   onCleanup(() => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     clearTimeout(release)
