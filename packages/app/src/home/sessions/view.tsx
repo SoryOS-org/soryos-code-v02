@@ -495,17 +495,23 @@ function HomeSessionGroupingMenu(props: {
 }) {
   const title = () => props.language.t("home.sessions.grouping.title")
 
+  const current = () =>
+    props.language.t(props.grouping === "server" ? "home.sessions.grouping.server" : "home.sessions.grouping.date")
+
   return (
     <Menu placement="bottom-end" gutter={6}>
       <Menu.Trigger
-        as={IconButton}
+        as={Button}
         data-action="home-session-grouping"
+        data-grouping={props.grouping}
         variant="ghost-muted"
         size="normal"
-        class="pointer-events-auto"
-        icon={<Icon name="sidebar" />}
-        aria-label={title()}
-      />
+        class="pointer-events-auto h-7 px-2 [font-weight:530]"
+        icon="bullet-list"
+        aria-label={`${title()}: ${current()}`}
+      >
+        {current()}
+      </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content>
           <Menu.Group>

@@ -359,14 +359,14 @@ test("Home groups sessions by server when several servers are connected", async 
   await expect(row(page, serverA.title)).toBeVisible()
   await expect(row(page, serverB.title)).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Group sessions", exact: true }).click()
+  await page.getByRole("button", { name: "Group sessions: By date", exact: true }).click()
   await page.getByRole("menuitemradio", { name: "By server", exact: true }).click()
 
   await expect(groups).toHaveText([new URL(SERVER).host, "Build server"])
   await expect(row(page, serverA.title)).toBeVisible()
   await expect(row(page, serverB.title)).toBeVisible()
 
-  await page.getByRole("button", { name: "Group sessions", exact: true }).click()
+  await page.getByRole("button", { name: "Group sessions: By server", exact: true }).click()
   await page.getByRole("menuitemradio", { name: "By date", exact: true }).click()
   await expect(local).toContainText("Today")
   await expect(row(page, serverB.title)).toHaveCount(0)
