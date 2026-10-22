@@ -38,6 +38,10 @@ Valid types are `feat`, `fix`, `docs`, `chore`, `refactor`, and `test`. Scopes a
 
 Examples: `fix(tui): simplify thinking toggle styling`, `docs: update contributing guide`, `chore(sdk): regenerate types`.
 
+## PR Descriptions
+
+When opening a GitHub PR, fill `.github/pull_request_template.md` as the body. Required sections: Issue for this PR, Type of change (at least one `[x]`), What does this PR do?, How did you verify your code works?, and Checklist (both items checked). Do not substitute a free-form `Summary` / `Test plan` body. For `fix` / `chore` / `test` titles, link the issue with `Fixes #N`, `Closes #N`, or `Resolves #N`. Base the PR on `dev`. Non-compliant descriptions are labeled `needs:compliance` and auto-closed.
+
 ## Style Guide
 
 ### General Principles
