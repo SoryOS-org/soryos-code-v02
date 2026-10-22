@@ -1,4 +1,4 @@
-import { connectClientMcp, sessionID, type ClientMcpConnection } from "@opencode/client/mcp"
+import { connectClientMcp, type ClientMcpConnection } from "@opencode/client/mcp"
 import { createEffect, onCleanup, untrack } from "solid-js"
 import { useClientMcpExperiment } from "../config"
 import { useClient } from "./client"
@@ -63,16 +63,15 @@ export function ClientMcp() {
               name: "tui",
               directory,
               headers: client.headers,
-              register(server) {
-                server.registerTool(
-                  "open_terminal",
-                  {
-                    description:
-                      "Open a terminal for the current session in the user's TUI, without taking keyboard focus.",
-                  },
-                  (ctx) => openTerminal(sessionID(ctx)),
-                )
-              },
+              tools: [
+                {
+                  name: "open_terminal",
+                  description:
+                    "Open a terminal for the current session in the user's TUI, without taking keyboard focus.",
+                  inputSchema: { type: "object" },
+                  handler: (_args, ctx) => openTerminal(ctx.sessionID),
+                },
+              ],
             }),
           )
         : undefined
