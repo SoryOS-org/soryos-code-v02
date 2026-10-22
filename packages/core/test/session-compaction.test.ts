@@ -272,6 +272,52 @@ test("compaction prompts prohibit task execution", () => {
     expect(SessionCompaction.buildPrompt(update)).toContain("Do not continue the task or call tools")
 })
 
+it.effect("a configured buffer larger than the window reserves at most a quarter of it", () =>
+  Effect.gen(function* () {
+    const compaction = yield* SessionCompaction.Service
+    yield* compaction.transform((editor) => editor.configure({ buffer: 100_000 }))
+    const session = yield* insertSession(Session.ID.make("ses_buffer_cap"))
+    const due = (tokens: number, window: number) =>
+      compaction
+        .compact({
+          reason: "auto",
+          context: {
+            session,
+            model: SessionRunnerModel.resolved(model, {
+              capabilities: { tools: true, input: ["text"], output: ["text"] },
+              cost: [],
+              limit: { context: window, output: 8_000 },
+            }),
+            messages: [
+              Schema.decodeUnknownSync(SessionMessage.Assistant)({
+                id: SessionMessage.ID.make("msg_assistant"),
+                type: "assistant",
+                agent: Agent.defaultID,
+                model: { id: "summary-model", providerID: "test" },
+                content: [{ type: "text", text: "Done" }],
+                tokens: { input: tokens, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+                time: { created: 0, completed: 0 },
+              }),
+            ],
+            agent: {
+              id: Agent.defaultID,
+              info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
+            },
+            initial: "Project instructions.",
+            tools: { definitions: [], execute: () => Effect.die("unused") },
+          },
+        })
+        .pipe(Effect.map((outcome) => outcome.status !== "skipped"))
+
+    // 100k buffer on a 100k window: the ceiling is 75k, not zero.
+    expect(yield* due(60_000, 100_000)).toBe(false)
+    expect(yield* due(75_000, 100_000)).toBe(true)
+    // A window larger than the buffer is unchanged.
+    expect(yield* due(899_999, 1_000_000)).toBe(false)
+    expect(yield* due(900_000, 1_000_000)).toBe(true)
+  }),
+)
+
 it.effect("auto compaction estimates current content against the buffered prompt ceiling", () =>
   Effect.gen(function* () {
     const compaction = yield* SessionCompaction.Service

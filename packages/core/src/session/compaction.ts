@@ -99,6 +99,8 @@ const RESERVE_MIN = 16_000
  * the cache. Single steps grew by up to ~22k tokens at p99 in real sessions.
  */
 const RESERVE_SHARE = 0.15
+/** A configured `buffer` tuned for a large window would otherwise swallow most of a smaller model's window. */
+const MAX_BUFFER_SHARE = 0.25
 /** A common window size, assumed for the compaction request when the model's window is unknown. */
 const UNKNOWN_WINDOW = 200_000
 /** A summary gets at least this much output, or the room left if less, even when the estimate margin leaves less. */
@@ -846,14 +848,14 @@ export const estimatePrompt = (context: SessionContext.Loaded) => {
 /**
  * The largest request the model takes while leaving room for its reply: `RESERVE_SHARE` of the window, or
  * `RESERVE_MIN` when that is more. A summary request that must be shrunk is aimed at the same size. A window too small
- * to give up `RESERVE_MIN` keeps `RESERVE_SHARE`.
+ * to give up `RESERVE_MIN` keeps `RESERVE_SHARE`. A configured `buffer` replaces both, capped at `MAX_BUFFER_SHARE`.
  */
 const calculateCeiling = (limit: SessionContext.Loaded["model"]["limit"], buffer: number | undefined) => {
   // Unknown limits are reported as 0. An unknown input limit falls back to the context window; with no window at
   // all, only a provider rejection can limit the request.
   const window = limit.input || limit.context
   if (window <= 0) return Number.POSITIVE_INFINITY
-  if (buffer !== undefined) return window - buffer
+  if (buffer !== undefined) return window - Math.min(buffer, Math.floor(window * MAX_BUFFER_SHARE))
   return window - Math.max(Math.floor(window * RESERVE_SHARE), window >= 2 * RESERVE_MIN ? RESERVE_MIN : 0)
 }
 
