@@ -13,6 +13,7 @@ import { springStyle } from "@opencode/ui/motion/solid"
 import { Dynamic } from "solid-js/web"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 import { useData } from "../context"
+import { useMessageMenu } from "../context/message-menu"
 import { TimelineSeparator } from "../components/timeline-separator"
 import {
   SessionAssistantContent,
@@ -87,6 +88,7 @@ export function createSessionTimelineRowRenderer(input: {
 }) {
   const i18n = useI18n()
   const data = useData()
+  const menu = useMessageMenu()
   // Cached timelines retain file-change subgroup identities alongside their disclosure choices.
   const patchGroupKeys = input.disclosure.patchGroupKeys ?? new Map<string, string>()
   const patchPartKeys = new WeakMap<SessionMessageAssistant["content"][number], string>()
@@ -823,9 +825,10 @@ export function createSessionTimelineRowRenderer(input: {
   function TurnGap(props: { messageID: string }) {
     let element: HTMLDivElement | undefined
     const joined = run(props.messageID)
+    const turn = () => (menu() ? 24 : 16)
     springStyle(
       () => element,
-      () => ({ height: joined()?.above ? 4 : 16 }),
+      () => ({ height: joined()?.above ? 4 : turn() }),
       (el, value) => {
         el.style.height = `${value.height}px`
       },
@@ -837,7 +840,7 @@ export function createSessionTimelineRowRenderer(input: {
         ref={element}
         data-timeline-row="TurnGap"
         aria-hidden="true"
-        style={{ height: untrack(joined)?.above ? "4px" : "16px" }}
+        style={{ height: untrack(joined)?.above ? "4px" : `${untrack(turn)}px` }}
       />
     )
   }

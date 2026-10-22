@@ -277,6 +277,7 @@ const source = {
   "ui.message.expand": "Expand message",
   "ui.message.collapse": "Collapse message",
   "ui.message.copy": "Copy",
+  "ui.message.options": "Message options",
   "ui.message.copyMessage": "Copy message",
   "ui.message.copyFullMessage": "Copy full message",
   "ui.message.forkMessage": "Fork to new session",
