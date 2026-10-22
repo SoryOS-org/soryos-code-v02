@@ -46,7 +46,7 @@ import {
   type StoryArgs,
   type StoryModule,
 } from "./catalog"
-import { applyMotionPatch, motionFields, motionKey, motionValues, storyMotion } from "./motion"
+import { applyMotionPatch, motionFields, motionValues, sameMotion, storyMotion } from "./motion"
 
 // How long Play holds each state at full speed. Slow motion doubles it while the motion itself runs 4× longer, so
 // a transition still finishes and Play keeps moving.
@@ -383,7 +383,7 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
   // The story's Knobs join its args here, so the inspector is the one place for its controls. Registering a knob or a
   // replay button (as the story mounts) rebuilds it where it was.
   let motion = storyMotion(entry.motion)
-  const [shown, setShown] = createSignal(motion, { equals: (a, b) => motionKey(a) === motionKey(b) })
+  const [shown, setShown] = createSignal(motion, { equals: sameMotion })
 
   const inspect = () => {
     const own = motionFields(motion, (values) => store.set(values))
@@ -458,7 +458,7 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
         queued = false
         const next = storyMotion(entry.motion)
 
-        if (motionKey(next) !== motionKey(motion)) return setShown(next)
+        if (!sameMotion(next, motion)) return setShown(next)
         store.sync(motionValues(motion))
       })
     }),

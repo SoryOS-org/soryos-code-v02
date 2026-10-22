@@ -20,9 +20,15 @@ export function storyMotion(names: readonly string[]) {
 
 export type StoryMotion = ReturnType<typeof storyMotion>
 
-/** What the inspector is built from: a new knob or replay button rebuilds it. */
-export function motionKey(motion: StoryMotion) {
-  return [...motion.knobs, ...motion.actions, ...motion.globals].map((item) => item.id).join()
+/**
+ * Whether the inspector built from `a` still fits `b`. Compared by instance: a remounted story registers its replay
+ * buttons again under the same ids, with callbacks bound to the new mount.
+ */
+export function sameMotion(a: StoryMotion, b: StoryMotion) {
+  const left = [...a.knobs, ...a.actions, ...a.globals]
+  const right = [...b.knobs, ...b.actions, ...b.globals]
+
+  return left.length === right.length && left.every((item, index) => item === right[index])
 }
 
 /**
