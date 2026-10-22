@@ -12,6 +12,7 @@ import { LogProvider, type LogSink } from "./context/log"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
 import { Selection } from "./util/selection"
+import { Locale } from "./util/locale"
 import {
   CliRenderEvents,
   createCliRenderer,
@@ -629,7 +630,7 @@ function App() {
         return
       }
 
-      setTerminalTitle(renderer, `OC | ${title.length > 40 ? title.slice(0, 37) + "…" : title}`)
+      setTerminalTitle(renderer, `OC | ${Locale.truncate(title, 40)}`)
       return
     }
 
