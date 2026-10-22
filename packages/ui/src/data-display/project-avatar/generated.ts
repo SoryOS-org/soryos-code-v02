@@ -23,7 +23,7 @@ const DEFAULTS = {
 }
 
 // Paper first, then four inks, as in the playground's art palettes. The mesh uses the four inks.
-const PALETTES = [
+export const PALETTES = [
   ["#f4efe6", "#1d3557", "#e63946", "#f1a208", "#2a9d8f"],
   ["#efe8d8", "#264653", "#e76f51", "#f4a261", "#e9c46a"],
   ["#f6f1eb", "#3d405b", "#e07a5f", "#81b29a", "#f2cc8f"],
@@ -140,7 +140,7 @@ export function drawProjectIcon(ctx: CanvasRenderingContext2D, px: number, icon:
 }
 
 // The playground's rounded tile: corner radius 22% of the size, antialiased over about one pixel.
-function tileMask(u: number, v: number, px: number) {
+export function tileMask(u: number, v: number, px: number) {
   const pixel = 1 / px
   const dx = Math.abs(u * 2 - 1) - 0.56
   const dy = Math.abs(v * 2 - 1) - 0.56
@@ -161,7 +161,7 @@ function hash(x: number, y: number) {
   return fract(f(px * py))
 }
 
-function valueNoise(x: number, y: number) {
+export function valueNoise(x: number, y: number) {
   const ix = Math.floor(x)
   const iy = Math.floor(y)
   const fx = x - ix
@@ -196,7 +196,7 @@ function normalize(x: number, y: number, z: number) {
   return [x / length, y / length, z / length]
 }
 
-function cyrb53(input: string) {
+export function cyrb53(input: string) {
   let h1 = 0xdeadbeef
   let h2 = 0x41c6ce57
 
@@ -212,7 +212,7 @@ function cyrb53(input: string) {
   return (h1 ^ h2) >>> 0
 }
 
-function mulberry32(seed: number) {
+export function mulberry32(seed: number) {
   let a = seed
 
   return () => {
