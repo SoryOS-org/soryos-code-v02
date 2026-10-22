@@ -1,5 +1,22 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js"
-import { frameLoop, observeReducedMotion, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  Show,
+  untrack,
+  type Accessor,
+  type JSX,
+} from "solid-js"
+import {
+  frameLoop,
+  observeReducedMotion,
+  prefersReducedMotion,
+  Spring,
+  type DurationOptions,
+} from "@opencode/ui/motion"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 
 const group = "Composer docks"
@@ -20,7 +37,15 @@ const fadeTail = motionTuning.number("docks.fade-tail", {
   max: 1,
   step: 0.05,
 })
-const blur = motionTuning.number("docks.blur", { label: "Blur", group, value: 0, min: 0, max: 6, step: 0.5, unit: "px" })
+const blur = motionTuning.number("docks.blur", {
+  label: "Blur",
+  group,
+  value: 0,
+  min: 0,
+  max: 6,
+  step: 0.5,
+  unit: "px",
+})
 export const queueStagger = motionTuning.number("docks.stagger", {
   label: "Queue row stagger",
   group,
@@ -69,20 +94,24 @@ export function ComposerMorph<T extends { key: string }>(props: {
     root?.style.removeProperty("height")
     list.forEach((item) => {
       const content = item.el?.firstElementChild instanceof HTMLElement ? item.el.firstElementChild : undefined
-      ;["height", "overflow", "opacity", "filter"].forEach((prop) => item.el?.style.removeProperty(prop))
-      ;["transform", "mask-image"].forEach((prop) => content?.style.removeProperty(prop))
+      ;["position", "inset-inline", "top", "transform", "clip-path", "opacity"].forEach((prop) =>
+        item.el?.style.removeProperty(prop),
+      )
+      ;["transform", "filter", "mask-image"].forEach((prop) => content?.style.removeProperty(prop))
     })
     setFaces(list.filter((item) => !item.leaving()))
     return false
   }
 
+  // Face heights come from a ResizeObserver; this one read happens only when a flight starts.
   const measure = () => {
-    for (const item of untrack(faces))
-      if (item.el) item.height = (item.el.firstElementChild ?? item.el).getBoundingClientRect().height
+    for (const item of untrack(faces)) if (item.el) item.height = item.el.getBoundingClientRect().height
   }
 
   // Each face gets a box: a closing face keeps its presence's share of its height, and the face coming in takes what is
-  // left of the region. Under reduced motion the closing faces fade out in full first, then the new face fades in.
+  // left of the region. During a flight the faces are stacked with transforms and cut to their boxes with clip-path, so
+  // only the region's own height changes layout. Under reduced motion the closing faces fade out in full first, then
+  // the new face fades in.
   const paintFaces = (list: Face<T>[], shown: number) => {
     const reduced = prefersReducedMotion()
     const leaving = list.filter((item) => item.leaving())
@@ -94,17 +123,18 @@ export function ComposerMorph<T extends { key: string }>(props: {
       ]),
     )
     const used = [...boxes.values()].reduce((sum, box) => sum + box, 0)
+    let offset = 0
     list.forEach((item) => {
       if (!item.el) return
       const box = boxes.get(item) ?? (waiting ? 0 : Math.max(0, Math.min(item.height, shown - used)))
       const content = item.el.firstElementChild instanceof HTMLElement ? item.el.firstElementChild : item.el
-      item.el.style.height = `${box}px`
-      item.el.style.overflow = "clip"
-      const p = item.leaving()
-        ? reduced
-          ? item.presence.value
-          : box / Math.max(1, item.height)
-        : item.presence.value
+      item.el.style.position = "absolute"
+      item.el.style.insetInline = "0"
+      item.el.style.top = "0"
+      item.el.style.transform = `translateY(${offset}px)`
+      item.el.style.clipPath = `inset(0 0 calc(100% - ${box.toFixed(2)}px) 0)`
+      offset += box
+      const p = item.leaving() ? (reduced ? item.presence.value : box / Math.max(1, item.height)) : item.presence.value
       styleFace(item.el, Math.max(0, Math.min(1, p)), {
         dy: item.leaving() ? 0 : 6,
         out: item.leaving(),
@@ -125,7 +155,8 @@ export function ComposerMorph<T extends { key: string }>(props: {
     const entering = list.find((item) => !item.leaving())
     if (!root || !height || !entering) return false
 
-    if (entering.el && height.target !== entering.height) height.set(entering.height)
+    // A face that just mounted has no height until its ResizeObserver reports one.
+    if (entering.height > 0 && height.target !== entering.height) height.set(entering.height)
     const reduced = prefersReducedMotion()
     if (reduced) height.snap(entering.height)
     height.step(dt)
@@ -140,6 +171,7 @@ export function ComposerMorph<T extends { key: string }>(props: {
 
     if (height.resting && list.every((item) => item.presence.resting)) return settle(list)
     const shown = regionHeight(list, height)
+    // Written every frame, never read back: the timeline inset follows the region's real height (as in #57559).
     root.style.height = `${shown}px`
     paintFaces(list, shown)
     return true
@@ -185,7 +217,7 @@ export function ComposerMorph<T extends { key: string }>(props: {
         root.style.height = `${shown}px`
         paintFaces(nextFaces, shown)
         setFaces(nextFaces)
-        stop ??= frameLoop.addMeasured(measure, paint)
+        stop ??= frameLoop.add(paint)
       },
       { defer: true },
     ),
@@ -201,6 +233,12 @@ export function ComposerMorph<T extends { key: string }>(props: {
           <div
             ref={(el) => {
               item.el = el
+              const observer = new ResizeObserver((entries) => {
+                const size = entries[0]?.borderBoxSize[0]?.blockSize
+                if (size !== undefined) item.height = size
+              })
+              observer.observe(el)
+              onCleanup(() => observer.disconnect())
               if (height) paintFaces(untrack(faces), snap(height.value))
             }}
             data-slot="composer-face"
@@ -231,18 +269,19 @@ function tune(spring: Spring, options: DurationOptions) {
 
 // A face coming in eases its opacity in late. A face going out stays opaque until only the fade-out tail of its box is
 // left, then fades, so it is gone just as its box closes.
-function styleFace(el: HTMLElement, p: number, input: { dy: number; out: boolean; hidden?: number; content?: HTMLElement }) {
+function styleFace(
+  el: HTMLElement,
+  p: number,
+  input: { dy: number; out: boolean; hidden?: number; content?: HTMLElement },
+) {
   const content = input.content ?? el
   const hidden = input.hidden ?? 0
-  // A face painted before its content mounted moved itself; once the content is there, only the content moves.
-  if (content !== el) {
-    el.style.removeProperty("transform")
-    el.style.removeProperty("mask-image")
-  }
   el.style.opacity = `${(input.out ? Math.min(1, p / fadeTail()) : p * p).toFixed(4)}`
-  if (prefersReducedMotion()) return
+  // Movement, blur and the soft edge go on the content inside the clipping box, never on the box itself, so a blur
+  // can't bleed past it. Before the content mounts there is nothing to move.
+  if (prefersReducedMotion() || content === el) return
   content.style.transform = `translateY(${((1 - p) * input.dy).toFixed(2)}px)`
-  el.style.filter = p < 0.999 && blur() > 0 ? `blur(${((1 - p) * blur()).toFixed(2)}px)` : ""
+  content.style.filter = p < 0.999 && blur() > 0 ? `blur(${((1 - p) * blur()).toFixed(2)}px)` : ""
   content.style.maskImage =
     hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
 }
@@ -291,7 +330,13 @@ export function Grow<T>(props: {
       >
         {(() => {
           const child = props.children
-          return typeof child === "function" ? <Show when={item()} keyed>{child}</Show> : child
+          return typeof child === "function" ? (
+            <Show when={item()} keyed>
+              {child}
+            </Show>
+          ) : (
+            child
+          )
         })()}
       </div>
     </Show>
@@ -341,67 +386,77 @@ function grow(
   }
   if ((withFade || reduced) && open) el.style.opacity = "0"
 
-  let full = 0
-  frameLoop.addMeasured(
-    () => {
-      const child = el.firstElementChild
-      if (!(child instanceof HTMLElement)) return
-      const margin = parseFloat(getComputedStyle(child).marginBottom) || 0
-      if (margin < 0) el.style.overflowClipMargin = `${-margin}px`
-      full = child.getBoundingClientRect().height + margin
-    },
-    (dt) => {
-      if (!el.isConnected) {
-        growing.delete(el)
-        return false
-      }
-      const noMotion = prefersReducedMotion()
-      const size = state.open ? full : 0
-      state.spring.set(size).step(dt)
-      if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
-      const shown = state.open ? 1 : 0
-      state.presence.set(shown).step(dt)
-      if (Math.abs(state.presence.value - shown) < 0.01 && Math.abs(state.presence.velocity) < 0.05)
-        state.presence.snap(shown)
+  // The content's height is read once here, then kept current by a ResizeObserver rather than read every frame.
+  const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : undefined
+  const margin = child ? parseFloat(getComputedStyle(child).marginBottom) || 0 : 0
+  if (margin < 0) el.style.overflowClipMargin = `${-margin}px`
+  let full = child ? child.getBoundingClientRect().height + margin : 0
+  const observer = new ResizeObserver((entries) => {
+    const size = entries[0]?.borderBoxSize[0]?.blockSize
+    if (size !== undefined) full = size + margin
+  })
+  if (child) observer.observe(child)
+  frameLoop.add((dt) => {
+    if (!el.isConnected) {
+      observer.disconnect()
+      growing.delete(el)
+      return false
+    }
+    const noMotion = prefersReducedMotion()
+    const size = state.open ? full : 0
+    state.spring.set(size).step(dt)
+    if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
+    const shown = state.open ? 1 : 0
+    state.presence.set(shown).step(dt)
+    if (Math.abs(state.presence.value - shown) < 0.01 && Math.abs(state.presence.velocity) < 0.05)
+      state.presence.snap(shown)
 
-      if (state.spring.resting && (!withFade || !state.open || state.presence.resting)) {
-        growing.delete(el)
-        finish(el, state.open, state.done)
-        return false
-      }
+    if (state.spring.resting && (!withFade || !state.open || state.presence.resting)) {
+      observer.disconnect()
+      growing.delete(el)
+      finish(el, state.open, state.done)
+      return false
+    }
 
-      const value = snap(Math.max(0, state.spring.value))
-      const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
-      const presence = Math.max(0, Math.min(1, state.presence.value))
-      if (!noMotion) {
-        el.style.height = `${value}px`
-        if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
-        if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
-      }
-      if (withFade || noMotion) {
-        const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
-        styleFace(el, state.open ? presence : p, {
-          dy: state.open ? 4 : 0,
-          out: !state.open,
-          hidden: card ? full - value : 0,
-          content: child,
-        })
-      }
-      return true
-    },
-  )
+    const value = snap(Math.max(0, state.spring.value))
+    const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
+    const presence = Math.max(0, Math.min(1, state.presence.value))
+    if (!noMotion) {
+      // Written every frame, never read back: neighbours and the timeline inset follow the real height (as in #57559).
+      el.style.height = `${value}px`
+      if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
+      if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
+    }
+    if (withFade || noMotion) {
+      const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
+      styleFace(el, state.open ? presence : p, {
+        dy: state.open ? 4 : 0,
+        out: !state.open,
+        hidden: card ? full - value : 0,
+        content: child,
+      })
+    }
+    return true
+  })
 }
 
 function finish(el: HTMLElement, open: boolean, done?: () => void) {
   const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : undefined
   el.removeAttribute("data-moving")
   el.removeAttribute("data-dock-border-underlay")
-  ;["height", "margin-top", "margin-bottom", "overflow-clip-margin", "opacity", "filter", "transform", "mask-image"].forEach(
-    (prop) => {
-      el.style.removeProperty(prop)
-      child?.style.removeProperty(prop)
-    },
-  )
+  ;[
+    "height",
+    "margin-top",
+    "margin-bottom",
+    "overflow-clip-margin",
+    "opacity",
+    "filter",
+    "transform",
+    "mask-image",
+  ].forEach((prop) => {
+    el.style.removeProperty(prop)
+    child?.style.removeProperty(prop)
+  })
   if (!open) done?.()
 }
 
@@ -409,9 +464,14 @@ function finish(el: HTMLElement, open: boolean, done?: () => void) {
 // cancellation, which clears what it painted.
 export function cascade(rows: HTMLElement[], step: number) {
   const springs = rows.map(() => Spring.fromDuration(0, fadeIn()))
-  const clear = () => rows.forEach((el) => ["opacity", "filter", "transform"].forEach((prop) => el.style.removeProperty(prop)))
+  const clear = () =>
+    rows.forEach((el) => ["opacity", "filter", "transform"].forEach((prop) => el.style.removeProperty(prop)))
   let elapsed = 0
-  rows.forEach((el) => styleFace(el, 0, { dy: 4, out: false }))
+  const paintRow = (el: HTMLElement, p: number) => {
+    el.style.opacity = `${(p * p).toFixed(4)}`
+    el.style.transform = `translateY(${((1 - p) * 4).toFixed(2)}px)`
+  }
+  rows.forEach((el) => paintRow(el, 0))
   const stop = frameLoop.add((dt) => {
     elapsed += dt
     springs.forEach((spring, index) => {
@@ -423,7 +483,7 @@ export function cascade(rows: HTMLElement[], step: number) {
       clear()
       return false
     }
-    rows.forEach((el, index) => styleFace(el, Math.max(0, Math.min(1, springs[index]!.value)), { dy: 4, out: false }))
+    rows.forEach((el, index) => paintRow(el, Math.max(0, Math.min(1, springs[index]!.value))))
     return true
   })
   return () => {
