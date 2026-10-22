@@ -60,9 +60,26 @@ export function make(input: Partial<Interface> = {}): Interface {
   }
 }
 
+export async function checkDataDirectory(directory = Path.data) {
+  const info = await fs.promises.lstat(directory).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return
+    throw error
+  })
+  if (!info?.isSymbolicLink()) return
+  const target = path.resolve(path.dirname(directory), await fs.promises.readlink(directory))
+  await fs.promises.stat(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error
+    throw new Error(
+      `OpenCode data directory is a symlink to a missing target: ${JSON.stringify(directory)} -> ${JSON.stringify(target)}. Restore the target directory or correct the symlink, then restart OpenCode.`,
+      { cause: error },
+    )
+  })
+}
+
 const acquire = (input: Partial<Interface>) =>
   Effect.gen(function* () {
     const service = Service.of(make(input))
+    yield* Effect.promise(() => checkDataDirectory(service.data))
     yield* Effect.promise(() =>
       Promise.all(
         [service.data, service.config, service.state, service.log, service.bin, service.repos, service.tmp].map(

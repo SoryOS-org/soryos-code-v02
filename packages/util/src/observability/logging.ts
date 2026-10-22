@@ -65,6 +65,10 @@ export function fileLogger(target = file(), id: string = runID()) {
   // Do not set batchWindow to 0; it causes high idle CPU usage.
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
+    // Logging is acquired before Global.Service during CLI startup.
+    if (path.dirname(target) === Global.Path.log) {
+      yield* Effect.promise(() => Global.checkDataDirectory())
+    }
     yield* fs.makeDirectory(path.dirname(target), { recursive: true })
     const logger = yield* Logger.toFile(formatter(id), target, { flag: "a" })
     yield* trim(target).pipe(
