@@ -9,6 +9,7 @@ import { ConfigDiscovery } from "./discovery.js"
 export const plan = Effect.fn("ConfigWatch.plan")(function* (sources: ConfigDiscovery.Sources) {
   const fs = yield* FSUtil.Service
   const directories = [
+    ...(sources.system?.present ? [sources.system.path] : []),
     ...(sources.global ? [sources.global] : []),
     ...sources.project.filter((root) => root.present).map((root) => root.path),
   ]
@@ -28,6 +29,7 @@ export const plan = Effect.fn("ConfigWatch.plan")(function* (sources: ConfigDisc
   )
   const files = [
     ...linked.filter((file) => file !== undefined),
+    ...(sources.system ? [sources.system.path] : []),
     ...sources.direct,
     ...sources.project.map((root) => root.path),
     ...sources.claude,
@@ -44,7 +46,7 @@ export const plan = Effect.fn("ConfigWatch.plan")(function* (sources: ConfigDisc
       ...directories.map((path) => ({
         path,
         type: "directory" as const,
-        ignore: ["node_modules", ".git", "**/{node_modules,.git}/**"],
+        ignore: FSUtil.ignoreGlobs,
       })),
       ...Array.from(parents, ([parent, files]) => ({
         path: parent,

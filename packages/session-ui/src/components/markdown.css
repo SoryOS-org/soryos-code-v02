@@ -41,6 +41,11 @@
     margin-bottom: 0;
   }
 
+  /* Pretty wrapping would move settled words as each token arrives, so the growing block stays greedy until it completes. */
+  &[data-streaming] > [data-markdown-block]:last-child {
+    text-wrap-style: auto;
+  }
+
   /* Headings: Sized by level, distinguished by color and spacing */
   h1 {
     font-size: 17px;
@@ -266,7 +271,7 @@
     margin: 32px 0;
   }
 
-  .shiki {
+  .highlights {
     background: var(--color-background-stronger);
     color: var(--text-base);
     font-size: 13px;
@@ -308,7 +313,7 @@
     display: none;
   }
 
-  [data-component="markdown-code"][data-code-kind="shell"] .shiki {
+  [data-component="markdown-code"][data-code-kind="shell"] .highlights {
     background: var(--markdown-shell-code-background);
     border-color: var(--markdown-shell-code-border);
     color: var(--markdown-shell-code-color);

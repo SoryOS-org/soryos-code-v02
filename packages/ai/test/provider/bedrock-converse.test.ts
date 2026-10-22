@@ -1,8 +1,9 @@
 import { EventStreamCodec } from "@smithy/eventstream-codec"
 import { fromUtf8, toUtf8 } from "@smithy/util-utf8"
 import { describe, expect } from "bun:test"
-import { Effect, Encoding, Ref, Schema, Stream } from "effect"
-import { HttpClientRequest } from "effect/unstable/http"
+import { Effect, Ref, Schema, Stream } from "effect"
+import { Base64 } from "effect/encoding"
+import { HttpClientRequest } from "effect/http"
 import {
   Media,
   CacheHint,
@@ -865,7 +866,7 @@ describe("Bedrock Converse route", () => {
           reason: { _tag: "InvalidProviderOutput", classification: "incomplete-stream" },
           message: `Incomplete Bedrock Converse event-stream frame: ${partial.length} buffered bytes remain at end of stream`,
         })
-        expect(error.reason.body).toBe(Encoding.encodeBase64(partial))
+        expect(error.reason.body).toBe(Base64.encode(partial))
       }
     }),
   )
@@ -1656,9 +1657,9 @@ describe("Bedrock Converse route", () => {
     }),
   )
 
-  it.effect("uses originalMessage from model stream exception frames", () =>
+  it.effect("uses originalMessage and originalStatusCode from model stream exception frames", () =>
     Effect.gen(function* () {
-      const error = yield* LLMClient.generate(baseRequest).pipe(
+      const serverError = yield* LLMClient.generate(baseRequest).pipe(
         Effect.provide(
           fixedBytes(
             exceptionFrame("modelStreamErrorException", {
@@ -1669,8 +1670,20 @@ describe("Bedrock Converse route", () => {
         ),
         Effect.flip,
       )
+      const clientError = yield* LLMClient.generate(baseRequest).pipe(
+        Effect.provide(
+          fixedBytes(
+            exceptionFrame("modelStreamErrorException", {
+              originalMessage: "Upstream rejected request",
+              originalStatusCode: 400,
+            }),
+          ),
+        ),
+        Effect.flip,
+      )
 
-      expect(error).toMatchObject({ reason: { _tag: "ProviderInternal" }, message: "Upstream model failed" })
+      expect(serverError).toMatchObject({ reason: { _tag: "ProviderInternal" }, message: "Upstream model failed" })
+      expect(clientError).toMatchObject({ reason: { _tag: "InvalidRequest" }, message: "Upstream rejected request" })
     }),
   )
 

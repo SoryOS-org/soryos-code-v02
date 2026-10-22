@@ -22,7 +22,7 @@ const sources: ConfigDiscovery.Sources = {
 }
 
 describe("ConfigWatch.plan", () => {
-  for (const source of ["global", "direct", "project", "explicit"] as const) {
+  for (const source of ["system", "global", "direct", "project", "explicit"] as const) {
     it.live(`watches the target of a symlinked ${source} config even when dangling`, () =>
       Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
         Effect.flatMap((tmp) =>
@@ -35,6 +35,7 @@ describe("ConfigWatch.plan", () => {
               project: source === "project" ? [{ path: directory, present: true }] : [],
               claude: [],
               agents: [],
+              system: source === "system" ? { path: directory, present: true } : undefined,
               global: source === "global" ? directory : undefined,
               explicit: source === "explicit" ? file : undefined,
             }
@@ -58,8 +59,16 @@ describe("ConfigWatch.plan", () => {
               await fs.symlink("../dotfiles/replacement.json", file)
             })
             const retargeted = Array.from((yield* ConfigWatch.plan(input)).values())
-            expect(retargeted).toContainEqual({ path: path.dirname(target), type: "entries", names: ["replacement.json"] })
-            expect(retargeted).not.toContainEqual({ path: path.dirname(target), type: "entries", names: ["target.json"] })
+            expect(retargeted).toContainEqual({
+              path: path.dirname(target),
+              type: "entries",
+              names: ["replacement.json"],
+            })
+            expect(retargeted).not.toContainEqual({
+              path: path.dirname(target),
+              type: "entries",
+              names: ["target.json"],
+            })
           }),
         ),
       ),
@@ -76,10 +85,20 @@ describe("ConfigWatch.plan", () => {
           names: [".agents", ".claude", ".opencode", "opencode.json", "opencode.jsonc"],
         },
       ])
-      const present = yield* ConfigWatch.plan({ ...sources, project: [{ path: root, present: true }] })
+      const system = AbsolutePath.make(path.join(project, "system-opencode"))
+      const present = yield* ConfigWatch.plan({
+        ...sources,
+        system: { path: system, present: true },
+        project: [{ path: root, present: true }],
+      })
       expect(Array.from(present.values())).toEqual([
-        { path: root, type: "directory", ignore: ["node_modules", ".git", "**/{node_modules,.git}/**"] },
-        ...missing.values(),
+        { path: system, type: "directory", ignore: FSUtil.ignoreGlobs },
+        { path: root, type: "directory", ignore: FSUtil.ignoreGlobs },
+        {
+          path: project,
+          type: "entries",
+          names: [".agents", ".claude", ".opencode", "opencode.json", "opencode.jsonc", "system-opencode"],
+        },
       ])
     }),
   )
