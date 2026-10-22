@@ -199,6 +199,8 @@ export default function Layout(props: ParentProps) {
           {/* Size containment collapses percentage-height descendants in WebKit. */}
           <main
             class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-content"
+            // Under James the sidebar stays at its landing box during a flight, under the content as the layout moves.
+            classList={{ "z-20": sidebarMotion.pinned() }}
             style={{
               "padding-top": bottomTitlebar() ? "env(safe-area-inset-top, 0px)" : "0px",
               "padding-bottom":
