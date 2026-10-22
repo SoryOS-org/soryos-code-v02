@@ -43,8 +43,8 @@ export function motionFields(motion: StoryMotion): { [key: string]: Field } {
 }
 
 /**
- * The motion cards' place among the story's presets: each card with springs gets its own strip of Shipped, Snappy,
- * Smooth and Calm, which the states' presets leave alone, and the states leave the other cards alone too.
+ * The motion cards' place among the story's presets: the states leave every card alone, and each card with springs
+ * gets its own strip of Shipped, Snappy, Smooth and Calm.
  */
 export function motionScopes(motion: StoryMotion) {
   const springs = motion.knobs.flatMap((item) => (item.kind === "spring" ? [item] : []))
@@ -52,7 +52,7 @@ export function motionScopes(motion: StoryMotion) {
   const groups = [...motion.knobs.map(group), ...motion.actions.map((item) => item.group), ...motion.globals.map(group)]
 
   return {
-    inPresets: Object.fromEntries(groups.flatMap((name) => (scopes.includes(name) ? [] : [[name, false]]))),
+    inPresets: Object.fromEntries(groups.map((name) => [name, false])),
     scopedPresets: Object.fromEntries(
       scopes.map((scope) => [
         scope,
