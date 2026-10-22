@@ -17,7 +17,6 @@
     "./file": "./src/components/file.tsx",
     "./file-media": "./src/components/file-media.tsx",
     "./file-search": "./src/components/file-search.tsx",
-    "./file-ssr": "./src/components/file-ssr.tsx",
     "./line-comment": "./src/components/line-comment.tsx",
     "./line-comment-annotations": "./src/components/line-comment-annotations.tsx",
     "./markdown": "./src/components/markdown.tsx",

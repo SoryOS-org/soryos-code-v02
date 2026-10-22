@@ -49,7 +49,7 @@ export function shellResultFailed(metadata: Record<string, unknown>) {
   return metadata.timeout === true || (typeof metadata.exit === "number" && metadata.exit !== 0)
 }
 
-export function executeToolFailed(metadata: Record<string, unknown>) {
+function executeToolFailed(metadata: Record<string, unknown>) {
   // Code Mode can report failed nested calls in a completed tool result.
   return metadata.error === true || executeToolCalls(metadata).some((call) => call.status === "error")
 }

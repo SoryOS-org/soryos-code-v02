@@ -1084,7 +1084,7 @@ export interface ToolProps {
   locked?: boolean
 }
 
-export type ToolComponent = Component<ToolProps>
+type ToolComponent = Component<ToolProps>
 
 const state: Record<
   string,
@@ -1094,13 +1094,13 @@ const state: Record<
   }
 > = {}
 
-export function registerTool(input: { name: string; render?: ToolComponent }) {
+function registerTool(input: { name: string; render?: ToolComponent }) {
   state[input.name] = input
 
   return input
 }
 
-export function getTool(name: string) {
+function getTool(name: string) {
   return state[name]?.render
 }
 
@@ -1871,13 +1871,7 @@ ToolRegistry.register({
 
     const openDetails = () =>
       dialog.show(() => (
-        <ExecuteDetails
-          code={code()}
-          output={output()}
-          error={error()}
-          calls={calls().length}
-          status={props.status}
-        />
+        <ExecuteDetails code={code()} output={output()} error={error()} calls={calls().length} status={props.status} />
       ))
 
     return (
@@ -1894,7 +1888,9 @@ ToolRegistry.register({
               <span data-slot="basic-tool-tool-title">
                 <TextShimmer text={i18n.t("ui.tool.execute")} active={pending()} />
               </span>
-              <Show when={!open() && subtitle()}>{(text) => <ShellSubmessage text={text()} animate={sawPending} />}</Show>
+              <Show when={!open() && subtitle()}>
+                {(text) => <ShellSubmessage text={text()} animate={sawPending} />}
+              </Show>
             </div>
           </div>
         )}

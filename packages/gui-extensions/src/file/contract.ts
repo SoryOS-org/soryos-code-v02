@@ -3,7 +3,7 @@ import type { ArtifactKind } from "@opencode/util/artifact"
 import type { ChangeKind } from "../review/contract"
 import { Contract, Registry, type MountedSession, type SessionScreen } from "../sdk"
 
-export interface FileTreeProps {
+interface FileTreeProps {
   /** The session screen that owns the rendered files. */
   readonly screen: SessionScreen
   readonly session: MountedSession
@@ -16,7 +16,7 @@ export interface FileTreeProps {
   onFileClick(path: string): void
 }
 
-export interface FileListProps {
+interface FileListProps {
   /** The session screen that owns the rendered files. */
   readonly screen: SessionScreen
   readonly session: MountedSession
@@ -36,7 +36,7 @@ export interface FileTree {
 
 export const FileTree = Contract.define<FileTree, "file.tree">("file.tree")
 
-export interface OpenInAppProps {
+interface OpenInAppProps {
   /** The session screen whose workspace opens. */
   readonly screen: SessionScreen
   readonly session: MountedSession
