@@ -20,6 +20,21 @@ export function ClientMcp() {
   const state: { key?: string; connection?: ClientMcpConnection } = {}
 
   const openTerminal = async (calledBy: string | undefined) => {
+    const result = await terminalFor(calledBy)
+    if (typeof result !== "string") return result
+    return { content: [{ type: "text" as const, text: `Opened terminal ${result}` }] }
+  }
+
+  const writeTerminal = async (calledBy: string | undefined, text: unknown) => {
+    if (typeof text !== "string") return failure("text must be a string")
+    const result = await terminalFor(calledBy)
+    if (typeof result !== "string") return result
+    terminals.write(result, new TextEncoder().encode(text))
+    return { content: [{ type: "text" as const, text: `Wrote to terminal ${result}` }] }
+  }
+
+  // Resolves the terminal open_terminal shows (selected, else newest, else a new one), or a tool failure.
+  const terminalFor = async (calledBy: string | undefined) => {
     if (!calledBy) return failure("Unknown session")
     if (!data.session.get(calledBy)) await data.session.sync(calledBy).catch(() => undefined)
     if (!data.session.get(calledBy)) return failure("Unknown session")
@@ -42,8 +57,7 @@ export function ClientMcp() {
     const existing = current.selectedTerminalID ?? current.terminals.at(-1)?.id
     if (existing && existing !== current.selectedTerminalID)
       await terminals.selectTerminal(target, existing, { focus: false })
-    const ptyID = existing ?? (await terminals.newTerminal(target, { focus: false })).id
-    return { content: [{ type: "text" as const, text: `Opened terminal ${ptyID}` }] }
+    return existing ?? (await terminals.newTerminal(target, { focus: false })).id
   }
 
   // Reconnects when the flag flips, the viewed location changes, or the server endpoint changes after a service reconnect.
@@ -70,6 +84,19 @@ export function ClientMcp() {
                     "Open a terminal for the current session in the user's TUI, without taking keyboard focus.",
                   inputSchema: { type: "object" },
                   handler: (_args, ctx) => openTerminal(ctx.sessionID),
+                },
+                {
+                  name: "write_terminal",
+                  description:
+                    "Type text into the current session's terminal in the user's TUI, opening one first if needed. Text is sent as-is; include a trailing newline to run a command.",
+                  inputSchema: {
+                    type: "object",
+                    properties: {
+                      text: { type: "string", description: "Text to send to the terminal, e.g. \"ls\\n\" to run ls." },
+                    },
+                    required: ["text"],
+                  },
+                  handler: (args, ctx) => writeTerminal(ctx.sessionID, args.text),
                 },
               ],
             }),

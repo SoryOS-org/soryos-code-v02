@@ -18,6 +18,9 @@ export const { use: useSessionTerminals, provider: SessionTerminalsProvider } = 
     const event = useEvent()
     const [available, setAvailable] = createSignal(false)
     const [focus, setFocus] = createSignal<string>()
+    // Input written before a terminal's pane mounts waits here; the pane drains it when it attaches.
+    const writers = new Map<string, (data: Uint8Array) => void>()
+    const pending = new Map<string, Uint8Array[]>()
     // Settles once the latest terminal support check finishes; pending until the first connection.
     const initial = Promise.withResolvers<void>()
     let check = initial.promise
@@ -108,6 +111,19 @@ export const { use: useSessionTerminals, provider: SessionTerminalsProvider } = 
         await refresh(sessionID)
         await selectTerminal(sessionID, terminal.id, options)
         return terminal
+      },
+      write(ptyID: string, data: Uint8Array) {
+        const writer = writers.get(ptyID)
+        if (writer) return writer(data)
+        pending.set(ptyID, [...(pending.get(ptyID) ?? []), data])
+      },
+      attachWriter(ptyID: string, writer: (data: Uint8Array) => void) {
+        writers.set(ptyID, writer)
+        pending.get(ptyID)?.forEach(writer)
+        pending.delete(ptyID)
+        return () => {
+          if (writers.get(ptyID) === writer) writers.delete(ptyID)
+        }
       },
       shouldFocus(ptyID: string) {
         return focus() === ptyID

@@ -41,25 +41,8 @@ test.skipIf(process.platform === "win32")("open_terminal opens an unfocused term
   const peer = await tui.mcp.promise
   expect(peer.url.searchParams.get("name")).toBe("tui")
   expect(peer.url.searchParams.get("location[directory]")).toBe(directory)
-  let next = 0
-  const request = (method: string, params: unknown) => {
-    const id = ++next
-    const response = new Promise<{ result: ToolResult }>((resolve) => tui.responses.set(id, resolve))
-    peer.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }))
-    return response.then((message) => message.result)
-  }
-  const callTool = (sessionID?: string) =>
-    request("tools/call", {
-      name: "open_terminal",
-      arguments: {},
-      ...(sessionID ? { _meta: { "ai.opencode/sessionID": sessionID } } : {}),
-    })
-  await request("initialize", {
-    protocolVersion: "2025-06-18",
-    capabilities: {},
-    clientInfo: { name: "fixture", version: "1.0.0" },
-  })
-  peer.socket.send(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))
+  const call = await initialize(tui)
+  const callTool = (sessionID?: string) => call("open_terminal", {}, sessionID)
   await tui.setup.waitForFrame((frame) => frame.includes("Client MCP message"))
   // Mount and server.connected must not open a second connection.
   expect(tui.upgrades).toBe(1)
@@ -81,6 +64,34 @@ test.skipIf(process.platform === "win32")("open_terminal opens an unfocused term
   expect(tui.upgrades).toBe(1)
 })
 
+test.skipIf(process.platform === "win32")("write_terminal sends text as-is to the session's terminal", async () => {
+  await using tui = await start(true)
+  const call = await initialize(tui)
+  await tui.setup.waitForFrame((frame) => frame.includes("Client MCP message"))
+
+  expect(await call("write_terminal", {}, open.id)).toMatchObject({
+    isError: true,
+    content: [{ text: "text must be a string" }],
+  })
+  expect(await call("write_terminal", { text: "x" }, other.id)).toMatchObject({
+    isError: true,
+    content: [{ text: "session not open in this TUI" }],
+  })
+  // With no terminal open, it opens one and delivers the input once the pane attaches.
+  expect(await call("write_terminal", { text: "echo hi\n" }, open.id)).toMatchObject({
+    content: [{ text: "Wrote to terminal pty_fixture" }],
+  })
+  expect(tui.created).toEqual([open.id])
+  await tui.setup.waitFor(() => tui.input().includes("echo hi\n"))
+  expect(await call("write_terminal", { text: "pwd" }, open.id)).toMatchObject({
+    content: [{ text: "Wrote to terminal pty_fixture" }],
+  })
+  await tui.setup.waitFor(() => tui.input() === "echo hi\npwd")
+  expect(tui.created).toEqual([open.id])
+  await tui.setup.waitForVisualIdle()
+  expect(tui.setup.renderer.currentFocusedRenderable instanceof EmbeddedTerminalRenderable).toBe(false)
+})
+
 test.skipIf(process.platform === "win32")("does not connect when the experiment is off", async () => {
   await using tui = await start(false)
   await tui.setup.waitForFrame((frame) => frame.includes("Client MCP message"))
@@ -89,12 +100,36 @@ test.skipIf(process.platform === "win32")("does not connect when the experiment 
   expect(tui.upgrades).toBe(0)
 })
 
+async function initialize(tui: Awaited<ReturnType<typeof start>>) {
+  const peer = await tui.mcp.promise
+  let next = 0
+  const request = (method: string, params: unknown) => {
+    const id = ++next
+    const response = new Promise<{ result: ToolResult }>((resolve) => tui.responses.set(id, resolve))
+    peer.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }))
+    return response.then((message) => message.result)
+  }
+  await request("initialize", {
+    protocolVersion: "2025-06-18",
+    capabilities: {},
+    clientInfo: { name: "fixture", version: "1.0.0" },
+  })
+  peer.socket.send(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }))
+  return (name: string, args: Record<string, unknown>, sessionID?: string) =>
+    request("tools/call", {
+      name,
+      arguments: args,
+      ...(sessionID ? { _meta: { "ai.opencode/sessionID": sessionID } } : {}),
+    })
+}
+
 async function start(enabled: boolean) {
   const state = await tmpdir()
   const setup = await createTestRenderer({ width: 120, height: 36, kittyKeyboard: true })
   await setup.renderer.setupTerminal()
   setup.renderer.start()
   const created: string[] = []
+  const input: Buffer[] = []
   const requests: string[] = []
   const message = { id: "message-0", type: "user", text: "Client MCP message", time: { created: 0 } }
   const calls = createFetch((url, request) => {
@@ -143,7 +178,11 @@ async function start(enabled: boolean) {
         socket.send(JSON.stringify({ type: "replay_complete" }))
       },
       message(socket, text) {
-        if (socket.data.url.pathname !== "/api/experimental/client-mcp") return
+        if (socket.data.url.pathname !== "/api/experimental/client-mcp") {
+          // Interaction frames: [kind, cols(u16), rows(u16), ...input]; kind 1 carries input.
+          if (typeof text !== "string" && text[0] === 1) input.push(text.subarray(5))
+          return
+        }
         const message = JSON.parse(String(text))
         responses.get(message.id)?.(message)
       },
@@ -168,6 +207,7 @@ async function start(enabled: boolean) {
     setup,
     created,
     requests,
+    input: () => Buffer.concat(input).toString(),
     mcp,
     responses,
     get upgrades() {
