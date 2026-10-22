@@ -44,7 +44,7 @@ story.describe("message timestamp", () => {
   })
 })
 
-story("smoothly delivers a pending footer with and without hover", async ({ mount, page }) => {
+story("drops a pending footer at once on delivery with and without hover", async ({ mount, page }) => {
   const timeline = await mount("current-prompt-message--pending")
   const message = timeline.locator('[data-component="user-message"]')
   const footer = timeline.locator('[data-slot="user-message-copy-wrapper"]')
@@ -73,36 +73,24 @@ story("smoothly delivers a pending footer with and without hover", async ({ moun
     expect(actions.x - label.x - label.width).toBeLessThanOrEqual(9)
     await timeline.getByLabel("Delivery state").selectOption("delivered")
 
-    const middle = await message.evaluate((element) => {
-      for (const animation of element.getAnimations({ subtree: true })) {
-        animation.pause()
-        animation.currentTime = 100
-      }
+    // The first frame after delivery already shows the delivered footer: nothing shrinks or fades out.
+    const after = await message.evaluate((element) => {
       const pending = element.querySelector(
         '[data-slot="user-message-transition"]:has([data-slot="user-message-pending"])',
       )!
       const footer = element.querySelector('[data-slot="user-message-copy-wrapper"]')!
 
       return {
+        animations: [...pending.getAnimations(), ...footer.getAnimations()].length,
         width: pending.getBoundingClientRect().width,
         opacity: Number(getComputedStyle(pending).opacity),
         footer: Number(getComputedStyle(footer).opacity),
       }
     })
 
-    expect(middle.width).toBeGreaterThan(0)
-    expect(middle.width).toBeLessThan(before.width)
-    expect(middle.opacity).toBeGreaterThan(0)
-    expect(middle.opacity).toBeLessThan(1)
-    if (hover) expect(middle.footer).toBe(1)
-    if (!hover) {
-      expect(middle.footer).toBeGreaterThan(0)
-      expect(middle.footer).toBeLessThan(1)
-    }
+    expect(after).toEqual({ animations: 0, width: 0, opacity: 0, footer: hover ? 1 : 0 })
+    expect(before.width).toBeGreaterThan(0)
 
-    await message.evaluate((element) =>
-      element.getAnimations({ subtree: true }).forEach((animation) => animation.finish()),
-    )
     await expect(pending).toBeHidden()
     await expect(footer).toHaveCSS("opacity", hover ? "1" : "0")
     await expect(timestamp).toHaveCSS("opacity", hover ? "1" : "0")

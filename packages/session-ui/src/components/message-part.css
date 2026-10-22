@@ -360,8 +360,10 @@
     overflow: visible;
   }
 
-  /* A growing row settles its labels in place: its pending status can land a few frames after it appears. */
+  /* Delivery swaps Pending for the time at once, and a growing row settles its labels in place: its pending status
+     can land a few frames after it appears. */
   :root[data-motion="reduce"] &,
+  &[data-delivering],
   [data-timeline-grow] & {
     [data-slot="user-message-copy-wrapper"],
     [data-slot="user-message-meta-tail"],
