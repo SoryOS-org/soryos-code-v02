@@ -66,6 +66,11 @@ export type CreateDataInput = {
   readonly directory: string
   /** Raw-message window used for an initial transcript read. Older pages retain their normal size. */
   readonly initialMessageLimit?: () => number
+  /**
+   * Most raw messages a transcript re-read may page through to cover the history already loaded. Without it, a
+   * re-read (for example after a reconnect) replaces loaded history with the initial window.
+   */
+  readonly resyncMessageLimit?: () => number
   readonly event: {
     readonly on: <Type extends OpenCodeEvent["type"]>(
       type: Type,
@@ -82,6 +87,7 @@ export type CreateDataInput = {
 
 const messageIDFromEvent = (eventID: string) => eventID.replace(/^evt_/, "msg_")
 const messagePageLimit = 20
+const resyncPageLimit = 200
 // Trailing window for event bursts that each ask for the same refetch.
 export const settleMs = 150
 
@@ -280,6 +286,11 @@ export function createData(config: CreateDataInput) {
     Object.values(store.session.info).toSorted((a, b) => b.time.updated - a.time.updated),
   )
   const messageIndex = new Map<string, Map<string, number>>()
+  // Counts live-event transcript edits per session, so a multi-page re-read can tell its pages went stale.
+  const messageEvents = new Map<string, number>()
+  let handlingEvent = false
+  // Message IDs the last transcript read took from the server, per session.
+  const fetchedMessages = new Map<string, Set<string>>()
   const sync = createSync()
   let activeUpdates: Map<string, DataSessionStatus | undefined> | undefined
   const pendingUpdates = new Map<string, Map<string, SessionInboxInfo | SessionInbox.Delivery | undefined>>()
@@ -448,6 +459,7 @@ export function createData(config: CreateDataInput) {
 
   const message = {
     update(sessionID: string, fn: (messages: SessionMessageInfo[], index: Map<string, number>) => void) {
+      if (handlingEvent) messageEvents.set(sessionID, (messageEvents.get(sessionID) ?? 0) + 1)
       setStore(
         "session",
         "message",
@@ -1511,7 +1523,18 @@ export function createData(config: CreateDataInput) {
               // know about yet.
               const inflight = (store.session.pending[sessionID] ?? []).filter((item) => outbox.has(item.id))
               const merged = inflight.length === 0 ? pending : [...pending, ...inflight]
+              // A transcript read that finished first kept rows this snapshot no longer admits, such as input
+              // cancelled while disconnected. An unfinished read drops them itself.
+              const kept = new Set(merged.map((item) => item.id))
+              const settled =
+                sync.has(`session.message:${sessionID}`) && !sync.pending(`session.message:${sessionID}`)
+              const dropped = settled
+                ? (store.session.pending[sessionID] ?? []).filter(
+                    (item) => !kept.has(item.id) && !fetchedMessages.get(sessionID)?.has(item.id),
+                  )
+                : []
               batch(() => {
+                dropped.forEach((item) => retractLocal(sessionID, item.id))
                 setStore("session", "pending", sessionID, reconcile(merged))
                 merged.forEach(materializeInboxMessage)
               })
@@ -1709,12 +1732,50 @@ export function createData(config: CreateDataInput) {
         },
         sync(sessionID: string) {
           return sync.run(`session.message:${sessionID}`, async () => {
-            const response = await api().message.list({
-              sessionID,
-              limit: config.initialMessageLimit?.() ?? messagePageLimit,
-              order: "desc",
-            })
-            const fetched = response.data.toReversed()
+            const limit = config.initialMessageLimit?.() ?? messagePageLimit
+            const depth = config.resyncMessageLimit?.() ?? 0
+            // A re-read covers every loaded page so the transcript keeps its place, then replaces it wholesale:
+            // the server stays the source of truth, and reconcile writes only the rows that changed.
+            const loaded = store.session.message[sessionID] ?? []
+            const oldest =
+              depth > limit && loaded.length > limit
+                ? loaded.find((item) => !outbox.has(item.id) && !result.session.input.has(sessionID, item.id))?.id
+                : undefined
+            const events = messageEvents.get(sessionID)
+            const head = (size: number) => api().message.list({ sessionID, limit: size, order: "desc" })
+            const response = await head(oldest ? Math.min(resyncPageLimit, loaded.length) : limit)
+            let pages = [...response.data]
+            let cursor = response.cursor.next ?? undefined
+            let paged = false
+            let stale = false
+            // Past the limit, older loaded rows drop as they do without one.
+            while (oldest && cursor && pages.length < depth && !pages.some((item) => item.id === oldest)) {
+              paged = true
+              const page = await api().message.list({
+                sessionID,
+                limit: Math.min(resyncPageLimit, depth - pages.length),
+                cursor,
+              })
+              // An empty page means a revert removed the cursor's anchor.
+              stale = page.data.length === 0
+              if (stale) break
+              pages.push(...page.data)
+              cursor = page.cursor.next ?? undefined
+            }
+            // A live edit or a revert between page reads leaves the pages inconsistent. Re-read the head and fall
+            // back to the newest window if it moved.
+            if (paged) {
+              const fresh = await head(limit)
+              const moved =
+                stale ||
+                messageEvents.get(sessionID) !== events ||
+                fresh.data.some((item, index) => item.id !== response.data[index]?.id)
+              if (moved) {
+                pages = [...fresh.data]
+                cursor = fresh.cursor.next ?? undefined
+              }
+            }
+            const fetched = pages.toReversed()
             // Same protection as the pending sync: a re-fetch racing an
             // admission must not wipe its local transcript row.
             const ids = new Set(fetched.map((item) => item.id))
@@ -1728,9 +1789,10 @@ export function createData(config: CreateDataInput) {
             )
             const messages = local.length === 0 ? fetched : [...fetched, ...local]
             batch(() => {
+              fetchedMessages.set(sessionID, ids)
               messageIndex.set(sessionID, new Map(messages.map((message, index) => [message.id, index])))
               setStore("session", "message", sessionID, reconcile(messages))
-              setStore("session", "messageCursor", sessionID, response.cursor.next ?? undefined)
+              setStore("session", "messageCursor", sessionID, cursor)
             })
           })
         },
@@ -2026,7 +2088,12 @@ export function createData(config: CreateDataInput) {
 
   onCleanup(
     config.event.listen(({ details }) => {
-      handleEvent(details)
+      handlingEvent = true
+      try {
+        handleEvent(details)
+      } finally {
+        handlingEvent = false
+      }
     }),
   )
 

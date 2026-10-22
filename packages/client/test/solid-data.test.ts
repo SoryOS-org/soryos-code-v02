@@ -1069,6 +1069,266 @@ test("loads bounded message pages", async () => {
   }
 })
 
+const resyncSession = "ses_resync"
+const resyncRow = (index: number) => ({
+  id: `msg_${String(index).padStart(4, "0")}`,
+  type: "user",
+  text: `Message ${index}`,
+  time: { created: index },
+})
+
+function resyncFixture(options: {
+  history: { id: string }[]
+  initial?: number
+  depth?: number
+  beforeRead?: (url: URL) => unknown
+}) {
+  const server = { history: options.history, inbox: [] as unknown[] }
+  const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+  const api = OpenCode.make({
+    baseUrl: "http://opencode.local",
+    fetch: async (input, init) => {
+      const url = new URL((input instanceof Request ? input : new Request(input, init)).url)
+      await options.beforeRead?.(url)
+      if (url.pathname.endsWith("/inbox")) return Response.json({ data: server.inbox })
+      // Like the server, a cursor names the oldest message already read; a removed anchor returns nothing.
+      const cursor = url.searchParams.get("cursor")
+      const end = Math.max(0, cursor ? server.history.findIndex((item) => item.id === cursor) : server.history.length)
+      const start = Math.max(0, end - Number(url.searchParams.get("limit")))
+      return Response.json({
+        data: structuredClone(server.history.slice(start, end)).toReversed(),
+        cursor: start > 0 ? { next: server.history[start]!.id } : {},
+      })
+    },
+  })
+  let seq = 0
+  return createRoot((dispose) => {
+    const data = createData({
+      api: () => api,
+      directory: "/project",
+      initialMessageLimit: () => options.initial ?? 20,
+      resyncMessageLimit: () => options.depth ?? 2_000,
+      event: {
+        on: () => () => {},
+        listen(handler) {
+          listeners.add(handler)
+          return () => listeners.delete(handler)
+        },
+      },
+    })
+    return {
+      data,
+      server,
+      dispose,
+      seq: () => seq,
+      emit: (event: Record<string, unknown>) =>
+        listeners.forEach((listener) =>
+          listener({
+            name: event.type as OpenCodeEvent["type"],
+            details: {
+              created: ++seq,
+              durable: { aggregateID: resyncSession, seq, version: 1 },
+              ...event,
+            } as OpenCodeEvent,
+          }),
+        ),
+      ids: () => data.session.message.list(resyncSession).map((message) => message.id),
+      async loadAll() {
+        await data.session.message.sync(resyncSession)
+        while (data.session.message.more(resyncSession)) await data.session.message.loadMore(resyncSession)
+      },
+      resync() {
+        data.session.message.invalidate(resyncSession)
+        return data.session.message.sync(resyncSession)
+      },
+    }
+  })
+}
+
+test.each(["completed and cancelled", "reverted"] as const)(
+  "a resync re-reads loaded history from the server when it was %s while disconnected",
+  async (change) => {
+    const sessionID = resyncSession
+    const assistant = (completed: boolean) => ({
+      id: "msg_1",
+      type: "assistant",
+      agent: "build",
+      model: { providerID: "fixture", id: "model" },
+      content: [{ type: "text", text: completed ? "done" : "working" }],
+      time: completed ? { created: 1, completed: 2 } : { created: 1 },
+    })
+    const history: { id: string }[] = [{ id: "msg_0", type: "user", text: "msg_0", time: { created: 0 } }, assistant(false)]
+    const setup = resyncFixture({ history, initial: 2, depth: 100 })
+    const appendSynthetic = (id: string) => {
+      history.push({ id, type: "synthetic", text: id, time: { created: setup.seq() + 1 } })
+      setup.emit({ id: id.replace(/^msg_/, "evt_"), type: "session.synthetic", data: { sessionID, text: id } })
+    }
+
+    try {
+      await setup.data.session.message.sync(sessionID)
+      await setup.data.session.pending.sync(sessionID)
+      setup.emit({
+        id: "evt_q",
+        type: "session.inbox.enqueued",
+        data: { sessionID, inboxID: "msg_q", item: { type: "user", delivery: "queue", payload: { text: "Queued" } } },
+      })
+      setup.server.inbox = [
+        { id: "msg_q", sessionID, type: "user", delivery: "queue", time: { created: 3 }, payload: { text: "Queued" } },
+      ]
+      appendSynthetic("msg_2")
+      appendSynthetic("msg_3")
+      expect(setup.ids()).toEqual(["msg_0", "msg_1", "msg_q", "msg_2", "msg_3"])
+
+      // Disconnected: the server finishes msg_1 and cancels the queued prompt, or reverts everything after msg_0.
+      setup.server.inbox = []
+      if (change === "completed and cancelled") history[1] = assistant(true)
+      if (change === "reverted") history.splice(1)
+      setup.data.session.pending.invalidate(sessionID)
+      setup.data.session.message.invalidate(sessionID)
+      if (change === "reverted") {
+        appendSynthetic("msg_4")
+        appendSynthetic("msg_5")
+      }
+      await setup.data.session.pending.sync(sessionID)
+      await setup.data.session.message.sync(sessionID)
+
+      if (change === "completed and cancelled") {
+        expect(setup.ids()).toEqual(["msg_0", "msg_1", "msg_2", "msg_3"])
+        const message = setup.data.session.message.get(sessionID, "msg_1")
+        expect(message?.type === "assistant" ? message.time.completed : undefined).toBe(2)
+      }
+      if (change === "reverted") expect(setup.ids()).toEqual(["msg_0", "msg_4", "msg_5"])
+      expect(setup.data.session.message.more(sessionID)).toBe(false)
+    } finally {
+      setup.dispose()
+    }
+  },
+)
+
+test("a resync keeps paged history and takes changed rows from the server", async () => {
+  const history = Array.from({ length: 450 }, (_, index) => resyncRow(index))
+  const setup = resyncFixture({ history, depth: 400 })
+  const list = () => setup.data.session.message.list(resyncSession)
+
+  try {
+    await setup.data.session.message.sync(resyncSession)
+    while (list().length < 300) await setup.data.session.message.loadMore(resyncSession)
+    const before = setup.ids()
+    history[449] = { ...history[449]!, text: "Edited" }
+
+    await setup.resync()
+    // Whole pages may read a little further back than what was loaded.
+    expect(setup.ids().slice(-before.length)).toEqual(before)
+    expect(list().at(-1)?.type === "user" ? list().at(-1)?.text : undefined).toBe("Edited")
+    expect(setup.data.session.message.more(resyncSession)).toBe(true)
+
+    // Past the limit, the re-read keeps only the newest rows it read.
+    await setup.loadAll()
+    await setup.resync()
+    expect(setup.data.session.message.get(resyncSession, "msg_0000")).toBeUndefined()
+    expect(setup.data.session.message.get(resyncSession, "msg_0449")).toBeDefined()
+    expect(setup.data.session.message.more(resyncSession)).toBe(true)
+  } finally {
+    setup.dispose()
+  }
+})
+
+test("a resync keeps loaded history when message IDs do not sort chronologically", async () => {
+  // iOS mints random IDs, and forks number theirs so that msg_f_10 sorts before msg_f_9.
+  const history = Array.from({ length: 250 }, (_, index) => resyncRow(index))
+  history[0] = { ...history[0]!, id: "msg_z_old_client_id" }
+  const setup = resyncFixture({ history })
+
+  try {
+    await setup.loadAll()
+    expect(setup.ids()).toHaveLength(250)
+    await setup.resync()
+    expect(setup.data.session.message.get(resyncSession, "msg_z_old_client_id")).toBeDefined()
+  } finally {
+    setup.dispose()
+  }
+})
+
+test.each(["delivered", "reverted", "reverted unobserved"] as const)(
+  "a resync falls back to the newest window when history is %s while it pages",
+  async (change) => {
+    const sessionID = resyncSession
+    const history: { id: string }[] = Array.from({ length: 250 }, (_, index) => resyncRow(index))
+    const hold = { active: false, entered: Promise.withResolvers<void>(), release: Promise.withResolvers<void>() }
+    const setup = resyncFixture({
+      history,
+      initial: 2,
+      async beforeRead(url) {
+        if (!hold.active || !url.searchParams.has("cursor")) return
+        hold.active = false
+        hold.entered.resolve()
+        await hold.release.promise
+      },
+    })
+
+    try {
+      await setup.loadAll()
+      if (change === "delivered")
+        setup.emit({
+          id: "evt_q",
+          type: "session.inbox.enqueued",
+          data: { sessionID, inboxID: "msg_q", item: { type: "user", delivery: "steer", payload: { text: "Steer" } } },
+        })
+
+      hold.active = true
+      const reading = setup.resync()
+      await hold.entered.promise
+      if (change === "delivered") {
+        history.push({ ...resyncRow(250), id: "msg_q" })
+        setup.emit({ id: "evt_delivered", type: "session.inbox.delivered", data: { sessionID, inboxID: "msg_q" } })
+      }
+      // The revert's event has not arrived. Reverting to msg_0040 removes the anchor of the page in flight;
+      // reverting to msg_0120 keeps it, so only the head shows the change.
+      if (change === "reverted") history.splice(40)
+      if (change === "reverted unobserved") history.splice(120)
+      hold.release.resolve()
+      await reading
+
+      if (change === "delivered") expect(setup.ids()).toEqual(["msg_0249", "msg_q"])
+      if (change === "reverted") expect(setup.ids()).toEqual(["msg_0038", "msg_0039"])
+      if (change === "reverted unobserved") expect(setup.ids()).toEqual(["msg_0118", "msg_0119"])
+    } finally {
+      hold.release.resolve()
+      setup.dispose()
+    }
+  },
+)
+
+test("input cancelled while disconnected disappears when the inbox read finishes after the transcript read", async () => {
+  const sessionID = resyncSession
+  const gate = Promise.withResolvers<void>()
+  const setup = resyncFixture({
+    history: [0, 1, 2].map(resyncRow),
+    initial: 2,
+    beforeRead: (url) => url.pathname.endsWith("/inbox") && gate.promise,
+  })
+
+  try {
+    await setup.data.session.message.sync(sessionID)
+    setup.emit({
+      id: "evt_queued",
+      type: "session.inbox.enqueued",
+      data: { sessionID, inboxID: "msg_queued", item: { type: "user", delivery: "queue", payload: { text: "Offline" } } },
+    })
+    setup.data.session.message.invalidate(sessionID)
+    setup.data.session.pending.invalidate(sessionID)
+    const pending = setup.data.session.pending.sync(sessionID)
+    await setup.data.session.message.sync(sessionID)
+    gate.resolve()
+    await pending
+    expect(setup.data.session.pending.list(sessionID)).toEqual([])
+    expect(setup.data.session.message.get(sessionID, "msg_queued")).toBeUndefined()
+  } finally {
+    gate.resolve()
+    setup.dispose()
+  }
+})
+
 test.each(["success", "failure", "cancel", "cancel-retry", "cancel-page", "join-cancel", "join-failure"])(
   "bulk history (%s)",
   async (mode) => {
