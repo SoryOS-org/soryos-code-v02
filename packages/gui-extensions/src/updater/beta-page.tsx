@@ -1,4 +1,5 @@
-import { For, Show } from "solid-js"
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
 import { Option } from "effect"
 import { Button } from "@opencode/ui/button"
 import { useExtension } from "../sdk"
@@ -20,6 +21,9 @@ export default function BetaNotesPage() {
 
 export function BetaNotesView(props: { embedded: EmbeddedNotes | undefined; open: (href: string) => void }) {
   const ctx = useExtension<typeof definition>()
+  // Below 640px a row's control slot wraps under its title, so narrow windows leave the visuals to the dialog.
+  const wide = createMediaQuery("(min-width: 640px)")
+  const watch = createWatch()
 
   return (
     <Show when={props.embedded}>
@@ -47,8 +51,8 @@ export function BetaNotesView(props: { embedded: EmbeddedNotes | undefined; open
               </div>
             </div>
             <div class="settings-tab-body settings-tab-body--sectioned">
-              <Notes title={ctx.t("beta.added")} notes={notes.added} open={props.open} />
-              <Notes title={ctx.t("beta.fixed")} notes={notes.fixed} open={props.open} />
+              <Notes title={ctx.t("beta.added")} notes={notes.added} open={props.open} wide={wide()} watch={watch} />
+              <Notes title={ctx.t("beta.fixed")} notes={notes.fixed} open={props.open} wide={wide()} watch={watch} />
             </div>
           </>
         )
@@ -57,9 +61,15 @@ export function BetaNotesView(props: { embedded: EmbeddedNotes | undefined; open
   )
 }
 
-// A change's visual sits in the row's control slot, inside the list; narrow windows, where the slot wraps under the
-// title, leave it to the dialog.
-function Notes(props: { title: string; notes: readonly BetaNote[]; open: (href: string) => void }) {
+type Watch = (element: Element, inView: (value: boolean) => void) => () => void
+
+function Notes(props: {
+  title: string
+  notes: readonly BetaNote[]
+  open: (href: string) => void
+  wide: boolean
+  watch: Watch
+}) {
   return (
     <Show when={props.notes.length > 0}>
       <section class="settings-section" aria-label={props.title}>
@@ -78,12 +88,8 @@ function Notes(props: { title: string; notes: readonly BetaNote[]; open: (href: 
                     </div>
                   </Show>
                 </div>
-                <Show when={note.visual}>
-                  {(visual) => (
-                    <div data-slot="settings-row-control" class="max-sm:hidden">
-                      <Visual visual={visual()} label={note.description} />
-                    </div>
-                  )}
+                <Show when={props.wide && note.visual}>
+                  {(visual) => <RowVisual visual={visual()} label={note.description} watch={props.watch} />}
                 </Show>
               </div>
             )}
@@ -92,4 +98,42 @@ function Notes(props: { title: string; notes: readonly BetaNote[]; open: (href: 
       </section>
     </Show>
   )
+}
+
+/** A row's visual in its control slot, mounted only while the row is near the viewport so off-screen loops stop. */
+function RowVisual(props: { visual: NonNullable<BetaNote["visual"]>; label?: string; watch: Watch }) {
+  const [visible, setVisible] = createSignal(false)
+  let slot!: HTMLDivElement
+
+  onMount(() => onCleanup(props.watch(slot, setVisible)))
+
+  return (
+    <div ref={slot} data-slot="settings-row-control" class="h-9 w-[120px]">
+      <Show when={visible()}>
+        <Visual visual={props.visual} label={props.label} />
+      </Show>
+    </div>
+  )
+}
+
+/** One IntersectionObserver for every row on the page; each watched element hears when it nears or leaves the viewport. */
+function createWatch(): Watch {
+  const rows = new Map<Element, (value: boolean) => void>()
+
+  const observer = new IntersectionObserver(
+    (entries) => entries.forEach((entry) => rows.get(entry.target)?.(entry.isIntersecting)),
+    { rootMargin: "200px 0px" },
+  )
+
+  onCleanup(() => observer.disconnect())
+
+  return (element, inView) => {
+    rows.set(element, inView)
+    observer.observe(element)
+
+    return () => {
+      rows.delete(element)
+      observer.unobserve(element)
+    }
+  }
 }
