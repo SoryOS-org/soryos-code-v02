@@ -265,8 +265,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
               // compositionstart and on every composition keystroke; reacting
               // here re-renders mid-composition and splits it into per-letter
               // micro compositions. State is reconciled once by the
-              // compositionend write-back.
-              if (event.isComposing || props.controller.imeActive()) return
+              // compositionend write-back, so only genuinely composing input
+              // is gated — input arriving after compositionend (e.g. Korean
+              // IMEs inserting the next character in the same keystroke) must
+              // reach the store.
+              if (props.controller.imeInserting(event)) return
               syncEditor(event.currentTarget)
             }}
             onKeyDown={(event) => {

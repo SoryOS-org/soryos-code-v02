@@ -235,17 +235,31 @@ export function createComposerEditor(input: {
   let lastCompositionEnd = 0
   // Safari fires compositionend BEFORE the confirming Enter keydown, so that
   // keydown reports isComposing=false (keyCode 229 on Safari 26, 13 in older
-  // reports). Treat any key event within 100ms of compositionend as part of
-  // the IME confirmation. Compare with performance.now() rather than
-  // event.timeStamp so the guard never depends on the event clock source.
+  // reports). Treat Enter/Tab within a short window after compositionend as
+  // part of the IME confirmation. The window only has to outlive the browser's
+  // runloop turn between the two events (measured at <=10ms in WKWebView); a
+  // longer window swallows a fast follow-up Enter pressed to send, since the
+  // typematic minimum is ~30ms. The window is scoped to Enter/Tab so Escape,
+  // arrows and Android soft keyboards (keyCode 229 on most keys) are never
+  // affected. Compare with performance.now() rather than event.timeStamp so
+  // the guard never depends on the event clock source.
+  const IME_CONFIRM_WINDOW_MS = 10
   const imeComposing = (event: KeyboardEvent) =>
-    event.isComposing || composing || event.keyCode === 229 || performance.now() - lastCompositionEnd < 100
-  // True while a composition is in flight or just ended. The editor must stay
-  // completely inert in this window: dispatching state updates or touching the
+    event.isComposing ||
+    composing ||
+    ((event.key === "Enter" || event.key === "Tab") &&
+      (event.keyCode === 229 || performance.now() - lastCompositionEnd < IME_CONFIRM_WINDOW_MS))
+  // True while a composition is in flight or just ended. The editor DOM must
+  // stay untouched in this window: rewriting the contentEditable DOM or the
   // selection makes the browser abort the composition and split it into
-  // per-letter micro compositions, after which the confirming Enter arrives as
-  // a plain keyCode 13 that no guard can recognize.
-  const imeActive = () => composing || performance.now() - lastCompositionEnd < 100
+  // per-letter micro compositions, after which the confirming Enter arrives
+  // as a plain keyCode 13 that no guard can recognize.
+  const imeActive = () => composing || performance.now() - lastCompositionEnd < IME_CONFIRM_WINDOW_MS
+  // Input events are only gated while a composition is genuinely in flight.
+  // Korean IMEs end the current syllable and insert the next character (a
+  // space, "?", "@", ...) in the same keystroke; that input arrives right
+  // after compositionend with isComposing=false and must reach the store.
+  const imeInserting = (event: InputEvent) => event.isComposing || composing
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (
@@ -389,6 +403,7 @@ export function createComposerEditor(input: {
     onKeyDown,
     imeComposing,
     imeActive,
+    imeInserting,
     onCompositionStart() {
       composing = true
     },
