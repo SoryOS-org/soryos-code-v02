@@ -94,7 +94,7 @@ function DialogConnectedModels(props: {
       if (!showSections) return []
       return items.flatMap((item) => {
         const model = models().find((model) => model.providerID === item.providerID && model.id === item.modelID)
-        if (!model) return []
+        if (!model || model.status === "deprecated") return []
         const provider = providers().get(model.providerID)
         return [
           {
