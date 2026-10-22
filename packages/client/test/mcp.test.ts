@@ -207,11 +207,14 @@ function serve() {
           ready.push(peer)
         })
       },
+      // Deliver outside the uWS callback: on Bun 1.4.4, replying from the SDK's microtasks inside it can make the
+      // server reject the client's next frame ("Received new message inside a fragmented message").
       message(socket, message) {
-        transports.get(socket.data.id)?.deliver(String(message))
+        const text = String(message)
+        setImmediate(() => transports.get(socket.data.id)?.deliver(text))
       },
       close(socket) {
-        transports.get(socket.data.id)?.ended()
+        setImmediate(() => transports.get(socket.data.id)?.ended())
       },
     },
   })
