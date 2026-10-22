@@ -3,6 +3,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Spinner } from "@opencode/ui/spinner"
 import { TitlebarItem } from "@opencode/gui-extensions/sdk"
 import { useExtensionHost } from "./host"
+import "./titlebar-items.css"
 
 /** TitlebarItem contributions shown in the titlebar. */
 export function useTitlebarItems() {
@@ -58,7 +59,7 @@ function TitlebarItemButton(props: { item: TitlebarItem; vertical?: boolean }) {
     >
       <button
         type="button"
-        class="relative z-10 flex h-full w-full items-center overflow-hidden rounded-full bg-v2-icon-icon-accent/20 text-v2-icon-icon-accent transition-[background-color] duration-150 ease-out group-hover:bg-[color-mix(in_srgb,var(--v2-icon-icon-accent)_20%,var(--v2-background-bg-deep))] group-focus-within:bg-[color-mix(in_srgb,var(--v2-icon-icon-accent)_20%,var(--v2-background-bg-deep))] focus-visible:outline-none disabled:opacity-60 motion-reduce:transition-none [app-region:no-drag]"
+        class="relative z-10 flex h-full w-full items-center overflow-hidden rounded-full text-v2-icon-icon-accent transition-[background-color] duration-150 ease-out focus-visible:outline-none disabled:opacity-60 motion-reduce:transition-none [app-region:no-drag]"
         classList={{ "justify-start": props.vertical, "justify-end": !props.vertical }}
         onClick={() => props.item.run?.()}
         disabled={!!props.item.busy}
@@ -71,10 +72,7 @@ function TitlebarItemButton(props: { item: TitlebarItem; vertical?: boolean }) {
           class="flex shrink-0 items-center justify-center"
           classList={{ "size-7": props.vertical, "size-5": !props.vertical }}
         >
-          <Show
-            when={!props.item.busy}
-            fallback={<Spinner class="m-px size-3" aria-hidden="true" />}
-          >
+          <Show when={!props.item.busy} fallback={<Spinner class="m-px size-3" aria-hidden="true" />}>
             <Show
               when={props.item.icon}
               fallback={
