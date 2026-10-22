@@ -611,7 +611,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   <SidebarToggle />
                 </Show>
                 <Show when={!mobile() && !props.verticalTabs}>
-                  <div class="flex shrink-0 items-center gap-0">
+                  <div class="flex shrink-0 items-center gap-1.5">
                     {homeButton()}
                     {searchButton()}
                   </div>
