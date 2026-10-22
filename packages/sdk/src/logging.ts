@@ -42,9 +42,7 @@ export function layer(log?: LogOptions) {
     const values = Array.isArray(entry.message) ? entry.message : [entry.message]
     const [message, ...data] = values
     const details =
-      data.length === 1 && typeof data[0] === "object" && data[0] !== null && !Array.isArray(data[0])
-        ? (data[0] as Readonly<Record<string, unknown>>)
-        : undefined
+      data.length === 1 && !Array.isArray(data[0]) ? (data[0] as Readonly<Record<string, unknown>>) : undefined
     const { cause: detailCause, ...detailAttributes } = details ?? {}
     const attributes = {
       ...entry.annotations,
