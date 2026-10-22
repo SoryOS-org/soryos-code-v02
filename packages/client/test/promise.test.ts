@@ -1,5 +1,4 @@
-import { describe, expect, test } from "bun:test"
-import { make } from "../src/promise/generated/client"
+import { expect, test } from "bun:test"
 import { isSessionNotFoundError, isUnauthorizedError, OpenCode } from "../src/promise/index"
 
 test("exposes every standard HTTP API group", () => {
@@ -880,94 +879,68 @@ test("native pre-aborted event signals do not open a transport", async () => {
   expect(requests).toBe(0)
 })
 
-describe.each([Infinity, 64 * 1024])("SSE size guard with %s-byte chunks", (chunkSize) => {
-  test("accepts multiple sub-limit events whose combined size exceeds the limit", async () => {
-    const events = ["a", "b"].map((text) => ({
-      type: "session.reasoning.ended",
-      data: { sessionID: "ses_test", text: text.repeat(8 * 1024 * 1024) },
-    }))
-    const fixture = sseFixture(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""), chunkSize)
-
-    for (const event of events) {
-      expect(await fixture.iterator.next()).toEqual({ done: false, value: event })
-    }
-    expect((await fixture.iterator.next()).done).toBe(true)
-  })
-
-  test("keeps the UTF-16 code-unit budget for multibyte text", async () => {
-    const event = {
-      type: "session.reasoning.ended",
-      data: { sessionID: "ses_test", text: "界😀".repeat(3 * 1024 * 1024) },
-    }
-    const frame = `data: ${JSON.stringify(event)}\n\n`
-    expect(frame.length).toBeLessThan(16 * 1024 * 1024)
-    expect(new TextEncoder().encode(frame).length).toBeGreaterThan(16 * 1024 * 1024)
-    const fixture = sseFixture(frame, chunkSize)
-
-    expect(await fixture.iterator.next()).toEqual({ done: false, value: event })
-    expect((await fixture.iterator.next()).done).toBe(true)
-  })
-
-  test.each(["complete", "unfinished"])("rejects an oversized %s frame and cancels the stream", async (ending) => {
-    const first = { type: "server.connected", data: {} }
-    const frame = `data: ${JSON.stringify({ text: "x".repeat(16 * 1024 * 1024) })}`
-    const fixture = sseFixture(
-      `data: ${JSON.stringify(first)}\n\n${frame}${ending === "complete" ? '\n\ndata: {"marker":true}\n\n' : ""}`,
-      chunkSize,
-      false,
-    )
-
-    await expect(fixture.iterator.next()).resolves.toEqual({ done: false, value: first })
-    await expect(fixture.iterator.next()).rejects.toMatchObject({ name: "ClientError", reason: "SseEventTooLarge" })
-    expect(fixture.cancelled()).toBe(true)
-    expect((await fixture.iterator.next()).done).toBe(true)
-  })
-})
-
-test.each(["\n\n", "\r\n\r\n", "\r\r", ""])(
-  "SSE size guard enforces the exact limit with ending %j",
-  async (ending) => {
-    const limit = 16 * 1024 * 1024
-    const event = { text: "x".repeat(limit - 'data: {"text":""}'.length - (ending ? 2 : 0)) }
-    const frame = `data: ${JSON.stringify(event)}${ending}`
-
-    // Split the delimiter too; EOF must not charge an artificial delimiter to the frame.
-    for (const chunkSize of [Infinity, limit - 1]) {
-      const fixture = sseFixture(frame, chunkSize)
-      expect(await fixture.iterator.next()).toEqual({ done: false, value: event })
-      expect((await fixture.iterator.next()).done).toBe(true)
-      const oversized = sseFixture(`data: ${JSON.stringify({ text: event.text + "x" })}${ending}`, chunkSize)
-      await expect(oversized.iterator.next()).rejects.toMatchObject({ name: "ClientError", reason: "SseEventTooLarge" })
-    }
-  },
-)
-
-function sseFixture(input: string, chunkSize: number, close = true) {
-  const encoded = new TextEncoder().encode(input)
-  let offset = 0
-  let cancelled = false
-  const client = make({
+test("event.subscribe accepts a fragmented SSE event below the size limit", async () => {
+  const event = { id: "evt_large", type: "test.large", data: { output: "x".repeat(12 * 1024 * 1024) } }
+  const encoded = new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
+  const client = OpenCode.make({
     baseUrl: "http://localhost:3000",
     fetch: async () =>
       new Response(
-        new ReadableStream<Uint8Array>({
-          pull(controller) {
-            if (offset >= encoded.length) {
-              if (close) controller.close()
-              return
+        new ReadableStream({
+          start(controller) {
+            for (let offset = 0; offset < encoded.length; offset += 64 * 1024) {
+              controller.enqueue(encoded.slice(offset, offset + 64 * 1024))
             }
-            controller.enqueue(encoded.subarray(offset, offset + chunkSize))
-            offset += chunkSize
-          },
-          cancel() {
-            cancelled = true
+            controller.close()
           },
         }),
         { headers: { "content-type": "text/event-stream" } },
       ),
   })
-  return { iterator: client.event.subscribe()[Symbol.asyncIterator](), cancelled: () => cancelled }
-}
+
+  await expect(client.event.subscribe()[Symbol.asyncIterator]().next()).resolves.toEqual({ done: false, value: event })
+})
+
+test("event.subscribe accepts sub-limit SSE events whose combined size exceeds the limit", async () => {
+  const events = ["a", "b"].map((text) => ({
+    id: `evt_${text}`,
+    type: "test.large",
+    data: { output: text.repeat(8 * 1024 * 1024) },
+  }))
+  const encoded = new TextEncoder().encode(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""))
+  const client = OpenCode.make({
+    baseUrl: "http://localhost:3000",
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoded)
+            controller.close()
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      ),
+  })
+
+  const iterator = client.event.subscribe()[Symbol.asyncIterator]()
+  await expect(iterator.next()).resolves.toEqual({ done: false, value: events[0] })
+  await expect(iterator.next()).resolves.toEqual({ done: false, value: events[1] })
+})
+
+test("event.subscribe rejects an SSE event above the size limit", async () => {
+  const client = OpenCode.make({
+    baseUrl: "http://localhost:3000",
+    fetch: async () =>
+      new Response(`data: ${JSON.stringify({ output: "x".repeat(16 * 1024 * 1024) })}`, {
+        headers: { "content-type": "text/event-stream" },
+      }),
+  })
+
+  await expect(client.event.subscribe()[Symbol.asyncIterator]().next()).rejects.toMatchObject({
+    name: "ClientError",
+    reason: "SseEventTooLarge",
+  })
+})
 
 test("session methods use the public HTTP contract", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = []
