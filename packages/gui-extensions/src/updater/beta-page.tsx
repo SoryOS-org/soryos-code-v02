@@ -108,7 +108,8 @@ function RowVisual(props: { visual: NonNullable<BetaNote["visual"]>; label?: str
   onMount(() => onCleanup(props.watch(slot, setVisible)))
 
   return (
-    <div ref={slot} data-slot="settings-row-control" class="h-9 w-[120px]">
+    // Inline, so the host's unlayered control-slot width cannot collapse the space before the visual mounts.
+    <div ref={slot} data-slot="settings-row-control" style={{ width: "120px", height: "36px" }}>
       <Show when={visible()}>
         <Visual visual={props.visual} label={props.label} />
       </Show>
