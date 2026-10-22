@@ -617,6 +617,7 @@ export const dict = {
   "common.moreOptions": "More options",
   "common.learnMore": "Learn more",
   "common.rename": "Rename",
+  "common.markUnread": "Mark as unread",
   "common.export": "Export",
   "common.reset": "Reset",
   "common.archive": "Archive",
