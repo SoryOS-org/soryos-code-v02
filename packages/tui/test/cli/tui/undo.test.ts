@@ -1,12 +1,16 @@
 import { expect, test } from "bun:test"
-import { revertUserMessage, type RevertUserMessageApi } from "../../../src/routes/session/undo"
+import {
+  projectedMessageExists,
+  revertUserMessage,
+  type RevertUserMessageApi,
+} from "../../../src/routes/session/undo"
 
 function api(handlers: Partial<RevertUserMessageApi> & { calls?: string[] }): RevertUserMessageApi {
   const calls = handlers.calls ?? []
   return {
     cancel: async () => {
       calls.push("cancel")
-      await handlers.cancel?.()
+      return (await handlers.cancel?.()) ?? true
     },
     messageExists: async () => {
       calls.push("messageExists")
@@ -63,6 +67,19 @@ test.each([
   expect(outcome).toBe(result)
 })
 
+test("revertUserMessage stops when cancel is declined locally", async () => {
+  const calls: string[] = []
+  const outcome = await revertUserMessage({
+    pending: true,
+    api: api({
+      calls,
+      cancel: async () => false,
+    }),
+  })
+  expect(calls).toEqual(["cancel"])
+  expect(outcome).toBe("aborted")
+})
+
 test("revertUserMessage surfaces cancel failures without staging", async () => {
   const calls: string[] = []
   await expect(
@@ -94,4 +111,20 @@ test("revertUserMessage surfaces stage failures after a promotion race", async (
     }),
   ).rejects.toMatchObject({ message: "Message not found" })
   expect(calls).toEqual(["cancel", "messageExists", "interrupt", "wait", "stage"])
+})
+
+test("projectedMessageExists treats only MessageNotFoundError as missing", async () => {
+  expect(
+    await projectedMessageExists(async () => {
+      throw Object.assign(new Error("Message not found"), { _tag: "MessageNotFoundError" })
+    }),
+  ).toBe(false)
+
+  await expect(
+    projectedMessageExists(async () => {
+      throw Object.assign(new Error("offline"), { _tag: "UnknownError" })
+    }),
+  ).rejects.toMatchObject({ message: "offline", _tag: "UnknownError" })
+
+  expect(await projectedMessageExists(async () => ({ id: "msg_1" }))).toBe(true)
 })

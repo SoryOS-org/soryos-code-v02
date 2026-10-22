@@ -1,4 +1,4 @@
-import type { SessionMessageUser } from "@opencode/client/promise"
+import { isMessageNotFoundError, type SessionMessageUser } from "@opencode/client/promise"
 import { useComposerState } from "@/composer/persistence"
 import { useData } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -61,9 +61,20 @@ export function createSessionRevert(input: {
       const promoted = await server.api.session.message
         .get({ sessionID, messageID: message.id })
         .then(
-          () => true,
-          () => false,
+          () => true as const,
+          (error) => {
+            if (isMessageNotFoundError(error)) return false as const
+            throw error
+          },
         )
+        .catch((error) => {
+          showToast({
+            title: language.t("common.requestFailed"),
+            description: error instanceof Error ? error.message : String(error),
+          })
+          return "failed" as const
+        })
+      if (promoted === "failed") return
       if (!promoted) {
         restore(target, message)
         owner.run(() => input.setActiveMessage(previous))

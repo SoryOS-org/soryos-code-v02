@@ -47,8 +47,8 @@ export function DialogMessage(props: {
                 messageID: props.messageID,
               }),
             })
-              .then(() => {
-                if (value?.type !== "user") return
+              .then((result) => {
+                if (result === "aborted" || value?.type !== "user") return
                 props.setPrompt?.({
                   ...projectedPromptInput(value),
                   pasted: [],

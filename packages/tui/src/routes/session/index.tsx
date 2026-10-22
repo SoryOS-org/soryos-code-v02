@@ -1118,11 +1118,17 @@ export function Session(props: {
         }
         const sessionID = route.sessionID
         const target = prompt()
+        const api = revertUserMessageApi(client.api.session, { sessionID, messageID: message.id })
         void revertUserMessage({
           pending: data.session.input.has(sessionID, message.id),
-          api: revertUserMessageApi(client.api.session, { sessionID, messageID: message.id }),
+          api: {
+            ...api,
+            // Keep the single-flight guard and failure toast from mutatePending.
+            cancel: () => mutatePending("cancel", message.id, "undo"),
+          },
         })
-          .then(() => {
+          .then((result) => {
+            if (result === "aborted") return
             target?.set({
               ...projectedPromptInput(message),
               pasted: [],
