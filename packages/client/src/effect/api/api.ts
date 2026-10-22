@@ -1210,7 +1210,7 @@ export type SessionLogOutput =
             | undefined
           readonly data: {
             readonly sessionID: Session.ID
-            readonly source: "title" | "compaction" | "revert"
+            readonly source: "title" | "compaction"
             readonly cost: Money.USD
             readonly tokens: {
               readonly input: number
