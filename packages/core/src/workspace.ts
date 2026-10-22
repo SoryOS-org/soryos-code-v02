@@ -7,7 +7,7 @@ import { Clock, Context, Deferred, Duration, Effect, Exit, FiberSet, Layer, Ref,
 import { systemError } from "effect/PlatformError"
 import { make } from "effect/process/ChildProcessSpawner"
 import type { EnvironmentDriver } from "./environment/driver.js"
-import { Environment } from "./environment/index.js"
+import { execDefaults } from "./environment/exec-defaults.js"
 import { Failed, type Files, type FilesImpl } from "./environment/files.js"
 import { Database } from "./database/database.js"
 import { KeyedMutex } from "./effect/keyed-mutex.js"
@@ -169,7 +169,10 @@ const layer = (options: Options) =>
         const connection: Connection = {
           driver,
           environment,
-          files: Environment.makeFiles(environment),
+          files: {
+            ...execDefaults(environment.spawner),
+            ...environment.overrides,
+          },
           saveBinding: persistBinding,
           lastActivity: yield* Ref.make(now),
           active: yield* Ref.make(0),
