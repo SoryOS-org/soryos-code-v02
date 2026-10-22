@@ -25,12 +25,16 @@ export function mountTerminalFocus(input: { autoFocus: boolean }) {
 
   // As the panel's focus request does, consuming the request turns autoFocus off.
   const [requested, setRequested] = createSignal(input.autoFocus)
+
+  // SAFETY: the terminal reads only these extension members while it mounts and focuses.
   const extension = {
     t: (key: string) => key,
     appearance: { font: () => "monospace" },
     keybinds: { matches: () => false },
     system: { openExternal() {} },
   } as unknown as Context
+
+  // SAFETY: the terminal reads only these server members; the PTY token never resolves, so it never connects.
   const server = {
     id: "fixture",
     name: "fixture",

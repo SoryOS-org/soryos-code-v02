@@ -3,11 +3,16 @@ import { createRoot } from "solid-js"
 import type { ServerRef, Sessions, Storage } from "../sdk"
 import { createTerminalModel } from "./model"
 
+// SAFETY: the workspace model reads only these members when it loads and handles focus.
 const storage = {
   memory: (_key: string, options: { initial: unknown }) => [options.initial],
   store: () => ({ value: { all: [] }, ready: () => true }),
 } as unknown as Storage
+
+// SAFETY: load reads only sessions.list and server.id.
 const sessions = { list: () => [] } as unknown as Sessions
+
+// SAFETY: load reads only sessions.list and server.id.
 const server = { id: "server" } as unknown as ServerRef
 
 const cleanups: VoidFunction[] = []
@@ -20,12 +25,14 @@ afterEach(() => {
 const workspace = () =>
   createRoot((dispose) => {
     cleanups.push(dispose)
+
     return createTerminalModel({ storage, sessions }).load({ server, directory: "/workspace" })
   })
 
 const field = (parent: HTMLElement) => {
   const input = document.createElement("input")
   parent.append(input)
+
   return input
 }
 
