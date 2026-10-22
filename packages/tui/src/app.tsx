@@ -316,14 +316,18 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
           return (
             <LogProvider log={log}>
               <ExitProvider
-                exit={(input) => {
+                exit={(reason) => {
                   if (renderer.isDestroyed) return
-                  exit.reason = input?.reason
-                  exit.updatedVersion = input?.updatedVersion
+                  exit.reason = reason
                   destroyRenderer(renderer)
                 }}
               >
-                <EpilogueProvider set={(value) => (exit.session = value)}>
+                <EpilogueProvider
+                  value={{
+                    session: (value) => (exit.session = value),
+                    updatedVersion: (version) => (exit.updatedVersion = version),
+                  }}
+                >
                   <TuiAppProvider value={input.app}>
                     <ErrorBoundary
                       fallback={(error, reset) => (

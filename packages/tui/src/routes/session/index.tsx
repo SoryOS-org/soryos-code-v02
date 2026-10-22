@@ -156,7 +156,7 @@ export function Session(props: {
   onTerminalPicker?: (show: (() => void) | undefined) => void
   width?: number
 }) {
-  const setEpilogue = useEpilogue()
+  const epilogue = useEpilogue()
   const clipboard = useClipboard()
   const writeExport = async (file: string, content: string) => {
     await mkdir(path.dirname(file), { recursive: true })
@@ -195,9 +195,9 @@ export function Session(props: {
 
   createEffect(() => {
     const title = Locale.truncate(session()?.title ?? "", 50)
-    setEpilogue({ title, sessionID: session()?.id })
+    epilogue.session({ title, sessionID: session()?.id })
   })
-  onCleanup(() => setEpilogue())
+  onCleanup(() => epilogue.session())
   const descendantSessionIDs = createMemo(() => {
     if (session()?.parentID) return []
     return data.session.family(route.sessionID).filter((id) => id !== route.sessionID)

@@ -1,7 +1,6 @@
 import { createSimpleContext } from "./helper"
 
-// `updatedVersion` adds the update restart instructions to the epilogue.
-export type Exit = (input?: { readonly reason?: unknown; readonly updatedVersion?: string }) => void
+export type Exit = (reason?: unknown) => void
 
 export const { use: useExit, provider: ExitProvider } = createSimpleContext({
   name: "Exit",
