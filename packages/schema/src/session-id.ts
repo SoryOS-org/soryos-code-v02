@@ -2,7 +2,10 @@ import { Schema } from "effect"
 import { descending } from "./identifier.js"
 import { statics } from "./schema.js"
 
-export const SessionID = Schema.String.check(Schema.isStartingWith("ses")).pipe(
+// The emitted JSON Schema pattern is end-anchored because some providers (older llama.cpp) reject unanchored patterns.
+export const SessionID = Schema.String.check(
+  Schema.isStartingWith("ses", { toJsonSchema: () => ({ pattern: "^ses.*$" }) }),
+).pipe(
   Schema.brand("SessionID"),
   Schema.annotate({ identifier: "Session.ID" }),
   statics((schema) => {

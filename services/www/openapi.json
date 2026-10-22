@@ -1465,7 +1465,7 @@
                     "data": {
                       "type": "object",
                       "patternProperties": {
-                        "^ses": {
+                        "^ses.*$": {
                           "$ref": "#/components/schemas/SessionActive"
                         }
                       },
@@ -18203,7 +18203,7 @@
       },
       "Session.ID": {
         "type": "string",
-        "pattern": "^ses"
+        "pattern": "^ses.*$"
       },
       "Session.Inbox.Compaction": {
         "type": "object",
