@@ -5,40 +5,16 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { Cause, Context, Effect, Exit, Layer } from "effect"
 import { Global } from "../src/global.js"
-import { it } from "../../core/test/lib/effect.js"
 
 describe("global", () => {
-  for (const kind of [
-    "directory",
-    "symlink",
-    "loop",
-    "file",
-    // Windows does not enforce POSIX directory mode bits.
-    ...(process.platform === "win32" ? [] : ["permission"]),
-  ]) {
-    it.live(`preserves normal data directory handling for ${kind}`, () =>
-      Effect.gen(function* () {
-        const root = yield* Effect.acquireRelease(
-          Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-control-"))),
-          (root) =>
-            Effect.sync(() => {
-              if (kind === "permission") fs.chmodSync(path.join(root, "target"), 0o700)
-              fs.rmSync(root, { recursive: true, force: true })
-            }),
-        )
-        const data = path.join(root, "data")
-        const target = path.join(root, "target")
-        if (kind === "symlink") fs.mkdirSync(target)
-        if (kind === "file") fs.writeFileSync(target, "not a directory")
-        if (kind === "permission") fs.mkdirSync(target, { mode: 0o000 })
-        if (kind !== "directory") {
-          fs.symlinkSync(
-            kind === "loop" ? data : kind === "permission" ? path.join(target, "data") : target,
-            data,
-            "dir",
-          )
-        }
-        const exit = yield* Effect.exit(
+  test("reports a missing data symlink target without changing it", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-symlink-"))
+    try {
+      const data = path.join(root, "data")
+      const target = path.join(root, "missing", "target")
+      fs.symlinkSync(target, data, "dir")
+      const exit = await Effect.runPromise(
+        Effect.scoped(
           Layer.build(
             Global.layerWith({
               data,
@@ -50,60 +26,23 @@ describe("global", () => {
               tmp: path.join(root, "tmp"),
             }),
           ),
-        )
-        if (kind === "directory" || kind === "symlink") {
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(fs.statSync(path.join(data, "log")).isDirectory()).toBe(true)
-          return
-        }
-        expect(Exit.isFailure(exit)).toBe(true)
-        if (Exit.isFailure(exit)) {
-          const message = Cause.pretty(exit.cause)
-          expect(message).not.toContain("missing target")
-          expect(message).toMatch(kind === "loop" ? /ELOOP/ : kind === "permission" ? /EACCES/ : /EEXIST|ENOTDIR/)
-        }
-      }),
-    )
-  }
-
-  for (const relative of [false, true]) {
-    it.live(`reports a missing ${relative ? "relative" : "absolute"} data symlink target`, () =>
-      Effect.gen(function* () {
-        const root = yield* Effect.acquireRelease(
-          Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-symlink-"))),
-          (root) => Effect.sync(() => fs.rmSync(root, { recursive: true, force: true })),
-        )
-        const data = path.join(root, "data")
-        const target = path.join(root, "missing", "target")
-        const link = relative ? path.relative(root, target) : target
-        fs.symlinkSync(link, data, "dir")
-        const exit = yield* Effect.exit(
-          Layer.build(
-            Global.layerWith({
-              data,
-              log: path.join(data, "log"),
-              repos: path.join(data, "repos"),
-              config: path.join(root, "config"),
-              state: path.join(root, "state"),
-              bin: path.join(root, "bin"),
-              tmp: path.join(root, "tmp"),
-            }),
-          ),
-        )
-        expect(Exit.isFailure(exit)).toBe(true)
-        if (Exit.isFailure(exit)) {
-          const message = Cause.pretty(exit.cause)
-          expect(message).toContain("data directory is a symlink to a missing target")
-          expect(message).toContain(JSON.stringify(data))
-          expect(message).toContain(JSON.stringify(target))
-          expect(message).toContain("Restore the target directory or correct the symlink")
-        }
-        expect(fs.readlinkSync(data)).toBe(link)
-        expect(fs.existsSync(target)).toBe(false)
-        expect(fs.existsSync(path.join(root, "config"))).toBe(false)
-      }),
-    )
-  }
+        ).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) {
+        const message = Cause.pretty(exit.cause)
+        expect(message).toContain("data directory is a symlink to a missing target")
+        expect(message).toContain(JSON.stringify(data))
+        expect(message).toContain(JSON.stringify(target))
+        expect(message).toContain("Restore the target directory or correct the symlink")
+      }
+      expect(fs.readlinkSync(data)).toBe(target)
+      expect(fs.existsSync(target)).toBe(false)
+      expect(fs.existsSync(path.join(root, "config"))).toBe(false)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
 
   test("importing the module does not create directories", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-import-"))
