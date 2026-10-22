@@ -9,6 +9,18 @@ test("renders links with application attributes", async () => {
   )
 })
 
+test("keeps in-document links in the current document", async () => {
+  expect(await parser.parse("[Install](#install)")).toBe(
+    '<p><a href="#install" class="external-link">Install</a></p>\n',
+  )
+})
+
+test("adds unique ids to headings", async () => {
+  expect(await parser.parse("# Install\n\n## Install\n\n## API & Usage\n\n## Install")).toBe(
+    '<h1 id="install">Install</h1>\n<h2 id="install-1">Install</h2>\n<h2 id="api-usage">API &amp; Usage</h2>\n<h2 id="install-2">Install</h2>\n',
+  )
+})
+
 test("renders inline and block math", async () => {
   expect(await parser.parse("\\(x^2\\)")).toContain('<span class="katex">')
   expect(await parser.parse("$$\nx^2\n$$\n")).toContain('<span class="katex-display">')
