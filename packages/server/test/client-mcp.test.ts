@@ -1,6 +1,5 @@
 import { expect } from "bun:test"
 import { NodeHttpServer } from "@effect/platform-node"
-import { McpServer, type JSONRPCMessage, type Transport } from "@modelcontextprotocol/server"
 import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Mcp } from "@opencode/core/mcp/index"
@@ -67,29 +66,36 @@ const connectClient = (url: URL, headers?: Record<string, string>) =>
       const socket = new WebSocket(url, { headers })
       const state = { open: false, initialized: false, closed: false, code: 0 }
       const sessions: unknown[] = []
-      const transport: Transport = {
-        start: async () => {},
-        send: async (message: JSONRPCMessage) => socket.send(JSON.stringify(message)),
-        close: async () => socket.close(),
-      }
+      const reply = (id: unknown, result: unknown) => socket.send(JSON.stringify({ jsonrpc: "2.0", id, result }))
       socket.addEventListener("open", () => {
         state.open = true
       })
-      socket.addEventListener("message", (event) => transport.onmessage?.(JSON.parse(String(event.data))))
+      socket.addEventListener("message", (event) => {
+        const message = JSON.parse(String(event.data))
+        if (message.method === "initialize")
+          return reply(message.id, {
+            protocolVersion: message.params.protocolVersion,
+            capabilities: { tools: {} },
+            serverInfo: { name: "test-client", version: "1.0.0" },
+          })
+        if (message.method === "notifications/initialized") {
+          state.initialized = true
+          return
+        }
+        if (message.method === "tools/list")
+          return reply(message.id, {
+            tools: [{ name: "open_terminal", description: "Open a terminal", inputSchema: { type: "object" } }],
+          })
+        if (message.method === "tools/call") {
+          sessions.push(message.params._meta?.["ai.opencode/sessionID"])
+          return reply(message.id, { content: [{ type: "text", text: "opened" }] })
+        }
+        if (message.id !== undefined && message.method) reply(message.id, {})
+      })
       socket.addEventListener("close", (event) => {
         state.closed = true
         state.code = event.code
-        transport.onclose?.()
       })
-      const server = new McpServer({ name: "test-client", version: "1.0.0" })
-      server.registerTool("open_terminal", { description: "Open a terminal" }, (ctx) => {
-        sessions.push(ctx.mcpReq._meta?.["ai.opencode/sessionID"])
-        return { content: [{ type: "text", text: "opened" }] }
-      })
-      server.server.oninitialized = () => {
-        state.initialized = true
-      }
-      await server.connect(transport)
       return { socket, state, sessions }
     }),
     (client) => Effect.sync(() => client.socket.close()),
