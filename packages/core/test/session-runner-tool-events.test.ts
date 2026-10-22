@@ -132,7 +132,7 @@ test("provider-executed success derives content and retains provider result stat
       { type: "text", text: "Image read successfully" },
       { type: "file", uri: `data:image/png;base64,${base64}`, mime: "image/png" },
     ],
-    resultState: { result: { type: "content" } },
+    native: { result: { type: "content" } },
   })
 })
 
@@ -304,7 +304,7 @@ test("provider metadata is flattened using the route key", async () => {
   )
 
   expect(published.find((event) => event.type === "session.reasoning.started.1")?.data).toMatchObject({
-    state: { signature: "signed" },
+    native: { signature: "signed" },
   })
 })
 
@@ -331,7 +331,7 @@ test("reasoning state from start, empty delta, and end is merged", async () => {
   )
 
   expect(published.find((event) => event.type === "session.reasoning.ended.1")?.data).toMatchObject({
-    state: { blockType: "thinking", signature: "signed", stopReason: "tool_use" },
+    native: { blockType: "thinking", signature: "signed", stopReason: "tool_use" },
   })
 })
 
@@ -506,26 +506,55 @@ test("authoritative end values replace accumulated deltas in the durable ended e
   })
 })
 
-test("tool input deltas are accumulated without being published", async () => {
-  const { published, publisher } = capture()
-  await Effect.runPromise(
-    Effect.forEach(
+it.effect("batches tool input deltas and flushes pending input before the terminal event", () =>
+  Effect.gen(function* () {
+    const { published, publisher } = capture()
+    const deltas = () =>
+      published.filter((event) => event.type === "session.tool.input.delta").map((event) => event.data)
+    yield* Effect.forEach(
       [
         LLMEvent.toolInputStart({ id: "call", name: "read" }),
         LLMEvent.toolInputDelta({ id: "call", name: "read", text: '{"path":' }),
-        LLMEvent.toolInputDelta({ id: "call", name: "read", text: '"file.txt"}' }),
-        LLMEvent.toolInputEnd({ id: "call", name: "read" }),
+        LLMEvent.toolInputDelta({ id: "call", name: "read", text: '"file' }),
       ],
       publisher.publish,
       { discard: true },
-    ),
-  )
+    )
 
-  expect(published.some((event) => event.type === "session.tool.input.delta")).toBe(false)
-  expect(published.find((event) => event.type === "session.tool.input.ended.1")?.data).toMatchObject({
-    text: '{"path":"file.txt"}',
-  })
-})
+    expect(deltas()).toHaveLength(0)
+    yield* TestClock.adjust("100 millis")
+    expect(deltas()).toMatchObject([{ id: "call", delta: '{"path":"file' }])
+
+    yield* publisher.publish(LLMEvent.toolInputDelta({ id: "call", name: "read", text: '.txt"}' }))
+    yield* publisher.publish(LLMEvent.toolInputEnd({ id: "call", name: "read" }))
+    expect(published.slice(-2)).toMatchObject([
+      { type: "session.tool.input.delta", data: { delta: '.txt"}' } },
+      { type: "session.tool.input.ended.1", data: { text: '{"path":"file.txt"}' } },
+    ])
+  }),
+)
+
+it.effect("publishes held tool input before the next block starts", () =>
+  Effect.gen(function* () {
+    const { published, publisher } = capture()
+    yield* Effect.forEach(
+      [
+        LLMEvent.toolInputStart({ id: "call", name: "read" }),
+        LLMEvent.toolInputDelta({ id: "call", name: "read", text: '{"path":' }),
+        LLMEvent.textStart({ id: "text" }),
+      ],
+      publisher.publish,
+      { discard: true },
+    )
+
+    expect(published.map((event) => event.type).filter((type) => type !== "session.step.started.1")).toEqual([
+      "session.tool.input.started.1",
+      "session.tool.input.delta",
+      "session.text.started.1",
+    ])
+    yield* publisher.flush()
+  }),
+)
 
 test("provider-executed tool metadata is flattened using the route key", async () => {
   const { published, publisher } = capture("openai")
@@ -553,10 +582,10 @@ test("provider-executed tool metadata is flattened using the route key", async (
   )
 
   expect(published.find((event) => event.type === "session.tool.called.1")?.data).toMatchObject({
-    state: { itemId: "call" },
+    native: { itemId: "call" },
   })
   expect(published.find((event) => event.type === "session.tool.success.2")?.data).toMatchObject({
-    resultState: { itemId: "result" },
+    native: { itemId: "result" },
   })
 })
 
@@ -568,21 +597,21 @@ test("binary failure emits no success event", async () => {
   expect(published.some((event) => event.type === "session.tool.failed.2")).toBe(true)
 })
 
-test("success event data can carry provider-executed result state", () => {
+test("success event data can carry provider-executed native data", () => {
   const decoded = Schema.decodeUnknownSync(SessionEvent.Tool.Success.data)({
     sessionID,
     assistantMessageID: SessionMessage.ID.create(),
     id: "call-old",
     content: [{ type: "file", uri: `data:image/png;base64,${base64}`, mime: "image/png" }],
     executed: true,
-    resultState: {
+    native: {
       result: {
         type: "content",
         value: [{ type: "file", uri: `data:image/png;base64,${base64}`, mime: "image/png" }],
       },
     },
   })
-  expect(decoded.resultState).toMatchObject({ result: { type: "content" } })
+  expect(decoded.native).toMatchObject({ result: { type: "content" } })
 })
 
 test("step start waits for the pending start snapshot", async () => {
@@ -635,7 +664,7 @@ test("content-filter finish retains failure evidence until step closeout", async
   expect(settlement).toMatchObject({
     finish: "content-filter",
     rawFinish: "refusal",
-    providerState: {
+    native: {
       stopDetails: { type: "refusal", category: "safety", explanation: "Blocked" },
     },
     tokens: { input: 8, output: 2, reasoning: 1 },
@@ -654,7 +683,7 @@ test("content-filter finish retains failure evidence until step closeout", async
     error: { type: "provider.content-filter", message: "Provider blocked the response" },
     finish: "content-filter",
     rawFinish: "refusal",
-    providerState: {
+    native: {
       stopDetails: { type: "refusal", category: "safety", explanation: "Blocked" },
     },
     cost: 1.25,

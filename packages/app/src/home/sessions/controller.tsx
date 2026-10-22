@@ -70,6 +70,8 @@ export function createHomeSessionsController(home: HomeController) {
         : skipToken,
       retry: false,
       staleTime: 30_000,
+      // Returning to Home shows the last list and refreshes it, instead of loading again once the cache expires.
+      gcTime: Infinity,
       refetchOnMount: true,
       refetchOnReconnect: true,
       select: selectSessions,
@@ -117,13 +119,16 @@ export function createHomeSessionsController(home: HomeController) {
     if (!ctx) return
 
     if (record) {
+      if (!ctx.data.location.info(record.session.location)) return
       void ctx.data.location.vcs.sync(record.session.location).catch(() => undefined)
 
       return
     }
 
     const locations = new Map(
-      records().map((record) => [pathKey(record.session.location.directory), record.session.location] as const),
+      records()
+        .filter((record) => !!ctx.data.location.info(record.session.location))
+        .map((record) => [pathKey(record.session.location.directory), record.session.location] as const),
     )
 
     void Promise.allSettled(Array.from(locations.values(), (location) => ctx.data.location.vcs.sync(location)))
@@ -145,7 +150,7 @@ export function createHomeSessionsController(home: HomeController) {
       })
   })
 
-  command.register("home.palette", () => [
+  command.register("palette", () => [
     {
       id: "command.palette",
       title: language.t("command.palette"),
@@ -157,7 +162,7 @@ export function createHomeSessionsController(home: HomeController) {
         const ctx = home.server.focusedContext()
 
         if (!ctx) return
-        const { HomeCommandPalette } = await import("./command-palette")
+        const { HomeCommandPalette } = await import("../start/command-palette")
         void dialog.show(() => (
           <HomeCommandPalette
             server={conn}
@@ -166,7 +171,6 @@ export function createHomeSessionsController(home: HomeController) {
               const sessionID = entry.sessionID
               const server = entry.server
               const directory = entry.project?.worktree ?? entry.directory
-              ctx.projects.open(directory)
               ctx.projects.touch(directory)
               void startTransition(() => {
                 const tab = tabs.addSessionTab({ server, sessionId: sessionID })
@@ -293,7 +297,7 @@ export function createHomeSessionsController(home: HomeController) {
           />
         </DialogHeader>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => dialog.close()}>
+          <Button variant="ghost" autofocus onClick={() => dialog.close()}>
             {language.t("common.cancel")}
           </Button>
           <Button variant="danger" onClick={confirm}>
@@ -360,7 +364,6 @@ export function createHomeSessionsController(home: HomeController) {
 
           if (!options?.background) tabs.select(tab)
           ctx.data.session.remember(session)
-          ctx.projects.open(directory)
 
           if (!options?.background) ctx.projects.touch(directory)
         })

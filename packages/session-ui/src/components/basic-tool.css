@@ -170,6 +170,55 @@
   }
 }
 
+/* The action sits on the trigger's line as a sibling, since buttons cannot nest inside the trigger button. */
+[data-component="collapsible"].tool-collapsible[data-has-action="true"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 2px;
+
+  > [data-slot="collapsible-trigger"] {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    /* Leave room for the action so a long collapsed subtitle truncates instead of wrapping it. */
+    max-width: calc(100% - 26px);
+
+    /* The trigger now sizes to its content, so the content's room for the arrow would clip the title. */
+    [data-slot="basic-tool-tool-trigger-content"] {
+      max-width: none;
+    }
+  }
+
+  > [data-slot="collapsible-content"] {
+    flex-basis: 100%;
+    /* In this row layout, unbreakable content would otherwise widen the content past the tool's width. */
+    min-width: 0;
+  }
+}
+
+[data-slot="basic-tool-action"] {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Reveal the action while the pointer is anywhere over the tool, including its expanded content. */
+[data-component="collapsible"].tool-collapsible:hover > [data-slot="basic-tool-action"],
+[data-slot="collapsible-trigger"]:focus-visible + [data-slot="basic-tool-action"],
+[data-slot="basic-tool-action"]:hover,
+[data-slot="basic-tool-action"]:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  [data-slot="basic-tool-action"] {
+    opacity: 1;
+  }
+}
+
 [data-component="collapsible"].tool-collapsible[data-compact="true"] > [data-slot="collapsible-trigger"] {
   height: 28px;
 
@@ -235,18 +284,6 @@
     gap: 8px;
   }
 
-  [data-component="task-tool-spinner"] {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-
-    [data-component="spinner"] {
-      width: 16px;
-      height: 16px;
-    }
-  }
-
   [data-component="task-tool-action"] {
     display: inline-flex;
     align-items: center;
@@ -276,7 +313,7 @@
       transform: none;
     }
 
-    @media (prefers-reduced-motion: reduce) {
+    :root[data-motion="reduce"] & {
       transition: none;
     }
   }
@@ -290,7 +327,7 @@
     line-height: var(--line-height-compact);
     letter-spacing: var(--letter-spacing-normal);
     text-transform: capitalize;
-    color: var(--task-agent-color-fallback, var(--text-strong));
+    color: var(--text-strong);
   }
 
   [data-slot="basic-tool-tool-subtitle"] {
@@ -334,18 +371,6 @@
       background: var(--v2-background-bg-layer-02);
     }
 
-    [data-component="task-tool-spinner"],
-    [data-component="task-tool-icon"] {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-
-      [data-slot="icon-svg"] {
-        color: var(--task-agent-color, var(--v2-icon-icon-base));
-      }
-    }
-
     [data-component="task-tool-title"] {
       height: 20px;
       font-family: var(--v2-font-family-sans, "Inter", sans-serif);
@@ -370,10 +395,6 @@
       font-variation-settings: "slnt" 0;
       flex: none;
       flex-grow: 0;
-    }
-
-    [data-component="session-progress-indicator-v2"] {
-      color: var(--task-agent-color, light-dark(var(--v2-text-text-base), #ffffff));
     }
 
     &:hover,

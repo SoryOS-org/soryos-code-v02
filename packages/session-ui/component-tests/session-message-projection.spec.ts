@@ -1,4 +1,73 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
+
+story("marks pending metadata without badging delivered, starting, or queued prompts", async ({ mount, page }) => {
+  const timeline = await mount("current-prompt-message--pending")
+  const indicator = timeline.locator('[data-slot="user-message-meta"] [data-slot="user-message-pending"]')
+  const text = timeline.locator('[data-slot="user-message-text"]')
+
+  for (const status of ["steering", "stranded", "starting", "queued", "delivered"]) {
+    await timeline.getByLabel("Delivery state").selectOption(status)
+    const pending = status === "steering" || status === "stranded"
+    await expect(indicator).toHaveCount(pending ? 1 : 0)
+
+    const colors = await timeline.evaluate((element, pending) => {
+      const probe = document.createElement("span")
+      probe.style.color = `var(--v2-text-text-${pending ? "muted" : "base"})`
+      probe.style.backgroundColor = `var(--v2-background-bg-layer-${pending ? "01" : "02"})`
+      element.append(probe)
+      const result = { color: getComputedStyle(probe).color, background: getComputedStyle(probe).backgroundColor }
+      probe.remove()
+
+      return result
+    }, pending)
+
+    await expect(text).toHaveCSS("color", colors.color)
+    await expect(text).toHaveCSS("background-color", colors.background)
+  }
+
+  await timeline.getByLabel("Delivery state").selectOption("steering")
+  await timeline.getByLabel("Voice message", { exact: true }).check()
+  const voice = timeline.getByRole("img", { name: "Voice", exact: true })
+  await expect(voice).toBeVisible()
+  await expect(indicator).toBeVisible()
+  await expect(indicator).toHaveAttribute("aria-hidden", "true")
+
+  await expect(voice.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-wave-audio")
+  await expect(indicator.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
+
+  await expect(voice).toHaveCSS("width", "20px")
+  await expect(voice).toHaveCSS("height", "20px")
+  await expect(voice.locator('[data-slot="icon-svg"]')).toHaveCSS("width", "14px")
+  await expect(voice.locator('[data-slot="icon-svg"]')).toHaveCSS("height", "14px")
+
+  const faint = await indicator.evaluate((element) => {
+    const probe = document.createElement("span")
+    probe.style.color = "var(--v2-icon-icon-faint)"
+    element.append(probe)
+    const color = getComputedStyle(probe).color
+    probe.remove()
+
+    return color
+  })
+
+  await expect(indicator).toHaveCSS("color", faint)
+  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText(/^Pending/)
+  await timeline.getByLabel("Grouped prompts", { exact: true }).check()
+  await expect(timeline.locator('[data-run-folded] [data-slot="user-message-copy-wrapper"]')).toBeHidden()
+  await expect(
+    timeline.locator('[data-component="user-message"]:not([data-run-folded]) [data-slot="user-message-pending"]'),
+  ).toBeVisible()
+  await expect(timeline.getByRole("img", { name: "Pending", exact: true })).toHaveCount(0)
+  await timeline.getByLabel("Grouped prompts", { exact: true }).uncheck()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(indicator).toBeVisible()
+  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText("Pending")
+  await timeline.getByLabel("Prompt text", { exact: true }).uncheck()
+  await expect(timeline.getByText("notes.json", { exact: true })).toBeVisible()
+  await expect(indicator).toBeVisible()
+  await timeline.getByRole("button", { name: "Move to queue", exact: true }).click()
+  await expect(indicator).toHaveCount(0)
+})
 
 // Moved from packages/app/e2e/regression/session-timeline-collapse-state.spec.ts
 story("keeps a manually collapsed tool collapsed when later assistant content streams", async ({ mount }) => {
@@ -80,10 +149,44 @@ story("renders user image, file attachment, file reference, and agent reference"
   await expect(timeline.getByText("@src/a.ts", { exact: true })).toBeVisible()
   await expect(timeline.getByText("@explore", { exact: true })).toBeVisible()
 
+  const accent = await timeline.evaluate((element) => {
+    const probe = document.createElement("span")
+    probe.style.color = "var(--v2-text-text-accent)"
+    element.append(probe)
+    const color = getComputedStyle(probe).color
+    probe.remove()
+
+    return color
+  })
+
+  for (const mention of await timeline.locator("[data-highlight]").all()) {
+    await expect(mention).toHaveCSS("color", accent)
+    await expect(mention).toHaveCSS("font-weight", "440")
+  }
+
+  for (const prefix of await timeline.locator('[data-slot="user-message-mention-prefix"]').all()) {
+    await expect(prefix).toHaveCSS("color", accent)
+  }
+
   const attachments = timeline.locator('[data-slot="user-message-attachments"]')
   const body = timeline.locator('[data-slot="user-message-body"]')
   const [attachmentsBox, bodyBox] = await Promise.all([attachments.boundingBox(), body.boundingBox()])
   expect(attachmentsBox).not.toBeNull()
   expect(bodyBox).not.toBeNull()
   expect(bodyBox!.y - (attachmentsBox!.y + attachmentsBox!.height)).toBe(8)
+})
+
+story("links URLs in user messages without swallowing punctuation or mentions", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--conversation", { args: { scenario: "links" } })
+  const links = timeline.locator('[data-slot="user-message-text"] a[data-slot="user-message-link"]')
+  await expect(links).toHaveCount(2)
+  await expect(links.nth(0)).toHaveText("https://github.com/Hona/mesh")
+  await expect(links.nth(0)).toHaveAttribute("href", "https://github.com/Hona/mesh")
+  await expect(links.nth(0)).toHaveAttribute("target", "_blank")
+  await expect(links.nth(0)).toHaveCSS("cursor", "pointer")
+  await expect(links.nth(1)).toHaveText("https://opencode.ai/docs")
+  await expect(timeline.getByText("@src/a.ts", { exact: true })).toBeVisible()
+  await expect(timeline.locator('[data-slot="user-message-text"]')).toHaveText(
+    "set it up on this pc https://github.com/Hona/mesh, then compare @src/a.ts with (https://opencode.ai/docs).",
+  )
 })

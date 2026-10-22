@@ -744,6 +744,14 @@ export function createData(config: CreateDataInput) {
         if (store.session.info[event.data.sessionID])
           setStore("session", "info", event.data.sessionID, "permissions", event.data.permissions)
         return
+      case "session.archived":
+        if (store.session.info[event.data.sessionID])
+          setStore("session", "info", event.data.sessionID, "time", "archived", event.created)
+        return
+      case "session.unarchived":
+        if (store.session.info[event.data.sessionID])
+          setStore("session", "info", event.data.sessionID, "time", "archived", undefined)
+        return
       case "session.moved": {
         const current = store.session.info[event.data.sessionID]
         if (current) {
@@ -889,7 +897,7 @@ export function createData(config: CreateDataInput) {
             existing.error = undefined
             existing.finish = undefined
             existing.rawFinish = undefined
-            existing.providerState = undefined
+            existing.native = undefined
             existing.time.created = event.data.started
             existing.time.streamed = undefined
             existing.time.completed = undefined
@@ -923,7 +931,7 @@ export function createData(config: CreateDataInput) {
           assistant.time.completed = event.created
           assistant.finish = event.data.finish
           assistant.rawFinish = event.data.rawFinish
-          assistant.providerState = event.data.providerState
+          assistant.native = event.data.native
           assistant.cost = event.data.cost
           assistant.tokens = event.data.tokens
           if (event.data.snapshot) assistant.snapshot = { ...assistant.snapshot, end: event.data.snapshot }
@@ -935,7 +943,7 @@ export function createData(config: CreateDataInput) {
           assistant.time.completed = event.created
           assistant.finish = event.data.finish ?? "error"
           assistant.rawFinish = event.data.rawFinish
-          assistant.providerState = event.data.providerState
+          assistant.native = event.data.native
           assistant.error = event.data.error
           assistant.retry = undefined
           if (event.data.cost !== undefined && event.data.tokens !== undefined) {
@@ -984,7 +992,7 @@ export function createData(config: CreateDataInput) {
         message.editTool(event.data.sessionID, event.data.assistantMessageID, event.data.id, (tool) => {
           tool.time.ran = event.created
           tool.executed = event.data.executed
-          tool.providerState = event.data.state
+          tool.native = event.data.native
           tool.state = { status: "running", input: event.data.input, metadata: {} }
         })
         return
@@ -1003,7 +1011,7 @@ export function createData(config: CreateDataInput) {
             content: [...event.data.content],
           }
           tool.executed = event.data.executed || tool.executed === true
-          tool.providerResultState = event.data.resultState
+          if (event.data.native) tool.native = { ...tool.native, ...event.data.native }
           tool.time.completed = event.created
         })
         return
@@ -1018,7 +1026,7 @@ export function createData(config: CreateDataInput) {
             content: event.data.content,
           }
           tool.executed = event.data.executed || tool.executed === true
-          tool.providerResultState = event.data.resultState
+          if (event.data.native) tool.native = { ...tool.native, ...event.data.native }
           tool.time.completed = event.created
         })
         return
@@ -1027,7 +1035,7 @@ export function createData(config: CreateDataInput) {
           assistant.content.push({
             type: "reasoning",
             text: "",
-            state: event.data.state,
+            native: event.data.native,
             time: { created: event.created },
           })
         })
@@ -1041,7 +1049,7 @@ export function createData(config: CreateDataInput) {
         message.editReasoning(event.data.sessionID, event.data.assistantMessageID, (reasoning) => {
           reasoning.text = event.data.text
           reasoning.time = { created: reasoning.time?.created ?? event.created, completed: event.created }
-          if (event.data.state !== undefined) reasoning.state = event.data.state
+          if (event.data.native !== undefined) reasoning.native = event.data.native
         })
         return
       case "session.retry.scheduled":
@@ -1060,7 +1068,6 @@ export function createData(config: CreateDataInput) {
           status: "running",
           reason: event.data.reason,
           summary: "",
-          recent: event.data.recent ?? "",
           time: { created: event.created },
         })
         if (event.data.inputID) compacting.get(event.data.sessionID)?.observed.add(event.data.inputID)
@@ -1150,10 +1157,8 @@ export function createData(config: CreateDataInput) {
               status: "completed",
               reason: event.data.reason,
               model: event.data.model,
-              providerState: event.data.providerState,
-              providerContext: event.data.providerContext,
+              native: event.data.native,
               summary: event.data.text,
-              recent: event.data.recent,
               cost: event.data.cost,
               tokens: event.data.tokens,
             })
@@ -1165,10 +1170,8 @@ export function createData(config: CreateDataInput) {
             status: "completed",
             reason: event.data.reason,
             model: event.data.model,
-            providerState: event.data.providerState,
-            providerContext: event.data.providerContext,
+            native: event.data.native,
             summary: event.data.text,
-            recent: event.data.recent,
             cost: event.data.cost,
             tokens: event.data.tokens,
             time: { created: event.created },
@@ -1223,26 +1226,29 @@ export function createData(config: CreateDataInput) {
         const ref = JSON.parse(key) as [string, string | null]
         const location = { directory: ref[0], workspaceID: ref[1] ?? undefined }
         if (event.type === "credential.updated") {
-          result.location.integration.invalidate(location)
-          refresh(() => result.location.integration.sync(location))
+          refreshLocation("integration", result.location.integration, location)
           return
         }
-        setStore("location", key, (data) => ({
-          integration: data?.integration?.map((integration) => {
-            if (integration.id !== event.data.integrationID) return integration
-            const active = integration.connections.find(
-              (connection) => connection.type === "credential" && connection.id === event.data.credentialID,
-            )
-            if (!active) return integration
-            return {
-              ...integration,
-              connections: [active, ...integration.connections.filter((connection) => connection !== active)],
-            }
-          }),
-        }))
+        if (store.location[key]?.integration)
+          setStore("location", key, (data) => ({
+            integration: data?.integration?.map((integration) => {
+              if (integration.id !== event.data.integrationID) return integration
+              const active = integration.connections.find(
+                (connection) => connection.type === "credential" && connection.id === event.data.credentialID,
+              )
+              if (!active) return integration
+              return {
+                ...integration,
+                connections: [active, ...integration.connections.filter((connection) => connection !== active)],
+              }
+            }),
+          }))
+        const active =
+          hasLocation("integration", location) || hasLocation("model", location) || hasLocation("provider", location)
         result.location.model.invalidate(location)
         result.location.provider.invalidate(location)
-        refresh(() => Promise.all([result.location.model.sync(location), result.location.provider.sync(location)]))
+        if (active)
+          refresh(() => Promise.all([result.location.model.sync(location), result.location.provider.sync(location)]))
       })
       return
     }
@@ -1251,26 +1257,22 @@ export function createData(config: CreateDataInput) {
     const location = event.location
     switch (event.type) {
       case "provider.updated":
-        result.location.provider.invalidate(location)
-        refresh(() => result.location.provider.sync(location))
+        refreshLocation("provider", result.location.provider, location)
         break
       case "model.updated":
-        result.location.model.invalidate(location)
-        refresh(() => result.location.model.sync(location))
+        refreshLocation("model", result.location.model, location)
         break
       case "agent.updated":
-        result.location.agent.invalidate(location)
-        refresh(() => result.location.agent.sync(location))
+        refreshLocation("agent", result.location.agent, location)
         break
       case "command.updated":
-        result.location.command.invalidate(location)
-        refresh(() => result.location.command.sync(location))
+        refreshLocation("command", result.location.command, location)
         break
       case "skill.updated":
-        result.location.skill.invalidate(location)
-        refresh(() => result.location.skill.sync(location))
+        refreshLocation("skill", result.location.skill, location)
         break
       case "vcs.branch.updated":
+        if (!store.location[locationKey(location)]?.vcs) break
         setStore("location", locationKey(location), (data) => ({
           vcs: {
             branch: {
@@ -1297,47 +1299,65 @@ export function createData(config: CreateDataInput) {
         break
       case "shell.exited":
       case "shell.deleted":
+        if (!store.location[locationKey(location)]?.shell?.[event.data.id]) break
         setStore("location", locationKey(location), (data) => ({
           shell: Object.fromEntries(Object.entries(data?.shell ?? {}).filter(([id]) => id !== event.data.id)),
         }))
         break
       case "reference.updated":
-        result.location.reference.invalidate(location)
-        refresh(() => result.location.reference.sync(location))
+        refreshLocation("reference", result.location.reference, location)
         break
-      case "integration.updated":
+      case "integration.updated": {
+        const active =
+          hasLocation("integration", location) || hasLocation("model", location) || hasLocation("provider", location)
         result.location.integration.invalidate(location)
         result.location.model.invalidate(location)
         result.location.provider.invalidate(location)
-        refresh(() =>
-          Promise.all([
-            result.location.integration.sync(location),
-            result.location.model.sync(location),
-            result.location.provider.sync(location),
-          ]),
-        )
+        if (active)
+          refresh(() =>
+            Promise.all([
+              result.location.integration.sync(location),
+              result.location.model.sync(location),
+              result.location.provider.sync(location),
+            ]),
+          )
         break
+      }
       case "config.updated":
-        result.location.config.invalidate(location)
-        if (result.location.config.list(location) !== undefined || sync.has(`location.config:${locationKey(location)}`))
-          refresh(() => result.location.config.sync(location))
-        refresh(() => result.location.websearch.refresh(location))
+        refreshLocation("config", result.location.config, location)
+        if (hasLocation("websearch", location)) refresh(() => result.location.websearch.refresh(location))
         break
       case "websearch.updated":
-        refresh(() => result.location.websearch.refresh(location))
+        if (hasLocation("websearch", location)) refresh(() => result.location.websearch.refresh(location))
         break
       // Authenticating an MCP integration reconnects its server, which emits mcp.status.changed,
       // so the mcp list syncs here rather than off integration.updated. The server emits one event
       // per MCP server as each settles, so a location booting nine servers emitted nine refetches.
-      case "mcp.status.changed":
+      case "mcp.status.changed": {
+        const active = hasLocation("mcpServer", location)
         result.location.mcp.server.invalidate(location)
-        settle(`mcp.status:${locationKey(location)}`, () => result.location.mcp.server.sync(location))
+        if (active) settle(`mcp.status:${locationKey(location)}`, () => result.location.mcp.server.sync(location))
         break
+      }
       case "mcp.resources.changed":
-        result.location.mcp.resource.invalidate(location)
-        refresh(() => result.location.mcp.resource.sync(location))
+        refreshLocation("mcpResource", result.location.mcp.resource, location)
         break
     }
+  }
+
+  function hasLocation<Field extends keyof LocationData>(field: Field, ref?: LocationRef) {
+    const id = locationKey(ref ?? defaultLocation())
+    return store.location[id]?.[field] !== undefined || sync.has(`location.${field}:${id}`)
+  }
+
+  function refreshLocation<Field extends keyof LocationData>(
+    field: Field,
+    resource: { invalidate: (ref?: LocationRef) => void; sync: (ref?: LocationRef) => Promise<void> },
+    location: LocationRef,
+  ) {
+    const active = hasLocation(field, location)
+    resource.invalidate(location)
+    if (active) refresh(() => resource.sync(location))
   }
 
   // A cached per-location catalog. `sync` loads once per invalidation, keyed by the

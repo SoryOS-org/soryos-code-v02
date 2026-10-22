@@ -26,6 +26,9 @@ export function configureApplication() {
   const features = app.commandLine.getSwitchValue("enable-features")
   app.commandLine.appendSwitch("enable-features", features ? `${jsCallStackFeature},${features}` : jsCallStackFeature)
 
+  // Chromium animates each mouse-wheel notch on Linux; native Linux apps scroll by the full delta immediately.
+  if (process.platform === "linux") app.commandLine.appendSwitch("disable-smooth-scrolling")
+
   if (!app.isPackaged)
     app.commandLine.appendSwitch("remote-debugging-port", process.env.OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT ?? "9222")
 
@@ -52,9 +55,7 @@ export function acquireApplicationLock() {
 function createTestRoot() {
   const root = testOnboarding
     ? path.join(tmpdir(), `opencode-onboarding-${randomUUID()}`)
-    : app.isPackaged
-      ? undefined
-      : process.env.OPENCODE_DESKTOP_TEST_ROOT
+    : process.env.OPENCODE_DESKTOP_TEST_ROOT
 
   if (!root) return undefined
 
@@ -64,6 +65,7 @@ function createTestRoot() {
     mkdirSync(path.join(root, dir), { recursive: true })
 
   if (testOnboarding) process.env.OPENCODE_DB = ":memory:"
+
   process.env.XDG_DATA_HOME = path.join(root, "data")
   process.env.XDG_CONFIG_HOME = path.join(root, "config")
   process.env.XDG_CACHE_HOME = path.join(root, "cache")

@@ -47,8 +47,12 @@ export function createSessionMutations(remove: (sessionID: string) => Promise<vo
           throw error
         })
     },
+    // Keep the deleted session hidden: cached lists such as the Home index still hold it until they refetch.
     deleted(sessionID: string) {
-      setStore("session", (current) => current.filter((mutation) => mutation.sessionID !== sessionID))
+      setStore("session", (current) => [
+        ...current.filter((mutation) => mutation.sessionID !== sessionID),
+        { id: uuid(), type: "remove", sessionID },
+      ])
     },
   }
 }

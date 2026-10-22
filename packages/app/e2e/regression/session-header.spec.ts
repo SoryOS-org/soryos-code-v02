@@ -1,31 +1,31 @@
 import type { SessionMessageInfo } from "@opencode/client/promise"
 import { expect, test, type Page } from "@playwright/test"
-import { seed, sessionHref } from "../utils/app"
+import { REMOTE_SERVER, seed, sessionHref } from "../utils/app"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { expectSessionTitle } from "../utils/waits"
-import { mockWorkspace, openSession } from "../utils/workspace"
+import { mockRemoteServer, mockWorkspace, openSession } from "../utils/workspace"
 
 const tabs = (page: Page) => page.locator('[data-slot="titlebar-tabs"] a')
 
 for (const direction of ["ltr", "rtl"] as const) {
   test(`session header groups controls and exposes session details in ${direction}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
     await mockStressTimeline(page)
     await seed(page, {
-      projects: { local: [{ worktree: fixture.directory, expanded: true }] },
-      lastProject: { local: fixture.directory },
       tabs: [fixture.sourceID, fixture.targetID],
       settings: { general: { showStatus: true } },
     })
     await page.goto(sessionHref(fixture.targetID))
     const header = page.locator("[data-session-title]")
-    const more = header.getByRole("button", { name: "More options", exact: true })
-    const project = header.getByRole("button", { name: fixture.project.name, exact: true })
+    const project = header.locator('[data-slot="session-location-trigger"]')
     const review = page.getByRole("button", { name: "Toggle review", exact: true })
     const details = header.getByRole("button", { name: "Session details", exact: true })
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
     await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
     await expect(review).toBeVisible()
     await expect(details).toBeVisible()
+    const options = header.getByRole("button", { name: "More options", exact: true })
+    await expect(options).toBeVisible()
     await expect(page.locator('[data-slot="titlebar-v2"]').getByRole("button", { name: "Status" })).toHaveCount(0)
     const titleBounds = await header.getByRole("heading").boundingBox()
     expect(titleBounds).not.toBeNull()
@@ -41,25 +41,23 @@ for (const direction of ["ltr", "rtl"] as const) {
       await expect(header.locator('[data-slot="session-title-child"]')).toHaveCSS("padding-right", "4px")
       await expect
         .poll(async () => {
-          const [icon, title, menu, sidebar, summary] = await Promise.all(
-            [project, header.locator('[data-slot="session-title-child"]'), more, review, details].map((control) =>
+          const [icon, title, sidebar, summary] = await Promise.all(
+            [project, header.locator('[data-slot="session-title-child"]'), review, details].map((control) =>
               control.boundingBox(),
             ),
           )
 
-          if (!icon || !title || !menu || !sidebar || !summary || !titleBounds) return false
+          if (!icon || !title || !sidebar || !summary || !titleBounds) return false
 
           if (Math.abs(title.y - titleBounds.y) > 0.5 || Math.abs(title.height - titleBounds.height) > 0.5) return false
 
           return direction === "ltr"
-            ? Math.abs(title.x - icon.x - icon.width - 2) <= 0.5 &&
-                Math.abs(menu.x - title.x - title.width - 2) <= 0.5 &&
-                menu.x + menu.width <= summary.x &&
+            ? title.x > icon.x + icon.width &&
+                title.x + title.width <= summary.x &&
                 summary.x + summary.width <= sidebar.x
-            : Math.abs(icon.x - title.x - title.width - 2) <= 0.5 &&
-                Math.abs(title.x - menu.x - menu.width - 2) <= 0.5 &&
-                sidebar.x + sidebar.width <= summary.x &&
-                summary.x + summary.width <= menu.x
+            : icon.x > title.x + title.width &&
+                summary.x + summary.width <= title.x &&
+                sidebar.x + sidebar.width <= summary.x
         })
         .toBe(true)
     }
@@ -67,76 +65,260 @@ for (const direction of ["ltr", "rtl"] as const) {
     await header.getByRole("textbox").press("Escape")
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
 
+    // The header stays one row at every width.
+    for (const width of [900, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect
+        .poll(async () => {
+          const [location, title, summary, sidebar] = await Promise.all(
+            [project, header.getByRole("heading"), details, review].map((control) => control.boundingBox()),
+          )
+
+          if (!location || !title || !summary || !sidebar) return false
+          const middle = (box: { y: number; height: number }) => box.y + box.height / 2
+
+          return (
+            Math.abs(middle(location) - middle(title)) <= 0.5 &&
+            Math.abs(middle(summary) - middle(sidebar)) <= 0.5 &&
+            Math.abs(summary.height - sidebar.height) <= 0.5
+          )
+        })
+        .toBe(true)
+
+      const screenshot = test.info().outputPath(`header-${width}.png`)
+      await page.screenshot({ path: screenshot })
+      await test.info().attach(`header-${width}`, { path: screenshot, contentType: "image/png" })
+    }
+
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "true")
     await expect(page.locator("#review-panel")).toBeVisible()
     await review.click()
     await expect(review).toHaveAttribute("aria-expanded", "false")
 
-    await more.click()
-    const options = page.getByRole("menu")
-    await expect(options.getByRole("menuitem")).toHaveText(["Rename", "Export…", "Delete…"])
+    await options.click()
+    const actions = page.getByRole("menu").filter({ has: page.getByRole("menuitem", { name: "Rename", exact: true }) })
+    await expect(actions.getByRole("menuitem")).toHaveText(["Rename", "Export…", "Delete…"])
+    await expect(actions.locator("svg")).toHaveCount(0)
+    await actions.getByRole("menuitem", { name: "Rename", exact: true }).click()
+    await expect(header.getByRole("textbox")).toBeFocused()
+    await header.getByRole("textbox").press("Escape")
 
-    if (direction === "ltr") {
-      await expect
-        .poll(async () => {
-          const [button, menu] = await Promise.all([
-            header.getByRole("button", { name: "More options", exact: true, includeHidden: true }).boundingBox(),
-            options.boundingBox(),
-          ])
-
-          return button && menu ? Math.abs(button.x - menu.x) : Infinity
-        })
-        .toBeLessThanOrEqual(1)
-    }
-
-    await expect
-      .poll(() =>
-        options.evaluate((element) => {
-          const menu = element.getBoundingClientRect()
-          const rtl = getComputedStyle(element).direction === "rtl"
-
-          return Math.min(
-            ...Array.from(element.querySelectorAll('[data-slot="menu-v2-item-content"]'), (label) => {
-              const range = document.createRange()
-              range.selectNodeContents(label)
-              const text = range.getBoundingClientRect()
-
-              return rtl ? text.left - menu.left : menu.right - text.right
-            }),
-          )
-        }),
-      )
-      .toBeCloseTo(32, 0)
-    await expect
-      .poll(() =>
-        options.evaluate((element) => {
-          const menu = element.getBoundingClientRect()
-          const divider = element.querySelector('[data-slot="menu-v2-separator"]')?.getBoundingClientRect()
-          const rows = Array.from(element.querySelectorAll('[role="menuitem"]'), (row) => row.getBoundingClientRect())
-
-          return (
-            !!divider &&
-            Math.abs(divider.left - menu.left) <= 0.5 &&
-            Math.abs(divider.right - menu.right) <= 0.5 &&
-            rows.every(
-              (row) => Math.abs(row.left - menu.left - 2) <= 0.5 && Math.abs(menu.right - row.right - 2) <= 0.5,
-            )
-          )
-        }),
-      )
-      .toBe(true)
-    await expect(page.getByRole("menuitem", { name: "Server status", exact: true })).toHaveCount(0)
-    await page.keyboard.press("Escape")
     await details.click()
-    const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-    const mcp = summary.getByRole("button", { name: "MCP", exact: true })
-    await expect(mcp).toBeVisible()
-    await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
+    const menu = page.getByRole("dialog", { name: "Session details", exact: true })
+    await expect(menu.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible()
+    await expect(menu.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+    await expect(menu.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
+    await expect(menu).not.toContainText(fixture.project.name)
+    await expect(menu.getByText("No changes", { exact: true })).toHaveCount(0)
+    await expect(details.locator('use[href="#opencode-v2-icon-window-analytics"]')).toHaveCount(1)
+
     await page.keyboard.press("Escape")
-    await expect(mcp).toBeHidden()
+    await expect(menu).toBeHidden()
   })
 }
+
+// A frameless desktop window moves when its titlebar row is dragged. The session header continues that row through one
+// area over the empty gap between the title and the actions, so no control sits under it.
+for (const direction of ["ltr", "rtl"] as const) {
+  test(`the desktop session header drags the window from the gap after the title in ${direction}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await mockStressTimeline(page)
+    await page.goto(
+      `/e2e/utils/windows-menu.html?${new URLSearchParams({ server: fixture.serverKey, path: sessionHref(fixture.targetID, "sidecar") })}`,
+    )
+    const header = page.locator("[data-session-title]")
+    const area = page.locator('[data-slot="session-header-drag"]')
+    const options = header.getByRole("button", { name: "More options", exact: true })
+    const actions = header.locator(".session-header-actions")
+    await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
+    await page.evaluate((direction) => document.documentElement.setAttribute("dir", direction), direction)
+    await expect(area).toHaveCSS("app-region", "drag")
+    await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCSS("app-region", "drag")
+
+    const gap = header.locator('[data-slot="session-header-gap"]')
+    const aligned = async () => {
+      const [box, space, end, start, row] = await Promise.all([
+        area.boundingBox(),
+        gap.boundingBox(),
+        options.boundingBox(),
+        actions.boundingBox(),
+        header.locator(".session-header-layout").boundingBox(),
+      ])
+
+      if (!box || !space || !end || !start || !row) return false
+      const between =
+        direction === "ltr"
+          ? space.x >= end.x + end.width && space.x + space.width <= start.x
+          : space.x + space.width <= end.x && space.x >= start.x + start.width
+
+      return (
+        between &&
+        Math.abs(box.x - space.x) <= 0.5 &&
+        Math.abs(box.width - space.width) <= 0.5 &&
+        Math.abs(box.y - row.y) <= 0.5 &&
+        Math.abs(box.height - row.height) <= 0.5
+      )
+    }
+
+    await expect.poll(aligned).toBe(true)
+
+    // The area lives outside the timeline's scroller, so scrolling leaves it over the header.
+    const timeline = page.locator('[data-slot="session-timeline-scroll"]')
+    await timeline.hover()
+    await page.mouse.wheel(0, -2000)
+    await expect.poll(aligned).toBe(true)
+
+    // The rename field takes the gap's place, so the area steps aside until the title is back.
+    await header.getByRole("heading").click()
+    await expect(header.getByRole("textbox")).toBeFocused()
+    await expect(area).toBeHidden()
+    await header.getByRole("textbox").press("Escape")
+    await expect(area).toBeVisible()
+  })
+}
+
+test("the web session header leaves window dragging to the browser", async ({ page }) => {
+  await mockStressTimeline(page)
+  await seed(page, { tabs: [fixture.targetID] })
+  await page.goto(sessionHref(fixture.targetID))
+  const header = page.locator("[data-session-title]")
+  await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
+  await expect(page.locator('[data-slot="session-header-drag"]')).toHaveCount(0)
+  await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCount(0)
+})
+
+test.describe("location", () => {
+  const root = "C:/OpenCode/Location"
+  const worktree = "C:/OpenCode/Worktrees/location/quiet-falcon"
+  const trigger = (page: Page) => page.locator('[data-slot="session-location-trigger"]')
+
+  const workspace = {
+    name: "Location",
+    directory: root,
+    project: { sandboxes: [worktree] },
+    sessions: [{ id: "ses_location", title: "Location session", directory: worktree }],
+  }
+
+  test("only collapses location names when the timeline header is narrow", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openSession(page, {
+      ...workspace,
+      sessions: [{ id: "ses_location", title: "Investigate session header layout regression", directory: worktree }],
+    })
+    const header = page.locator("[data-session-title]")
+    const names = header.locator('[data-slot="session-location-project"], [data-slot="session-location-worktree"]')
+    const review = page.getByRole("button", { name: "Toggle review", exact: true })
+    await expect(names).toHaveText(["Location", "quiet-falcon"])
+
+    for (const panel of [false, true, false]) {
+      if (panel || (await review.getAttribute("aria-expanded")) === "true") await review.click()
+      await expect(review).toHaveAttribute("aria-expanded", String(panel))
+      await expect
+        .poll(() =>
+          names.evaluateAll((elements) => elements.every((element) => getComputedStyle(element).clipPath === "none")),
+        )
+        .toBe(!panel)
+      await expect(header.getByRole("button", { name: "More options", exact: true })).toBeInViewport()
+      await expect
+        .poll(() => header.getByRole("heading").evaluate((element) => element.scrollWidth <= element.clientWidth))
+        .toBe(true)
+      if (panel) {
+        const separator = header.locator('[data-slot="session-title-separator"]')
+        await expect(separator).toBeVisible()
+        await expect(separator).toHaveText("")
+        await expect(separator).toHaveAttribute("aria-hidden", "true")
+        await expect(header.locator(".session-location-worktree-icon")).toBeHidden()
+        const location = header.locator('[data-slot="session-location-trigger"]')
+        await location.hover()
+        await expect(location).toHaveCSS("padding-inline-start", "4px")
+        await expect(location).toHaveCSS("padding-inline-end", "4px")
+      }
+      await header.screenshot({ path: test.info().outputPath(`location-${panel ? "compact" : "expanded"}.png`) })
+    }
+  })
+
+  test("names the project and worktree, and the card copies the full path", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    await openSession(page, workspace)
+    await expect(trigger(page).locator('[data-slot="session-location-project"]')).toHaveText("Location")
+    await expect(trigger(page).locator('[data-slot="session-location-worktree"]')).toHaveText("quiet-falcon")
+    await expect(trigger(page)).not.toContainText("/")
+    await expect(trigger(page).locator('svg:has(use[href="#opencode-v2-icon-outline-worktree"])')).toBeVisible()
+    await trigger(page).click()
+    const card = page.locator('[data-slot="session-location-card"]')
+    const path = card.getByRole("menuitem", { name: worktree, exact: true })
+    await expect(path).toHaveText(worktree)
+    await expect(card.getByRole("menuitem", { name: "Copy path", exact: true })).toHaveCount(0)
+    // Select actual text on the first line, not the empty half of a wrapped path's bounding box.
+    await path.locator("bdi").dblclick({ position: { x: 32, y: 8 } })
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("")
+    await path.press("Enter")
+    const actions = page.getByRole("menu", { name: worktree, exact: true })
+    await expect(actions.getByRole("menuitem", { name: "Copy path", exact: true })).toBeFocused()
+    await page.screenshot({ path: test.info().outputPath("path-flyout.png"), animations: "disabled" })
+    await actions.getByRole("menuitem", { name: "Copy path", exact: true }).click()
+    await expect(card).toBeHidden()
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(worktree)
+  })
+
+  test("names another server only in the card, not the breadcrumb", async ({ page }) => {
+    await mockWorkspace(page, { name: "Location", sessions: [] })
+    await mockRemoteServer(page, {
+      name: "apollo",
+      directory: "/srv/remote/project",
+      sessions: [
+        {
+          id: "ses_remote",
+          title: "Remote session",
+          directory: "/srv/remote/project",
+          slug: "ses_remote",
+          version: "dev",
+          time: { created: 1, updated: 1 },
+        },
+      ],
+    })
+    await seed(page, { tabs: [{ session: "ses_remote", server: REMOTE_SERVER }] })
+    await page.goto(sessionHref("ses_remote", REMOTE_SERVER))
+    await expect(trigger(page).locator('[data-slot="session-location-project"]')).toHaveText("project")
+    await expect(trigger(page)).not.toContainText("apollo")
+    await trigger(page).click()
+    await expect(page.locator('[data-slot="session-location-card"]').getByText("apollo", { exact: true })).toBeVisible()
+  })
+
+  test.describe("touch", () => {
+    test.use({ hasTouch: true })
+
+    test("shows the location bar under the mobile view tabs and opens path actions on tap", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await openSession(page, workspace)
+      const bar = page.locator('[data-slot="session-location-bar"]')
+      await expect(bar.locator('[data-slot="session-location-worktree"]')).toHaveText("quiet-falcon")
+      await bar.locator('[data-slot="session-location-trigger"]').click()
+      await expect(page.locator('[data-slot="session-location-card"] [data-slot="session-location-path"]')).toHaveText(
+        worktree,
+      )
+      await page.getByRole("menuitem", { name: worktree, exact: true }).tap()
+      const actions = page.getByRole("menu", { name: worktree, exact: true })
+      await expect(actions.getByRole("menuitem", { name: "Copy path", exact: true })).toBeVisible()
+      await expect
+        .poll(() =>
+          actions.evaluate((element) => {
+            const bounds = element.getBoundingClientRect()
+
+            return (
+              bounds.left >= 16 &&
+              bounds.right <= innerWidth - 16 &&
+              bounds.top >= 16 &&
+              bounds.bottom <= innerHeight - 16
+            )
+          }),
+        )
+        .toBe(true)
+      await page.screenshot({ path: test.info().outputPath("path-flyout-mobile.png"), animations: "disabled" })
+    })
+  })
+})
 
 test.describe("rename", () => {
   const heading = (page: Page, name: string) => page.getByRole("heading", { name, exact: true })

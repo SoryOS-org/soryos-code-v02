@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story.describe("touch timeline", () => {
   story.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })

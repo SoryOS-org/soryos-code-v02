@@ -22,6 +22,8 @@ import {
   revertDocument,
   streamingDocument,
   thinkingDocument,
+  voiceDocument,
+  voicePresentation,
 } from "../storybook/current-session-fixtures"
 
 export default {
@@ -205,7 +207,10 @@ function RetryAndRecoverStory() {
             ? {
                 attempt: 2,
                 at: 1_900_000_000_000,
-                error: { type: "ProviderRateLimitError" as const, message: "Rate limit reached. Retrying with backoff." },
+                error: {
+                  type: "ProviderRateLimitError" as const,
+                  message: "Rate limit reached. Retrying with backoff.",
+                },
               }
             : undefined,
           time: { created: STORY_TIME, completed: finished ? STORY_TIME + 300 : undefined },
@@ -322,7 +327,7 @@ function CompactSessionStory() {
               message: 'Error: {"error":{"type":"ProviderError","message":"The provider rejected the summary."}}',
             },
           }
-        : { summary: state.summary, recent: "" }),
+        : { summary: state.summary }),
       time: { created: STORY_TIME + 10 },
     }
 
@@ -445,6 +450,18 @@ export const PromptWithAttachments = {
       description="A user message combines text, two files, an agent mention, and a selected-line comment."
       document={attachmentsAndCommentsDocument}
       presentation={attachmentsAndCommentsPresentation}
+      width="480px"
+    />
+  ),
+}
+
+export const VoiceMessages = {
+  render: () => (
+    <CurrentSessionTimelineStory
+      title="Voice messages"
+      description="A voice call's agent prompts on the user's behalf: its framing, or the user's spoken words, with a Voice badge on the bubble."
+      document={voiceDocument}
+      presentation={voicePresentation}
       width="480px"
     />
   ),
@@ -603,6 +620,38 @@ const RichUserAttachments = {
   ),
 }
 
+const UserMessageLinks = {
+  render: () => (
+    <CurrentSessionTimelineStory
+      title="Prompt with links"
+      description="URLs in a prompt open externally; trailing punctuation and mentions stay plain text."
+      document={{
+        ...thinkingDocument,
+        status: { type: "idle" },
+        messages: [
+          {
+            id: "msg_story_user_links",
+            type: "user",
+            text: "set it up on this pc https://github.com/Hona/mesh, then compare @src/a.ts with (https://opencode.ai/docs).",
+            agents: [],
+            files: [
+              {
+                data: "",
+                mime: "text/plain",
+                name: "a.ts",
+                source: { type: "uri", uri: "src/a.ts" },
+                mention: { text: "@src/a.ts", start: 64, end: 73 },
+              },
+            ],
+            time: { created: 1_735_689_633_000 },
+          },
+        ],
+      }}
+      width="620px"
+    />
+  ),
+}
+
 const conversationScenarios = {
   reasoning: AgentReasoning,
   hidden: WorkingWithoutReasoningDetails,
@@ -613,6 +662,7 @@ const conversationScenarios = {
   interruption: InterruptedTurn,
   models: AliasedModelNotices,
   attachments: RichUserAttachments,
+  links: UserMessageLinks,
 }
 
 export const Conversation = {

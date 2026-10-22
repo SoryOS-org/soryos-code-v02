@@ -4,3 +4,47 @@
   width: 18px;
   aspect-ratio: 1;
 }
+
+[data-slot="spinner-grid"] {
+  background-color: currentColor;
+  /* Preserve the session progress indicator's exact 5x5 frames. A CSS mask keeps instances in phase. */
+  mask-image:
+    url("./spinner.png"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1h2v2h-2zM4 1h2v2h-2zM7 1h2v2h-2zM10 1h2v2h-2zM13 1h2v2h-2zM1 4h2v2h-2zM4 4h2v2h-2zM7 4h2v2h-2zM10 4h2v2h-2zM13 4h2v2h-2zM1 7h2v2h-2zM4 7h2v2h-2zM7 7h2v2h-2zM10 7h2v2h-2zM13 7h2v2h-2zM1 10h2v2h-2zM4 10h2v2h-2zM7 10h2v2h-2zM10 10h2v2h-2zM13 10h2v2h-2zM1 13h2v2h-2zM4 13h2v2h-2zM7 13h2v2h-2zM10 13h2v2h-2zM13 13h2v2h-2z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+[data-slot="spinner-grid"] [data-reduced-motion] {
+  display: none;
+}
+
+:root[data-motion="reduce"] {
+  [data-slot="spinner-grid"] {
+    background-color: transparent;
+    mask-image: none;
+  }
+
+  [data-slot="spinner-grid"] [data-reduced-motion] {
+    display: block;
+  }
+}
+
+/* Dot-matrix variations (Knobs → Experiments → Activity spinner). Each dot rests at its frozen pose, so reduced
+   motion only has to stop the animation. */
+[data-slot="spinner-dots"] rect {
+  opacity: var(--still);
+}
+
+/* syncSpinPhase marks spinners out of view; `!important` beats the inline animation each dot carries. */
+[data-slot="spinner-dots"][data-offscreen] rect {
+  animation-play-state: paused !important;
+}
+
+:root[data-motion="reduce"] [data-slot="spinner-dots"] rect {
+  /* Beats the inline animation each dot carries. */
+  animation: none !important;
+}

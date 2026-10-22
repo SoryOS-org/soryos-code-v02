@@ -26,6 +26,8 @@
 @import "../components/progress.css" layer(components);
 @import "../components/resize-handle.css" layer(components);
 @import "../components/spinner.css" layer(components);
+@import "../components/status-link.css" layer(components);
+@import "../components/error-details.css" layer(components);
 @import "../components/scroll-view.css" layer(components);
 @import "../components/sticky-accordion-header.css" layer(components);
 @import "../navigation/tabs/tabs.css" layer(components);

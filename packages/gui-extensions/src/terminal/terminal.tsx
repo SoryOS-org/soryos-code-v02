@@ -13,7 +13,7 @@ import type { TerminalModel } from "./model"
 import type { LocalPTY } from "./state"
 import { SerializeAddon } from "./serialize"
 import { disposeIfDisposable, getHoveredLinkText, setOptionIfSupported } from "./runtime-adapters"
-import { terminalKeyInput } from "./terminal-key-event"
+import { consumeTerminalMetaKey, terminalKeyInput } from "./terminal-key-event"
 import { terminalWriter } from "./writer"
 
 // Serialization on unmount is a synchronous O(rows x cols) walk on the main thread and the
@@ -481,7 +481,12 @@ export const Terminal = (props: TerminalProps) => {
         }
 
         // allow for toggle terminal keybinds in parent
-        return keybinds.matches("terminal.toggle", event)
+        if (keybinds.matches("terminal.toggle", event)) return true
+
+        return consumeTerminalMetaKey(event, {
+          paste: () => void document.execCommand("paste"),
+          copy: () => t.hasSelection() && (document.execCommand("copy") || t.copySelection()),
+        })
       })
 
       const fit = new mod.FitAddon()
@@ -502,12 +507,15 @@ export const Terminal = (props: TerminalProps) => {
         handleLinkClick,
       })
 
-      if (local.autoFocus === true) {
+      // onAutoFocus consumes the request, which flips autoFocus, so read it once.
+      const autoFocus = local.autoFocus === true
+
+      if (autoFocus) {
         focusTerminal()
         local.onAutoFocus?.()
       }
 
-      if (local.autoFocus !== true) {
+      if (!autoFocus) {
         const restoreFocus = () => {
           const current = document.activeElement
 
@@ -796,11 +804,16 @@ export const Terminal = (props: TerminalProps) => {
       dir="ltr"
       data-prevent-autofocus
       tabIndex={-1}
-      style={{ "background-color": terminalColors().background, "caret-color": "transparent", opacity: 0 }}
+      style={{
+        "background-color": terminalColors().background,
+        "caret-color": "transparent",
+        "font-family": appearance.font("mono"),
+        opacity: 0,
+      }}
       classList={{
         ...local.classList,
         "select-text": true,
-        "size-full px-6 py-3 font-mono relative overflow-hidden": true,
+        "size-full px-6 py-3 relative overflow-hidden": true,
         [local.class ?? ""]: !!local.class,
       }}
       {...others}

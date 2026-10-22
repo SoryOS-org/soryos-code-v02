@@ -6,7 +6,10 @@ import type {
 } from "@opencode/client/promise"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Option, Predicate, Schema } from "effect"
-import { For, Show, createMemo, type Accessor, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, untrack, type Accessor, type JSX } from "solid-js"
+import { DiffChanges } from "@opencode/ui/diff-changes"
+import { Icon } from "@opencode/ui/icon"
+import { springStyle } from "@opencode/ui/motion/solid"
 import { Dynamic } from "solid-js/web"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 import { useData } from "../context"
@@ -25,11 +28,14 @@ import {
   SessionCompactionMessage,
   SessionCompactionQueued,
 } from "../message/message-content"
-import type { ContextGroupPart } from "../tools/tool-renderer"
+import { taskAgentName, ToolRegistry, type ContextGroupPart } from "../tools/tool-renderer"
+import { GenericTool } from "../components/basic-tool"
 import { SessionRetry } from "../components/session-retry"
 import { SessionError } from "../components/session-error"
 import { timelineCategory, type TimelineDetail } from "./detail"
 import { currentToolFailed } from "../message/current-tool-state"
+import { userMessageRuns, userRunSpring } from "./user-runs"
+import { attached } from "../components/message-file"
 import {
   createReactiveTimelineProjection,
   Timeline,
@@ -41,16 +47,23 @@ import {
 
 const emptyAssistantMessages: SessionMessageAssistant[] = []
 
+// Past this many files, the rest of a turn's changes wait behind "Show all".
+const turnDiffFileLimit = 5
+
 const decodeMetadataFile = Schema.decodeUnknownOption(Schema.Struct({ file: Schema.String }))
 
 type Projection = ReturnType<typeof createReactiveTimelineProjection>
 
 type FramedTimelineRow = Exclude<TimelineRow.TimelineRow, TimelineRow.TurnGap>
 
+type Outcome = "completed" | "error" | "cancelled"
+
 export type SessionUserPresentation = {
   displayText?: string
   comments?: SessionUserComment[]
   references?: SessionUserAttachmentReference[]
+  /** A voice call's agent sent it on the user's behalf. */
+  voice?: boolean
 }
 
 export function createSessionTimelineRowRenderer(input: {
@@ -103,6 +116,33 @@ export function createSessionTimelineRowRenderer(input: {
 
     return owners
   })
+
+  const runs = createMemo(() => {
+    const messages = input.projection.messageByID()
+    const context = input.projection.userContextByID()
+
+    return userMessageRuns(input.projection.rows(), [...messages.values()], (id) => {
+      const message = messages.get(id)
+      const user = context.get(id)
+
+      if (message?.type !== "user" || !user) return undefined
+      const status = input.actions?.pending?.status(id)
+      const presentation = input.presentation(message)
+
+      return {
+        kind: status === "steering" || status === "stranded" ? "pending" : "sent",
+        agent: user.agent,
+        model: user.model,
+        text: !!(presentation?.displayText ?? message.text),
+        attachments: (message.files ?? []).some(attached) || !!presentation?.references?.length,
+      }
+    })
+  })
+
+  const run = (messageID: string) =>
+    createMemo(() => runs().get(messageID), undefined, {
+      equals: (a, b) => a?.above === b?.above && a?.below === b?.below,
+    })
 
   const workingTurn = (messageID: string) =>
     input.status().type !== "idle" && input.projection.activeMessageID() === messageID
@@ -198,6 +238,15 @@ export function createSessionTimelineRowRenderer(input: {
             ]
           const message = input.projection.messageByID().get(ref.messageID)
 
+          if (content?.type === "text" && message?.type === "assistant")
+            return [
+              {
+                type: "text",
+                id: ref.partID,
+                render: () => <SessionAssistantContent message={message} content={content} contentID={ref.partID} />,
+              },
+            ]
+
           if (ref.messageID !== ref.partID || !message) return []
 
           if (message.type === "shell")
@@ -236,7 +285,9 @@ export function createSessionTimelineRowRenderer(input: {
             }
             reasoningOpen={(id) => input.disclosure.value(id)}
             onReasoningOpenChange={(id, open) => input.disclosure.set(id, open)}
-            toolDefaultOpen={(tool) => (input.timelineDetail ? contentDefaultOpen(tool) : false)}
+            toolDefaultOpen={(tool) =>
+              input.timelineDetail || tool.name === "execute" ? contentDefaultOpen(tool) : false
+            }
             toolOpen={(id) => input.disclosure.value(`${row().group.key}:tool:${id}`)}
             onToolOpenChange={(id, open) => input.disclosure.set(`${row().group.key}:tool:${id}`, open)}
             fileOpen={(path) =>
@@ -375,6 +426,8 @@ export function createSessionTimelineRowRenderer(input: {
   }
 
   function contentDefaultOpen(item: SessionMessageAssistant["content"][number]) {
+    if (item.type === "tool" && item.name === "execute") return true
+
     if (input.timelineDetail) {
       const category = timelineCategory(item)
 
@@ -447,15 +500,17 @@ export function createSessionTimelineRowRenderer(input: {
       const actor =
         source === "shell"
           ? i18n.t("ui.tool.shell")
-          : Predicate.isString(agent)
-            ? agent
-            : i18n.t("ui.tool.agent.default")
+          : ((Predicate.isString(agent) ? taskAgentName(agent, data.store.agent) : undefined) ??
+            i18n.t("ui.tool.agent.default"))
 
       const state = message.metadata?.state
+      const outcome: Outcome = state === "error" || state === "cancelled" ? state : "completed"
 
       return {
-        label: i18n.t(outcomeNoticeKey(Predicate.isString(state) ? state : undefined), { actor }),
+        label: i18n.t(outcomeNoticeKey(outcome), { actor }),
         data: message.description,
+        outcome,
+        icon: source === "shell" && outcome === "completed" ? undefined : outcomeNoticeIcon(outcome),
       }
     }
 
@@ -597,17 +652,27 @@ export function createSessionTimelineRowRenderer(input: {
                         <Dynamic
                           component={href() ? "a" : "div"}
                           data-slot="session-timeline-notice"
+                          data-outcome={content().outcome}
                           class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-text-weak ${inset()}`}
-                          classList={{ "cursor-pointer": clickable() }}
+                          classList={{ "cursor-pointer hover:text-v2-text-text-base": clickable() }}
                           href={href()}
                           role={clickable() && !href() ? "link" : undefined}
                           tabIndex={clickable() && !href() ? 0 : undefined}
                           onClick={navigate}
                           onKeyDown={navigateKey}
                         >
+                          <Show when={content().icon}>
+                            {(icon) => (
+                              <Icon
+                                name={icon()}
+                                size="normal"
+                                class={`inline-block align-top me-1.5 ${outcomeNoticeColor(content().outcome)}`}
+                              />
+                            )}
+                          </Show>
                           <bdi
                             dir="auto"
-                            class="font-[530]"
+                            class={`font-[530] ${outcomeNoticeColor(content().outcome)}`}
                             classList={{ "text-v2-text-text-faint": message()?.type === "agent-switched" }}
                           >
                             {content().label}
@@ -704,8 +769,81 @@ export function createSessionTimelineRowRenderer(input: {
     )
   }
 
+  function TurnDiff(props: { row: TimelineRow.TurnDiff; onSizeChange?: () => void }) {
+    const render = ToolRegistry.render("patch") ?? GenericTool
+    // Until the diff loads, list the paths the turn's steps recorded, without change counts.
+    const turn = () => ({ sessionID: input.sessionID(), from: props.row.from })
+    const diffs = () => data.turnDiff?.get(turn())
+    const paths = () => diffs()?.map((diff) => diff.file) ?? props.row.files
+    const showAllKey = () => `turn-diff:${props.row.messageID}`
+    const showAll = () => input.disclosure.value(showAllKey()) === true
+    const limit = <T,>(items: readonly T[]) => (showAll() ? items : items.slice(0, turnDiffFileLimit))
+    const overflow = () => paths().length > turnDiffFileLimit
+    const fileKey = (path: string) => `turn-diff:${props.row.messageID}:file:${path}`
+
+    createEffect(() => data.turnDiff?.load(turn()))
+
+    return (
+      <Show when={data.turnDiff && paths().length > 0}>
+        <div data-slot="session-turn-diffs" class="flex flex-col gap-2 pt-4">
+          <div class="flex h-6 min-w-0 items-center gap-2">
+            <span class="text-14-medium text-text-strong tabular-nums">
+              {i18n.plural("ui.sessionTurn.diffs.changed", paths().length)}
+            </span>
+            <DiffChanges changes={[...(diffs() ?? [])]} />
+            <Show when={overflow()}>
+              <button
+                type="button"
+                class="ml-auto text-14-regular text-text-interactive-base"
+                onClick={() => input.disclosure.set(showAllKey(), !showAll())}
+              >
+                {showAll() ? i18n.t("ui.sessionTurn.diffs.showLess") : i18n.t("ui.sessionTurn.diffs.showAll")}
+              </button>
+            </Show>
+          </div>
+          <Dynamic
+            component={render}
+            tool="patch"
+            input={{}}
+            metadata={{ files: limit(diffs() ?? []) }}
+            pendingFiles={diffs() ? undefined : limit(props.row.files)}
+            status="completed"
+            fileOpen={(path: string) => input.disclosure.value(fileKey(path))}
+            onFileOpenChange={(path: string, open: boolean) => input.disclosure.set(fileKey(path), open)}
+            deferContent
+            virtualizeDiff={false}
+            onContentRendered={props.onSizeChange}
+          />
+        </div>
+      </Show>
+    )
+  }
+
+  // A run's messages sit as close as the iOS app's (4 px); the gap springs as a message joins or leaves.
+  function TurnGap(props: { messageID: string }) {
+    let element: HTMLDivElement | undefined
+    const joined = run(props.messageID)
+    springStyle(
+      () => element,
+      () => ({ height: joined()?.above ? 4 : 24 }),
+      (el, value) => {
+        el.style.height = `${value.height}px`
+      },
+      userRunSpring,
+    )
+
+    return (
+      <div
+        ref={element}
+        data-timeline-row="TurnGap"
+        aria-hidden="true"
+        style={{ height: untrack(joined)?.above ? "4px" : "24px" }}
+      />
+    )
+  }
+
   const render = (row: Accessor<TimelineRow.TimelineRow>, onSizeChange?: () => void) => {
-    if (Predicate.isTagged(row(), "TurnGap")) return <div data-timeline-row="TurnGap" aria-hidden="true" class="h-6" />
+    if (Predicate.isTagged(row(), "TurnGap")) return <TurnGap messageID={row().userMessageID} />
 
     // The host owns live status and renders this slot itself.
     if (Predicate.isTagged(row(), "Activity")) return null
@@ -726,6 +864,7 @@ export function createSessionTimelineRowRenderer(input: {
       })
 
       const context = createMemo(() => input.projection.userContextByID().get(current().userMessageID))
+      const joined = run(current().userMessageID)
 
       return (
         <Frame row={current()}>
@@ -742,9 +881,11 @@ export function createSessionTimelineRowRenderer(input: {
                       displayText={presentation()?.displayText}
                       comments={presentation()?.comments}
                       references={presentation()?.references}
+                      voice={presentation()?.voice}
                       historicalAgent={context()?.agent ?? ""}
                       historicalModel={context()?.model ?? { id: "", providerID: "" }}
                       actions={input.actions}
+                      run={joined()}
                     />
                   </div>
                 </div>
@@ -898,6 +1039,24 @@ export function createSessionTimelineRowRenderer(input: {
       )
     }
 
+    if (Predicate.isTagged(row(), "TurnDiff")) {
+      const current = () => {
+        const value = row()
+
+        if (!Predicate.isTagged(value, "TurnDiff")) throw new Error("Expected a turn-diff timeline row")
+
+        return value
+      }
+
+      return (
+        <Frame row={current()}>
+          <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
+            <TurnDiff row={current()} onSizeChange={onSizeChange} />
+          </div>
+        </Frame>
+      )
+    }
+
     if (Predicate.isTagged(row(), "Retry")) {
       const current = () => {
         const value = row()
@@ -934,10 +1093,37 @@ export function createSessionTimelineRowRenderer(input: {
       return value
     }
 
+    const freeLimit = createMemo(() => {
+      if (current().kind !== "free-limit") return
+      const at = current().resetAt
+
+      if (at === undefined || !Number.isFinite(at) || Number.isNaN(new Date(at).getTime()))
+        return i18n.t("ui.sessionTurn.freeLimit.title")
+
+      const now = Date.now()
+      const sameDay = new Date(at).toDateString() === new Date(now).toDateString() && at - now < 86_400_000
+
+      const time = new Intl.DateTimeFormat(
+        i18n.locale(),
+        sameDay ? { timeStyle: "short" } : { dateStyle: "medium", timeStyle: "short" },
+      ).format(at)
+
+      return i18n.t("ui.sessionTurn.freeLimit.lineReset", { time })
+    })
+
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <SessionError message={current().text} />
+          <Show when={freeLimit()} fallback={<SessionError message={current().text} />}>
+            {(text) => (
+              <div
+                role="status"
+                class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+              >
+                {text()}
+              </div>
+            )}
+          </Show>
         </div>
       </Frame>
     )
@@ -956,6 +1142,24 @@ export function createSessionTimelineRowRenderer(input: {
 
 function capitalizeAgent(agent: string) {
   return agent.slice(0, 1).toUpperCase() + agent.slice(1)
+}
+
+function outcomeNoticeIcon(outcome: Outcome) {
+  if (outcome === "error") return "warning"
+
+  if (outcome === "cancelled") return "circle-ban-sign"
+
+  return "check"
+}
+
+function outcomeNoticeColor(outcome: Outcome | undefined) {
+  if (!outcome) return ""
+
+  if (outcome === "error") return "text-v2-state-fg-danger"
+
+  if (outcome === "cancelled") return "text-[var(--v2-yellow-900)] [[data-color-scheme=dark]_&]:text-v2-state-fg-warning"
+
+  return "text-v2-text-text-code-accent"
 }
 
 function outcomeNoticeKey(state: string | undefined) {

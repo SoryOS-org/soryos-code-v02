@@ -1,6 +1,6 @@
 {
   "name": "@opencode/session-ui",
-  "version": "2.0.28",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "./line-comment": "./src/components/line-comment.tsx",
     "./line-comment-annotations": "./src/components/line-comment-annotations.tsx",
     "./markdown": "./src/components/markdown.tsx",
+    "./genui": "./src/genui/surface.tsx",
     "./message-part": "./src/components/message-part.tsx",
     "./message-nav": "./src/components/message-nav.tsx",
     "./session-review": "./src/components/session-review.tsx",
@@ -46,8 +47,7 @@
     "./v2/*": "./src/v2/components/*.tsx"
   },
   "scripts": {
-    "generate:progress-indicator": "bun script/generate-session-progress-indicator.ts",
-    "typecheck": "tsgo -b",
+    "typecheck": "tsc -b",
     "test": "bun test src --only-failures",
     "test:components": "playwright test --config playwright.components.config.ts",
     "test:components:ui": "playwright test --config playwright.components.config.ts --ui"
@@ -57,17 +57,19 @@
     "@playwright/test": "catalog:",
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:",
+    "@typescript/native": "catalog:",
     "vite": "catalog:",
     "vite-plugin-solid": "catalog:"
   },
   "dependencies": {
     "@kobalte/core": "catalog:",
     "@opencode/client": "workspace:*",
+    "@opencode/patchmark": "workspace:*",
+    "@opencode/plugin-genui": "workspace:*",
     "@opencode/ui": "workspace:*",
     "@opencode/util": "workspace:*",
     "@pierre/diffs": "catalog:",
-    "@shikijs/stream": "catalog:",
+    "@pierre/highlights": "catalog:",
     "@solid-primitives/event-listener": "catalog:",
     "@solid-primitives/media": "catalog:",
     "@solid-primitives/resize-observer": "catalog:",
@@ -76,10 +78,8 @@
     "effect": "catalog:",
     "dompurify": "3.4.14",
     "marked": "catalog:",
-    "mermaid": "11.17.2",
     "motion": "12.34.5",
-    "remend": "catalog:",
-    "shiki": "catalog:",
+    "pele": "1.7.0",
     "solid-js": "catalog:",
     "strip-ansi": "7.1.2"
   }

@@ -10,7 +10,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ProjectIcon } from "@/shell/layout/project-icon"
 import { useCommand } from "@/shell/commands/command"
-import { settingsProjects, useSettingsServers } from "./servers/inventory"
+import { useSettingsServers } from "./servers/inventory"
 import { useSettingsSurface } from "./surface"
 import { rankSettings, type SettingsSearchResult } from "./search-results"
 import { settingsSearchIndex } from "./search-index"
@@ -19,12 +19,9 @@ import { SettingsSearchEmpty } from "./search-empty"
 export function SettingsSearch() {
   const language = useLanguage()
   const command = useCommand()
-  const platform = usePlatform()
-  const global = useGlobal()
   const servers = useSettingsServers()
   const surface = useSettingsSurface()
   const search = surface.search
-  const mobile = createMediaQuery("(max-width: 767px)")
   const [state, setState] = createStore({ narrow: false, overflow: { start: false, end: false } })
   const listID = `settings-results-${createUniqueId()}`
   let root: HTMLDivElement | undefined
@@ -62,32 +59,9 @@ export function SettingsSearch() {
     },
   ])
 
-  const inventory = createMemo(() =>
-    servers().map((server) => {
-      const context = server.connection ? global.ensureServerCtx(server.connection) : undefined
+  const catalog = createSettingsSearchCatalog()
 
-      return {
-        ...server,
-        connected: context?.sdk.connection.status() === "connected",
-        projects: context ? settingsProjects(context) : [],
-      }
-    }),
-  )
-
-  const origin = () => search.state.origin ?? surface.view()
-
-  const catalog = createMemo(() =>
-    settingsSearchIndex({
-      servers: inventory(),
-      desktop: platform.platform === "desktop",
-      browser: platform.platform === "desktop",
-      mobile: mobile(),
-      translate: language.t,
-      extensions: surface.extensions.items(),
-    }),
-  )
-
-  const matches = createMemo(() => rankSettings(search.state.query, catalog(), origin()))
+  const matches = createMemo(() => rankSettings(search.state.query, catalog()))
 
   const category = (item: SettingsSearchResult) =>
     item.topLevel
@@ -207,14 +181,11 @@ export function SettingsSearch() {
           search.expand()
           const index = shown().findIndex((item) => item.id === highlighted()?.id)
 
-          const next =
-            shown()[
-              event.key === "Home"
-                ? 0
-                : event.key === "End"
-                  ? shown().length - 1
-                  : Math.max(0, Math.min(shown().length - 1, index + (event.key === "ArrowDown" ? 1 : -1)))
-            ]
+          const last = shown().length - 1
+          const moves = { Home: 0, End: last, ArrowDown: Math.min(last, index + 1), ArrowUp: Math.max(0, index - 1) }
+          const move = Object.entries(moves).find(([key]) => key === event.key)
+
+          const next = move && shown()[move[1]]
 
           if (!next) return
           search.highlight(next.id)
@@ -352,5 +323,39 @@ export function SettingsSearch() {
         </div>
       </Show>
     </div>
+  )
+}
+
+/** The settings search index for the current platform, servers, and extensions. */
+export function createSettingsSearchCatalog() {
+  const language = useLanguage()
+  const platform = usePlatform()
+  const global = useGlobal()
+  const servers = useSettingsServers()
+  const surface = useSettingsSurface()
+  const mobile = createMediaQuery("(max-width: 767px)")
+
+  const inventory = createMemo(() =>
+    servers().map((server) => {
+      const context = server.connection ? global.ensureServerCtx(server.connection) : undefined
+
+      return {
+        ...server,
+        connected: context?.sdk.connection.status() === "connected",
+        projects: context ? context.projects.list() : [],
+      }
+    }),
+  )
+
+  return createMemo(() =>
+    settingsSearchIndex({
+      servers: inventory(),
+      selected: surface.server()?.key,
+      desktop: platform.platform === "desktop",
+      browser: platform.platform === "desktop",
+      mobile: mobile(),
+      translate: language.t,
+      extensions: surface.extensions.items(),
+    }),
   )
 }

@@ -23,6 +23,9 @@ const ConnectServerScreen = lazy(() =>
   import("@/servers/connect/screen").then((module) => ({ default: module.ConnectServerScreen })),
 )
 
+// Development builds only: production drops the import, so the lab, its stories and knobs never ship.
+const ComponentsLab = import.meta.env.DEV ? lazy(() => import("@/components-lab/lab")) : undefined
+
 const TargetSessionRouteContent = lazy(() =>
   loadSessionRoute().then((module) => ({ default: module.TargetSessionRouteContent })),
 )
@@ -64,6 +67,7 @@ export function AppRoutes() {
         )}
       />
       <Route path="/new-session" component={DraftRoute} />
+      {ComponentsLab && <Route path="/components" component={ComponentsLab} />}
     </Route>
   )
 }

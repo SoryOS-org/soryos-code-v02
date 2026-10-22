@@ -5,7 +5,7 @@ import { getFilename } from "@opencode/util/path"
 import { retry } from "@opencode/util/retry"
 import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import type { State } from "./types"
-import { cmp, normalizeProjectInfo } from "./utils"
+import { normalizeProjectInfo } from "./utils"
 import { formatServerError } from "@/runtime/server/errors"
 import { QueryClient, queryOptions } from "@tanstack/solid-query"
 import type { ServerScope } from "@/runtime/server/scope"
@@ -62,21 +62,34 @@ type ProjectApi = {
 
 type LocationApi = { readonly get: (input?: LocationGetInput) => Promise<LocationGetOutput> }
 
-// Metadata only. Worktree inventories load per project when a view shows it (see workspaces/inventory).
+// Metadata only, in the server's order (most recently active first). Worktree inventories load per project when a
+// view shows it (see workspaces/inventory).
 export const loadProjectsQuery = (scope: ServerScope, projects: ProjectApi) =>
   queryOptions({
     queryKey: [scope, "project"],
     queryFn: () =>
       retry(() =>
-        projects.list().then((items) =>
-          items
-            .filter((project) => !!project?.id)
-            .map(normalizeProjectInfo)
-            .filter((p) => !!p.worktree && !p.worktree.includes("opencode-test"))
-            .sort((a, b) => cmp(a.id, b.id)),
-        ),
+        projects
+          .list()
+          .then((items) => items.flatMap((project) => (project?.id ? [normalizeProjectInfo(project)] : []))),
       ),
   })
+
+export function loadProjects(input: {
+  scope: ServerScope
+  project: ProjectApi
+  setGlobalStore: SetStoreFunction<GlobalStore>
+  queryClient: QueryClient
+}) {
+  return input.queryClient.fetchQuery(loadProjectsQuery(input.scope, input.project)).then((data) =>
+    input.setGlobalStore(
+      "project",
+      data.map((project) =>
+        withWorktreeInventory(project, input.queryClient.getQueryData(worktreeInventoryKey(input.scope, project.id))),
+      ),
+    ),
+  )
+}
 
 export async function bootstrapGlobal(input: {
   serverAPI: {
@@ -91,17 +104,12 @@ export async function bootstrapGlobal(input: {
     () => input.queryClient.fetchQuery(loadGlobalConfigQuery(input.scope)),
     () => input.queryClient.fetchQuery(loadPathQuery(input.scope, null, input.serverAPI.location)),
     () =>
-      input.queryClient.fetchQuery(loadProjectsQuery(input.scope, input.serverAPI.project)).then((data) =>
-        input.setGlobalStore(
-          "project",
-          data.map((project) =>
-            withWorktreeInventory(
-              project,
-              input.queryClient.getQueryData(worktreeInventoryKey(input.scope, project.id)),
-            ),
-          ),
-        ),
-      ),
+      loadProjects({
+        scope: input.scope,
+        project: input.serverAPI.project,
+        setGlobalStore: input.setGlobalStore,
+        queryClient: input.queryClient,
+      }),
   ]
 
   await runAll(slow)

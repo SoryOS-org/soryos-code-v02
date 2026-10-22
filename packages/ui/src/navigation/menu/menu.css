@@ -67,6 +67,10 @@
   font-variant-numeric: tabular-nums;
   color: var(--menu-v2-fg);
 
+  &[data-variant="critical"] {
+    --menu-v2-fg: var(--v2-state-fg-danger);
+  }
+
   [data-slot="menu-v2-item-content"] {
     display: flex;
     flex: 1 1 auto;
@@ -225,6 +229,10 @@
 
     &[data-highlighted] {
       background: var(--surface-raised-base-hover);
+    }
+
+    &[data-variant="critical"] {
+      color: var(--text-on-critical-base);
     }
 
     &[data-disabled] {

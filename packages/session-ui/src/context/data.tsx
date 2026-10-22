@@ -1,6 +1,8 @@
 import type {
   FileDiffInfo,
+  JsonValue,
   SessionInfo,
+  SessionMessageUser,
   SessionStatus,
   ShellOutputInput,
   ShellOutputOutput,
@@ -36,6 +38,17 @@ type Data = {
   }
 }
 
+/** Names a finished turn by its Session and the user message that opened it. */
+export type TurnDiffInput = { sessionID: string; from: string }
+
+/** The host's cache of the files each finished turn changed. */
+export type TurnDiffSource = {
+  /** The turn's diffs, or undefined until they load. */
+  get: (input: TurnDiffInput) => readonly FileDiffInfo[] | undefined
+  /** Starts loading the turn's diffs unless they are cached or already loading. */
+  load: (input: TurnDiffInput) => void
+}
+
 export type NavigateToSessionFn = (sessionID: string) => void
 
 export type SessionHrefFn = (sessionID: string) => string
@@ -46,10 +59,17 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     data: Data
     directory: string
     sessionID?: string
+    /** Whether the host lets the user pick agents; hosts that don't show no agent names. Defaults to true. */
+    agents?: boolean
     shellRunning?: (id: string) => boolean
     shellOutput?: (input: ShellOutputInput) => Promise<ShellOutputOutput>
+    turnDiff?: TurnDiffSource
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
+    /** Sends a prompt as the user, e.g. a reply from an agent-rendered surface. Absent where the user cannot reply. */
+    onPrompt?: (input: { sessionID: string; text: string; metadata?: { [key: string]: JsonValue } }) => Promise<void>
+    /** The metadata of the session's user prompts, including ones not delivered yet. */
+    promptMetadata?: (sessionID: string) => readonly SessionMessageUser["metadata"][]
   }) => {
     return {
       get store() {
@@ -61,10 +81,16 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       get sessionID() {
         return props.sessionID
       },
+      get agents() {
+        return props.agents ?? true
+      },
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,
       shellRunning: props.shellRunning,
       shellOutput: props.shellOutput,
+      turnDiff: props.turnDiff,
+      prompt: props.onPrompt,
+      promptMetadata: props.promptMetadata,
     }
   },
 })

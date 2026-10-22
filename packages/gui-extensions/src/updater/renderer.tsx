@@ -87,8 +87,8 @@ const setup: Setup<typeof definition> = (ctx) => {
 }
 
 /**
- * What's New after an update, on every platform: the release highlights since the version last seen. The first run
- * and a disabled What's New only remember the version.
+ * What's New after an update, on every platform: the release highlights since the version last seen, or on beta the
+ * features and fixes of the beta builds since then. The first run and a disabled What's New only remember the version.
  */
 function whatsNew(ctx: SetupContext<typeof definition>) {
   const version = ctx.build.version
@@ -97,12 +97,28 @@ function whatsNew(ctx: SetupContext<typeof definition>) {
 
   if (!version || previous === version) return
 
+  const commit = import.meta.env.OPENCODE_COMMIT
+  const previousCommit = seen.value.commit
+
   const markSeen = () =>
     seen.update((draft) => {
       draft.version = version
+
+      // Beta remembers the build's commit even when nothing shows, so the next update lists what came after it.
+      if (commit) draft.commit = commit
     })
 
   if (!previous || !ctx.stores.releaseNotes.value.enabled) return markSeen()
+
+  if (ctx.build.channel === "beta") {
+    void import("./beta-dialog").then((module) => {
+      if (ctx.signal.aborted) return
+
+      module.showBetaNotes(ctx, { previous, previousCommit, markSeen })
+    })
+
+    return
+  }
 
   void import("./whats-new").then((module) => {
     if (ctx.signal.aborted) return

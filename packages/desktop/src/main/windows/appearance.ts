@@ -83,6 +83,11 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   updateTitlebar(win)
 }
 
+export function setTrafficLightsPosition(win: BrowserWindow, position: { x: number; y: number }) {
+  if (process.platform !== "darwin") return
+  win.setWindowButtonPosition({ x: Math.round(position.x), y: Math.round(position.y) })
+}
+
 export function updateTitlebar(win: BrowserWindow) {
   if (process.platform !== "win32") return
   win.setTitleBarOverlay(overlay(titlebarThemes.get(win), win.webContents.getZoomFactor()))

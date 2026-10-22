@@ -1,7 +1,7 @@
 export * as Skill from "./skill.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
-import type { FSUtil } from "@opencode/util/fs-util"
+import { FSUtil } from "@opencode/util/fs-util"
 import path from "path"
 import { Context, Effect, Layer, Types } from "effect"
 import { Skill } from "@opencode/schema/skill"
@@ -56,7 +56,13 @@ export const prepare = Effect.fn("Skill.prepare")(function* (fs: FSUtil.Interfac
   const directory = path.dirname(skill.path)
   const files =
     path.basename(skill.path) === "SKILL.md"
-      ? (yield* fs.scan("**/*", { cwd: directory, absolute: true, include: "file", dot: true }))
+      ? (yield* fs.scan("**/*", {
+          cwd: directory,
+          absolute: true,
+          include: "file",
+          dot: true,
+          ignore: FSUtil.ignoreGlobs,
+        }))
           .filter((file) => path.basename(file) !== "SKILL.md")
           .toSorted()
           .slice(0, 10)
@@ -110,7 +116,10 @@ const layer = Layer.effect(
           editor.skills.delete(ID.make(id))
         },
       }),
-      notify: () => bus.publish(Skill.Event.Updated, {}).pipe(Effect.asVoid),
+      notify: State.changes(
+        (data) => Array.from(data.skills.values()),
+        () => bus.publish(Skill.Event.Updated, {}).pipe(Effect.asVoid),
+      ),
     })
 
     return Service.of({

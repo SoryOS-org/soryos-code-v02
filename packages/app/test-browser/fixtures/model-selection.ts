@@ -131,6 +131,7 @@ function fixture(input: { session?: Commit; agents?: Agent[]; config?: ConfigMod
   const [preferences, setPreferences] = createStore({
     user: [] as Array<ModelKey & { visibility: "show" | "hide" }>,
     recent: [] as ModelKey[],
+    favorite: [] as ModelKey[],
     variant: (input.preferred ? { "provider/a": input.preferred } : {}) as Record<string, string>,
   })
 
@@ -143,11 +144,17 @@ function fixture(input: { session?: Commit; agents?: Agent[]; config?: ConfigMod
     state,
     set,
     setPreferences,
-    preferences: { store: preferences, set: setPreferences, ready: () => true, recent: () => preferences.recent },
+    preferences: {
+      store: preferences,
+      set: setPreferences,
+      ready: () => true,
+      recent: () => preferences.recent,
+      favorite: () => preferences.favorite,
+    },
     data: {
       session: { get: (id: string) => state.sessions[id] },
       location: {
-        agent: { list: () => state.agents },
+        agent: { list: () => state.agents, sync: async () => undefined },
         config: {
           list: () => (state.configLoaded ? [{ type: "document", info: { model: state.config } }] : undefined),
           sync: async () => {

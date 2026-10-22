@@ -158,6 +158,7 @@ export default function SessionBrowserPane(props: {
     return tab ? props.model.embed(props.session, tab.id) : undefined
   }
 
+  let root: HTMLElement | undefined
   let box: HTMLDivElement | undefined
   let input: HTMLInputElement | undefined
   let anchor: HTMLFormElement | undefined
@@ -387,11 +388,30 @@ export default function SessionBrowserPane(props: {
       close: () => {
         const tab = state()
 
-        if (tab) props.model.closeTab(props.session, tab.id)
+        if (tab) props.model.close(props.session, tab.id)
       },
       inspectable,
       inspect: toggleInspect,
       focusAddress,
+      // Dispatched inside the pane, so keybinds scoped to it, such as closing the browser tab, apply.
+      press: (event) => {
+        if (!visible()) return
+        root?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: event.key,
+            code: event.code,
+            ctrlKey: event.ctrl,
+            metaKey: event.meta,
+            shiftKey: event.shift,
+            altKey: event.alt,
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+          }),
+        )
+      },
+      // A focusin inside the pane, so the app's focus tracking sees the page's focus as the side panel's.
+      focused: () => root?.dispatchEvent(new FocusEvent("focusin", { bubbles: true, composed: true })),
     }),
   )
 
@@ -427,17 +447,6 @@ export default function SessionBrowserPane(props: {
             element: event.element,
             draft: "",
           })
-        }),
-      ),
-  )
-
-  // The page's address shortcut moves focus to this field when the page is the one on screen.
-  createKeyed(
-    () => props.session.key,
-    (sessionKey) =>
-      onCleanup(
-        props.model.onAddress({ key: sessionKey }, (tabID) => {
-          if (tabID === state()?.id && visible()) focusAddress()
         }),
       ),
   )
@@ -524,7 +533,13 @@ export default function SessionBrowserPane(props: {
   )
 
   return (
-    <aside id="browser-panel" class="relative size-full min-w-0 overflow-hidden bg-v2-background-bg-base flex flex-col">
+    <aside
+      ref={root}
+      id="browser-panel"
+      // A click on the pane's own surface, like its loading or error view, keeps focus here, so its shortcuts apply.
+      tabIndex={-1}
+      class="relative size-full min-w-0 overflow-hidden bg-v2-background-bg-base flex flex-col outline-none"
+    >
       <div
         data-component="browser-bar"
         class="h-11 shrink-0 flex items-center gap-2 px-3 border-b-[0.5px] border-v2-border-border-muted"
@@ -779,16 +794,7 @@ export default function SessionBrowserPane(props: {
           </Popover.Portal>
         </Popover>
         <div class="flex shrink-0 items-center gap-1">
-          <Tooltip
-            placement="top"
-            value={
-              <div class="flex flex-col gap-1">
-                {tip(extension.t("inspect"), keybinds.keybind("browser.inspect"))}
-                {/* The page claims Chromium's picker chord itself; the app leaves it to the terminal. */}
-                {tip(extension.t("inspect.pageShortcut"), keybinds.keys("mod+shift+c"))}
-              </div>
-            }
-          >
+          <Tooltip placement="top" value={tip(extension.t("inspect"), keybinds.keybind("browser.inspect"))}>
             {/* The ghost variant sets the button color, so the active accent needs precedence over it. */}
             <IconButton
               variant="ghost-muted"
@@ -875,33 +881,34 @@ export default function SessionBrowserPane(props: {
       >
         <div ref={box} aria-hidden="true" class="pointer-events-none absolute inset-0" />
         <Show when={empty() && !failed() && !suspended()}>
-          {/* As designed: the heading 80px from the top, the recent list centered above a 160px bottom inset. The
-              minimum height keeps a full list clear of the heading in a short pane, which then scrolls. */}
           <div dir="auto" class="size-full overflow-y-auto">
-            <div class="relative flex min-h-[max(100%,732px)] items-center justify-center px-6 pb-40">
-              <div class="absolute inset-x-6 top-20 mx-auto flex max-w-[360px] flex-col items-center gap-4 text-center">
-                <Icon name="outline-globe" size="large" class="text-v2-icon-icon-muted" />
+            <Show
+              when={recent().length > 0}
+              fallback={
+                <div class="mx-auto flex max-w-[360px] flex-col items-center gap-4 px-6 pt-20 text-center">
+                  <Icon name="outline-globe" size="large" class="text-v2-icon-icon-muted" />
+                  <div class="flex flex-col gap-2">
+                    <div class="text-[13px] font-[530] leading-[var(--line-height-compact)] text-v2-text-text-base">
+                      {extension.t("home.title")}
+                    </div>
+                    <div class="text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+                      {extension.t("home.description")}
+                    </div>
+                  </div>
+                </div>
+              }
+            >
+              {/* The pages the browser showed last; the side panel's new tab view offers the other tabs. One visit is
+                  enough to list; the list stops at a handful. */}
+              <div class="mx-auto flex w-full max-w-[608px] flex-col gap-4 px-6 pt-12 pb-10">
+                <div class="text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+                  {extension.t("home.recent")}
+                </div>
                 <div class="flex flex-col gap-2">
-                  <div class="text-[13px] font-[530] leading-[var(--line-height-compact)] text-v2-text-text-base">
-                    {extension.t("home.title")}
-                  </div>
-                  <div class="text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-                    {extension.t("home.description")}
-                  </div>
+                  <For each={recent()}>{(visit) => <PageRow visit={visit} onClick={() => go(visit.url)} />}</For>
                 </div>
               </div>
-              {/* One visit is enough to list; the list stops at a handful. */}
-              <Show when={recent().length > 0}>
-                <div class="flex w-full max-w-[685px] flex-col gap-4">
-                  <div class="px-2 text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-                    {extension.t("home.recent")}
-                  </div>
-                  <div class="flex flex-col gap-2">
-                    <For each={recent()}>{(visit) => <PageRow visit={visit} onClick={() => go(visit.url)} />}</For>
-                  </div>
-                </div>
-              </Show>
-            </div>
+            </Show>
           </div>
         </Show>
         <Show when={failed() && !suspended()}>

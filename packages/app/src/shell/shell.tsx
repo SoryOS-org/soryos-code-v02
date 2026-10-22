@@ -1,7 +1,8 @@
-import { Show, Suspense, type ParentProps } from "solid-js"
+import { Show, startTransition, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ResizeHandle } from "@opencode/ui/resize-handle"
+import { useDialog } from "@opencode/ui/context/dialog"
 import { Titlebar } from "@/shell/titlebar/titlebar"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ToastRegion } from "@/shell/notifications/toast"
@@ -11,20 +12,121 @@ import { useSettingsSurface } from "@/settings/surface"
 import { useSettings } from "@/settings/model"
 import { ExtensionServerCover } from "@/runtime/extension/server-shell"
 import { ExtensionSlot } from "@/runtime/extension/render"
+import { useCommand } from "@/shell/commands/command"
+import { useLanguage } from "@/runtime/i18n/language"
+import { useGlobal } from "@/runtime/server/runtime"
+import { useServers } from "@/runtime/server/registry"
+import { useTabs } from "@/shell/tabs/tabs"
+import { CollapsedSidebarToggle, measureSidebarToggles, paintCollapsedSlots } from "@/shell/sidebar-toggle"
+import { createPanelMotion, guardClosingFocus, panelOpacity, replayPanelToggle } from "@/shell/panel-motion"
+import { windowDragEnabled } from "@/session/header/drag-area"
+
+export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
 
 export default function Layout(props: ParentProps) {
   const platform = usePlatform()
   const settings = useSettingsSurface()
   const preferences = useSettings()
+  const command = useCommand()
+  const language = useLanguage()
+  const dialog = useDialog()
+  const global = useGlobal()
+  const servers = useServers()
+  const tabs = useTabs()
   const mobile = createMediaQuery("(max-width: 767px)")
 
-  const [state, setState] = createStore<{ tabsWidth: number; tabsMount: HTMLElement | undefined }>({
+  const [state, setState] = createStore<{
+    tabsWidth: number
+    tabsMount: HTMLElement | undefined
+    tabsAside: HTMLElement | undefined
+    tabsPanel: HTMLElement | undefined
+  }>({
     tabsWidth: 260,
     tabsMount: undefined,
+    tabsAside: undefined,
+    tabsPanel: undefined,
   })
 
-  const verticalTabs = () => preferences.appearance.tabLayout() === "vertical" && !mobile()
+  const verticalTabs = () => preferences.appearance.tabLayout() !== "horizontal" && !mobile()
+
+  const toggleSidebar = () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen())
+
+  const sidebarMotion = createPanelMotion({
+    open: preferences.appearance.sidebarOpen,
+    // The aside's real width moves main's edge with the sidebar's; its contents keep their width, pinned to that edge.
+    paint: (closed) => {
+      const aside = state.tabsAside
+
+      if (aside) aside.style.width = `${state.tabsWidth * (1 - closed)}px`
+
+      // Dims the contents, background included, as they leave and brightens them as they arrive.
+      if (state.tabsMount) state.tabsMount.style.opacity = panelOpacity(closed)
+      paintCollapsedSlots(closed)
+    },
+    measure: () => measureSidebarToggles(state.tabsWidth),
+    element: () => state.tabsPanel,
+    offset: () => -10,
+    neighbours: () => [
+      [document.querySelector<HTMLElement>('[data-slot="session-chat-panel"]'), "center"],
+      [document.querySelector<HTMLElement>('[data-slot="session-side-panel-presence"]'), "start"],
+    ],
+    resize: () => state.tabsAside,
+  })
+
+  replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
+
+  guardClosingFocus({
+    root: () => state.tabsAside,
+    closing: () => !preferences.appearance.sidebarOpen() && sidebarMotion.present(),
+    // The toggle that reopens the sidebar, outside it.
+    target: () =>
+      [...document.querySelectorAll<HTMLElement>('button[aria-controls="vertical-tabs-sidebar"]')].find(
+        (button) => !state.tabsAside?.contains(button),
+      ),
+  })
+
+  command.register("sidebar", () =>
+    verticalTabs()
+      ? [
+          {
+            ...sidebarToggleCommand,
+            title: language.t("command.sidebar.toggle"),
+            category: language.t("command.category.view"),
+            onSelect: toggleSidebar,
+          },
+        ]
+      : [],
+  )
+  // Every surface has a palette: routes with their own register under the same key, and the newest wins.
+  command.register("palette", () => [
+    {
+      id: "command.palette",
+      title: language.t("command.palette"),
+      hidden: true,
+      onSelect: async () => {
+        const conn = servers.visible.find((item) => servers.current(item)) ?? servers.visible[0]
+
+        if (!conn) return
+        const { HomeCommandPalette } = await import("@/home/start/command-palette")
+        void dialog.show(() => (
+          <HomeCommandPalette
+            server={conn}
+            onSelectSession={(entry) => {
+              if (!entry.sessionID || !entry.directory || !entry.server) return
+              const sessionID = entry.sessionID
+              const server = entry.server
+              global.ensureServerCtx(conn).projects.touch(entry.project?.worktree ?? entry.directory)
+              void startTransition(() => {
+                tabs.select(tabs.addSessionTab({ server, sessionId: sessionID }))
+              })
+            }}
+          />
+        ))
+      },
+    },
+  ])
   const bottomTitlebar = () => mobile() && preferences.general.mobileTitlebarPosition() === "bottom"
+  const dragInset = () => windowDragEnabled(platform) && !mobile()
 
   return (
     <TitlebarRightProvider>
@@ -46,25 +148,55 @@ export default function Layout(props: ParentProps) {
         }}
       >
         <Titlebar verticalTabs={verticalTabs() ? { mount: state.tabsMount } : undefined} />
-        <div class="flex flex-1 min-h-0 min-w-0 flex-row">
+        <div class="relative flex flex-1 min-h-0 min-w-0 flex-row">
+          {/* The empty inset above the panels moves the window, as the titlebar does. */}
+          <Show when={dragInset()}>
+            <div
+              data-slot="shell-drag-inset"
+              aria-hidden="true"
+              class="absolute inset-x-0 top-0 h-[var(--shell-top-inset,8px)]"
+              data-tauri-drag-region
+            />
+          </Show>
           <Show when={verticalTabs()}>
             <aside
-              ref={(element) => setState("tabsMount", element)}
+              id="vertical-tabs-sidebar"
               data-slot="vertical-tabs-sidebar"
-              class="relative flex h-full min-h-0 shrink-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
-              style={{
-                width: `${state.tabsWidth}px`,
-                "padding-bottom": "max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
-              }}
+              data-state={preferences.appearance.sidebarOpen() ? "open" : "closed"}
+              ref={(element) => setState("tabsAside", element)}
+              class="relative z-10 h-full min-h-0 shrink-0"
             >
-              <ResizeHandle
-                class="-end-2"
-                direction="horizontal"
-                size={state.tabsWidth}
-                min={140}
-                max={520}
-                onResize={(width) => setState("tabsWidth", width)}
+              {/* Skipped rather than display: none or inert, so neither direction restyles the sidebar's contents and
+                  a reopen reuses their layout. */}
+              <div
+                ref={(element) => setState("tabsPanel", element)}
+                class="absolute inset-0 overflow-hidden [contain:layout_style_paint]"
+                classList={{ "[content-visibility:hidden]": !sidebarMotion.present() }}
+              >
+                <div
+                  ref={(element) => setState("tabsMount", element)}
+                  class="absolute inset-y-0 end-0 contain-strict will-change-[opacity] flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+                  style={{
+                    width: `${state.tabsWidth}px`,
+                    "padding-bottom": "max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
+                  }}
+                />
+              </div>
+              {/* Takes the pointer while the sidebar closes, without restyling its contents. */}
+              <div
+                class="absolute inset-0 z-20"
+                classList={{ hidden: preferences.appearance.sidebarOpen() || !sidebarMotion.present() }}
               />
+              <Show when={preferences.appearance.sidebarOpen()}>
+                <ResizeHandle
+                  class="-end-1"
+                  direction="horizontal"
+                  size={state.tabsWidth}
+                  min={120}
+                  max={640}
+                  onResize={(width) => setState("tabsWidth", width)}
+                />
+              </Show>
             </aside>
           </Show>
           {/* Size containment collapses percentage-height descendants in WebKit. */}
@@ -85,6 +217,7 @@ export default function Layout(props: ParentProps) {
               <Suspense>{props.children}</Suspense>
             </ExtensionServerCover>
           </main>
+          <CollapsedSidebarToggle />
         </div>
         <ExtensionSlot at="window.bottom" input={{}} />
         <ToastRegion />

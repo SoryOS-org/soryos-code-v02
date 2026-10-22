@@ -17,6 +17,9 @@ function modelKey(model: ModelKey) {
   return `${model.providerID}:${model.modelID}`
 }
 
+export const isFreeModel = (model: { provider: { id: string }; cost?: { input: number } }) =>
+  model.provider.id === "opencode" && (!model.cost || model.cost.input === 0)
+
 const createModelsController = (directory: Accessor<string | undefined>) => {
   const providers = useProviders(() => directory())
   const models = useGlobal().models
@@ -37,7 +40,8 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
     () =>
       new Map(
         available().map(
-          (model) => [modelKey({ providerID: model.provider.id, modelID: model.id }), Date.parse(model.release_date)] as const,
+          (model) =>
+            [modelKey({ providerID: model.provider.id, modelID: model.id }), Date.parse(model.release_date)] as const,
         ),
       ),
   )
@@ -54,7 +58,8 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
       mapValues((models) =>
         pipe(
           models,
-          groupBy((x) => x.family),
+          // A free model shares its family and release date with its paid twin, so group them apart.
+          groupBy((x) => `${x.family}:${isFreeModel(x)}`),
           values(),
           (groups) =>
             groups.flatMap((g) => {
@@ -126,6 +131,19 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
     setStore("recent", uniq)
   }
 
+  // Newest favorite first, as in the TUI.
+  const toggleFavorite = (model: ModelKey) => {
+    const key = modelKey(model)
+    const rest = store.favorite.filter((item) => modelKey(item) !== key)
+
+    setStore(
+      "favorite",
+      rest.length === store.favorite.length
+        ? [{ providerID: model.providerID, modelID: model.modelID }, ...rest]
+        : rest,
+    )
+  }
+
   const variantKey = (model: ModelKey) => `${model.providerID}/${model.modelID}`
   const getVariant = (model: ModelKey) => store.variant?.[variantKey(model)]
 
@@ -151,6 +169,10 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
       list: models.recent,
       push,
     },
+    favorite: {
+      list: models.favorite,
+      toggle: toggleFavorite,
+    },
     variant: {
       get: getVariant,
       set: setVariant,
@@ -161,7 +183,7 @@ const createModelsController = (directory: Accessor<string | undefined>) => {
 export const { use: useModels, provider: ModelsProvider } = createSimpleContext({
   name: "Models",
   gate: false,
-  init: (props: { directory?: string | Accessor<string | undefined> } = {}) => {
-    return createModelsController(() => (typeof props.directory === "function" ? props.directory() : props.directory))
+  init: (props: { directory?: string } = {}) => {
+    return createModelsController(() => props.directory)
   },
 })

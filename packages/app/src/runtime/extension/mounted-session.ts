@@ -24,7 +24,7 @@ import type {
 import { useComments } from "@/composer/comments"
 import { useComposerState } from "@/composer/persistence"
 import { useServer } from "@/runtime/server/current"
-import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { sessionInWorkspace, sessionProject, type SessionModel } from "@/session/model"
 import { useFile } from "@/workspaces/files/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -45,6 +45,7 @@ export function createMountedSession(session: SessionModel) {
   const comments = useComments()
   const composer = useComposerState()
   const server = useServer()
+  const servers = useServers()
   const location = useWorkspaceLocation()
   const attachment = useExtensionAttachment()
   // The composer region owns background tasks and is created after the view.
@@ -55,7 +56,7 @@ export function createMountedSession(session: SessionModel) {
       return server.key
     },
     get name() {
-      return serverName(server.conn) || server.key
+      return servers.label(server.conn) || server.key
     },
     get url() {
       return server.ctx.sdk.url
@@ -155,14 +156,11 @@ export function createMountedSession(session: SessionModel) {
     const directory = input.directory
     const info = () => server.ctx.data.session.get(id)
 
-    // Global sync adds the worktrees found on disk, and the user's local name and icon override the server's.
-    // Raw metadata stands in until global sync lists the project.
+    // Global sync adds the worktrees found on disk. Raw metadata stands in until global sync lists the project.
     const project = createMemo(() => {
       const value = info()
 
-      return (
-        (value && server.ctx.projects.detailsForSession(value)) || sessionProject(server.ctx.data, value, directory)
-      )
+      return (value && server.ctx.projects.forSession(value)) || sessionProject(server.ctx.data, value, directory)
     })
 
     // Only a project opened at this exact directory; a session in a project subfolder has none.

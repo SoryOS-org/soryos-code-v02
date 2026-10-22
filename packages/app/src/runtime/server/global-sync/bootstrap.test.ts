@@ -133,7 +133,7 @@ describe("query keys", () => {
     expect(result).toMatchObject({ directory: "/repo/subpath", worktree: "/repo" })
   })
 
-  test("loads project metadata without enumerating any project's worktrees", async () => {
+  test("loads project metadata in server order without enumerating any project's worktrees", async () => {
     const requests: string[] = []
 
     const api = OpenCode.make({
@@ -164,11 +164,11 @@ describe("query keys", () => {
     const result = await new QueryClient().fetchQuery(loadProjectsQuery(ServerScope.local, api.project))
 
     expect(requests).toEqual(["/api/project"])
-    expect(result).toHaveLength(302)
-    expect(result.slice(0, 2)).toMatchObject([
-      { id: "a", worktree: "/a", sandboxes: ["/a/legacy"], worktrees: [{ directory: "/a" }] },
+    expect(result).toHaveLength(303)
+    expect(result.slice(300)).toMatchObject([
       { id: "b", worktree: "/b", sandboxes: [], worktrees: [{ directory: "/b" }] },
+      { id: "a", worktree: "/a", sandboxes: ["/a/legacy"], worktrees: [{ directory: "/a" }] },
+      { id: "test", worktree: "/tmp/opencode-test-1" },
     ])
-    expect(result.some((project) => project.id === "test")).toBe(false)
   })
 })

@@ -1,6 +1,29 @@
 import { createMemo, createResource, onCleanup } from "solid-js"
 import { uniqueCommandPaletteEntries, type CommandPaletteEntry } from "./palette"
 
+type SourceResult = {
+  query: string
+  items: CommandPaletteEntry[]
+  failed: boolean
+}
+
+type SourceState = {
+  abort?: AbortController
+  seen: CommandPaletteEntry[]
+}
+
+const emptyResult: SourceResult = { query: "", items: [], failed: false }
+
+export function matchesCommandPaletteEntry(entry: CommandPaletteEntry, query: string) {
+  const value = query.trim().toLowerCase()
+
+  if (!value) return true
+
+  return [entry.title, entry.description, entry.category, entry.keywords, entry.path, entry.sessionID].some((text) =>
+    text?.toLowerCase().includes(value),
+  )
+}
+
 export function createCommandPaletteSearch(props: {
   query: () => string
   items: (query: string) => CommandPaletteEntry[]
@@ -10,37 +33,82 @@ export function createCommandPaletteSearch(props: {
   const local = createMemo(() => props.items(query()))
 
   const sources = props.sources.map((load) => {
-    let abort: AbortController | undefined
-    onCleanup(() => abort?.abort())
+    const state: SourceState = { seen: [] }
+    onCleanup(() => state.abort?.abort())
 
-    const [result] = createResource(
+    const [result] = createResource<SourceResult, string>(
       query,
-      async (query) => {
-        abort?.abort()
+      async (query, info) => {
+        state.abort?.abort()
         const current = new AbortController()
-        abort = current
+        state.abort = current
+        const previous = info.value ?? emptyResult
 
-        return { query, items: await load(query, current.signal).catch(() => []) }
+        return load(query, current.signal).then(
+          (items) => {
+            if (current.signal.aborted) return previous
+
+            if (query && items.length > 0) {
+              state.seen = uniqueCommandPaletteEntries([...items, ...state.seen])
+            }
+
+            return { query, items, failed: false }
+          },
+          () => (current.signal.aborted ? previous : { query, items: [], failed: true }),
+        )
       },
       // Remote searches must not suspend the dialog's local results on first render.
-      { initialValue: { query: "", items: [] as CommandPaletteEntry[] } },
+      { initialValue: emptyResult },
     )
 
-    return result
+    return { result, state }
+  })
+
+  const loading = () => sources.some((source) => source.result.loading)
+
+  const items = createMemo<CommandPaletteEntry[]>(() => {
+    const current = query()
+
+    const entries = uniqueCommandPaletteEntries([
+      ...local(),
+      ...sources.flatMap((source) => {
+        const result =
+          source.result.state === "ready" || source.result.state === "refreshing" ? source.result.latest : emptyResult
+
+        if (result.query === current) return result.items
+
+        if (!current) return []
+
+        const matched = uniqueCommandPaletteEntries([...result.items, ...source.state.seen]).filter((item) =>
+          matchesCommandPaletteEntry(item, current),
+        )
+
+        if (matched.length > 0) return matched
+
+        return result.query && current.toLowerCase().startsWith(result.query.toLowerCase()) ? result.items : []
+      }),
+    ])
+
+    if (!current) return entries
+
+    const order = { command: 0, setting: 1, session: 2, file: 3 }
+
+    return entries.toSorted(
+      (a, b) =>
+        order[a.type] - order[b.type] ||
+        (a.type === "session" && b.type === "session" ? (b.updated ?? 0) - (a.updated ?? 0) : 0),
+    )
   })
 
   return {
-    items: createMemo(() =>
-      uniqueCommandPaletteEntries([
-        ...local(),
-        ...sources.flatMap((source) => {
-          // Never keep results for an older query selectable while the next one loads.
-          const result = source.latest
+    items,
+    loading,
+    failed: () =>
+      sources.some((source) => {
+        const result =
+          source.result.state === "ready" || source.result.state === "refreshing" ? source.result.latest : emptyResult
 
-          return result.query === query() ? result.items : []
-        }),
-      ]),
-    ),
-    loading: () => sources.some((source) => source.loading),
+        return result.query === query() && result.failed
+      }),
   }
 }

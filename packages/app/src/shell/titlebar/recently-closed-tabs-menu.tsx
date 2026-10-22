@@ -103,7 +103,7 @@ function RecentlyClosedTabItem(props: { entry: ClosedTab; onSelect: () => void }
 
     if (!directory()) return
 
-    return serverCtx()?.projects.resolve({ worktree: directory(), expanded: false })
+    return serverCtx()?.projects.forDirectory(directory()) ?? { worktree: directory() }
   })
 
   const title = () => sessionTabTitle(session()?.title ?? props.entry.info?.title, language.t("session.tab.session"))

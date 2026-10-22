@@ -37,6 +37,7 @@ import { createHostApis } from "../src/runtime/extension/host-apis"
 import { createInstalled } from "../src/runtime/extension/installed"
 import { extensionEnabled } from "@opencode/gui-extensions/sdk/bridge"
 import { createRegion, RegionContent } from "../src/runtime/extension/panels"
+import { createClosedTabs } from "../src/runtime/extension/closed-tabs"
 import { ExtensionSlot } from "../src/runtime/extension/render"
 import { persistedHandle } from "../src/runtime/extension/stores"
 import { LanguageProvider } from "../src/runtime/i18n/language"
@@ -65,14 +66,16 @@ const layout: Layout = {
   open() {},
   close() {},
   toggle() {},
+  hide() {},
   state: () => "closed",
   stored: () => [],
-  side: { opened: () => false, toggle() {} },
+  side: { opened: () => false, toggle() {}, menu: () => [] },
   sidebar: { opened: () => true },
-  dock: { opened: () => false, placement: () => "bottom" },
   scroll: { get: () => undefined, set() {} },
   settings() {},
   project() {},
+  draft() {},
+  command() {},
 }
 
 const build: Build = { version: "", channel: "dev", platform: "desktop", packaged: false }
@@ -207,6 +210,7 @@ export function mountExtensions(input: {
   settings?: boolean
 }) {
   const held = Promise.withResolvers<void>()
+  const saved = { ...input.stored }
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set(input.disabled ?? []))
   const hosts: ExtensionHost[] = []
   const container = document.createElement("div")
@@ -223,9 +227,11 @@ export function mountExtensions(input: {
       getItem: async (key: string) => {
         await held.promise
 
-        return key in (input.stored ?? {}) ? JSON.stringify(input.stored?.[key]) : null
+        return key in saved ? JSON.stringify(saved[key]) : null
       },
-      setItem: async () => undefined,
+      setItem: async (key: string, value: string) => {
+        saved[key] = JSON.parse(value)
+      },
       removeItem: async () => undefined,
     }),
   }
@@ -302,6 +308,8 @@ export function mountExtensions(input: {
       dispose()
       container.remove()
     },
+    /** What the window has written to storage, seeded with `stored`. */
+    saved: () => ({ ...saved }),
     /** Lets the held storage reads answer. */
     release: () => held.resolve(),
     disable: (ids: readonly string[]) => setDisabled(new Set(ids)),
@@ -333,15 +341,17 @@ function standIn(overrides: Partial<Interface>): Interface {
       open() {},
       close() {},
       toggle() {},
+      hide() {},
       state: () => "closed",
       stored: () => [],
-      side: { opened: () => true, toggle() {} },
+      side: { opened: () => true, toggle() {}, menu: () => [] },
       sidebar: { opened: () => false },
-      dock: { opened: () => false, placement: () => "bottom" },
       scroll: { get: () => undefined, set() {} },
     },
     settings() {},
     project() {},
+    draft() {},
+    command() {},
     font: () => "fixture mono",
     routing: () => false,
     path: () => "/",
@@ -418,6 +428,7 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
       view,
       screen,
       tabs: () => ({
+        tabs: () => ({ all: all(), active: input.active }),
         all,
         active: () => input.active,
         setAll() {},
@@ -425,6 +436,9 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
         close() {},
         remap() {},
       }),
+      closed: createClosedTabs(),
+      open() {},
+      side: () => ({ opened: () => true, toggle() {} }),
     })
 
     return (
@@ -439,7 +453,7 @@ export function mountSessionRegion(input: { definitions: readonly Definition[]; 
           }}
         />
         <RegionContent
-          region={region}
+          pane={region.pane("side")}
           view={view()}
           screen={screen}
           frame={{

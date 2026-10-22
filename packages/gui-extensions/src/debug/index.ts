@@ -1,8 +1,16 @@
-import { Extension } from "../sdk"
+import { Schema } from "effect"
+import { Extension, Store } from "../sdk"
 import en from "./i18n/en"
 
 export default Extension.define({
   id: "debug",
+  stores: {
+    // Whether the bar, and the Motion panel under it, are open; kept across reloads, restarts and updates.
+    bar: Store.global(Schema.Struct({ visible: Schema.Boolean, motion: Schema.Boolean }), {
+      visible: false,
+      motion: false,
+    }),
+  },
   i18n: {
     en,
     am: () => import("./i18n/am"),

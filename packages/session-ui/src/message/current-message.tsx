@@ -1,5 +1,6 @@
 import type { SessionMessageAssistant, SessionMessageAssistantTool, SessionMessageUser } from "@opencode/client/promise"
 import { Match, Switch, type ComponentProps } from "solid-js"
+import { GenUI } from "@opencode/plugin-genui/genui"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 import { AssistantReasoningContent, AssistantTextContent, CurrentUserMessageDisplay } from "./message-content"
 import {
@@ -9,6 +10,10 @@ import {
   ToolDisplay,
 } from "../tools/tool-renderer"
 import { currentToolError, currentToolInput, currentToolMetadata, currentToolOutput } from "./current-tool-state"
+import { currentStreamingInput } from "./streaming-input"
+import type { UserRun } from "../timeline/user-runs"
+// Registers the genui_render renderer with the tool registry.
+import "../genui/tool"
 
 export type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
 
@@ -22,9 +27,11 @@ export function SessionUserMessage(props: {
   displayText?: string
   comments?: SessionUserComment[]
   references?: SessionUserAttachmentReference[]
+  voice?: boolean
   historicalAgent: string
   historicalModel: SessionMessageAssistant["model"]
   actions?: SessionUserActions
+  run?: UserRun
 }) {
   return (
     <CurrentUserMessageDisplay
@@ -33,9 +40,11 @@ export function SessionUserMessage(props: {
       text={props.displayText ?? props.message.text}
       comments={props.comments}
       references={props.references}
+      voice={props.voice}
       agent={props.historicalAgent}
       model={props.historicalModel}
       actions={props.actions}
+      run={props.run}
     />
   )
 }
@@ -83,7 +92,8 @@ export function SessionAssistantContent(props: {
           <ToolDisplay
             id={props.contentID}
             tool={tool().name}
-            input={currentToolInput(tool())}
+            // Surfaces draw their arguments as they stream; every other tool waits for its complete input.
+            input={tool().name === GenUI.RENDER_TOOL ? currentStreamingInput(tool()) : currentToolInput(tool())}
             metadata={currentToolMetadata(tool())}
             output={currentToolOutput(tool())}
             status={tool().state.status}
