@@ -140,6 +140,7 @@ function ComposerModelControl(props: {
     <Show when={!props.loading || props.preview}>
       <Tooltip
         inactive={mobile()}
+        openDelay={750}
         contentClass={props.model.current() ? "!p-0 rounded-md" : undefined}
         placement="top"
         gutter={4}
