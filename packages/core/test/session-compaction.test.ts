@@ -399,6 +399,114 @@ it.effect("auto compaction estimates current content against the buffered prompt
   }),
 )
 
+it.effect("clamps an oversized compaction buffer and waits for an exchange to summarize", () =>
+  Effect.gen(function* () {
+    const compaction = yield* SessionCompaction.Service
+    const session = yield* insertSession(Session.ID.make("ses_oversized_buffer"))
+    yield* compaction.transform((editor) => editor.configure({ buffer: 600_000 }))
+
+    const assistant = (tokens: number) =>
+      Schema.decodeUnknownSync(SessionMessage.Assistant)({
+        id: SessionMessage.ID.create(),
+        type: "assistant",
+        agent: Agent.defaultID,
+        model: { id: "summary-model", providerID: "test" },
+        content: [{ type: "text", text: "Done" }],
+        tokens: { input: tokens, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        time: { created: 0, completed: 0 },
+      })
+    const user = (text: string) =>
+      SessionMessage.User.make({
+        id: SessionMessage.ID.create(),
+        type: "user",
+        text,
+        time: { created: DateTime.makeUnsafe(0) },
+      })
+    const context = (messages: readonly SessionMessage.Info[]) => ({
+      ...loaded(session, messages),
+      model: SessionRunnerModel.resolved(model, {
+        capabilities: { tools: true, input: ["text"], output: ["text"] },
+        cost: [],
+        limit: { context: 100_000, output: 10_000 },
+      }),
+      agent: {
+        id: Agent.defaultID,
+        info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
+      },
+      initial: "Project instructions.",
+    })
+    const status = (messages: readonly SessionMessage.Info[]) =>
+      compaction.compact({ reason: "auto", context: context(messages) }).pipe(Effect.map((outcome) => outcome.status))
+
+    // 600k free tokens on a 100k window is treated as unset, so the ceiling is the default 16k reserve
+    // below the window.
+    expect(yield* status([assistant(83_999)])).toBe("skipped")
+    expect(yield* status([assistant(84_000)])).toBe("completed")
+    // The opening prompt alone has no reply to summarize; it must not compact or surface a failure.
+    expect(yield* status([user("x".repeat(400_000))])).toBe("skipped")
+  }),
+)
+
+// Provider-switch regression suggested by @intrepid37 on the PR.
+it.effect("auto compaction stays model-aware when switching between differently sized providers", () =>
+  Effect.gen(function* () {
+    const compaction = yield* SessionCompaction.Service
+    const session = yield* insertSession(Session.ID.make("ses_synthetic_provider_switch"))
+    // A user may configure this for a large model, then change providers mid-thread.
+    yield* compaction.transform((editor) => editor.configure({ buffer: 600_000 }))
+
+    const models = {
+      large: LanguageModel.make({ id: "synthetic-large", provider: "synthetic-large", route: OpenAIChat.route }),
+      small: LanguageModel.make({ id: "synthetic-small", provider: "synthetic-small", route: OpenAIChat.route }),
+    }
+    const assistant = (provider: "large" | "small", inputTokens: number) =>
+      Schema.decodeUnknownSync(SessionMessage.Assistant)({
+        id: SessionMessage.ID.create(),
+        type: "assistant",
+        agent: Agent.defaultID,
+        model: { id: models[provider].id, providerID: models[provider].provider },
+        content: [{ type: "text", text: "Synthetic response" }],
+        tokens: { input: inputTokens, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        time: { created: 0, completed: 0 },
+      })
+    const user = (text: string) =>
+      SessionMessage.User.make({
+        id: SessionMessage.ID.create(),
+        type: "user",
+        text,
+        time: { created: DateTime.makeUnsafe(0) },
+      })
+    const status = (provider: "large" | "small", messages: readonly SessionMessage.Info[]) =>
+      compaction
+        .compact({
+          reason: "auto",
+          context: {
+            ...loaded(session, messages),
+            model: SessionRunnerModel.resolved(models[provider], {
+              capabilities: { tools: true, input: ["text"], output: ["text"] },
+              cost: [],
+              limit: { context: provider === "large" ? 1_000_000 : 200_000, output: 32_000 },
+            }),
+          },
+        })
+        .pipe(Effect.map((outcome) => outcome.status))
+
+    const big = assistant("large", 250_000)
+    const start = [user("Start synthetic task"), big]
+    expect(yield* status("large", start)).toBe("skipped") // 1M - 600k remains usable.
+
+    const switched = [...start, user("Switch to smaller provider")]
+    expect(yield* status("small", switched)).toBe("skipped") // Ignore large provider's token count.
+    const small = [...switched, assistant("small", 25_000)]
+    expect(yield* status("small", small)).toBe("skipped") // Oversized buffer falls back to default.
+
+    expect(yield* status("large", [...small, user("Switch back")])).toBe("skipped")
+
+    // Real pressure on the smaller provider still triggers normal auto-compaction (200k - 30k reserve).
+    expect(yield* status("small", [...switched, assistant("small", 180_000)])).toBe("completed")
+  }),
+)
+
 /** Seeds the global project plus one session row, returning the projected session. */
 const insertSession = (id: Session.ID, overrides?: Partial<typeof SessionTable.$inferInsert>) =>
   Effect.gen(function* () {
