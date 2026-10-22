@@ -57,6 +57,9 @@ export function createSessionQueue(input: {
   const [state, setState] = createStore<{
     editing?: { id: string; stash: EditStash }
     sent: SentEdit[]
+    // Reordering re-admits prompts under new inbox IDs. Keep their existing row keys until the
+    // whole rewrite settles so admission and cancellation events cannot grow or shrink the strip.
+    reordering?: { rows: ReturnType<typeof queuedPromptRows>; moved: Record<string, string> }
     // Prompts the server confirmed have left the queue. The pending list only drops them when the
     // server's events arrive, which lag on a loaded server, so the strip hides them until then.
     gone: string[]
@@ -163,7 +166,12 @@ export function createSessionQueue(input: {
       if (sent?.admitted) return
       restoreEdit(change.prompt)
     },
-    onSettled: () => data.session.pending.sync(input.sessionID).catch(() => undefined),
+    onSettled: async (_data, _error, change) => {
+      if (change.type === "reorder") data.session.pending.invalidate(input.sessionID)
+      await data.session.pending.sync(input.sessionID).catch(() => undefined)
+
+      if (change.type === "reorder") setState("reordering", undefined)
+    },
   }))
 
   const queued = createMemo(() =>
@@ -172,7 +180,16 @@ export function createSessionQueue(input: {
       .filter((item): item is QueuedPrompt => item.type === "user" && item.delivery === "queue"),
   )
 
-  const rows = createMemo(() => queuedPromptRows(queued(), state.sent, state.gone))
+  const rows = createMemo(() => {
+    const current = queuedPromptRows(queued(), state.sent, state.gone)
+    const reordering = state.reordering
+
+    if (!reordering) return current
+    const hidden = new Set([...reordering.rows.map((row) => row.id), ...Object.values(reordering.moved)])
+
+    // Fresh prompts still appear while the reordered rows keep their optimistic positions.
+    return [...reordering.rows, ...current.filter((row) => !hidden.has(row.id))]
+  })
 
   createEffect(() => {
     const listed = new Set(queued().map((item) => item.id))
@@ -236,6 +253,8 @@ export function createSessionQueue(input: {
 
     if (replace) setState("sent", (edit) => edit.original === replace.original, "moved", moved)
 
+    if (!replace) setState("reordering", "moved", moved)
+
     for (const item of ordered.slice(changed)) {
       const admission =
         item.id === replace?.original
@@ -263,7 +282,12 @@ export function createSessionQueue(input: {
       await data.session.prompt({ ...admission, id }).catch(async (error) => {
         await Promise.all(
           replacements.map((inboxID) =>
-            server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID }).catch(() => undefined),
+            server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID }).then(
+              () => {
+                if (!replace) hide([inboxID])
+              },
+              () => undefined,
+            ),
           ),
         )
         throw error
@@ -278,6 +302,8 @@ export function createSessionQueue(input: {
 
     for (const item of replace ? replaced.reverse() : replaced) {
       await server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: item.id })
+
+      if (!replace) hide([item.id])
     }
   }
 
@@ -342,12 +368,16 @@ export function createSessionQueue(input: {
   }
 
   const reorder = (inboxIDs: string[]) => {
-    if (mutation.isPending || refuseReverted()) return Promise.resolve()
+    if (state.reordering || mutation.isPending || refuseReverted()) return Promise.resolve()
+    const current = rows()
+    setState("reordering", { rows: inboxIDs.flatMap((id) => current.filter((row) => row.id === id)), moved: {} })
 
     return mutation.mutateAsync({ type: "reorder", inboxIDs }).catch(() => undefined)
   }
 
-  const sending = (id: string) => state.sent.some((edit) => id in edit.moved || Object.values(edit.moved).includes(id))
+  const sending = (id: string) =>
+    state.reordering?.rows.some((row) => row.id === id) ||
+    state.sent.some((edit) => id in edit.moved || Object.values(edit.moved).includes(id))
 
   // Other rows stay editable while a change is in flight; the row it is changing ignores clicks
   // and shows as pending until the server catches up.

@@ -294,41 +294,125 @@ test("a steer into an idle session leaves the finished turn finished until deliv
   await expect(finished).toHaveCount(1)
 })
 
-test("dragging reorders queued prompts", async ({ page }) => {
-  const mock = createQueueMock(["first queued prompt", "second queued prompt", "third queued prompt"])
-  mock.rows[0].payload.files = [
-    { data: "aGk=", mime: "text/plain", source: { type: "uri", uri: "file:///repo/main.ts" }, name: "main.ts" },
-  ]
-  const view = await openQueue(page, mock)
-  await expect(view.rows).toHaveCount(3)
+for (const count of [2, 6]) {
+  test(`dragging reorders ${count} queued prompts without bouncing`, async ({ page }) => {
+    const order = Array.from({ length: count }, (_, index) => `queued prompt ${index + 1}`)
+    const mock = createQueueMock(order)
+    mock.rows[0].payload.files = [
+      { data: "aGk=", mime: "text/plain", source: { type: "uri", uri: "file:///repo/main.ts" }, name: "main.ts" },
+    ]
+    const view = await openQueue(page, mock)
+    await expect(view.rows).toHaveCount(count)
+    const texts = view.rows.locator('[data-action="session-queue-edit"]')
+    const panel = page.locator('[data-component="session-queue-panel"]')
+    const height = await panel.evaluate((el) => el.getBoundingClientRect().height)
 
+    const geometry = await panel.evaluateHandle((el) => {
+      const heights = [el.getBoundingClientRect().height]
+      const observer = new ResizeObserver(() => heights.push(el.getBoundingClientRect().height))
+      observer.observe(el)
+
+      return { heights, stop: () => observer.disconnect() }
+    })
+
+    const admission = await holdRoute(page, new RegExp(`/api/session/${sessionID}/prompt(\\?|$)`), { method: "POST" })
+
+    const cancellation = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox/[^/?]+(\\?|$)`), {
+      method: "DELETE",
+    })
+
+    const first = view.rows.filter({ hasText: order[0] })
+    const targetIndex = Math.min(2, count - 1)
+    const destination = view.rows.filter({ hasText: order[targetIndex] })
+    await first.getByRole("button", { name: "Reorder queued prompt" }).hover()
+    await page.mouse.down()
+    const target = await destination.boundingBox()
+
+    if (!target) throw new Error("The target queue row is not visible")
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 })
+    await page.mouse.up()
+
+    const reordered = [...order.slice(1, targetIndex + 1), order[0], ...order.slice(targetIndex + 1)]
+    await admission.arrived
+    await expect(texts).toHaveText(reordered)
+    await expect(view.rows).toHaveCount(count)
+    admission.release()
+
+    // All replacements are admitted while the originals still exist. Neither copies nor extra height may leak out.
+    await cancellation.arrived
+    await expect(texts).toHaveText(reordered)
+    await expect(view.rows).toHaveCount(count)
+
+    const reconciliation = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox(\\?|$)`), {
+      method: "GET",
+    })
+
+    cancellation.release()
+    await reconciliation.arrived
+    await expect(texts).toHaveText(reordered)
+    await expect(view.rows).toHaveCount(count)
+    reconciliation.release()
+    await expect(
+      view.rows.filter({ hasText: order[1] }).getByRole("button", { name: "Remove", exact: true }),
+    ).toBeEnabled()
+    await expect(texts).toHaveText(reordered)
+    expect(
+      await geometry.evaluate((value) => {
+        value.stop()
+
+        return Math.max(...value.heights) - Math.min(...value.heights)
+      }),
+    ).toBeLessThanOrEqual(1)
+    expect(await panel.evaluate((el) => el.getBoundingClientRect().height)).toBeCloseTo(height, 0)
+    await geometry.dispose()
+    expect(mock.prompts.map((prompt) => prompt.text)).toEqual(reordered)
+    // A re-admitted file keeps the URI it came from instead of becoming an inline snapshot.
+    expect(mock.prompts[targetIndex].files).toMatchObject([{ uri: "file:///repo/main.ts", name: "main.ts" }])
+    expect(mock.changes).toEqual(order.map((_, index) => ({ inboxID: `inb_seed_${index + 1}`, action: "cancel" })))
+    // The handoff must leave actions targeting the new inbox IDs, not the optimistic row keys.
+    await view.rows.getByText(order[0], { exact: true }).click()
+    await expect(view.input).toHaveText(order[0])
+  })
+}
+
+test("a partially cancelled reorder reconciles the server's queue instead of restoring stale rows", async ({
+  page,
+}) => {
+  const mock = createQueueMock(["first queued prompt", "second queued prompt"])
+  const change = mock.onInboxChange
+  mock.onInboxChange = (input) => {
+    if (input.inboxID === "inb_seed_2") throw new Error("Cancellation failed")
+    change(input)
+  }
+
+  const view = await openQueue(page, mock)
+  await expect(view.rows).toHaveCount(2)
+  const admission = await holdRoute(page, new RegExp(`/api/session/${sessionID}/prompt(\\?|$)`), { method: "POST" })
   const first = view.rows.filter({ hasText: "first queued prompt" })
-  const third = view.rows.filter({ hasText: "third queued prompt" })
+  const second = view.rows.filter({ hasText: "second queued prompt" })
   await first.getByRole("button", { name: "Reorder queued prompt" }).hover()
   await page.mouse.down()
-  const target = await third.boundingBox()
+  const target = await second.boundingBox()
 
   if (!target) throw new Error("The target queue row is not visible")
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 })
   await page.mouse.up()
-
+  await admission.arrived
   await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText([
     "second queued prompt",
-    "third queued prompt",
     "first queued prompt",
   ])
-  expect(mock.prompts.map((prompt) => prompt.text)).toEqual([
+  admission.release()
+
+  // One original survived alongside the replacements: do not pretend the failed rewrite was rolled back.
+  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText([
     "second queued prompt",
-    "third queued prompt",
+    "second queued prompt",
     "first queued prompt",
   ])
-  // A re-admitted file keeps the URI it came from instead of becoming an inline snapshot.
-  expect(mock.prompts[2].files).toMatchObject([{ uri: "file:///repo/main.ts", name: "main.ts" }])
-  expect(mock.changes).toEqual([
-    { inboxID: "inb_seed_1", action: "cancel" },
-    { inboxID: "inb_seed_2", action: "cancel" },
-    { inboxID: "inb_seed_3", action: "cancel" },
-  ])
+  await expect(first.getByRole("button", { name: "Remove", exact: true })).toBeEnabled()
+  await first.getByRole("button", { name: "Remove", exact: true }).click()
+  await expect.poll(() => mock.changes.at(-1)).toEqual({ inboxID: mock.prompts[1].id, action: "cancel" })
 })
 
 for (const change of ["reorder", "edit"] as const) {
@@ -375,6 +459,9 @@ for (const change of ["reorder", "edit"] as const) {
     )
     await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(order)
     expect(mock.rows.map((row) => row.payload.text)).toEqual(order)
+    await expect(
+      view.rows.filter({ hasText: order[0] }).getByRole("button", { name: "Remove", exact: true }),
+    ).toBeEnabled()
 
     // A failed edit keeps its draft in the composer so nothing typed is lost.
     if (change === "edit") await expect(view.input).toHaveText("second queued prompt, edited")
@@ -1058,8 +1145,8 @@ for (const delivery of ["steer", "queue"] as const) {
               })),
             pending: await bubble.evaluate((element) => {
               const probe = document.createElement("span")
-              probe.style.backgroundColor = "var(--v2-background-bg-layer-02)"
-              probe.style.color = "var(--v2-text-text-base)"
+              probe.style.backgroundColor = "var(--v2-background-bg-layer-01)"
+              probe.style.color = "var(--v2-text-text-muted)"
               element.appendChild(probe)
 
               const colors = {
@@ -1080,9 +1167,7 @@ for (const delivery of ["steer", "queue"] as const) {
       await expect(bubble).toHaveCSS("color", colors.pending.text)
       await expect(bubble).toHaveCSS("transition-duration", "0s")
       await expect(pending.locator('[data-slot="user-message-copy-wrapper"]')).toHaveCSS("opacity", "1")
-      await expect(pending.locator('[data-slot="user-message-meta"]')).toHaveText(
-        /^Pending\s*·\s*Build\s*·\s*Queue Model$/,
-      )
+      await expect(pending.locator('[data-slot="user-message-meta"]')).toHaveText(/^Pending\s*·\s*Queue Model$/)
       await bubble.evaluate((element) => (element.dataset.deliveryMarker = "pending"))
     }
 
@@ -1164,7 +1249,7 @@ for (const delivery of ["steer", "queue"] as const) {
 
     if (colors) {
       await expect(bubble).toHaveAttribute("data-delivery-marker", "pending")
-      await expect(pending.locator('[data-slot="user-message-meta"]')).toHaveText(/^Build\s*·\s*Queue Model$/)
+      await expect(pending.locator('[data-slot="user-message-meta"]')).toHaveText("Queue Model")
       await expect(bubble).toHaveCSS("background-color", colors.delivered.background)
       await expect(bubble).toHaveCSS("color", colors.delivered.text)
       // Only delivery animates the colour; reduced motion switches instantly.
