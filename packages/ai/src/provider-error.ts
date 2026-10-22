@@ -18,6 +18,8 @@ import { isRecord } from "./utils/record.js"
 const patterns = [
   /prompt is too long/i,
   /input is too long for requested model/i,
+  // OpenCode Go reports gateway input limits as unsupported_request.
+  /text request is too large for the model's configured input limit/i,
   // Cloudflare Workers AI reports this as HTTP 413.
   /exceeded this model context window limit/i,
   /exceeds the context window/i,
