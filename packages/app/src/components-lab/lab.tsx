@@ -46,7 +46,7 @@ import {
   type StoryArgs,
   type StoryModule,
 } from "./catalog"
-import { applyMotionPatch, motionFields, motionValues, sameMotion, storyMotion } from "./motion"
+import { applyMotionPatch, motionFields, motionScopes, motionValues, sameMotion, storyMotion } from "./motion"
 
 // How long Play holds each state at full speed. Slow motion doubles it while the motion itself runs 4× longer, so
 // a transition still finishes and Play keeps moving.
@@ -354,11 +354,7 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
     first === undefined || rest.length === 0
       ? {}
       : {
-          state: choice(first, [first, ...rest], {
-            variants: true,
-            // The digit that picks each of the first nine.
-            labels: Object.fromEntries(names.slice(0, 9).map((name, offset) => [name, `${offset + 1}  ${name}`])),
-          }),
+          state: choice(first, [first, ...rest], { variants: true }),
           play: toolbar(
             [
               {
@@ -386,24 +382,25 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
   const [shown, setShown] = createSignal(motion, { equals: sameMotion })
 
   const inspect = () => {
-    const own = motionFields(motion, (values) => store.set(values))
+    const scopes = motionScopes(motion)
 
     return defineControls(
       "components-lab",
-      { ...states, ...fields, ...own },
+      { ...states, ...fields, ...motionFields(motion) },
       {
         storage: null,
         persist: "none",
         // Beta is a production build, where knobs resolves its production entry: the panel mounts only when shipped.
         ship: () => import("knobs/panel"),
-        defaultLabel: first && rest.length > 0 ? `1  ${first}` : first,
+        defaultLabel: { ...(first !== undefined && { "": first }), ...scopes.defaultLabels },
         presets: Object.fromEntries(
           entry.states.slice(1).map((state, offset) => [state.name, knobArgs(fields, stateArgs(entry, offset + 1))]),
         ),
+        // A state leaves the Knobs where they are: they're the story's tuning, not part of a state.
+        inPresets: scopes.inPresets,
+        scopedPresets: scopes.scopedPresets,
         onChange: (patch, values, meta) => {
-          // A state leaves the Knobs where they are: they're the story's tuning, not part of a state.
-          if (meta.source === "preset") queueMicrotask(() => store.sync(motionValues(motion)))
-          else applyMotionPatch(motion, patch)
+          applyMotionPatch(motion, patch)
 
           if (!("state" in patch)) {
             if (meta.source !== "preset") pause()
@@ -441,10 +438,11 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
         variants: false,
         session: false,
         empty: language.t("lab.noControls"),
+        hints: { digits: "always" },
       }),
     )
 
-    // Applied rather than matched, so the state's chip stays lit while the Knobs, which no state sets, move.
+    // A rebuild stays on the state it was showing.
     if (rest.length > 0) untrack(() => preset(index()))
   })
 

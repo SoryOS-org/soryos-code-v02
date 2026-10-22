@@ -1,7 +1,6 @@
 import { motionGlobals, motionPresets, motionTuning, type MotionKnob } from "@opencode/ui/motion-tuning"
 import { applyMotion, motionField } from "@opencode/ui/motion-tuning-fields"
-import type { DurationOptions } from "@opencode/ui/motion"
-import { action, toolbar, type Field, type Values } from "knobs"
+import { action, type Field, type Values } from "knobs"
 
 /**
  * The Knobs a story names in `parameters.motion` (ids, groups or cards) and their replay buttons. Speed and slow motion
@@ -31,32 +30,44 @@ export function sameMotion(a: StoryMotion, b: StoryMotion) {
   return left.length === right.length && left.every((item, index) => item === right[index])
 }
 
-/**
- * One card per group (or card): buttons for its spring presets, its knobs and its replay buttons, then speed and slow
- * motion. `apply` sets the values a preset button names.
- */
-export function motionFields(
-  motion: StoryMotion,
-  apply: (values: { [key: string]: DurationOptions }) => void,
-): { [key: string]: Field } {
+/** One card per group (or card): its knobs and its replay buttons, then speed and slow motion. */
+export function motionFields(motion: StoryMotion): { [key: string]: Field } {
   return Object.fromEntries([
-    ...Object.entries(springPresets(motion)).map(([group, list]) => [
-      `presets.${group}`,
-      toolbar(
-        list.map((item) => ({ id: item.name, label: item.name, run: () => apply(item.values) })),
-        { group, labels: true },
-      ),
-    ]),
-    ...motion.knobs.map((item) => [
-      key(item),
-      motionField(item, { label: item.label, group: item.card ?? item.group }),
-    ]),
+    ...motion.knobs.map((item) => [key(item), motionField(item, { label: item.label, group: group(item) })]),
     ...motion.actions.map((item) => [
       `replay.${item.id}`,
       action(item.label, { group: item.group, subsection: "Replay", run: item.run }),
     ]),
     ...motion.globals.map((item) => [key(item), motionField(item, { label: item.label, group: item.group })]),
   ])
+}
+
+/**
+ * The motion cards' place among the story's presets: each card with springs gets its own strip of Shipped, Snappy,
+ * Smooth and Calm, which the states' presets leave alone, and the states leave the other cards alone too.
+ */
+export function motionScopes(motion: StoryMotion) {
+  const springs = motion.knobs.flatMap((item) => (item.kind === "spring" ? [item] : []))
+  const scopes = [...new Set(springs.map(group))]
+  const groups = [...motion.knobs.map(group), ...motion.actions.map((item) => item.group), ...motion.globals.map(group)]
+
+  return {
+    inPresets: Object.fromEntries(groups.flatMap((name) => (scopes.includes(name) ? [] : [[name, false]]))),
+    scopedPresets: Object.fromEntries(
+      scopes.map((scope) => [
+        scope,
+        Object.fromEntries(
+          presets.map((preset) => [
+            motionPresets[preset],
+            Object.fromEntries(
+              springs.flatMap((item) => (group(item) === scope ? [[key(item), item.presets[preset]]] : [])),
+            ),
+          ]),
+        ),
+      ]),
+    ),
+    defaultLabels: Object.fromEntries(scopes.map((scope) => [scope, "Shipped"])),
+  }
 }
 
 export function motionValues(motion: StoryMotion) {
@@ -80,24 +91,6 @@ function key(item: MotionKnob) {
   return `motion.${item.id}`
 }
 
-// The Shipped, Snappy, Smooth and Calm values of each card's springs.
-function springPresets(motion: StoryMotion) {
-  const springs = motion.knobs.flatMap((item) => (item.kind === "spring" ? [item] : []))
-
-  return Object.fromEntries(
-    [...new Set(springs.map((item) => item.card ?? item.group))].map((group) => {
-      const own = springs.filter((item) => (item.card ?? item.group) === group)
-
-      return [
-        group,
-        [
-          { name: "Shipped", values: Object.fromEntries(own.map((item) => [key(item), item.initial])) },
-          ...presets.map((preset) => ({
-            name: motionPresets[preset],
-            values: Object.fromEntries(own.map((item) => [key(item), item.presets[preset]])),
-          })),
-        ],
-      ]
-    }),
-  )
+function group(item: MotionKnob) {
+  return item.card ?? item.group
 }
