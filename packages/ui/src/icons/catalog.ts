@@ -120,7 +120,7 @@ const icons = {
   },
   "outline-trash": {
     viewBox: "0 0 16 16",
-    body: `<path d="M2.44434 4.22224H13.5554M5.99994 4.22224V2.44446C5.99994 1.95557 5.99992 1.55557 5.99992 1.55557H9.99989C9.99989 1.55557 9.99994 1.95557 9.99994 2.44446V4.22224M6.55545 7.77779L6.7485 11.7778M9.44437 7.77779L9.2513 11.7778M12.1756 6.88891L11.8666 12.7556C11.8168 13.7068 11.7748 14.4445 11.7748 14.4445H4.22511C4.22511 14.4445 4.18392 13.7067 4.13414 12.7556L3.82509 6.88891" stroke="currentColor"/>`,
+    body: `<path d="M5.5 4.5H2.5L4 14.5H12L13.5 4.5H10.5M5.5 4.5V1.5H10.5V4.5M5.5 4.5H10.5M6.5 11.5L6 7M9.5 11.5L10 7" stroke="currentColor"/>`,
   },
   close: {
     viewBox: "0 0 20 20",
@@ -188,7 +188,7 @@ const icons = {
   },
   "outline-copy": {
     viewBox: "0 0 16 16",
-    body: `<path d="M4.14908 11.0081H1.76282V1.51758H9.1038V2.55588M14.2225 4.99681H6.75397V14.4873H14.2225V4.99681Z" stroke="currentColor"/>`,
+    body: `<path d="M9.5 3.5V1.5H1.5V10.5H4.5M6.5 14.5V5.5H14.5V14.5H6.5Z" stroke="currentColor"/>`,
   },
   "outline-quote": {
     viewBox: "0 0 16 16",
@@ -259,16 +259,16 @@ const icons = {
     body: `<path d="M16.25 7.5A6.5 6.5 0 1 0 16.5 11M16.25 3.5v4h-4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>`,
   },
   reset: {
-    viewBox: "0 0 20 20",
-    body: `<path d="M5.83333 4.16406L2.5 7.4974L5.83333 10.8307M3.33333 7.4974H17.9167V15.4141H10" stroke="currentColor" stroke-linecap="square"/>`,
+    viewBox: "0 0 16 16",
+    body: `<path d="M2.5 6.5H12.5C13.0523 6.5 13.5 6.94772 13.5 7.5V10.5C13.5 11.0523 13.0523 11.5 12.5 11.5H8.5M5.5 9.5L2.5 6.5L5.5 3.5" stroke="currentColor"/>`,
   },
   "outline-undo": {
     viewBox: "0 0 16 16",
     body: `<path d="M2 10L4.25193 7.76999C7.29213 4.7594 12.4119 5.77372 14.0747 9.71606" stroke="currentColor"/><path d="M2 6V10H6" stroke="currentColor" stroke-linecap="square"/>`,
   },
   "outline-reset": {
-    viewBox: "0 0 20 20",
-    body: `<path d="M5.83333 4.16406L2.5 7.4974L5.83333 10.8307M3.33333 7.4974H17.9167V15.4141H10" stroke="currentColor" stroke-linecap="square"/>`,
+    viewBox: "0 0 16 16",
+    body: `<path d="M2.5 6.5H12.5C13.0523 6.5 13.5 6.94772 13.5 7.5V10.5C13.5 11.0523 13.0523 11.5 12.5 11.5H8.5M5.5 9.5L2.5 6.5L5.5 3.5" stroke="currentColor"/>`,
   },
   "fill-triangle-down": {
     viewBox: "0 0 16 16",

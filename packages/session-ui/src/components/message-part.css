@@ -170,8 +170,11 @@
 
   [data-slot="user-message-pending"] {
     display: inline-flex;
-    vertical-align: middle;
-    margin-inline-end: 4px;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 14px;
+    height: 16px;
     color: var(--v2-icon-icon-faint);
   }
 
@@ -224,13 +227,14 @@
   }
 
   [data-slot="user-message-copy-wrapper"] {
-    height: calc(24px * var(--user-run-meta, 1));
+    height: calc(20px * var(--user-run-meta, 1));
     margin-top: calc(4px * var(--user-run-meta, 1));
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
+    transition: opacity 200ms ease-out;
 
     @media (hover: hover) {
       opacity: 0;
@@ -244,13 +248,47 @@
   }
 
   [data-slot="user-message-meta"] {
+    --user-message-transition-gap: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
     user-select: none;
     text-align: end;
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  [data-slot="user-message-meta-label"] {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  [data-slot="user-message-meta-item"] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  [data-slot="user-message-meta-separator"] {
+    flex: none;
+    opacity: 0.66;
+  }
+
+  [data-slot="user-message-meta-wrap"],
+  [data-slot="user-message-meta-tail"] {
+    font-family: var(--v2-font-family-sans);
+    font-size: 12px;
+    font-weight: 440;
+    line-height: var(--line-height-compact);
+    letter-spacing: 0.05px;
+    color: var(--v2-text-text-faint);
+    cursor: default;
   }
 
   [data-slot="user-message-meta-wrap"] {
@@ -264,15 +302,78 @@
   }
 
   [data-slot="user-message-meta-tail"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     user-select: none;
     flex: 0 0 auto;
     white-space: nowrap;
     text-align: end;
+    transition: opacity 200ms ease-out;
+
+    @media (hover: hover) {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
+  [data-slot="user-message-actions"] {
+    --user-message-transition-gap: 6px;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+  }
+
+  [data-slot="user-message-transition"] {
+    display: inline-grid;
+    grid-template-columns: 0fr;
+    flex: none;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    margin-inline-end: calc(-1 * var(--user-message-transition-gap));
+    transition:
+      grid-template-columns 200ms ease-out,
+      margin-inline-end 200ms ease-out,
+      opacity 200ms ease-out,
+      visibility 0s linear 200ms;
+
+    &[data-active="true"] {
+      grid-template-columns: 1fr;
+      margin-inline-end: 0;
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 0s;
+    }
+  }
+
+  [data-slot="user-message-transition-inner"] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--user-message-transition-gap);
+    min-width: 0;
+    overflow: clip;
+    white-space: nowrap;
+  }
+
+  [data-slot="user-message-transition"][data-active="true"]:focus-within [data-slot="user-message-transition-inner"] {
+    overflow: visible;
+  }
+
+  :root[data-motion="reduce"] & {
+    [data-slot="user-message-copy-wrapper"],
+    [data-slot="user-message-meta-tail"],
+    [data-slot="user-message-transition"] {
+      transition: none;
+    }
   }
 
   &:hover [data-slot="user-message-copy-wrapper"],
   &:focus-within [data-slot="user-message-copy-wrapper"],
-  [data-slot="user-message-copy-wrapper"]:has([data-expanded]) {
+  [data-slot="user-message-copy-wrapper"]:has([data-expanded]),
+  &:hover [data-slot="user-message-meta-tail"],
+  &:focus-within [data-slot="user-message-meta-tail"] {
     opacity: 1;
     pointer-events: auto;
   }
@@ -281,7 +382,6 @@
   &[data-pending] [data-slot="user-message-copy-wrapper"] {
     opacity: 1;
     pointer-events: auto;
-    transition: none;
   }
 
   [data-slot="user-message-copy-wrapper"] > * {
@@ -301,18 +401,18 @@
     }
   }
 
-  &[data-run-meta-hidden] [data-slot="user-message-copy-wrapper"] {
+  &[data-run-meta-hidden] [data-slot="user-message-copy-wrapper"],
+  &[data-run-meta-hidden] [data-slot="user-message-meta-tail"] {
     visibility: hidden;
   }
 
   [data-slot="user-message-run-actions"] {
     position: absolute;
     /* Centered on the bubble's last line. */
-    bottom: calc(8px + (1lh - 24px) / 2);
+    bottom: calc(8px + (1lh - 20px) / 2);
     inset-inline-end: calc(100% + 4px);
     display: flex;
     align-items: center;
-    gap: 10px;
 
     @media (hover: hover) {
       opacity: 0;
@@ -345,12 +445,13 @@
   }
 
   [data-slot="text-part-copy-wrapper"] {
-    min-height: 24px;
+    height: 20px;
     margin-top: 4px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 10px;
+    gap: 8px;
+    transition: opacity 200ms ease-out;
 
     @media (hover: hover) {
       opacity: 0;
@@ -359,18 +460,47 @@
 
     [data-component="tooltip-v2-trigger"] {
       display: inline-flex;
+      flex: none;
       width: fit-content;
     }
   }
 
   [data-slot="text-part-meta"] {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-family: var(--v2-font-family-sans);
+    font-size: 12px;
+    font-weight: 440;
+    line-height: var(--line-height-compact);
+    letter-spacing: 0.05px;
+    color: var(--v2-text-text-faint);
+    cursor: default;
     user-select: none;
+  }
+
+  [data-slot="text-part-meta-item"] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  [data-slot="text-part-meta-separator"] {
+    flex: none;
+    opacity: 0.66;
   }
 
   [data-slot="text-part-copy-wrapper"][data-interrupted] {
     width: 100%;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 8px;
+  }
+
+  :root[data-motion="reduce"] & [data-slot="text-part-copy-wrapper"] {
+    transition: none;
   }
 
   &:hover [data-slot="text-part-copy-wrapper"],

@@ -1,5 +1,115 @@
 import { expect, story } from "../../stories/playwright/story"
 
+story.describe("message timestamp", () => {
+  story.use({ timezoneId: "UTC" })
+
+  story("shows the full creation date, time, and time zone on hover and focus", async ({ mount, page }) => {
+    const timeline = await mount("current-prompt-message--pending")
+    const timestamp = timeline.locator('[data-slot="user-message-meta-tail"]')
+    await expect(timestamp.locator("time")).toHaveText("12:00 AM")
+    await timeline.getByLabel("Delivery state").selectOption("delivered")
+    const message = timeline.locator('[data-component="user-message"]')
+    await message.hover()
+    await expect(timestamp).toHaveCSS("opacity", "1")
+    await page.clock.install()
+    await page.clock.pauseAt(new Date(Date.now() + 1000))
+    await timestamp.locator("time").hover()
+    const tooltip = page.getByRole("tooltip")
+    await page.clock.runFor(799)
+    await expect(tooltip).toBeHidden()
+    await page.clock.runFor(1)
+    await expect(tooltip).toHaveText("Wednesday, January 1, 2025 at 12:00:00 AM UTC")
+    await page.clock.resume()
+    await page.mouse.move(0, 0)
+    await expect(tooltip).toBeHidden()
+    await expect(timestamp).toHaveCSS("opacity", "0")
+    await timestamp.locator('[data-component="tooltip-v2-trigger"]').focus()
+    await expect(tooltip).toBeVisible()
+
+    await page.evaluate(() => document.fonts.ready.then(() => undefined))
+    for (const width of [1000, 390]) {
+      await page.setViewportSize({ width, height: 844 })
+      const bubble = await timeline.locator('[data-slot="user-message-text"]').boundingBox()
+      const time = await timestamp.boundingBox()
+      const footer = await timeline.locator('[data-slot="user-message-copy-wrapper"]').boundingBox()
+      const message = await timeline.locator('[data-component="user-message"]').boundingBox()
+      if (!bubble || !time || !footer || !message) throw new Error("Message geometry is unavailable")
+      expect(Math.abs(bubble.x + bubble.width - message.x - message.width)).toBeLessThan(1)
+      expect(footer.y).toBeGreaterThanOrEqual(bubble.y + bubble.height)
+      expect(footer.x + footer.width).toBeLessThanOrEqual(bubble.x + bubble.width + 1)
+      expect(time.x).toBeGreaterThanOrEqual(footer.x)
+      expect(time.x + time.width).toBeLessThanOrEqual(footer.x + footer.width)
+      expect(Math.abs(time.y + time.height / 2 - footer.y - footer.height / 2)).toBeLessThan(1)
+    }
+  })
+})
+
+story("smoothly delivers a pending footer with and without hover", async ({ mount, page }) => {
+  const timeline = await mount("current-prompt-message--pending")
+  const message = timeline.locator('[data-component="user-message"]')
+  const footer = timeline.locator('[data-slot="user-message-copy-wrapper"]')
+  const timestamp = timeline.locator('[data-slot="user-message-meta-tail"]')
+  const pending = timeline.locator('[data-slot="user-message-meta"] [data-slot="user-message-transition"]')
+
+  await page.mouse.move(0, 0)
+  await expect(footer).toHaveCSS("height", "20px")
+  await expect(footer).toHaveCSS("margin-top", "4px")
+  await expect(timestamp).toHaveCSS("opacity", "0")
+
+  for (const hover of [true, false]) {
+    await timeline.getByLabel("Delivery state").selectOption("steering")
+    await expect(footer).toHaveCSS("opacity", "1")
+    await expect(pending).toHaveCSS("opacity", "1")
+    const before = await pending.boundingBox()
+    if (!before) throw new Error("Pending footer geometry is unavailable")
+
+    if (hover) await message.hover()
+    if (!hover) await page.mouse.move(0, 0)
+    await expect(timestamp).toHaveCSS("opacity", hover ? "1" : "0")
+    await timeline.getByLabel("Delivery state").selectOption("delivered")
+
+    const middle = await message.evaluate((element) => {
+      for (const animation of element.getAnimations({ subtree: true })) {
+        animation.pause()
+        animation.currentTime = 100
+      }
+      const pending = element.querySelector('[data-slot="user-message-meta"] [data-slot="user-message-transition"]')!
+      const footer = element.querySelector('[data-slot="user-message-copy-wrapper"]')!
+
+      return {
+        width: pending.getBoundingClientRect().width,
+        opacity: Number(getComputedStyle(pending).opacity),
+        footer: Number(getComputedStyle(footer).opacity),
+      }
+    })
+
+    expect(middle.width).toBeGreaterThan(0)
+    expect(middle.width).toBeLessThan(before.width)
+    expect(middle.opacity).toBeGreaterThan(0)
+    expect(middle.opacity).toBeLessThan(1)
+    if (hover) expect(middle.footer).toBe(1)
+    if (!hover) {
+      expect(middle.footer).toBeGreaterThan(0)
+      expect(middle.footer).toBeLessThan(1)
+    }
+
+    await message.evaluate((element) =>
+      element.getAnimations({ subtree: true }).forEach((animation) => animation.finish()),
+    )
+    await expect(pending).toBeHidden()
+    await expect(footer).toHaveCSS("opacity", hover ? "1" : "0")
+    await expect(timestamp).toHaveCSS("opacity", hover ? "1" : "0")
+  }
+
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await expect(page.locator("html")).toHaveAttribute("data-motion", "reduce")
+  await timeline.getByLabel("Delivery state").selectOption("steering")
+  await timeline.getByLabel("Delivery state").selectOption("delivered")
+  await expect(footer).toHaveCSS("transition-duration", "0s")
+  await expect(pending).toBeHidden()
+  await expect(footer).toHaveCSS("opacity", "0")
+})
+
 story("marks pending metadata without badging delivered, starting, or queued prompts", async ({ mount, page }) => {
   const timeline = await mount("current-prompt-message--pending")
   const indicator = timeline.locator('[data-slot="user-message-meta"] [data-slot="user-message-pending"]')
@@ -8,7 +118,8 @@ story("marks pending metadata without badging delivered, starting, or queued pro
   for (const status of ["steering", "stranded", "starting", "queued", "delivered"]) {
     await timeline.getByLabel("Delivery state").selectOption(status)
     const pending = status === "steering" || status === "stranded"
-    await expect(indicator).toHaveCount(pending ? 1 : 0)
+    if (pending) await expect(indicator).toBeVisible()
+    if (!pending) await expect(indicator).toBeHidden()
 
     const colors = await timeline.evaluate((element, pending) => {
       const probe = document.createElement("span")
@@ -25,6 +136,16 @@ story("marks pending metadata without badging delivered, starting, or queued pro
     await expect(text).toHaveCSS("background-color", colors.background)
   }
 
+  await timeline.locator('[data-component="user-message"]').hover()
+  await expect(timeline.locator('[data-slot="user-message-meta-item"]')).toHaveText([
+    "Build",
+    "Claude Sonnet 4 (Balanced)",
+  ])
+  const separator = timeline.locator('[data-slot="user-message-meta-label"] [data-slot="user-message-meta-separator"]')
+  await expect(separator).toHaveText("\u00B7")
+  await expect(separator).toHaveCSS("opacity", "0.66")
+  await expect(timeline.locator('[data-slot="user-message-meta-label"]')).toHaveCSS("gap", "4px")
+
   await timeline.getByLabel("Delivery state").selectOption("steering")
   await timeline.getByLabel("Voice message", { exact: true }).check()
   const voice = timeline.getByRole("img", { name: "Voice", exact: true })
@@ -34,6 +155,11 @@ story("marks pending metadata without badging delivered, starting, or queued pro
 
   await expect(voice.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-wave-audio")
   await expect(indicator.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
+
+  const icon = await indicator.locator("svg").boundingBox()
+  const label = await timeline.locator('[data-slot="user-message-meta"]').boundingBox()
+  if (!icon || !label) throw new Error("Pending metadata geometry is unavailable")
+  expect(Math.abs(icon.y + icon.height / 2 - label.y - label.height / 2)).toBeLessThan(0.5)
 
   await expect(voice).toHaveCSS("width", "20px")
   await expect(voice).toHaveCSS("height", "20px")
@@ -61,12 +187,12 @@ story("marks pending metadata without badging delivered, starting, or queued pro
   await timeline.getByLabel("Grouped prompts", { exact: true }).uncheck()
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(indicator).toBeVisible()
-  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText("Pending")
+  await expect(timeline.locator('[data-slot="user-message-meta-item"]')).toHaveCount(0)
   await timeline.getByLabel("Prompt text", { exact: true }).uncheck()
   await expect(timeline.getByText("notes.json", { exact: true })).toBeVisible()
   await expect(indicator).toBeVisible()
   await timeline.getByRole("button", { name: "Move to queue", exact: true }).click()
-  await expect(indicator).toHaveCount(0)
+  await expect(indicator).toBeHidden()
 })
 
 // Moved from packages/app/e2e/regression/session-timeline-collapse-state.spec.ts

@@ -825,7 +825,7 @@ export function createSessionTimelineRowRenderer(input: {
     const joined = run(props.messageID)
     springStyle(
       () => element,
-      () => ({ height: joined()?.above ? 4 : 24 }),
+      () => ({ height: joined()?.above ? 4 : 16 }),
       (el, value) => {
         el.style.height = `${value.height}px`
       },
@@ -837,7 +837,7 @@ export function createSessionTimelineRowRenderer(input: {
         ref={element}
         data-timeline-row="TurnGap"
         aria-hidden="true"
-        style={{ height: untrack(joined)?.above ? "4px" : "24px" }}
+        style={{ height: untrack(joined)?.above ? "4px" : "16px" }}
       />
     )
   }
@@ -1157,7 +1157,8 @@ function outcomeNoticeColor(outcome: Outcome | undefined) {
 
   if (outcome === "error") return "text-v2-state-fg-danger"
 
-  if (outcome === "cancelled") return "text-[var(--v2-yellow-900)] [[data-color-scheme=dark]_&]:text-v2-state-fg-warning"
+  if (outcome === "cancelled")
+    return "text-[var(--v2-yellow-900)] [[data-color-scheme=dark]_&]:text-v2-state-fg-warning"
 
   return "text-v2-text-text-code-accent"
 }
