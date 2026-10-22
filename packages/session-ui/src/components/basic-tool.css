@@ -205,7 +205,8 @@
   transition: opacity 0.15s ease;
 }
 
-[data-slot="collapsible-trigger"]:hover + [data-slot="basic-tool-action"],
+/* Reveal the action while the pointer is anywhere over the tool, including its expanded content. */
+[data-component="collapsible"].tool-collapsible:hover > [data-slot="basic-tool-action"],
 [data-slot="collapsible-trigger"]:focus-visible + [data-slot="basic-tool-action"],
 [data-slot="basic-tool-action"]:hover,
 [data-slot="basic-tool-action"]:focus-within {
