@@ -2,6 +2,7 @@ import { createEffect, on, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
+import { prefersReducedMotion } from "@opencode/ui/motion"
 import type { EmbedProps, Embeds } from "@opencode/gui-extensions/sdk"
 import type { Bridge } from "@opencode/gui-extensions/sdk/bridge"
 
@@ -15,6 +16,9 @@ type Input = {
   /** A panel is moving; native views would float unclipped over the app until it lands. */
   readonly moving: () => boolean
 }
+
+// A decoded still and where it sits in the box, in CSS pixels.
+type Still = { id: string; x: number; y: number; width: number; height: number; url: string; image: HTMLImageElement }
 
 /** Main-process embeds laid out over the DOM box an extension renders for them. */
 export function createEmbeds(input: Input): Embeds {
@@ -35,10 +39,15 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   const [store, setStore] = createStore<{
     visible: boolean
     snapshot: { id: string; url: string; presented: boolean } | undefined
+    still: Still | undefined
+    flying: boolean
   }>({
     visible: typeof document === "undefined" || document.visibilityState === "visible",
     // A still of the embed shown in the DOM while floating content covers the hidden native view.
     snapshot: undefined,
+    // The latest still of the shown page, which stands in for it while a panel flight hides the native view.
+    still: undefined,
+    flying: false,
   })
 
   let element: HTMLDivElement | undefined
@@ -49,6 +58,14 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   let release: ReturnType<typeof setTimeout> | undefined
   // The embed the last layout went to; it hides when another one takes the box.
   let placed: string | undefined
+  // Where the shown native view sits in the box, in CSS pixels; undefined while it is off screen.
+  let onscreen: Omit<Still, "url" | "image"> | undefined
+  let warming: ReturnType<typeof setTimeout> | undefined
+  let landing: ReturnType<typeof setTimeout> | undefined
+  let stilling: string | undefined
+  // The kept still's JPEG length, and how long to wait before the next still.
+  let bytes = 0
+  let pause = 3000
   const canvas = document.createElement("canvas")
   canvas.width = canvas.height = 1
   const paint = canvas.getContext("2d", { willReadFrequently: true })
@@ -68,6 +85,94 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   const hide = () => {
     if (placed) props.bridge.embed(placed)
     placed = undefined
+    onscreen = undefined
+    clearTimeout(warming)
+  }
+
+  // A panel flight hides the native view, which no DOM box clips. Keep a recent still for it: one once the shown
+  // view's layout settles, then more while it stays on screen, never one per frame. A page that stops changing is
+  // captured less and less often.
+  const warm = (delay: number) => {
+    clearTimeout(warming)
+    // Reduced motion lands panels at once, so no flight needs a still.
+    warming = setTimeout(() => {
+      if (onscreen && !props.input.moving() && !prefersReducedMotion()) take()
+    }, delay)
+  }
+
+  const take = () => {
+    const placement = onscreen
+
+    if (!placement || stilling === placement.id) return
+    stilling = placement.id
+    void props.bridge
+      .capture(placement.id)
+      .catch(() => undefined)
+      .then(async (data) => {
+        // The same JPEG length as the still already kept: the page has most likely not changed.
+        const unchanged = !!data && store.still?.id === placement.id && data.length === bytes
+        bytes = data?.length ?? 0
+        pause = unchanged ? Math.min(pause * 2, 60_000) : 3000
+
+        if (unchanged) {
+          if (stilling === placement.id) stilling = undefined
+
+          if (onscreen?.id === placement.id) warm(pause)
+
+          return
+        }
+
+        const url = data ? URL.createObjectURL(new Blob([new Uint8Array(data)], { type: "image/jpeg" })) : undefined
+        const image = new Image()
+
+        if (url) image.src = url
+
+        const ready =
+          !!url &&
+          (await image
+            .decode()
+            .then(() => true)
+            .catch(() => false))
+
+        // Another embed took the box, or the view was disposed, while this one captured.
+        const current = stilling === placement.id
+
+        if (current) stilling = undefined
+
+        if (!url || !ready || !current || props.id !== placement.id) {
+          if (url) URL.revokeObjectURL(url)
+
+          if (current && onscreen?.id === placement.id) warm(pause)
+
+          return
+        }
+
+        const previous = store.still?.url
+        image.alt = ""
+        image.draggable = false
+        image.className = "absolute max-w-none pointer-events-none select-none"
+        Object.assign(image.style, {
+          left: `${placement.x}px`,
+          top: `${placement.y}px`,
+          width: `${placement.width}px`,
+          height: `${placement.height}px`,
+        })
+        setStore("still", { ...placement, url, image })
+
+        if (previous) URL.revokeObjectURL(previous)
+
+        if (onscreen?.id === placement.id) warm(pause)
+      })
+  }
+
+  const fly = (moving: boolean) => {
+    clearTimeout(landing)
+
+    if (moving) return setStore("flying", true)
+
+    // A panel that landed closed is gone; one that landed open keeps the still under its view until the view paints.
+    if (!props.visible) return setStore("flying", false)
+    landing = setTimeout(() => setStore("flying", false), 150)
   }
 
   // The native embed always paints above the DOM, so hide it while a floating
@@ -185,6 +290,19 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
 
     if (placed !== id) hide()
     placed = id
+    // The still lines up with the view's device-pixel-rounded bounds, so swapping one for the other moves nothing.
+    onscreen = visible
+      ? {
+          id,
+          x: left / zoom - rect.left,
+          y: top / zoom - rect.top,
+          width: Math.max(0, right - left) / zoom,
+          height: Math.max(0, bottom - top) / zoom,
+        }
+      : undefined
+
+    if (onscreen) warm(600)
+    else clearTimeout(warming)
 
     const box = {
       visible,
@@ -214,6 +332,17 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
     if (frame === undefined) frame = requestAnimationFrame(tick)
   }
 
+  // A flight paints the still in the view's place. One that starts with the view on screen, like a close, first asks
+  // for a fresh still, before the effect below hides the view; one that opens the pane shows the last still.
+  createEffect(
+    on([props.input.moving, () => props.visible], ([moving]) => {
+      if (!moving) return fly(false)
+
+      if (store.flying || (!onscreen && !props.visible)) return
+      take()
+      fly(true)
+    }),
+  )
   createEffect(
     on(
       [
@@ -260,13 +389,20 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   onCleanup(() => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     clearTimeout(release)
+    clearTimeout(landing)
     capturing = undefined
+    stilling = undefined
     replaceSnapshot()
+
+    if (store.still) URL.revokeObjectURL(store.still.url)
     hide()
   })
 
   return (
     <div ref={element} class={props.class}>
+      <Show when={store.flying && store.still?.id === props.id && store.still}>
+        {(still) => <div class="absolute inset-0 overflow-hidden pointer-events-none">{still().image}</div>}
+      </Show>
       <Show when={store.snapshot?.id === props.id && props.visible && store.snapshot?.url}>
         {(url) => (
           <img

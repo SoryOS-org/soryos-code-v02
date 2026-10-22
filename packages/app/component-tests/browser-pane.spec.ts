@@ -66,9 +66,12 @@ story("hides the native view immediately while the pane stays mounted", async ({
   await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
 })
 
-story("hides the native view from the first frame a panel moves until it lands", async ({ page }) => {
+story("paints a still of the page in place of the native view while a panel moves", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   const motion = root.getByRole("button", { name: "Toggle panel motion", exact: true })
+  const pane = root.getByRole("button", { name: "Toggle Review tab", exact: true })
+  const native = root.getByTestId("native-Alpha")
+  const still = root.locator("#browser-panel img")
 
   // Read in the same task as the click: a native view left up for even one frame floats over the moving app.
   const visible = await motion.evaluate((element) => {
@@ -78,14 +81,29 @@ story("hides the native view from the first frame a panel moves until it lands",
   })
 
   expect(visible).toBe("false")
+  // A close: the page flies out as a still of itself rather than a blank box.
+  await expect(still).toBeVisible()
+  await pane.click()
+  await expect(still).toBeVisible()
   await motion.click()
-  await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
+  await expect(still).toHaveCount(0)
+
+  // An open shows the still the close left, until the flight lands and the page is back.
+  await motion.click()
+  await pane.click()
+  await expect(still).toBeVisible()
+  await expect(native).toHaveAttribute("data-visible", "false")
+  await motion.click()
+  await expect(native).toHaveAttribute("data-visible", "true")
+  await expect(still).toHaveCount(0)
 })
 
 story("keeps a still of the page under floating content that covers it", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   const still = root.locator("#browser-panel img")
   const native = root.getByTestId("native-Alpha")
+  // Reduced motion lands panels at once, so the pane keeps no flight still and captures only for the cover.
+  await page.emulateMedia({ reducedMotion: "reduce" })
   await root.getByRole("button", { name: "Hold capture", exact: true }).click()
   await root.getByRole("button", { name: "Toggle popover", exact: true }).click()
   await expect(root.getByText("Captures: 1", { exact: true })).toBeVisible()
