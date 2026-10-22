@@ -117,7 +117,7 @@ type Precomputed = {
 
 const NOTHING_TO_COMPACT: Failure = { error: { type: "compaction.unavailable", message: "Nothing to compact yet" } }
 /** After each "too long" rejection, the next attempt aims at this share of the first rejected request's size. */
-const SHRINK_STEPS = [0.7, 0.5, 0.35]
+const SHRINK_STEPS = [0.85, 0.7, 0.5, 0.35]
 // The least of the window kept free for the last reply before compaction and for the summary itself.
 const RESERVE_MIN = 16_000
 /**
@@ -130,6 +130,17 @@ const RESERVE_SHARE = 0.15
 const UNKNOWN_WINDOW = 200_000
 /** A summary gets at least this much output, or the room left if less, even when the estimate margin leaves less. */
 const SUMMARY_OUTPUT_FLOOR = 32_000
+/**
+ * How far one exchange of a summary transcript is shortened, in the order the levels apply: whole; tool outputs cut;
+ * tool outputs left out and tool inputs cut; only the user's text, cut; omitted.
+ */
+const OUTPUTS_CLIPPED = 1
+const OUTPUTS_REMOVED = 2
+const USER_ONLY = 3
+const OMITTED = 4
+const TRANSCRIPT_LEVELS = [0, OUTPUTS_CLIPPED, OUTPUTS_REMOVED, USER_ONLY, OMITTED]
+/** Characters kept, from the start and end, of a cut tool input, tool output, or user message. */
+const TRANSCRIPT_CLIP = 2_000
 const IMAGE_TOKEN_ESTIMATE = 1_500
 const PDF_TOKEN_ESTIMATE = 2_000
 /** Share of the compaction ceiling at which a background summary starts. */
@@ -553,11 +564,12 @@ export const layer = Layer.effect(
      * Every changed draft passes through request hooks again; edits from earlier attempts do not accumulate.
      * Limits and estimates can be wrong, so until the provider rejects something as too long, a request that cannot
      * be made to fit is sent whole: unchanged, or as text once its media has to go. A "too long" rejection means the
-     * estimate ran low, so the next attempts aim at 70%, 50%, then 35% of the first rejected request's estimate, and a
-     * rejection after those gives up. A "payload too large" rejection is about bytes, which inline media almost always
-     * accounts for, so one on the unchanged request resends it as text, which carries no media, without counting; one
-     * on text counts as "too long". Other provider errors resend the same request under the session's retry policy. A
-     * `Failure` from `send` is a reply that cannot be used, and is never retried.
+     * estimate ran low, so the next attempts aim at 85%, 70%, 50%, then 35% of the first rejected request's estimate,
+     * each shortening the transcript again from scratch, and a rejection after those gives up. A "payload too large"
+     * rejection is about bytes, which inline media almost always accounts for, so one on the unchanged request resends
+     * it as text, which carries no media, without counting; one on text counts as "too long". Other provider errors
+     * resend the same request under the session's retry policy. A `Failure` from `send` is a reply that cannot be
+     * used, and is never retried.
      */
     const deliver = Effect.fnUntraced(function* (
       trigger: Trigger,
@@ -585,8 +597,8 @@ export const layer = Layer.effect(
           const history = forceText ? undefined : yield* build()
           if (history?.event.result) return yield* fromHook(context, history.event.result, background)
           const unchanged = history && estimateRequest(history.request) <= target
-          // Reserve the latest hooked system/tool overhead, without carrying its message edits into the new draft.
-          const overhead = estimateRequest({ ...(history ?? prepared).request, messages: [] })
+          // Reserve the latest hooked system overhead; flattened drafts omit tool definitions.
+          const overhead = estimateRequest({ ...(history ?? prepared).request, tools: [], messages: [] })
           const next = unchanged ? history : yield* build(target - overhead)
           const candidate =
             next ?? (rejections > 0 ? undefined : forceText ? yield* build(Number.POSITIVE_INFINITY) : history)
@@ -646,9 +658,13 @@ export const layer = Layer.effect(
      * History that has to change is sent as text rather than as edited messages: `[previous compaction][transcript]`,
      * the conversation since that compaction as one text message. A previous summary always stays in front, while
      * its verbatim recent part becomes the oldest transcript entry; a previous native window stays exactly as the
-     * provider made it. The transcript leaves out reasoning, media, and instruction updates, and cuts long tool
-     * outputs. Only if it still does not fit are whole exchanges dropped, oldest first. Undefined when even the
-     * newest exchange does not fit.
+     * provider made it. The transcript has no tool definitions, which the summary does not need and which no longer
+     * share a cached prefix, and leaves out reasoning, media, and instruction updates.
+     *
+     * When the whole transcript does not fit, exchanges are shortened oldest first, one level at a time, until it
+     * does (see `flattenMessage` for the levels): every exchange reaches a level before any reaches the next, so
+     * detail is lost from the oldest history first and whole exchanges are omitted only as a last resort. The newest
+     * exchange is never omitted; undefined when the transcript cannot fit even so.
      */
     const flattenAndDropOldest = (messages: ReadonlyArray<Message>, context: SessionContext.Loaded, budget: number) => {
       const previous = previousCompaction(context.messages)
@@ -665,28 +681,58 @@ export const layer = Layer.effect(
         : messages.slice(0, end)
       const recent = summary ? SessionRecentText.kept(summary) : ""
 
-      // A user message and everything after it, up to the next one, is one exchange: kept or dropped whole.
-      const exchanges = messages.slice(end).reduce<string[]>(
-        (groups, message) => {
-          const text = flattenMessage(message)
-          if (!text) return groups
-          if (message.role === "user" || groups.length === 0) groups.push(text)
-          else groups[groups.length - 1] += `\n${text}`
-          return groups
-        },
-        recent ? [recent] : [],
-      )
-
+      // A user message and everything after it, up to the next one, is one exchange. Each is rendered at every level
+      // once, so shortening is running arithmetic over these sizes. The previous summary's recent part is already
+      // shortened text: whole until it is omitted.
+      const exchanges = [
+        ...(recent ? [TRANSCRIPT_LEVELS.map((level) => (level === OMITTED ? "" : recent))] : []),
+        ...messages
+          .slice(end)
+          .reduce<Message[][]>((groups, message) => {
+            if (message.role === "user" || groups.length === 0) groups.push([message])
+            else groups[groups.length - 1].push(message)
+            return groups
+          }, [])
+          .map((group) =>
+            TRANSCRIPT_LEVELS.map((level) =>
+              group
+                .map((message) => flattenMessage(message, level))
+                .filter(Boolean)
+                .join("\n"),
+            ),
+          )
+          .filter((renders) => renders[0]),
+      ]
+      if (exchanges.length === 0) return undefined
       const note = (omitted: number) =>
         omitted ? `[${omitted} older ${omitted === 1 ? "exchange" : "exchanges"} omitted]\n\n` : ""
+      const size = (text: string) => (text ? Token.estimate(text) + 1 : 0)
       // Room for the longest possible note is set aside before choosing what to keep.
       const room =
         budget -
         lead.reduce((sum, message) => sum + estimateMessage(message), 0) -
         Token.estimate(note(exchanges.length))
-      const kept = exchanges.slice(oldestToDrop(exchanges, (text) => Token.estimate(text) + 1, room))
-      if (kept.length === 0) return undefined
-      return [...lead, Message.user(note(exchanges.length - kept.length) + kept.join("\n\n"))]
+
+      const levels = exchanges.map(() => 0)
+      let total = exchanges.reduce((sum, renders) => sum + size(renders[0]), 0)
+      const newest = exchanges.length - 1
+      for (const level of TRANSCRIPT_LEVELS.slice(1)) {
+        for (let index = 0; index < exchanges.length && total > room; index++) {
+          // The newest exchange is what the summary most needs; it is shortened but never left out.
+          if (index === newest && !exchanges[index][level]) continue
+          total += size(exchanges[index][level]) - size(exchanges[index][levels[index]])
+          levels[index] = level
+        }
+      }
+      if (total > room) return undefined
+
+      // Includes exchanges with no user text, which are already gone at `USER_ONLY`.
+      const omitted = levels.filter((level, index) => !exchanges[index][level]).length
+      const text = exchanges
+        .map((renders, index) => renders[levels[index]])
+        .filter(Boolean)
+        .join("\n\n")
+      return [...lead, Message.user(note(omitted) + text)]
     }
 
     const stream = (
@@ -781,7 +827,7 @@ export const layer = Layer.effect(
         session: context.session,
         agent: context.agent.id,
         model: context.model,
-        tools: context.tools,
+        tools: room === undefined ? context.tools : undefined,
         system: base.system,
         messages: base.messages,
         webSocket,
@@ -976,27 +1022,46 @@ const oldestToDrop = <T>(items: ReadonlyArray<T>, size: (item: T) => number, bud
   return start
 }
 
-/** One request message as a flattened transcript line. Empty for what the transcript leaves out. */
-const flattenMessage = (message: Message) => {
-  if (message.role === "system") return ""
+/** One request message as transcript lines at a shortening level. Empty for what that level leaves out. */
+const flattenMessage = (message: Message, level: number) => {
+  if (message.role === "system" || level === OMITTED) return ""
+  if (level >= USER_ONLY && message.role !== "user") return ""
   return message.content
     .flatMap((part) => {
-      if (part.type === "text")
-        return part.text ? [`[${message.role === "user" ? "User" : "Assistant"}]: ${part.text}`] : []
+      if (part.type === "text") {
+        if (!part.text) return []
+        const text = level >= USER_ONLY ? clip(part.text) : part.text
+        return [`[${message.role === "user" ? "User" : "Assistant"}]: ${text}`]
+      }
+      if (level >= USER_ONLY) return []
       if (part.type === "media") return [`[${part.media.mediaType} omitted]`]
-      if (part.type === "tool-call") return [`[Assistant tool call]: ${part.name}(${JSON.stringify(part.input) ?? ""})`]
+      if (part.type === "tool-call") {
+        const input = JSON.stringify(part.input) ?? ""
+        return [`[Assistant tool call]: ${part.name}(${level >= OUTPUTS_REMOVED ? clip(input) : input})`]
+      }
       if (part.type !== "tool-result") return []
       const result = part.result
+      const label = result.type === "error" ? "Tool error" : "Tool result"
+      if (level >= OUTPUTS_REMOVED) return [`[${label} omitted]`]
       const output =
         result.type === "content"
           ? SessionRecentText.serializeToolContent(result.value)
           : typeof result.value === "string"
             ? result.value
             : (JSON.stringify(result.value) ?? "")
-      const label = result.type === "error" ? "Tool error" : "Tool result"
-      return [`[${label}]: ${SessionRecentText.truncateToolOutput(output)}`]
+      return [`[${label}]: ${level >= OUTPUTS_CLIPPED ? clip(output) : output}`]
     })
     .join("\n")
+}
+
+/** `value` cut to `TRANSCRIPT_CLIP` characters from its start and end, never splitting a surrogate pair. */
+const clip = (value: string) => {
+  if (value.length <= TRANSCRIPT_CLIP) return value
+  const chars = Array.from(value)
+  if (chars.length <= TRANSCRIPT_CLIP) return value
+  const half = TRANSCRIPT_CLIP / 2
+  const omitted = chars.length - TRANSCRIPT_CLIP
+  return `${chars.slice(0, half).join("")}\n[… ${omitted} characters omitted …]\n${chars.slice(-half).join("")}`
 }
 
 /** The newest whole, real user messages within `keep` tokens: no synthetic guidance, no half of an attachment. */
