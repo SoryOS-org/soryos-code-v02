@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@opencode/script"
+import { NpmLibraries } from "@opencode/script/npm"
 import { $ } from "bun"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -23,6 +23,13 @@ const output = (value: string, types = false) =>
 
 if (!dryRun && (await $`npm view ${pkg.name}@${pkg.version} version`.nothrow()).exitCode === 0) {
   console.log(`already published ${pkg.name}@${pkg.version}`)
+  process.exit(0)
+}
+
+const carried = await NpmLibraries.carried(tarball)
+
+if (carried && !dryRun) {
+  await NpmLibraries.publish(carried)
   process.exit(0)
 }
 
@@ -68,7 +75,7 @@ try {
   } finally {
     await rm(consumer, { recursive: true, force: true })
   }
-  if (!dryRun) await $`npm publish ${tarball} --tag ${Script.channel} --access public`
+  if (!dryRun) await NpmLibraries.publish(tarball)
 } finally {
   await Bun.write("package.json", originalText)
   await rm(tarball, { force: true })

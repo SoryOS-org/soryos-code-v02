@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@opencode/script"
+import { NpmLibraries } from "@opencode/script/npm"
 import { $ } from "bun"
 import { rm } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
@@ -17,11 +17,18 @@ if ((await $`npm view ${pkg.name}@${pkg.version} version`.nothrow()).exitCode ==
   process.exit(0)
 }
 
+const carried = await NpmLibraries.carried(tarball)
+
+if (carried) {
+  await NpmLibraries.publish(carried)
+  process.exit(0)
+}
+
 try {
   await $`bun run typecheck`
   await $`bun run test`
   await pack()
-  await $`npm publish ${tarball} --access public --tag ${Script.channel}`
+  await NpmLibraries.publish(tarball)
 } finally {
   await rm(tarball, { force: true })
 }

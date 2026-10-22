@@ -36,7 +36,26 @@ if (-not $module) {
     Write-Host "NuGet package provider install skipped: $($_.Exception.Message)"
   }
 
-  Install-Module -Name TrustedSigning -RequiredVersion $moduleVersion -Force -Repository PSGallery -Scope CurrentUser
+  # PowerShellGet registers PSGallery only when the gallery answers, so a short outage fails Install-Module with
+  # "Unable to find repository 'PSGallery'".
+  foreach ($attempt in 1..3) {
+    try {
+      if (-not (Get-PSRepository | Where-Object { $_.Name -eq "PSGallery" })) {
+        Register-PSRepository -Default
+      }
+
+      Install-Module -Name TrustedSigning -RequiredVersion $moduleVersion -Force -Repository PSGallery -Scope CurrentUser
+      break
+    }
+    catch {
+      if ($attempt -eq 3) {
+        throw
+      }
+
+      Write-Host "::warning::TrustedSigning module install attempt $attempt failed: $($_.Exception.Message)"
+      Start-Sleep -Seconds (30 * $attempt)
+    }
+  }
 }
 
 Import-Module TrustedSigning -RequiredVersion $moduleVersion -Force
