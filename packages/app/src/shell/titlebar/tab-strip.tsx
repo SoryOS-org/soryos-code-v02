@@ -7,7 +7,7 @@ import { RestrictToHorizontalAxis, RestrictToVerticalAxis } from "@dnd-kit/abstr
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
 import { arrayMove } from "@dnd-kit/helpers"
 import { tabHref, tabKey, type SessionTab, type Tab } from "@/shell/tabs/tabs"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, serverName } from "@/runtime/server/registry"
 import { DraftTabItem, TabNavItem } from "@/shell/titlebar/tab-nav"
 import { useGlobal, useServerCtx, type ServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -282,7 +282,25 @@ export function TitlebarTabStrip(props: {
   let listRef!: HTMLDivElement
   const [visibility, setVisibility] = createStore<Record<string, boolean>>({})
   const [unread, setUnread] = createStore<Record<string, boolean>>({})
-  const visibleTabs = createMemo(() => props.tabs.filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
+
+  // A vertical strip with several servers reads as one flat list of identical
+  // rows, so it groups by server. Sorting is stable, which keeps each server's
+  // own tab order and makes reordering inside a group persist.
+  const grouping = createMemo(() => {
+    const servers = global.servers.list()
+
+    if (!vertical() || servers.length <= 1) return
+    const names = new Map(servers.map((conn) => [ServerConnection.key(conn), serverName(conn)]))
+    const order = [...names.keys()]
+
+    return {
+      names,
+      tabs: props.tabs.toSorted((a, b) => rank(order, a.server) - rank(order, b.server)),
+    }
+  })
+
+  const orderedTabs = () => grouping()?.tabs ?? props.tabs
+  const visibleTabs = createMemo(() => orderedTabs().filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
   const visibleTabIds = () => visibleTabs().map(tabKey)
 
   command.register("titlebar-tab-cycle", () => [
@@ -414,7 +432,7 @@ export function TitlebarTabStrip(props: {
             classList={{ "flex-row items-center": !vertical(), "flex-col items-stretch": vertical() }}
             ref={listRef}
           >
-            <For each={props.tabs}>
+            <For each={orderedTabs()}>
               {(tab) => {
                 const id = tabKey(tab)
                 let ref!: HTMLDivElement
@@ -427,8 +445,22 @@ export function TitlebarTabStrip(props: {
                   return global.servers.list().find((item) => ServerConnection.key(item) === tab.server)
                 })
 
-                if (tab.type === "session") {
-                  return (
+                const header = () => {
+                  const groups = grouping()
+
+                  if (!groups) return
+                  const index = orderedTabs().findIndex((item) => tabKey(item) === id)
+
+                  if (index === 0) return groups.names.get(tab.server)
+                  const previous = orderedTabs()[index - 1]
+
+                  if (previous?.server === tab.server) return
+
+                  return groups.names.get(tab.server)
+                }
+
+                const entry =
+                  tab.type === "session" ? (
                     <SessionTabEntry
                       tab={tab}
                       id={id}
@@ -444,23 +476,39 @@ export function TitlebarTabStrip(props: {
                       }}
                       onClose={() => props.onClose(tab)}
                     />
+                  ) : (
+                    <DraftTabSlot
+                      tab={tab}
+                      id={id}
+                      index={visibleIndex()}
+                      active={props.currentTab === tab}
+                      orientation={vertical() ? "vertical" : "horizontal"}
+                      title={language.t("session.tab.session")}
+                      onNavigate={(element) => {
+                        ref = element
+                        props.onNavigate(tab, element)
+                      }}
+                      onClose={() => props.onClose(tab)}
+                    />
                   )
-                }
+
+                if (!grouping()) return entry
 
                 return (
-                  <DraftTabSlot
-                    tab={tab}
-                    id={id}
-                    index={visibleIndex()}
-                    active={props.currentTab === tab}
-                    orientation={vertical() ? "vertical" : "horizontal"}
-                    title={language.t("session.tab.session")}
-                    onNavigate={(element) => {
-                      ref = element
-                      props.onNavigate(tab, element)
-                    }}
-                    onClose={() => props.onClose(tab)}
-                  />
+                  <>
+                    <Show when={header()}>
+                      {(title) => (
+                        <div
+                          data-slot="tab-server-group"
+                          data-server={tab.server}
+                          class="mt-2 flex h-6 w-full shrink-0 items-center overflow-hidden px-1.5 text-[11px] text-v2-text-text-faint [font-weight:530]"
+                        >
+                          <bdi class="truncate">{title()}</bdi>
+                        </div>
+                      )}
+                    </Show>
+                    {entry}
+                  </>
                 )
               }}
             </For>
@@ -481,6 +529,12 @@ export function TitlebarTabStrip(props: {
       </Show>
     </div>
   )
+}
+
+function rank(order: string[], server: ServerConnection.Key) {
+  const index = order.indexOf(server)
+
+  return index === -1 ? order.length : index
 }
 
 function useTabShortcut(index: () => number, onSelect: () => void) {

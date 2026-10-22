@@ -524,6 +524,31 @@ test("closing the active server's last tab opens the remaining server tab", asyn
   expect(reads.filter((url) => !url.startsWith(REMOTE_SERVER))).toEqual([])
 })
 
+test("vertical tabs group by server without changing tabs inside a server", async ({ page }) => {
+  const sessionA = session({ id: "ses_group_a1", directory: "C:/server-a", title: "A one" })
+  const sessionA2 = session({ id: "ses_group_a2", directory: "C:/server-a", title: "A two" })
+  const sessionB = session({ id: "ses_group_b1", directory: "/home/server-b", title: "B one" })
+  await twoServers(page, { a: [sessionA, sessionA2], b: [sessionB] })
+  await seed(page, {
+    settings: { appearance: { tabLayout: "vertical" } },
+    tabs: [sessionA.id, sessionA2.id, { session: sessionB.id, server: REMOTE_SERVER }],
+  })
+  await page.goto(sessionHref(sessionA.id))
+
+  const order = () =>
+    page
+      .locator("[data-titlebar-tab-slot]")
+      .evaluateAll((slots) => slots.map((slot) => slot.getAttribute("data-tab-key")))
+  const expected = [
+    `${SERVER}\n${sessionHref(sessionA.id)}`,
+    `${SERVER}\n${sessionHref(sessionA2.id)}`,
+    `${REMOTE_SERVER}\n${sessionHref(sessionB.id, REMOTE_SERVER)}`,
+  ]
+
+  await expect.poll(order).toEqual(expected)
+  await expect(page.locator('[data-slot="tab-server-group"]')).toHaveText(["127.0.0.1:4096", "127.0.0.1:4097"])
+})
+
 test("a remote tab stays busy while a child session runs", async ({ page }) => {
   const sessionA = session({ id: "ses_server_a", directory: "C:/server-a", title: "Server A session" })
   const sessionB = session({ id: "ses_server_b", directory: "/home/server-b", title: "Server B session" })
