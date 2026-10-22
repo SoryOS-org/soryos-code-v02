@@ -62,7 +62,7 @@ export const layer = (options?: Options) =>
         initial: () => ({ files: new Map(), available: true }),
         editor: (editor) => ({
           list: () => Array.from(editor.files.values()),
-          add: (file) => editor.files.set(file.path, file as Types.DeepMutable<File>),
+          add: (file) => editor.files.set(file.path, new File(file) as Types.DeepMutable<File>),
           update: (path, update) => {
             const current = editor.files.get(path)
             if (!current) return
