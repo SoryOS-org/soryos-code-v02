@@ -3,13 +3,11 @@ import { useData } from "../../context/data"
 import { DialogSelect } from "../../ui/dialog-select"
 import { useClipboard } from "../../context/clipboard"
 import { useToast } from "../../ui/toast"
-import { useClient } from "../../context/client"
 import { errorMessage } from "../../util/error"
 import { DialogFork } from "./dialog-fork"
 import type { PromptInfo } from "../../prompt/history"
 import { projectedPromptInput } from "../../prompt/codec"
 import { useNewDesigns } from "../../config"
-import { revertUserMessage, revertUserMessageApi } from "./undo"
 
 export function DialogMessage(props: {
   messageID: string
@@ -19,7 +17,6 @@ export function DialogMessage(props: {
   const data = useData()
   const clipboard = useClipboard()
   const toast = useToast()
-  const client = useClient()
   const newDesigns = useNewDesigns()
   const message = createMemo(() => data.session.message.get(props.sessionID, props.messageID))
 
@@ -40,15 +37,10 @@ export function DialogMessage(props: {
           description: "undo messages and file changes",
           onSelect: (dialog) => {
             const value = message()
-            void revertUserMessage({
-              pending: data.session.input.has(props.sessionID, props.messageID),
-              api: revertUserMessageApi(client.api.session, {
-                sessionID: props.sessionID,
-                messageID: props.messageID,
-              }),
-            })
-              .then((result) => {
-                if (result === "aborted" || value?.type !== "user") return
+            void data.session
+              .undo({ sessionID: props.sessionID, messageID: props.messageID })
+              .then(() => {
+                if (value?.type !== "user") return
                 props.setPrompt?.({
                   ...projectedPromptInput(value),
                   pasted: [],

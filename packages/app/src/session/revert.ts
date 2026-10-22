@@ -1,4 +1,4 @@
-import { isMessageNotFoundError, type SessionMessageUser } from "@opencode/client/promise"
+import type { SessionMessageUser } from "@opencode/client/promise"
 import { useComposerState } from "@/composer/persistence"
 import { useData } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -52,44 +52,9 @@ export function createSessionRevert(input: {
     const owner = input.session.ownership.capture()
     const target = prompt.capture()
 
-    // An undelivered prompt has no history to rewind. Withdraw it like the TUI
-    // instead of interrupting the work it is waiting behind. Cancel returns 204
-    // for both withdrawal and a promotion race, so probe projected history before
-    // treating the undo as finished.
-    if (data.session.input.has(sessionID, message.id)) {
-      if (!(await request(() => server.api.session.inbox.cancel({ sessionID, inboxID: message.id })))) return
-      const promoted = await server.api.session.message
-        .get({ sessionID, messageID: message.id })
-        .then(
-          () => true as const,
-          (error) => {
-            if (isMessageNotFoundError(error)) return false as const
-            throw error
-          },
-        )
-        .catch((error) => {
-          showToast({
-            title: language.t("common.requestFailed"),
-            description: error instanceof Error ? error.message : String(error),
-          })
-          return "failed" as const
-        })
-      if (promoted === "failed") return
-      if (!promoted) {
-        restore(target, message)
-        owner.run(() => input.setActiveMessage(previous))
-        return
-      }
-    }
-
-    // Interrupt acknowledges before the execution settles, and staging a busy Session fails. The
-    // local status can lag the server either way, so always settle first; both are idle no-ops.
-    // Like the TUI, stop at the first failure instead of waiting on work that was never interrupted.
-    if (!(await request(() => server.api.session.interrupt({ sessionID })))) return
-
-    if (!(await request(() => server.api.session.wait({ sessionID })))) return
-
-    if (!(await request(() => server.api.session.revert.stage({ sessionID, messageID: message.id })))) return
+    // Shared with the TUI: withdraw undelivered inbox rows, otherwise interrupt and stage.
+    // Runs on the per-session send chain so cancel cannot overtake the prompt POST.
+    if (!(await request(() => data.session.undo({ sessionID, messageID: message.id })))) return
     // Like the TUI, pending inputs are left alone: the revert hides them, committing it drops them,
     // and redo delivers them.
     restore(target, message)
@@ -135,10 +100,7 @@ export function createSessionRevert(input: {
     )
   }
 
-  /** Puts a sent prompt back in the composer without rewinding the Session. */
-  const recall = (message: SessionMessageUser) => restore(prompt.capture(), message)
-
-  return { to, undo, redo, recall }
+  return { to, undo, redo }
 }
 
 export type SessionRevert = ReturnType<typeof createSessionRevert>
