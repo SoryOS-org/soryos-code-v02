@@ -856,6 +856,52 @@ it.effect("compaction lowers the output limit when it sends a request it could n
   }),
 )
 
+it.effect("compaction sends a newest exchange it cannot shorten enough as text", () =>
+  Effect.gen(function* () {
+    requests = []
+    const compaction = yield* SessionCompaction.Service
+    const session = yield* insertSession(Session.ID.make("ses_oversized_newest_text"))
+    // A turn that continued after a checkpoint has no user message to shorten it to, and its text alone is past the
+    // target, so it cannot fit. Its reasoning makes the unchanged request larger still.
+    const assistant = Schema.decodeUnknownSync(SessionMessage.Assistant)({
+      id: SessionMessage.ID.create(),
+      type: "assistant",
+      agent: Agent.defaultID,
+      model: resolved.ref,
+      content: [
+        {
+          type: "reasoning",
+          id: "thought",
+          text: "Weighing the options. ".repeat(2_000),
+          time: { created: 0, completed: 0 },
+        },
+        { type: "text", text: "Step result. ".repeat(4_000) },
+        { type: "text", text: "The task is done." },
+      ],
+      time: { created: 0, completed: 0 },
+    })
+    const checkpoint = SessionMessage.CompactionCompleted.make({
+      id: SessionMessage.ID.create(),
+      type: "compaction",
+      status: "completed",
+      reason: "auto",
+      summary: "## Objective\n- Earlier work",
+      time: { created: DateTime.makeUnsafe(0) },
+    })
+    const context = {
+      ...loaded(session, [checkpoint, assistant]),
+      model: { ...resolved, limit: { context: 16_000, output: 4_000 } },
+    }
+
+    expect(yield* compaction.compact({ reason: "overflow", context })).toEqual({ status: "completed" })
+    expect(requests).toHaveLength(1)
+    const sent = JSON.stringify(requests[0]?.messages)
+    expect(sent).toContain("[Assistant]: Step result.")
+    expect(sent).toContain("The task is done.")
+    expect(sent).not.toContain("Weighing the options.")
+  }),
+)
+
 it.effect("compaction keeps the output limit for a request that fits its target", () =>
   Effect.gen(function* () {
     requests = []

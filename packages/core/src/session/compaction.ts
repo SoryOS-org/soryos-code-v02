@@ -558,14 +558,14 @@ export const layer = Layer.effect(
     /**
      * Sends the request as-is if it is estimated to fit `shrink.fit`, else `shrink.history` as-is if it fits `target`,
      * and otherwise `shrink.history` as text aimed at `target` (see `flattenAndDropOldest`).
-     * Limits and estimates can be wrong, so until the provider rejects something as too long, a request that cannot
-     * be made to fit is sent whole: unchanged, or as text once its media has to go. A "too long" rejection means the
-     * estimate ran low, so the next attempts aim at 85%, 70%, 50%, then 35% of the first rejected request's estimate,
-     * each shortening the transcript again from scratch, and a rejection after those gives up. A "payload too large"
-     * rejection is about bytes, which inline media almost always accounts for, so one on the unchanged request resends
-     * it as text, which carries no media, without counting; one on text counts as "too long". Other provider errors
-     * resend the same request under the session's retry policy. A `Failure` from `send` is a reply that cannot be
-     * used, and is never retried.
+     * Limits and estimates can be wrong, so until the provider rejects something as too long, a request that cannot be
+     * made to fit is sent whole as text, which leaves out reasoning, media, and tool definitions and so is smaller than
+     * the request unchanged. A "too long" rejection means the estimate ran low, so the next attempts aim at 85%, 70%,
+     * 50%, then 35% of the first rejected request's estimate, each shortening the transcript again from scratch, and a
+     * rejection after those gives up. A "payload too large" rejection is about bytes, which inline media almost always
+     * accounts for, so one on the unchanged request resends it as text, which carries no media, without counting; one
+     * on text counts as "too long". Other provider errors resend the same request under the session's retry policy. A
+     * `Failure` from `send` is a reply that cannot be used, and is never retried.
      */
     const deliver = Effect.fnUntraced(function* (
       trigger: Trigger,
@@ -597,9 +597,8 @@ export const layer = Layer.effect(
           flattenAndDropOldest(shrink.history, context, target) ??
           (rejections > 0
             ? undefined
-            : asText
-              ? flattenAndDropOldest(shrink.history, context, Number.POSITIVE_INFINITY)
-              : shrink.history)
+            : (flattenAndDropOldest(shrink.history, context, Number.POSITIVE_INFINITY) ??
+              (asText ? undefined : shrink.history)))
         if (!request) {
           return yield* Effect.fail<Failure>({
             error: {
