@@ -541,7 +541,10 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
       const db = (yield* Database.Service).db
       const global = yield* Global.Service
       const state = yield* readState(db)
-      if (state?.phase === "completed") return { status: "completed" as const }
+      if (state?.phase === "completed") {
+        yield* appendLateMessages(db)
+        return { status: "completed" as const }
+      }
       if (!(yield* hasLegacySessions(db))) return { status: "completed" as const }
       const now = Date.now()
       yield* db.run(sql`
@@ -685,6 +688,9 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
                   set: { seq: transformed.watermark, owner_id: null },
                 })
                 .run()
+              // Record how far this session's legacy messages reached, so a later start can tell a message
+              // written afterwards from one V2 removed through a committed revert.
+              yield* writeImportedThrough(tx, next.id, latest(sourceMessages))
             }),
           )
           .pipe(Effect.orDie)
@@ -716,6 +722,155 @@ export function run(options: Options = {}): Effect.Effect<RunResult, never, Data
       return { status: "completed" as const }
     }).pipe(Effect.orDie),
   )
+}
+
+/**
+ * A pre-upgrade V1 client can keep appending to a session this process already imported. Completion was a
+ * permanent latch, so those messages never reached `session_message` and export silently truncated the
+ * session (#57000). Each imported session records how far its legacy messages reached, so only messages
+ * written later are added: a message V2 removed through a committed revert stays removed.
+ */
+function appendLateMessages(db: Database.Interface["db"]) {
+  return Effect.gen(function* () {
+    if (!(yield* hasLegacyTable(db, "message"))) return
+    const sessions = yield* db.all<{ id: string }>(sql`
+      SELECT DISTINCT m.session_id AS id
+      FROM message m
+      JOIN session_v2 projected_session ON projected_session.id = m.session_id
+      WHERE NOT EXISTS (SELECT 1 FROM session_message projected WHERE projected.id = m.id)
+    `)
+    yield* Effect.forEach(sessions, (session) => appendLateSession(db, session.id), { discard: true })
+  })
+}
+
+function appendLateSession(db: Database.Interface["db"], sessionID: string) {
+  return Effect.gen(function* () {
+    const session = yield* db
+      .select()
+      .from(SessionTable)
+      .where(eq(SessionTable.id, SessionSchema.ID.make(sessionID)))
+      .get()
+    // A session that is not projected yet belongs to the initial pass, which imports it in full.
+    if (!session) return
+    const sourceMessages = yield* db.all<SourceMessage>(
+      sql`SELECT id, session_id, time_created, time_updated, data FROM message WHERE session_id = ${sessionID}`,
+    )
+    const through = yield* readImportedThrough(db, sessionID)
+    // A database migrated before this watermark existed cannot tell a late message from one reverted in V2,
+    // so adopt what is already there and add nothing; messages written from now on are still picked up.
+    if (through === undefined) {
+      yield* writeImportedThrough(db, sessionID, latest(sourceMessages))
+      return
+    }
+    const projected = yield* db.all<{ id: string; seq: number }>(
+      sql`SELECT id, seq FROM session_message WHERE session_id = ${sessionID} ORDER BY seq`,
+    )
+    const known = new Set(projected.map((row) => row.id))
+    const lateSources = sourceMessages.filter((row) => row.time_created > through && !known.has(row.id))
+    if (lateSources.length === 0) return
+    const late = new Set(lateSources.map((row) => row.id))
+    const sourceParts = yield* db.all<SourcePart>(
+      sql`SELECT id, message_id, session_id, time_created, time_updated, data FROM part WHERE session_id = ${sessionID}`,
+    )
+    const transformed = transformSession({ session, messages: sourceMessages, parts: sourceParts })
+    // The legacy tool notice is synthesized rather than a V1 message, and already sits where the import put it.
+    const messages = transformed.messages.filter((message) => late.has(message.id))
+    const lateIDs = new Set(messages.map((message) => message.id))
+    yield* Effect.forEach(
+      transformed.warnings.filter((warning) => warning.messageID !== undefined && lateIDs.has(warning.messageID)),
+      (warning) => Effect.logWarning("Skipped V1 migration row", warning),
+    )
+    // Totals are added as the late messages' own amounts. Writing `transformed.session` would replace the
+    // live row's cost and tokens with V1-only sums and clear `revert` and `time_compacting` (#57000 review).
+    const added = transformSession({
+      session,
+      messages: lateSources,
+      parts: sourceParts.filter((row) => late.has(row.message_id)),
+    }).session
+    const first = (projected.at(-1)?.seq ?? -1) + 1
+    const sequence = yield* db.get<{ seq: number }>(
+      sql`SELECT seq FROM event_sequence WHERE aggregate_id = ${sessionID}`,
+    )
+    // Appending must never rewind the aggregate sequence: V2 may already be past the migrated watermark.
+    const watermark = Math.max(sequence?.seq ?? -1, first + messages.length - 1)
+    // Every message past the watermark counts as handled, including ones the transform drops, so a row that
+    // can never be projected is not reconsidered on every start.
+    const reached = latest(lateSources)
+    yield* db
+      .transaction((tx) =>
+        Effect.gen(function* () {
+          yield* Effect.forEach(messages, (message, index) =>
+            tx
+              .insert(SessionMessageTable)
+              .values({
+                id: SessionMessage.ID.make(message.id),
+                session_id: SessionSchema.ID.make(message.session_id),
+                type: message.type,
+                seq: first + index,
+                time_created: message.time_created,
+                time_updated: message.time_updated,
+                data: sql`${JSON.stringify(message.data)}`,
+              })
+              .run(),
+          )
+          yield* tx
+            .update(SessionTable)
+            .set({
+              cost: sql`${SessionTable.cost} + ${added.cost}`,
+              tokens_input: sql`${SessionTable.tokens_input} + ${added.tokens_input}`,
+              tokens_output: sql`${SessionTable.tokens_output} + ${added.tokens_output}`,
+              tokens_reasoning: sql`${SessionTable.tokens_reasoning} + ${added.tokens_reasoning}`,
+              tokens_cache_read: sql`${SessionTable.tokens_cache_read} + ${added.tokens_cache_read}`,
+              tokens_cache_write: sql`${SessionTable.tokens_cache_write} + ${added.tokens_cache_write}`,
+            })
+            .where(eq(SessionTable.id, session.id))
+            .run()
+          yield* tx
+            .insert(EventSequenceTable)
+            .values({ aggregate_id: session.id, seq: watermark })
+            .onConflictDoUpdate({ target: EventSequenceTable.aggregate_id, set: { seq: watermark } })
+            .run()
+          yield* writeImportedThrough(tx, sessionID, reached)
+        }),
+      )
+      .pipe(Effect.orDie)
+  })
+}
+
+type ThroughWriter = Pick<Database.Interface["db"], "insert">
+
+/** The newest legacy `time_created` a session has already imported, absent before watermarks existed. */
+function readImportedThrough(db: Database.Interface["db"], sessionID: string) {
+  return db
+    .select({ value: KVTable.value })
+    .from(KVTable)
+    .where(eq(KVTable.key, importedThroughKey(sessionID)))
+    .get()
+    .pipe(
+      Effect.map((row) => {
+        const value = row?.value
+        if (!value || typeof value !== "object" || !("through" in value)) return undefined
+        return typeof value.through === "number" ? value.through : undefined
+      }),
+      Effect.orDie,
+    )
+}
+
+function writeImportedThrough(db: ThroughWriter, sessionID: string, through: number) {
+  return db
+    .insert(KVTable)
+    .values({ key: importedThroughKey(sessionID), value: { through } })
+    .onConflictDoUpdate({ target: KVTable.key, set: { value: { through }, time_updated: Date.now() } })
+    .run()
+    .pipe(Effect.orDie)
+}
+
+function importedThroughKey(sessionID: string) {
+  return `migration.v1-v2:through:${sessionID}`
+}
+
+function latest(messages: ReadonlyArray<SourceMessage>) {
+  return messages.reduce((newest, message) => Math.max(newest, message.time_created), 0)
 }
 
 function nextPath(options: Options, data: string) {
@@ -1148,9 +1303,13 @@ function parseState(input: unknown): MigrationState | undefined {
   if (typeof input.cursor === "string") return { phase: "sessions", cursor: input.cursor }
 }
 
-function hasLegacySessions(db: Database.Interface["db"]) {
-  return db.get(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session'`).pipe(
+function hasLegacyTable(db: Database.Interface["db"], table: "session" | "message") {
+  return db.get(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${table}`).pipe(
     Effect.map((row) => row !== undefined),
     Effect.orDie,
   )
+}
+
+function hasLegacySessions(db: Database.Interface["db"]) {
+  return hasLegacyTable(db, "session")
 }

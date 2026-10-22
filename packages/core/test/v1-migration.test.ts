@@ -1408,6 +1408,177 @@ describe("V1Migration database workflow", () => {
     )
   })
 
+  // A pre-upgrade V1 client can keep appending to a session V2 has already imported. The completion
+  // latch meant those messages never reached session_message, so export silently truncated the session.
+  test("appends legacy messages written after the import completed", async () => {
+    await database(
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.run(
+          sql`INSERT INTO project (id, worktree, time_created, time_updated, sandboxes) VALUES ('global', '/tmp/test', 1, 2, '[]')`,
+        )
+        yield* db.run(
+          sql`INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES ('ses_test', 'global', 'test', '/tmp/test', 'Test', '1', 1, 2)`,
+        )
+        const insertLegacy = (message: V1Migration.SourceMessage) =>
+          db.run(
+            sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${message.id}, 'ses_test', ${message.time_created}, ${message.time_updated}, ${message.data})`,
+          )
+
+        const first = user("msg_000000000010aaaaaaaaaaaaaa", {}, 10)
+        const second = user("msg_000000000020aaaaaaaaaaaaaa", {}, 20)
+        yield* insertLegacy(first)
+        yield* insertLegacy(second)
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect(yield* db.all(sql`SELECT id, seq FROM session_message ORDER BY seq`)).toEqual([
+          { id: first.id, seq: 0 },
+          { id: second.id, seq: 1 },
+        ])
+
+        // V2 keeps writing to the session after the import, and advances the aggregate sequence.
+        yield* db.run(
+          sql`INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES ('msg_from_v2', 'ses_test', 'user', 2, 30, 31, '{"text":"from v2","time":{"created":30}}')`,
+        )
+        yield* db.run(sql`UPDATE event_sequence SET seq = 5 WHERE aggregate_id = 'ses_test'`)
+
+        const third = user("msg_000000000030aaaaaaaaaaaaaa", {}, 40)
+        const fourth = user("msg_000000000040aaaaaaaaaaaaaa", {}, 50)
+        yield* insertLegacy(third)
+        yield* insertLegacy(fourth)
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+
+        // The late messages append after what is already projected: nothing is deleted or renumbered.
+        expect(yield* db.all(sql`SELECT id, seq FROM session_message ORDER BY seq`)).toEqual([
+          { id: first.id, seq: 0 },
+          { id: second.id, seq: 1 },
+          { id: "msg_from_v2", seq: 2 },
+          { id: third.id, seq: 3 },
+          { id: fourth.id, seq: 4 },
+        ])
+        // Appending must not rewind the aggregate sequence, which would corrupt the event log.
+        expect(yield* db.get(sql`SELECT seq FROM event_sequence WHERE aggregate_id = 'ses_test'`)).toEqual({ seq: 5 })
+
+        // A third run finds nothing to append and leaves the projection alone.
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect((yield* db.get<{ value: number }>(sql`SELECT COUNT(*) AS value FROM session_message`))?.value).toBe(5)
+      }),
+    )
+  })
+
+  // V2 removes rows on a committed revert, so "absent from session_message" alone cannot mean "never
+  // imported". The per-session watermark keeps a reverted message from coming back.
+  test("does not re-append a legacy message a V2 revert removed", async () => {
+    await database(
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.run(
+          sql`INSERT INTO project (id, worktree, time_created, time_updated, sandboxes) VALUES ('global', '/tmp/test', 1, 2, '[]')`,
+        )
+        yield* db.run(
+          sql`INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES ('ses_test', 'global', 'test', '/tmp/test', 'Test', '1', 1, 2)`,
+        )
+        const first = user("msg_000000000010aaaaaaaaaaaaaa", {}, 10)
+        const second = user("msg_000000000020aaaaaaaaaaaaaa", {}, 20)
+        for (const message of [first, second])
+          yield* db.run(
+            sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${message.id}, 'ses_test', ${message.time_created}, ${message.time_updated}, ${message.data})`,
+          )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+
+        // RevertEvent.Committed deletes the projection from the boundary on and clears the session's revert.
+        yield* db.run(sql`DELETE FROM session_message WHERE id = ${second.id}`)
+
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect((yield* db.all<{ id: string }>(sql`SELECT id FROM session_message`)).map((row) => row.id)).toEqual([first.id])
+      }),
+    )
+  })
+
+  // `transformed.session` is a V1-only recomputation, so writing it over the live row would replace V2's
+  // totals and clear revert and time_compacting. Only the appended messages' own amounts may be added.
+  test("adds appended totals to V2 session state instead of replacing it", async () => {
+    await database(
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.run(
+          sql`INSERT INTO project (id, worktree, time_created, time_updated, sandboxes) VALUES ('global', '/tmp/test', 1, 2, '[]')`,
+        )
+        yield* db.run(
+          sql`INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES ('ses_test', 'global', 'test', '/tmp/test', 'Test', '1', 1, 2)`,
+        )
+        const first = user("msg_000000000010aaaaaaaaaaaaaa", {}, 10)
+        yield* db.run(
+          sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${first.id}, 'ses_test', ${first.time_created}, ${first.time_updated}, ${first.data})`,
+        )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+
+        // V2 continues the session: it owns the totals and carries live revert and compaction state.
+        yield* db.run(
+          sql`UPDATE session_v2 SET cost = 42, tokens_input = 7, tokens_output = 8, agent = 'v2-agent', revert = '{"messageID":"' || ${first.id} || '"}', time_compacting = 99 WHERE id = 'ses_test'`,
+        )
+
+        const prompt = user("msg_000000000030aaaaaaaaaaaaaa", {}, 30)
+        const reply = assistant("msg_000000000040aaaaaaaaaaaaaa", prompt.id, {}, 40)
+        for (const message of [prompt, reply])
+          yield* db.run(
+            sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${message.id}, 'ses_test', ${message.time_created}, ${message.time_updated}, ${message.data})`,
+          )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+
+        const row = yield* db.get(
+          sql`SELECT cost, tokens_input, tokens_output, agent, revert, time_compacting FROM session_v2 WHERE id = 'ses_test'`,
+        )
+        expect(row).toEqual({
+          cost: 43,
+          tokens_input: 9,
+          tokens_output: 11,
+          agent: "v2-agent",
+          revert: `{"messageID":"${first.id}"}`,
+          time_compacting: 99,
+        })
+      }),
+    )
+  })
+
+  // Databases migrated before watermarks existed cannot tell a late message from a reverted one, so the
+  // first run adopts what is there without appending, and later messages are then picked up normally.
+  test("adopts a completed database that has no watermark", async () => {
+    await database(
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.run(
+          sql`INSERT INTO project (id, worktree, time_created, time_updated, sandboxes) VALUES ('global', '/tmp/test', 1, 2, '[]')`,
+        )
+        yield* db.run(
+          sql`INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated) VALUES ('ses_test', 'global', 'test', '/tmp/test', 'Test', '1', 1, 2)`,
+        )
+        const first = user("msg_000000000010aaaaaaaaaaaaaa", {}, 10)
+        yield* db.run(
+          sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${first.id}, 'ses_test', ${first.time_created}, ${first.time_updated}, ${first.data})`,
+        )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        yield* db.run(sql`DELETE FROM kv WHERE key = 'migration.v1-v2:through:ses_test'`)
+
+        const second = user("msg_000000000020aaaaaaaaaaaaaa", {}, 20)
+        yield* db.run(
+          sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${second.id}, 'ses_test', ${second.time_created}, ${second.time_updated}, ${second.data})`,
+        )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect((yield* db.all<{ id: string }>(sql`SELECT id FROM session_message`)).map((row) => row.id)).toEqual([first.id])
+
+        const third = user("msg_000000000030aaaaaaaaaaaaaa", {}, 30)
+        yield* db.run(
+          sql`INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (${third.id}, 'ses_test', ${third.time_created}, ${third.time_updated}, ${third.data})`,
+        )
+        expect(yield* V1Migration.run()).toEqual({ status: "completed" })
+        expect((yield* db.all<{ id: string }>(sql`SELECT id FROM session_message ORDER BY seq`)).map((row) => row.id)).toEqual([
+          first.id,
+          third.id,
+        ])
+      }),
+    )
+  })
+
   test("serializes concurrent callers and migrates each session once", async () => {
     await database(
       Effect.gen(function* () {
