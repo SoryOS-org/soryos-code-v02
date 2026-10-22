@@ -368,11 +368,15 @@ const land = async (played: Played[]) => {
   await tick()
 }
 
-it("James opens with the layout first, then shifts the panel in on a spring and fades it up from 0.15", async () => {
+it("James opens with the layout on its spring while the panel shifts in by its offset and fades up from 0.15", async () => {
   const panel = setupJames(false)
   panel.setOpen(true)
-  expect(panel.painted.width).toBe(200)
   expect(panel.motion.present()).toBe(true)
+  // The panel keeps its landing box while the layout moves, so its only travel is its own shift.
+  expect(panel.motion.pinned()).toBe(true)
+  frame()
+  expect(panel.painted.width).toBeGreaterThan(0)
+  expect(panel.painted.width).toBeLessThan(200)
   await tick()
 
   const [shift, fade] = panel.played
@@ -384,29 +388,64 @@ it("James opens with the layout first, then shifts the panel in on a spring and 
     const t = (index + 1) / 60
     expect(point).toBeCloseTo(1 - (1 + omega * t) * Math.exp(-omega * t), 2)
   })
-  expect(fade.keyframes.opacity).toEqual([0.15, 1])
+  expect(fade.keyframes.opacity).toEqual(["0.15", "1"])
   expect(fade.options).toMatchObject({ duration: 240, easing: "cubic-bezier(0.17, 0.85, 0.63, 1.03)" })
   expect(panelsMoving()).toBe(true)
 
+  // The flight settles once the layout has landed and the panel's animations have finished.
   const ran: string[] = []
   panel.motion.whenSettled(() => ran.push("opened"))
+  settle()
+  expect(panel.painted.width).toBe(200)
+  expect(ran).toEqual([])
   await land(panel.played)
   expect(ran).toEqual(["opened"])
   expect(panelsMoving()).toBe(false)
+  expect(panel.motion.pinned()).toBe(false)
 })
 
-it("James closes at once, cancelling an opening in flight", async () => {
+it("James closes in reverse, the panel staying until the close settles", async () => {
+  const panel = setupJames(true)
+  panel.setOpen(false)
+  await tick()
+
+  const [shift, fade] = panel.played
+  expect(shift.keyframes.transform).toEqual(["none", "translateX(-10px)"])
+  expect(fade.keyframes.opacity).toEqual(["1", "0.15"])
+  // The open's fade played backwards.
+  expect(fade.options).toMatchObject({ duration: 240, easing: "cubic-bezier(0.37, -0.03, 0.83, 0.15)" })
+  frame()
+  expect(panel.painted.width).toBeGreaterThan(0)
+  expect(panel.painted.width).toBeLessThan(200)
+
+  settle()
+  expect(panel.painted.width).toBe(0)
+  expect(panel.motion.present()).toBe(true)
+  expect(panel.closed).toEqual([])
+  await land(panel.played)
+  expect(panel.motion.present()).toBe(false)
+  expect(panel.closed).toHaveLength(1)
+  expect(panelsMoving()).toBe(false)
+})
+
+it("James turns a close around mid-flight, from where the panel is", async () => {
   const panel = setupJames(false)
   panel.setOpen(true)
   await tick()
+  frame()
   panel.setOpen(false)
+  await tick()
 
-  expect(panel.painted.width).toBe(0)
+  expect(panel.played.slice(0, 2).every((animation) => animation.cancelled)).toBe(true)
+  const [shift, fade] = panel.played.slice(2)
+  expect(shift.keyframes.transform?.at(-1)).toBe("translateX(-10px)")
+  expect(fade.keyframes.opacity?.at(-1)).toBe("0.15")
+  expect(panel.motion.present()).toBe(true)
+
+  settle()
+  await land(panel.played)
   expect(panel.motion.present()).toBe(false)
-  expect(panel.closed).toHaveLength(1)
-  expect(panel.played).toHaveLength(2)
-  expect(panel.played.every((animation) => animation.cancelled)).toBe(true)
-  expect(panelsMoving()).toBe(false)
+  expect(panel.painted.width).toBe(0)
 })
 
 it("James snaps under reduced motion", () => {
