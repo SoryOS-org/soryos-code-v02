@@ -42,6 +42,22 @@ opencode service start
   needed when diagnosing its lifecycle.
 </Callout>
 
+## Desktop startup on older GNOME releases
+
+On GNOME 3.38 Wayland, OpenCode Desktop 2.0.29 has been reported to stop at startup with:
+
+```text
+Schema org.gnome.desktop.interface does not have key font-antialiasing
+```
+
+For this specific error, try launching the Desktop executable with `--ozone-platform=x11` to use XWayland instead:
+
+```bash
+/opt/OpenCode/ai.opencode.desktop --ozone-platform=x11
+```
+
+Use the executable path for your installation. This is a reported workaround, not a fix for every Wayland startup failure.
+
 ## Allow a browser origin
 
 If a browser client on another origin cannot connect because of CORS, add the client's origin to the service configuration:
