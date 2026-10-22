@@ -236,7 +236,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         restart: managed.restart,
       }
     : undefined
-  const exit = { epilogue: undefined as string | undefined, reason: undefined as unknown }
+  const exit = {
+    epilogue: undefined as string | undefined,
+    notice: undefined as string | undefined,
+    reason: undefined as unknown,
+  }
   const result = yield* Effect.scoped(
     Effect.gen(function* () {
       const options = {
@@ -311,9 +315,10 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
           return (
             <LogProvider log={log}>
               <ExitProvider
-                exit={(reason) => {
+                exit={(input) => {
                   if (renderer.isDestroyed) return
-                  exit.reason = reason
+                  exit.reason = input?.reason
+                  exit.notice = input?.notice
                   destroyRenderer(renderer)
                 }}
               >
@@ -457,13 +462,14 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         }
       })
       yield* shutdown.await
-      return { epilogue: exit.epilogue, reason: exit.reason }
+      return { epilogue: exit.epilogue, notice: exit.notice, reason: exit.reason }
     }),
   )
   yield* Effect.sync(() => {
     if (result.reason !== undefined)
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
     if (result.epilogue) process.stdout.write(result.epilogue + "\n")
+    if (result.notice) process.stdout.write(result.notice + "\n")
   })
 })
 

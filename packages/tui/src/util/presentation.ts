@@ -23,8 +23,13 @@ function wordmark(pad = "") {
   })
 }
 
+const weak = (text: string) => `${dim}${text.padEnd(10, " ")}${reset}`
+
+export function updateRestartNotice(version: string) {
+  return `  ${weak("Updated")}${bold}OpenCode ${version}${reset}${dim} · run ${reset}${bold}opencode${reset}${dim} to start it${reset}`
+}
+
 export function sessionEpilogue(input: { title: string; sessionID?: string }) {
-  const weak = (text: string) => `${dim}${text.padEnd(10, " ")}${reset}`
   return [
     ...wordmark("  "),
     "",
