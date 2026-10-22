@@ -35,7 +35,12 @@ export function BetaNotesView(props: { embedded: EmbeddedNotes | undefined; open
                   <span class="text-11-regular text-v2-text-text-muted">{ctx.t("beta.page.description")}</span>
                 </div>
                 <div class="settings-tab-header-actions">
-                  <Button type="button" variant="ghost" onClick={() => props.open(betaHistory(embedded()))}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    class="-me-2.5"
+                    onClick={() => props.open(betaHistory(embedded()))}
+                  >
                     {ctx.t("beta.github")}
                   </Button>
                 </div>

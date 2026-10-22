@@ -35,7 +35,7 @@ export default {
   "beta.added": "New",
   "beta.fixed": "Fixes",
   "beta.viewAll": "View all",
-  "beta.page.description": "Every feature and fix in this build, newest first.",
+  "beta.page.description": "Every change in this build.",
   "beta.github": "History on GitHub",
   "beta.done": "Got it",
 }
