@@ -414,7 +414,8 @@ export function createPanelMotion(input: {
 
   /**
    * Runs `change`, which moves the layout, then glides the neighbours from their old boxes to the new ones, measured
-   * on either side of the change and started in the same frame.
+   * on either side of the change and started in the same frame. A held box's anchor, like the timeline's first row in
+   * view, keeps its start edge where it was and glides with them, so its text doesn't jump sideways.
    */
   const glide = (open: boolean, change: () => void) => {
     const mode = jamesLayout()
@@ -426,6 +427,16 @@ export function createPanelMotion(input: {
           )
         : []
 
+    const anchored =
+      mode === "flip"
+        ? [...holds].flatMap((hold) => {
+            const box = hold.box()
+            const anchor = hold.anchor?.()
+
+            return box?.isConnected && anchor ? [{ box, anchor, x: anchorX(anchor, "start") }] : []
+          })
+        : []
+
     const box = mode === "width" ? input.resize?.() : undefined
 
     const width = box?.getBoundingClientRect().width
@@ -433,13 +444,20 @@ export function createPanelMotion(input: {
 
     if (before.length === 0 && !box) return
     const timing = layoutEasing(open ? jamesLayoutOpen() : jamesLayoutClose())
+    // Measured before any glide starts, so no running animation offsets the new boxes.
+    const moves = before.map((item) => ({ ...item, dx: item.x - anchorX(item.element, item.anchor) }))
+    const holding = anchored.map((item) => {
+      // The neighbour around the box already carries it part of the way.
+      const carried = moves.find((move) => move.element.contains(item.box))?.dx ?? 0
 
-    before.forEach(({ element, anchor, x }) => {
-      const dx = x - anchorX(element, anchor)
-
-      if (Math.abs(dx) > 0.5)
-        element.animate({ transform: [`translateX(${dx}px)`, "none"] }, { ...timing, composite: "add" })
+      return { ...item, dx: item.x - anchorX(item.anchor, "start") - carried }
     })
+
+    ;[...moves.map(({ element, dx }) => ({ element, dx })), ...holding.map(({ box, dx }) => ({ element: box, dx }))]
+      .filter((item) => Math.abs(item.dx) > 0.5)
+      .forEach((item) =>
+        item.element.animate({ transform: [`translateX(${item.dx}px)`, "none"] }, { ...timing, composite: "add" }),
+      )
 
     if (!box || width === undefined) return
     const to = box.getBoundingClientRect().width

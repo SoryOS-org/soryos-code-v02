@@ -194,7 +194,7 @@ function SessionScreenContent(props: {
     },
     element: () => sidePresence,
     offset: jamesPanelShift,
-    neighbours: () => [[chat, "center"]],
+    neighbours: () => [[chat, "start"]],
     resize: () => chat,
   })
 
