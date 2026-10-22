@@ -385,7 +385,7 @@ it("James opens with the layout first, then shifts the panel in on a spring and 
     expect(point).toBeCloseTo(1 - (1 + omega * t) * Math.exp(-omega * t), 2)
   })
   expect(fade.keyframes.opacity).toEqual([0.15, 1])
-  expect(fade.options).toMatchObject({ duration: 180, easing: "cubic-bezier(0.44, 0.75, 0.63, 1.03)" })
+  expect(fade.options).toMatchObject({ duration: 240, easing: "cubic-bezier(0.17, 0.85, 0.63, 1.03)" })
   expect(panelsMoving()).toBe(true)
 
   const ran: string[] = []
@@ -439,6 +439,6 @@ it("ships the spring as the default sidebar motion, with James one choice away",
 
   expect(knob?.kind).toBe("mode")
   expect(knob?.initial).toBe(false)
-  // The side panel shifts 30px by default; the left sidebar stays at 10px.
-  expect(motionTuning.list().find((item) => item.id === "sidebars.james.panelShift")?.initial).toBe(30)
+  // The side panel shifts 46px by default; the left sidebar stays at 10px.
+  expect(motionTuning.list().find((item) => item.id === "sidebars.james.panelShift")?.initial).toBe(46)
 })

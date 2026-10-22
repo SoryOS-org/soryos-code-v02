@@ -67,14 +67,14 @@ const jamesFade = motionTuning.easing("sidebars.james.fade", {
   label: "Fade",
   group,
   when: james,
-  value: [0.44, 0.75, 0.63, 1.03],
+  value: [0.17, 0.85, 0.63, 1.03],
 })
 
 const jamesFadeDuration = motionTuning.number("sidebars.james.fadeDuration", {
   label: "Fade duration",
   group,
   when: james,
-  value: 0.18,
+  value: 0.24,
   min: 0.05,
   max: 0.6,
   step: 0.01,
@@ -87,7 +87,7 @@ export const jamesPanelShift = motionTuning.number("sidebars.james.panelShift", 
   label: "Panel shift",
   group,
   when: james,
-  value: 30,
+  value: 46,
   min: 0,
   max: 48,
   step: 1,
@@ -111,9 +111,9 @@ const layoutSpring = (direction: string, label: string) =>
     when: () => james() && jamesLayout() !== "off",
     shipped: "smooth",
     presets: {
-      snappy: { duration: 0.12, bounce: 0 },
-      smooth: { duration: 0.16, bounce: 0 },
-      calm: { duration: 0.24, bounce: 0 },
+      snappy: { duration: 0.16, bounce: 0 },
+      smooth: { duration: 0.24, bounce: 0 },
+      calm: { duration: 0.32, bounce: 0 },
     },
   })
 
@@ -430,7 +430,7 @@ export function createPanelMotion(input: {
           { opacity: [start.opacity, end.opacity] },
           {
             duration: jamesFadeDuration() * 1000,
-            easing: `cubic-bezier(${jamesFade().join(", ")})`,
+            easing: `cubic-bezier(${(open ? jamesFade() : reverseBezier(jamesFade())).join(", ")})`,
             fill: "both",
           },
         ),
@@ -517,6 +517,11 @@ function springEasing(tuning: DurationOptions) {
   points[points.length - 1] = 1
 
   return { duration: ((points.length - 1) * 1000) / 60, easing: `linear(${points.join(", ")})` }
+}
+
+/** The curve that plays `curve` backwards in time, so a close looks like its open in reverse. */
+function reverseBezier([x1, y1, x2, y2]: readonly number[]) {
+  return [1 - x2, 1 - y2, 1 - x1, 1 - y1].map((value) => Math.round(value * 1000) / 1000)
 }
 
 function anchorX(element: HTMLElement, anchor: Anchor) {
