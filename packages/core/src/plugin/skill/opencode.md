@@ -98,12 +98,10 @@ This configuration is distinct from `cli.json`. Use the
 [CLI settings reference](https://opencode.ai/v2/docs/cli/config) for terminal
 preferences, especially themes and keybindings.
 
-Configuration changes apply without restarting OpenCode. The service watches
-discovered config files and reloads agents, commands, skills, instructions, MCP
-servers, plugins, and other config-driven features shortly after a save, and
-the TUI picks up `cli.json` edits the same way. To force a full reload, tell the
-user to run `/reload` in the TUI. Do not tell the user to restart OpenCode or
-its service after editing configuration.
+Config changes apply without a restart. OpenCode watches config files and
+reloads agents, commands, skills, MCP servers, and plugins after a save. The TUI
+does the same for `cli.json`. To force a full reload, use `/reload`. Don't tell
+the user to restart OpenCode after editing config.
 
 Do not guess field names or shapes. Fetch the V2 configuration guide and its
 linked topic guide as the source of truth, and preserve unrelated settings when
