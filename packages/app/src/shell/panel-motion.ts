@@ -9,10 +9,9 @@ const [flights, setFlights] = createSignal(0)
 
 export const panelsMoving = () => flights() > 0
 
-// The "James" option, chosen in the preset strip beside Snappy, Smooth and Calm, swaps the section's knobs for its own: layout
-// changes in one frame and only the panel moves, a few pixels toward its edge, while it fades. The neighbours beside it
-// glide from their old box to the new one. All run as Web Animations, so the compositor plays them through main-thread
-// work. The shared spring ships; James stays one choice away.
+// The "James" option, chosen in the preset strip beside Snappy, Smooth and Calm, swaps the section's knobs for its own: the
+// layout moves on its layout spring, like the shared spring's, while the panel opens with a short shift and fade (Web
+// Animations on the compositor) and closes at once. The shared spring ships; James stays one choice away.
 const james = motionTuning.mode("sidebars.james", { label: "James", group })
 
 const springs = () => !james()
@@ -50,7 +49,7 @@ const fadeFloor = motionTuning.number("sidebars.fadeFloor", {
 })
 
 /** The opacity of a panel's contents `closed` of the way through a spring flight, from 1 down to the fade floor. */
-export const panelOpacity = (closed: number) => (closed === 0 ? "" : `${1 - closed * (1 - fadeFloor())}`)
+export const panelOpacity = (closed: number) => (closed === 0 || james() ? "" : `${1 - closed * (1 - fadeFloor())}`)
 
 const jamesShift = motionTuning.spring("sidebars.james.shift", {
   label: "Movement",
@@ -95,14 +94,14 @@ export const jamesPanelShift = motionTuning.number("sidebars.james.panelShift", 
   unit: "px",
 })
 
-// "flip" translates the neighbours from their old box on the compositor; "width" animates the resized box's real width,
-// re-wrapping its content each frame.
+// The layout's width moves on the layout spring, with the timeline held at its landing width as with the shared spring;
+// "off" moves it in one frame.
 const jamesLayout = motionTuning.choice("sidebars.james.layout", {
   label: "Layout",
   group,
   when: james,
-  value: "flip",
-  labels: { flip: "Glide (FLIP)", width: "Width", off: "Off" },
+  value: "animate",
+  labels: { animate: "Animate", off: "Off" },
 })
 
 const layoutSpring = (direction: string, label: string) =>
@@ -238,10 +237,6 @@ export function createPanelMotion(input: {
    */
   element?: Accessor<HTMLElement | undefined>
   offset?: () => number
-  /** James: the boxes beside the panel that glide into place when its layout changes, and how. */
-  neighbours?: () => Array<[HTMLElement | null | undefined, Anchor]>
-  /** James, width layout: the box whose real width animates. */
-  resize?: () => HTMLElement | null | undefined
 }) {
   const [present, setPresent] = createSignal(input.open())
   // Percent closed, so the spring's rest threshold stays well under a pixel.
@@ -251,8 +246,9 @@ export function createPanelMotion(input: {
   // A state `sync` asked to show at once, for when the change hasn't reached this motion yet, e.g. inside a batch.
   let snapTo: boolean | undefined
   let flying = false
-  // James's flight in progress, if any.
+  // James's panel animations in progress, if any: its fade and shift in, or holding it hidden while a close lands.
   let fades: Animation[] = []
+  let hidden: Animation | undefined
 
   const fly = (next: boolean) => {
     if (flying === next) return
@@ -292,6 +288,8 @@ export function createPanelMotion(input: {
     if (!input.open()) setPresent(false)
     fades.forEach((animation) => animation.cancel())
     fades = []
+    hidden?.cancel()
+    hidden = undefined
 
     if (!input.open()) input.onClosed?.()
 
@@ -321,6 +319,8 @@ export function createPanelMotion(input: {
           stop = undefined
           fades.forEach((animation) => animation.cancel())
           fades = []
+          hidden?.cancel()
+          hidden = undefined
           fly(false)
           motion.snap(target)
           paint()
@@ -338,12 +338,28 @@ export function createPanelMotion(input: {
           return open ? reveal() : undefined
         }
 
-        if (now || (!james() && style() === "instant")) return snap(open)
+        const instantLayout = james() && jamesLayout() === "off"
 
-        // James closes at once; only its neighbours glide into place.
-        if (james()) return open ? fade() : glide(false, () => snap(false))
+        if (now || (!james() && style() === "instant") || (instantLayout && !open)) return snap(open)
 
-        const tuning = spring()
+        if (instantLayout) {
+          motion.snap(0)
+          paint()
+          fly(true)
+
+          return fadeIn()
+        }
+
+        // James's panel closes at once while its layout lands; it opens with its own fade and shift.
+        if (james() && open) {
+          hidden?.cancel()
+          hidden = undefined
+          fadeIn()
+        }
+
+        if (james() && !open) hide()
+
+        const tuning = james() ? (open ? jamesLayoutOpen() : jamesLayoutClose()) : spring()
         motion.omega = (2 * Math.PI) / tuning.duration
         motion.zeta = 1 - tuning.bounce
         // Retargeting keeps the current position and velocity, so a second toggle mid-flight turns around smoothly.
@@ -361,7 +377,9 @@ export function createPanelMotion(input: {
 
           if (!motion.resting) return true
           stop = undefined
-          settle()
+
+          // A panel still fading in settles when its animations finish.
+          if (fades.length === 0) settle()
 
           return false
         }
@@ -378,91 +396,44 @@ export function createPanelMotion(input: {
       if (input.open()) input.element?.()?.animate?.({ opacity: [0, 1] }, { duration: 150, easing: ease.out })
     })
 
-  /** The layout opens at once, gliding its neighbours into place; the panel then shifts in and fades up. */
-  const fade = () => {
-    stop?.()
-    stop = undefined
-    glide(true, () => {
-      motion.snap(0)
-      paint()
-    })
-    fly(true)
-    // Deferred so a panel that mounts with this open exists before it animates; microtasks run before the next paint.
+  /** James: the panel shifts in and fades up, deferred so a panel that mounts with this open exists first. */
+  const fadeIn = () =>
     queueMicrotask(() => {
       const element = input.element?.()
 
       if (!input.open()) return
+      fades.forEach((animation) => animation.cancel())
+      fades = []
 
-      if (!element?.animate) return settle()
+      if (!element?.animate) return stop ? undefined : settle()
 
       const x = (input.offset?.() ?? 0) * (element.matches(":dir(rtl)") ? -1 : 1)
-      fades.forEach((animation) => animation.cancel())
-      fades = [
+      const current = [
         element.animate({ transform: [`translateX(${x}px)`, "none"] }, springEasing(jamesShift())),
         element.animate(
           { opacity: [faded, 1] },
           { duration: jamesFadeDuration() * 1000, easing: `cubic-bezier(${jamesFade().join(", ")})` },
         ),
       ]
-      const current = fades
+      fades = current
       void Promise.all(current.map((animation) => animation.finished)).then(
-        () => current === fades && settle(),
+        () => {
+          if (current !== fades) return
+          fades = []
+
+          if (!stop) settle()
+        },
         () => undefined,
       )
     })
-  }
 
-  /**
-   * Runs `change`, which moves the layout, then glides the neighbours from their old boxes to the new ones, measured
-   * on either side of the change and started in the same frame. A held box's anchor, like the timeline's first row in
-   * view, keeps its start edge where it was and glides with them, so its text doesn't jump sideways.
-   */
-  const glide = (open: boolean, change: () => void) => {
-    const mode = jamesLayout()
+  /** James: the panel disappears at once and stays hidden until its close lands. */
+  const hide = () => {
+    fades.forEach((animation) => animation.cancel())
+    fades = []
+    const animation = input.element?.()?.animate?.({ opacity: [0, 0] }, { duration: 0, fill: "forwards" })
 
-    const before =
-      mode === "flip"
-        ? (input.neighbours?.() ?? []).flatMap(([element, anchor]) =>
-            element ? [{ element, anchor, x: anchorX(element, anchor) }] : [],
-          )
-        : []
-
-    const anchored =
-      mode === "flip"
-        ? [...holds].flatMap((hold) => {
-            const box = hold.box()
-            const anchor = hold.anchor?.()
-
-            return box?.isConnected && anchor ? [{ box, anchor, x: anchorX(anchor, "start") }] : []
-          })
-        : []
-
-    const box = mode === "width" ? input.resize?.() : undefined
-
-    const width = box?.getBoundingClientRect().width
-    change()
-
-    if (before.length === 0 && !box) return
-    const timing = layoutEasing(open ? jamesLayoutOpen() : jamesLayoutClose())
-    // Measured before any glide starts, so no running animation offsets the new boxes.
-    const moves = before.map((item) => ({ ...item, dx: item.x - anchorX(item.element, item.anchor) }))
-    const holding = anchored.map((item) => {
-      // The neighbour around the box already carries it part of the way.
-      const carried = moves.find((move) => move.element.contains(item.box))?.dx ?? 0
-
-      return { ...item, dx: item.x - anchorX(item.anchor, "start") - carried }
-    })
-
-    ;[...moves.map(({ element, dx }) => ({ element, dx })), ...holding.map(({ box, dx }) => ({ element: box, dx }))]
-      .filter((item) => Math.abs(item.dx) > 0.5)
-      .forEach((item) =>
-        item.element.animate({ transform: [`translateX(${item.dx}px)`, "none"] }, { ...timing, composite: "add" }),
-      )
-
-    if (!box || width === undefined) return
-    const to = box.getBoundingClientRect().width
-
-    if (Math.abs(to - width) > 0.5) box.animate({ width: [`${width}px`, `${to}px`] }, timing)
+    if (animation) hidden = animation
   }
 
   // Repaints at rest when the open size changes, e.g. a resize drag or a window resize.
@@ -471,6 +442,7 @@ export function createPanelMotion(input: {
   onCleanup(() => {
     stop?.()
     fades.forEach((animation) => animation.cancel())
+    hidden?.cancel()
     fly(false)
     unhold()
   })
@@ -526,23 +498,6 @@ function springEasing(tuning: DurationOptions) {
   const points = [0]
 
   while (points.length < 240 && points.at(-1)! < 0.995) points.push(Math.round(spring.step(1 / 60) * 1000) / 1000)
-  points[points.length - 1] = 1
-
-  return { duration: ((points.length - 1) * 1000) / 60, easing: `linear(${points.join(", ")})` }
-}
-
-/** A layout spring sampled per 60 Hz frame into `linear()`, until it rests within 0.5% and nearly still. */
-function layoutEasing(tuning: DurationOptions) {
-  const spring = Spring.fromDuration(0, tuning).set(1)
-  const points = [0]
-
-  while (points.length < 240) {
-    const y = Math.round(spring.step(1 / 60) * 1000) / 1000
-    points.push(y)
-
-    if (Math.abs(1 - y) < 0.005 && Math.abs(spring.velocity) < 0.05) break
-  }
-
   points[points.length - 1] = 1
 
   return { duration: ((points.length - 1) * 1000) / 60, easing: `linear(${points.join(", ")})` }
