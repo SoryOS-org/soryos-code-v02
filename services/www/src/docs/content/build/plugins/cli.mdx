@@ -534,8 +534,9 @@ context.ui.slot({ after: "home.footer", render: () => <text>After footer slot</t
 context.ui.slot({ replace: "home.footer", render: () => <text>New footer</text> })
 ```
 
-Use `home.logo` to take over the built-in wordmark on Home. The slot wraps the wordmark alone, so the prompt and footer
-keep their layout, and with no claim it renders the built-in logo unchanged.
+Use `home.logo` to take over the built-in wordmark on Home. The Home block is vertically centered, so a replacement of a
+different height re-centers the whole block and moves the prompt below it; with no claim it renders the built-in logo
+unchanged.
 
 ```tsx
 context.ui.slot({ replace: "home.logo", render: () => <text>ACME</text> })

@@ -88,6 +88,8 @@ export function Home() {
       >
         <box flexGrow={1} minHeight={0} />
         <box height={3} minHeight={0} flexShrink={1} />
+        {/* A claim replaces the content of this measured box, so the claimed logo also sets the width UpdateNotification
+            centers its text within. */}
         <box
           flexShrink={0}
           onSizeChange={function () {
