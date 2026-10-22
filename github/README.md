@@ -50,15 +50,7 @@ This allows for more targeted requests without needing to specify file paths or 
 
 ## Installation
 
-Run the following command in the terminal from your GitHub repo:
-
-```bash
-opencode github install
-```
-
-This will walk you through installing the GitHub app, creating the workflow, and setting up secrets.
-
-### Manual Setup
+Set up manually:
 
 1. Install the GitHub app https://github.com/apps/opencode-agent. Make sure it is installed on the target repository.
 2. Add the following workflow file to `.github/workflows/opencode.yml` in your repo. Set the appropriate `model` and required API keys in `env`.
@@ -81,13 +73,13 @@ This will walk you through installing the GitHub app, creating the workflow, and
        permissions:
          id-token: write
        steps:
-          - name: Checkout repository
-            uses: actions/checkout@v6
-            with:
-              fetch-depth: 1
-              persist-credentials: false
+         - name: Checkout repository
+           uses: actions/checkout@v6
+           with:
+             fetch-depth: 1
+             persist-credentials: false
 
-          - name: Run opencode
+         - name: Run opencode
            uses: anomalyco/opencode/github@latest
            env:
              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

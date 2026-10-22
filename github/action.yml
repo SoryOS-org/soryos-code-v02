@@ -41,6 +41,9 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
     - name: Get opencode version
       id: version
       shell: bash
@@ -67,7 +70,7 @@ runs:
     - name: Run opencode
       shell: bash
       id: run_opencode
-      run: opencode github run
+      run: bun run index.ts
       env:
         MODEL: ${{ inputs.model }}
         AGENT: ${{ inputs.agent }}
