@@ -76,7 +76,8 @@ Use an object for event behavior:
 }
 ```
 
-Unknown command IDs are rejected.
+Unknown command IDs are ignored without a warning. Setting a known command to `true` is invalid and makes OpenCode
+ignore the whole `cli.json` file.
 
 ## Application
 

@@ -32,8 +32,8 @@ There is no project-local CLI settings file. Add the published JSON Schema for v
 }
 ```
 
-OpenCode adds `$schema` when it creates or migrates this file. Unknown settings are rejected, and valid edits reload
-while the TUI is running.
+OpenCode adds `$schema` when it creates or migrates this file. Unknown settings are ignored without a warning, and
+valid edits reload while the TUI is running. Editors that read `$schema` flag unknown settings.
 
 ## Inline config
 
