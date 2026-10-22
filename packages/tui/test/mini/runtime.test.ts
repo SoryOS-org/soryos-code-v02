@@ -508,6 +508,85 @@ describe("run interactive runtime", () => {
     expect(submitted).toEqual(recent)
   })
 
+  test.each([false, true])(
+    "preserves configured model priority when a config read fails (refresh=%s)",
+    async (refresh) => {
+      const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
+      const ui = createFooterApiFixture()
+      const configured = { providerID: "test", modelID: "configured" }
+      const recent = { providerID: "test", modelID: "recent" }
+      const inputHost = host()
+      inputHost.preferences.recentModels = async () => [recent]
+      const model = catalogModel({ id: configured.modelID, providerID: configured.providerID })
+      stubCatalogLists(sdk, {
+        providers: [catalogProvider("test", "Test")],
+        models: [model, catalogModel({ id: recent.modelID, providerID: recent.providerID })],
+        config: [{ type: "document", info: { model: "test/configured" } }],
+      })
+      spyOn(sdk.config, "get").mockRejectedValueOnce(new Error("offline"))
+      spyOn(sdk.model, "default").mockResolvedValue({ location: { directory: "/tmp" }, data: model })
+      let refreshCatalog: (() => Promise<unknown>) | undefined
+      let submitted: unknown
+      const task = runInteractiveDeferredMode(
+        {
+          host: inputHost,
+          sdk,
+          directory: "/tmp",
+          target: async () => ({
+            sessionID: "ses_root",
+            location: { directory: "/tmp", project: { id: "pro-1", directory: "/tmp", canonical: "/tmp" } },
+            agent: "build",
+            model: undefined,
+            variant: undefined,
+            resume: false,
+          }),
+          agent: "build",
+          model: undefined,
+          variant: undefined,
+          files: [],
+        },
+        {
+          createRuntimeLifecycle: async () => ({
+            footer: ui.api,
+            onResize: () => () => {},
+            refreshTheme() {},
+            setTitle() {},
+            resetForReplay: async () => {},
+            close: async () => {},
+          }),
+          streamTransport: Promise.resolve({
+            createSessionTransport: async (input) => {
+              refreshCatalog = () => Promise.resolve(input.onCatalogRefresh?.())
+              return {
+                runPromptTurn: async (turn) => {
+                  submitted = turn.model
+                  ui.api.close()
+                },
+                admitPromptTurn: async () => {},
+                waitForIdle: async () => {},
+                interruptActiveTurn: async () => {},
+                selectSubagent() {},
+                replayOnResize: async () => false,
+                close: async () => {},
+              }
+            },
+            formatUnknownError: String,
+          }),
+        },
+      )
+      try {
+        await ui.promptReady
+        if (refresh) await refreshCatalog?.()
+        ui.submit("hello")
+        await task
+        expect(submitted).toEqual(refresh ? configured : undefined)
+      } finally {
+        ui.api.close()
+        await task
+      }
+    },
+  )
+
   test("routes form responses to their owners with global location and local settlement", async () => {
     const sdk = OpenCode.make({ baseUrl: "https://opencode.test" })
     const api = footer()

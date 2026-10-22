@@ -59,7 +59,7 @@ export function stubCatalogLists(
   }
   const empty = { location, data: [] }
 
-  spyOn(sdk.config, "get").mockResolvedValue((input.config ?? []) as never)
+  spyOn(sdk.config, "get").mockResolvedValue(input.config ?? [])
   return {
     provider: spyOn(sdk.provider, "list").mockResolvedValue({ location, data: input.providers ?? [] } as never),
     model: spyOn(sdk.model, "list").mockResolvedValue({ location, data: input.models ?? [] } as never),

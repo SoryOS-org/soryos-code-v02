@@ -433,6 +433,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
   let modelLoad: Promise<void> | undefined
   let modelLoadQueued = false
   let modelLoadStarted = false
+  let modelPreferencePending = true
 
   const updateClient = (sdk: RunInput["sdk"]) => {
     if (state.sdk === sdk) return
@@ -534,13 +535,17 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         // added to startup.
         const [recent, configured] = await Promise.all([
           input.host.preferences.recentModels(),
-          sdk.config.get({ location: { directory: state.location.directory } }, { signal }).catch(() => []),
+          sdk.config.get({ location: { directory: state.location.directory } }, { signal }).catch(() => undefined),
         ])
         if (!currentModelLoad(generation, sdk)) return
+        // A failed config read must not promote a recent model over an unknown
+        // configured model. Leave selection to the server until a refresh retries.
+        modelPreferencePending = configured === undefined
         // A model selected while the preference was loading wins over it.
-        const preference = state.model
-          ? undefined
-          : resolveMiniModelPreference({ providers: info.providers, recent, configured })
+        const preference =
+          state.model || !configured
+            ? undefined
+            : resolveMiniModelPreference({ providers: info.providers, recent, configured })
         if (preference) {
           state.model = preference.model
           if (preference.model) {
@@ -756,12 +761,11 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
           abortable(resolveModelInfoStrict(attempt.sdk, state.location, attempt.signal), attempt.signal),
         ])
         if (!currentClient(attempt)) return
-        const catalogWasEmpty = state.providers.length === 0
+        const retryModelPreference = modelPreferencePending || state.providers.length === 0
         if (catalog) applyCatalog(catalog, attempt)
         if (info) applyModelInfo(info, state.activeVariant, attempt)
-        // A model picked while the catalog was empty was decided blind; derive it
-        // again now that providers are known, like the full TUI's selection.
-        if (catalogWasEmpty && info?.providers.length && !state.model) await requestModelLoad()
+        // Retry preferences once an unavailable catalog or config recovers.
+        if (retryModelPreference && info?.providers.length && !state.model) await requestModelLoad()
         loadDefaultModel(attempt)
       }
     })()
