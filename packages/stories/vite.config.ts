@@ -56,7 +56,6 @@ export default defineConfig({
       { find: /^@\/composer\/comments$/, replacement: path.resolve(mocks, "app/context/comments.ts") },
       { find: /^@\/shell\/commands\/command$/, replacement: path.resolve(mocks, "app/context/command.ts") },
       { find: /^@\/runtime\/platform\/platform$/, replacement: path.resolve(mocks, "app/context/platform.ts") },
-      { find: /^@\/runtime\/server\/global-sync$/, replacement: path.resolve(mocks, "app/context/global-sync.ts") },
       { find: /^@\/runtime\/server\/sync$/, replacement: path.resolve(mocks, "app/context/server-sync.ts") },
       { find: /^@\/runtime\/server\/client$/, replacement: path.resolve(mocks, "app/context/server-sdk.ts") },
       { find: /^@\/runtime\/server\/current$/, replacement: path.resolve(mocks, "app/context/server-current.ts") },

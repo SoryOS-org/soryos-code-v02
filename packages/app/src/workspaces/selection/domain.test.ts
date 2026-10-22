@@ -3,7 +3,6 @@ import {
   absoluteTreePath,
   activeTreeNavigation,
   nextSuggestionIndex,
-  nextTreeScrollTop,
   pickerFileSearchQuery,
   pickerMode,
   selectedTreePath,
@@ -113,12 +112,32 @@ test.each([
   ["relative input", pickerAbsoluteInput("src", "C:/Users/luke", "C:/Users/luke/repo"), "C:/Users/luke/repo/src"],
   ["file search", pickerFileSearchQuery("/home/luke/repos", "/home/luke/repos/src/in", "/home/luke"), "src/in"],
   ["file search", pickerFileSearchQuery("/home/luke", "~/repos/op", "/home/luke"), "repos/op"],
-  ["recent short 2-level tilde", shortenPickerRecentPath("/home/luke/Developer/opencode", "/home/luke"), "~/Developer/opencode"],
-  ["recent deep tilde", shortenPickerRecentPath("/home/luke/workspaces/anomalyco/opencode/packages/app", "/home/luke"), "~/…/packages/app"],
-  ["recent short 2-level root", shortenPickerRecentPath("/workspace/billing-api", "/home/luke"), "/workspace/billing-api"],
-  ["recent deep root", shortenPickerRecentPath("/srv/clients/acme/services/payments-gateway", "/home/luke"), "/srv/…/services/payments-gateway"],
+  [
+    "recent short 2-level tilde",
+    shortenPickerRecentPath("/home/luke/Developer/opencode", "/home/luke"),
+    "~/Developer/opencode",
+  ],
+  [
+    "recent deep tilde",
+    shortenPickerRecentPath("/home/luke/workspaces/anomalyco/opencode/packages/app", "/home/luke"),
+    "~/…/packages/app",
+  ],
+  [
+    "recent short 2-level root",
+    shortenPickerRecentPath("/workspace/billing-api", "/home/luke"),
+    "/workspace/billing-api",
+  ],
+  [
+    "recent deep root",
+    shortenPickerRecentPath("/srv/clients/acme/services/payments-gateway", "/home/luke"),
+    "/srv/…/services/payments-gateway",
+  ],
   ["recent short Windows", shortenPickerRecentPath("C:/OpenCode/NewProject", ""), "C:\\OpenCode\\NewProject"],
-  ["recent deep Windows", shortenPickerRecentPath("C:/Users/luke/work/acme/repo", "C:/Users/luke"), "C:\\…\\acme\\repo"],
+  [
+    "recent deep Windows",
+    shortenPickerRecentPath("C:/Users/luke/work/acme/repo", "C:/Users/luke"),
+    "C:\\…\\acme\\repo",
+  ],
 ])("uses the selected server path format for %s: %p", (_name, actual, expected) => {
   expect(actual).toBe(expected)
 })
@@ -438,14 +457,6 @@ test.each([
   [2, 3, false],
 ])("a tree mutation from navigation %p applies during navigation %p: %p", (request, current, expected) => {
   expect(activeTreeNavigation(request, current)).toBe(expected)
-})
-
-test.each([
-  [100, 40, 140],
-  [10, -40, 0],
-  [290, 40, 300],
-])("bridged wheel scrolling from %p by %p clamps to %p", (current, delta, expected) => {
-  expect(nextTreeScrollTop(current, delta, 500, 200)).toBe(expected)
 })
 
 test("wraps autocomplete keyboard navigation", () => {

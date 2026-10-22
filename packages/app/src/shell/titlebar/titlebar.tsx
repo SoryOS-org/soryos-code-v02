@@ -26,7 +26,6 @@ import { ServerConnection } from "@/runtime/server/registry"
 import { tabKey, useTabs } from "@/shell/tabs/tabs"
 import type { ComposerState } from "@/composer/persistence"
 import "./titlebar.css"
-import { TitlebarRightMount } from "@/shell/titlebar/right-slot"
 import { MobileDrawer, MobileDrawerContent, MobileDrawerLabel, MobileDrawerTrigger } from "@/shell/mobile-drawer"
 import { sessionTabTitle } from "./tab-title"
 import { SessionTabAvatar } from "@/shell/layout/session-tab-avatar"
@@ -877,7 +876,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 <Show when={!props.verticalTabs}>
                   <div class="relative z-20 flex shrink-0 items-center justify-end gap-0 overflow-visible">
                     <TitlebarItems items={titlebarItems} />
-                    <TitlebarRightMount />
                   </div>
                 </Show>
               </div>
