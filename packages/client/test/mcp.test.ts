@@ -32,7 +32,7 @@ describe("connectClientMcp", () => {
         },
         {
           name: "echo",
-          inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+          inputSchema: { properties: { text: { type: "string" } }, required: ["text"] },
           handler: (args) => ({ content: [{ type: "text", text: String(args.text) }] }),
         },
         {

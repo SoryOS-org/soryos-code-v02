@@ -15,7 +15,7 @@ export type ClientMcpTool = {
   /** `[a-zA-Z0-9_-]+` */
   readonly name: string
   readonly description?: string
-  /** JSON Schema for the arguments. Defaults to `{ type: "object" }`. Arguments are not validated here. */
+  /** JSON Schema for the arguments; `type: "object"` is always set. Arguments are not validated here. */
   readonly inputSchema?: Record<string, unknown>
   readonly handler: (
     args: Record<string, unknown>,
@@ -41,8 +41,8 @@ export type ClientMcpConnection = {
 }
 
 type Message = {
-  readonly id?: string | number | null
-  readonly method?: string
+  readonly id?: unknown
+  readonly method?: unknown
   readonly params?: {
     readonly protocolVersion?: unknown
     readonly name?: unknown
@@ -76,13 +76,14 @@ export function connectClientMcp(options: ClientMcpOptions): ClientMcpConnection
       : new Socket(endpoint(options))
     state.socket = socket
     socket.addEventListener("message", (event) => {
-      if (typeof event.data !== "string") return
+      if (state.disposed || typeof event.data !== "string") return
       const message = parse(event.data)
-      if (!message) return send(socket, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } })
+      if (!message) return
       // Reset backoff only once the opencode server finished initializing, so a failed attach keeps backing off.
       if (message.method === "notifications/initialized") state.delay = RECONNECT_MIN
       // Notifications and responses need no reply.
-      if (message.id === undefined || message.method === undefined) return
+      if ((typeof message.id !== "string" && typeof message.id !== "number") || typeof message.method !== "string")
+        return
       void respond(options, message.method, message.params).then((reply) =>
         send(socket, { jsonrpc: "2.0", id: message.id, ...reply }),
       )
@@ -125,7 +126,7 @@ async function respond(options: ClientMcpOptions, method: string, params: Messag
           tools: options.tools.map((tool) => ({
             name: tool.name,
             description: tool.description,
-            inputSchema: tool.inputSchema ?? { type: "object" },
+            inputSchema: { type: "object", ...tool.inputSchema },
           })),
         },
       }
