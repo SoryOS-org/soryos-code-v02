@@ -129,7 +129,8 @@ export type Anchor = "center" | "start"
 
 type Hold = { box: () => HTMLElement | null | undefined; anchor?: (() => HTMLElement | null | undefined) | "blocks" }
 
-type Shift = { element: HTMLElement; shift: number }
+// `rest` 1 for a box laid out where it is rather than where it lands, so its shift runs from nothing to the whole.
+type Shift = { element: HTMLElement; shift: number; rest: number }
 
 type Landing = {
   /** Paints where the flight lands, then back where it is. */
@@ -158,8 +159,10 @@ let shifted: Shift[] = []
  * contents of a closing panel, is left to its own layout.
  *
  * `anchor` is an element inside the box whose start edge must not jump when the box takes its landing width: the box
- * shifts by the difference, with a transform, and the shift runs out over the flight. `"blocks"` does the same for each
- * block in view that would move against its parent, like a centred column, while start-pinned content stays put.
+ * shifts by the difference, with a transform, and the shift runs out over the flight. `"blocks"` holds the box at the
+ * wider of its width now and where it lands, so it always covers its container, and moves each block in view that
+ * doesn't keep to the box's start, like a centred column or an end-aligned label, from where it was to where it lands
+ * with the flight; content at the start moves with the box's start edge.
  */
 export function holdLandingWidth(box: Hold["box"], anchor?: Hold["anchor"]) {
   const hold = { box, anchor }
@@ -178,7 +181,10 @@ function rehold(next: Landing | undefined) {
 
         if (!box?.isConnected) return []
 
-        return [{ box, shifts: measureAnchors(box, hold.anchor) }]
+        // The width now, which a "blocks" box keeps if it would land narrower.
+        const wide = hold.anchor === "blocks" ? box.getBoundingClientRect().width : 0
+
+        return [{ box, wide, shifts: measureAnchors(box, hold.anchor) }]
       })
     : []
 
@@ -194,21 +200,30 @@ function rehold(next: Landing | undefined) {
   const widths = boxes.map((item) => item.box.getBoundingClientRect().width)
   flights.forEach((flight) => flight.resume())
 
-  const kept = boxes.filter((item, index) => {
-    if (widths[index] === 0) return false
-    item.box.style.setProperty("--panel-hold-width", `${widths[index]}px`)
+  const kept = boxes
+    .map((item, index) => ({ ...item, width: widths[index]! }))
+    .filter((item) => {
+      if (item.width === 0) return false
+      item.box.style.setProperty("--panel-hold-width", `${item.width}px`)
 
-    return true
-  })
+      return true
+    })
 
   held = kept.map((item) => item.box)
-  shifted = kept.flatMap((item) => item.shifts())
+  shifted = kept.flatMap((item) => {
+    const shifts = item.shifts()
+
+    if (item.wide <= item.width) return shifts
+    item.box.style.setProperty("--panel-hold-width", `${item.wide}px`)
+
+    return shifts.map((shift) => ({ ...shift, rest: 1 }))
+  })
   shiftHeld()
 }
 
 function shiftHeld() {
   const remaining = driver?.remaining() ?? 0
-  shifted.forEach((item) => (item.element.style.translate = `${item.shift * remaining}px`))
+  shifted.forEach((item) => (item.element.style.translate = `${item.shift * (remaining - item.rest)}px`))
 }
 
 // Reads where a hold's anchors start before its box takes its landing width; the returned function reads them again
@@ -223,19 +238,19 @@ function measureAnchors(box: HTMLElement, anchor: Hold["anchor"]): () => Shift[]
   return () => {
     const shift = before - anchorX(element, "start")
 
-    return shift === 0 ? [] : [{ element: box, shift }]
+    return shift === 0 ? [] : [{ element: box, shift, rest: 0 }]
   }
 }
 
-// The box's blocks in view, breadth first, so a column that moves against its parent, like centred content, keeps its
-// start edge. Inline boxes rewrap rather than move, and a block that also moves down has wrapped onto another line; both
-// are left to the layout, as is a block that already has its own translate. Every element read counts toward the bound,
-// in view or not, so a long document or tree costs no more than a short one; a subtree out of view is skipped whole.
+// The box's blocks in view, breadth first. A block that keeps its width but moves when the box changes width, like a
+// centred column or an end-aligned label, shifts by the difference, less what its ancestors already shift. A block that
+// changes width with the box keeps to the box's start; it doesn't shift, since that would move its other edge. Inline
+// boxes rewrap rather than move, and a block that also moves down has wrapped onto another line; both are left to the
+// layout, as is a block that already has its own translate. Every element read counts toward the bound, in view or not,
+// so a long document or tree costs no more than a short one; a subtree out of view is skipped whole.
 function measureBlocks(box: HTMLElement) {
   const bounds = box.getBoundingClientRect()
-  const rtl = box.matches(":dir(rtl)")
-  const start = (rect: DOMRect) => (rtl ? rect.right : rect.left)
-  const blocks = [{ element: box, parent: -1, x: start(bounds), y: bounds.top }]
+  const blocks = [{ element: box, parent: -1, left: bounds.left, right: bounds.right, top: bounds.top }]
   let visits = 0
 
   const visit = (element: Element, parent: number) => {
@@ -251,7 +266,7 @@ function measureBlocks(box: HTMLElement) {
       if (rect.width === 0 || rect.bottom <= bounds.top || rect.top >= bounds.bottom) continue
 
       if (getComputedStyle(child).display.startsWith("inline")) continue
-      blocks.push({ element: child, parent, x: start(rect), y: rect.top })
+      blocks.push({ element: child, parent, left: rect.left, right: rect.right, top: rect.top })
     }
   }
 
@@ -261,18 +276,29 @@ function measureBlocks(box: HTMLElement) {
     const moved = blocks.map((block) => {
       const rect = block.element.getBoundingClientRect()
 
-      return { x: block.x - start(rect), y: block.y - rect.top }
+      return { left: block.left - rect.left, right: block.right - rect.right, top: block.top - rect.top }
     })
 
-    return blocks.flatMap((block, index) =>
-      block.parent >= 0 &&
-      Math.abs(moved[index].x) >= 0.5 &&
-      Math.abs(moved[index].y) < 0.5 &&
-      Math.abs(moved[block.parent].x) < 0.5 &&
-      !block.element.style.translate
-        ? [{ element: block.element, shift: moved[index].x }]
-        : [],
-    )
+    // What each block's ancestors shift it by, which its own shift doesn't repeat.
+    const carried = blocks.map(() => 0)
+
+    return blocks.flatMap((block, index) => {
+      if (block.parent < 0) return []
+      const own = moved[index]!
+      carried[index] = carried[block.parent]!
+      const shift = own.left - carried[index]
+
+      if (
+        Math.abs(own.top) >= 0.5 ||
+        Math.abs(own.left - own.right) >= 0.5 ||
+        Math.abs(shift) < 0.5 ||
+        block.element.style.translate
+      )
+        return []
+      carried[index] += shift
+
+      return [{ element: block.element, shift, rest: 0 }]
+    })
   }
 }
 

@@ -259,25 +259,30 @@ it("holds content beside the panel at its landing width for the flight, its anch
   expect(box.style.translate).toBe("")
 })
 
-it("keeps a held box's centred column at its start edge for the flight, leaving start-pinned blocks put", () => {
+it("keeps a held box's end-aligned blocks still and its centred column centred while its start edge moves", () => {
   const box = document.createElement("div")
   const tabs = document.createElement("div")
+  const label = document.createElement("div")
   const column = document.createElement("div")
   // Like the side region's tab content, the column sits in a `display: contents` wrapper, which has no box.
   const wrapper = document.createElement("div")
   wrapper.style.display = "contents"
   wrapper.append(column)
+  tabs.append(label)
   box.append(tabs, wrapper)
   document.body.append(box)
   cleanups.push(() => box.remove())
   const [open, setOpen] = createSignal(false)
   const painted = { width: 0 }
-  // The box takes what the panel leaves of 1000px. Its tab bar fills it from the start; its 400px column is centred
-  // in the box's held width once it has one. happy-dom has no layout.
+  // The box is what the panel leaves of 1000px: its start edge moves, its end stays at 1000. Its contents lay out from
+  // its start at the held width: a tab bar across them with a 50px label at its end, and a 400px column centred in
+  // them. happy-dom has no layout.
   const width = () => parseFloat(box.style.getPropertyValue("--panel-hold-width")) || 1000 - painted.width
-  box.getBoundingClientRect = () => new DOMRect(0, 0, 1000 - painted.width, 100)
-  tabs.getBoundingClientRect = () => new DOMRect(0, 0, width(), 10)
-  column.getBoundingClientRect = () => new DOMRect((width() - 400) / 2, 10, 400, 90)
+  const x = (element: HTMLElement, left: number) => left + (parseFloat(element.style.translate) || 0)
+  box.getBoundingClientRect = () => new DOMRect(painted.width, 0, 1000 - painted.width, 100)
+  tabs.getBoundingClientRect = () => new DOMRect(painted.width, 0, width(), 10)
+  label.getBoundingClientRect = () => new DOMRect(painted.width + width() - 50, 0, 50, 10)
+  column.getBoundingClientRect = () => new DOMRect(painted.width + width() / 2 - 200, 10, 400, 90)
   // A long document: its rows run far below the box, and reading them all would stall the flight's first frame.
   const reads = { rows: 0 }
   Array.from({ length: 2000 }, (_, index) => {
@@ -291,22 +296,36 @@ it("keeps a held box's centred column at its start edge for the flight, leaving 
     createPanelMotion({ open, paint: (shut) => (painted.width = 300 * (1 - shut)) })
   })
 
+  const fly = () =>
+    Array.from({ length: 12 }, () => {
+      frame()
+
+      return {
+        label: x(label, painted.width + width() - 50),
+        // How far the column's centre is from the centre of the box as it is.
+        column: x(column, painted.width + width() / 2 - 200) + 200 - (painted.width + 1000) / 2,
+      }
+    })
+
+  // The box narrows: it keeps its 1000px until it lands at 700px, so it still reaches the end.
   setOpen(true)
   expect(reads.rows).toBeLessThan(500)
-  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("700px")
-  // Centred in 700px rather than 1000px, the column would start 150px further left.
-  expect(column.style.translate).toBe("150px")
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("1000px")
+  const narrowing = fly()
   expect(tabs.style.translate).toBeFalsy()
-  expect(box.style.translate).toBeFalsy()
-  const shifts: number[] = []
+  settle()
+  // The box widens: it lays out at the 1000px it lands at from the start.
+  setOpen(false)
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("1000px")
+  const widening = fly()
+  settle()
 
-  for (let i = 0; i < 6; i++) {
-    frame()
-    shifts.push(parseFloat(column.style.translate))
+  for (const frame of [...narrowing, ...widening]) {
+    expect(Math.abs(frame.label - 950)).toBeLessThan(0.5)
+    expect(Math.abs(frame.column)).toBeLessThan(0.5)
   }
 
-  expect(shifts.every((shift, index) => shift < (shifts[index - 1] ?? 150) && shift > 0)).toBe(true)
-  settle()
+  expect(label.style.translate).toBe("")
   expect(column.style.translate).toBe("")
 })
 
