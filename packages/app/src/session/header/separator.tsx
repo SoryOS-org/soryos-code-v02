@@ -3,10 +3,14 @@ import { Match, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 
 const group = "Experiments"
+const card = "Icons"
+const order = 3
 
 const glyph = motionTuning.choice("sessionHeader.separator", {
-  label: "Header separator",
+  label: "Separator",
   group,
+  card,
+  order,
   value: "chevron",
   labels: { divider: "Divider", slash: "Slash", chevron: "Chevron", bold: "Bold chevron", dot: "Dot" },
 })
@@ -14,6 +18,8 @@ const glyph = motionTuning.choice("sessionHeader.separator", {
 const size = motionTuning.number("sessionHeader.separator.size", {
   label: "Separator size",
   group,
+  card,
+  order,
   value: 11,
   min: 6,
   max: 24,
@@ -24,6 +30,8 @@ const size = motionTuning.number("sessionHeader.separator.size", {
 const weight = motionTuning.number("sessionHeader.separator.weight", {
   label: "Separator weight",
   group,
+  card,
+  order,
   value: 1,
   min: 0.5,
   max: 3,
@@ -34,6 +42,8 @@ const weight = motionTuning.number("sessionHeader.separator.weight", {
 const opacity = motionTuning.number("sessionHeader.separator.opacity", {
   label: "Separator opacity",
   group,
+  card,
+  order,
   value: 1,
   min: 0.2,
   max: 1,
@@ -43,6 +53,8 @@ const opacity = motionTuning.number("sessionHeader.separator.opacity", {
 const gap = motionTuning.number("sessionHeader.separator.gap", {
   label: "Separator gap (ink to ink)",
   group,
+  card,
+  order,
   value: 10,
   min: 4,
   max: 20,

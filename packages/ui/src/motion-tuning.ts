@@ -9,6 +9,9 @@ type Knob<Kind extends string, Value> = {
   id: string
   label: string
   group: string
+  /** Its own card within the group's tab, such as one experiment among several; `order` places that card. */
+  card?: string
+  order?: number
   /** Shown only while this holds, e.g. the controls of the option a choice selects. */
   when?: () => boolean
   initial: Value
@@ -33,7 +36,7 @@ export type MotionKnob =
 
 export type MotionAction = { id: string; label: string; group: string; run: () => void }
 
-type Meta = { label: string; group: string; when?: () => boolean }
+type Meta = { label: string; group: string; card?: string; order?: number; when?: () => boolean }
 
 // Bumped when knobs are merged or renamed, so values saved for the old ones are dropped.
 const key = "opencode.motion.v2"
@@ -57,6 +60,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial,
       value: { duration: number(`${id}.duration`, initial.duration), bounce: number(`${id}.bounce`, initial.bounce) },
@@ -75,6 +80,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial: meta.value,
       // SAFETY: mapping the four indices of a Bezier yields four numbers.
@@ -95,6 +102,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial,
       value: number(id, initial ? 1 : 0) === 1,
@@ -108,6 +117,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial: meta.value,
       value: number(id, meta.value ? 1 : 0) === 1,
@@ -125,6 +136,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial: meta.value,
       value: options[number(id, options.indexOf(meta.value))] ?? meta.value,
@@ -148,6 +161,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
+      card: meta.card,
+      order: meta.order,
       when: meta.when,
       initial: meta.value,
       value: number(id, meta.value),

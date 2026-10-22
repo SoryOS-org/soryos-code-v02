@@ -4,15 +4,19 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createSignal, onCleanup, onMount, Show } from "solid-js"
 
 const choice = motionTuning.choice("sidebar.hover", {
-  label: "Sidebar hover",
+  label: "Style",
   group: "Experiments",
+  card: "Sidebar hover",
+  order: 2,
   value: "today",
   labels: { today: "Today", glide: "Glide" },
 })
 
 const tuning = motionTuning.spring("sidebar.hover.glide", {
-  label: "Sidebar hover glide",
+  label: "Glide",
   group: "Experiments",
+  card: "Sidebar hover",
+  order: 2,
   presets: {
     snappy: { duration: 0.14, bounce: 0 },
     smooth: { duration: 0.2, bounce: 0 },

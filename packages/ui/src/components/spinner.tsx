@@ -10,6 +10,7 @@ export type SpinnerVariantName = "today" | keyof typeof spinnerVariants
 const choice = motionTuning.choice("spinner.variant", {
   label: "Activity spinner",
   group: "Experiments",
+  order: 1,
   value: "radar",
   // SAFETY: built from spinnerVariants' own keys, plus "today".
   labels: Object.fromEntries([

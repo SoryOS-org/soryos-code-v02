@@ -31,7 +31,11 @@ export function mountMotionPanel(
     const { action, choice, defineControls, easing, knob, spring, toggle } = await import("knobs")
 
     const field = (item: MotionKnob) => {
-      const meta = { label: item.label, group: item.group, tab: item.group === global ? undefined : item.group }
+      const meta = {
+        label: item.label,
+        group: item.card ?? item.group,
+        tab: item.group === global ? undefined : item.group,
+      }
 
       if (item.kind === "spring") return spring(item.initial, meta)
 
@@ -104,7 +108,11 @@ export function mountMotionPanel(
           ...Object.fromEntries(
             [...list, ...actions]
               .filter((item) => item.group !== global)
-              .toSorted((a, b) => sections.indexOf(a.group) - sections.indexOf(b.group))
+              .toSorted(
+                (a, b) =>
+                  sections.indexOf(a.group) - sections.indexOf(b.group) ||
+                  ("order" in a ? (a.order ?? 0) : 0) - ("order" in b ? (b.order ?? 0) : 0),
+              )
               .map((item) =>
                 "run" in item
                   ? [

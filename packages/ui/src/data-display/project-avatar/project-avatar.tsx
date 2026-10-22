@@ -24,6 +24,7 @@ export { generateProjectIcon, GENERATED_PROJECT_ICON_STYLE, type GeneratedProjec
 const avatarChoice = motionTuning.choice("projectAvatar.style", {
   label: "Project avatars",
   group: "Experiments",
+  order: 1,
   value: "letters",
   labels: { letters: "Letters", generated: "Generated" },
 })

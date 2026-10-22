@@ -1433,6 +1433,8 @@ function ComposerEditorAlternateDelivery(props: { controller: ComposerEditorMode
 const sendIcon = motionTuning.choice("composer.sendIcon", {
   label: "Send icon",
   group: "Experiments",
+  card: "Icons",
+  order: 3,
   value: "today",
   labels: { today: "Today", ios: "iOS", heavy: "Heavier", filled: "Filled" },
 })
@@ -1440,6 +1442,8 @@ const sendIcon = motionTuning.choice("composer.sendIcon", {
 const stopIcon = motionTuning.choice("composer.stopIcon", {
   label: "Stop icon",
   group: "Experiments",
+  card: "Icons",
+  order: 3,
   value: "today",
   labels: { today: "Today", rounded: "Rounded", ios: "iOS", heavy: "Heavier" },
 })
@@ -1447,6 +1451,8 @@ const stopIcon = motionTuning.choice("composer.stopIcon", {
 const roundedStopSize = motionTuning.number("composer.stopIcon.size", {
   label: "Rounded stop size",
   group: "Experiments",
+  card: "Icons",
+  order: 3,
   value: 10,
   min: 6,
   max: 14,
