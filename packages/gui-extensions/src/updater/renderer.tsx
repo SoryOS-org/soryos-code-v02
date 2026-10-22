@@ -88,8 +88,8 @@ const setup: Setup<typeof definition> = (ctx) => {
 }
 
 /**
- * What's new in beta as a settings page and a command, so it is a keystroke away after its dialog closes. Only builds
- * that embed the notes have it: beta builds and the desktop dev server.
+ * What's new in beta as a settings page, to come back to after its dialog closes. Only builds that embed the notes
+ * have it: beta builds and the desktop dev server.
  */
 function betaNotes(ctx: SetupContext<typeof definition>) {
   if (!import.meta.env.OPENCODE_BETA_NOTES) return
@@ -110,15 +110,6 @@ function betaNotes(ctx: SetupContext<typeof definition>) {
         <Page />
       </Suspense>
     ),
-  })
-
-  ctx.add(Command, {
-    id: "whats-new",
-    get title() {
-      return ctx.t("beta.title")
-    },
-    keywords: "changelog release notes beta",
-    run: () => ctx.layout.settings("whats-new"),
   })
 }
 

@@ -115,7 +115,7 @@ const FADE = 24
 
 // Every entry starts on the heading's edge; a visual sits small at the row's end, so rows keep one rhythm with or
 // without one.
-export function Section(props: { title: string; notes: readonly BetaNote[]; open: (href: string) => void }) {
+function Section(props: { title: string; notes: readonly BetaNote[]; open: (href: string) => void }) {
   return (
     <Show when={props.notes.length > 0}>
       <section class="flex flex-col gap-3">
@@ -141,7 +141,7 @@ export function Section(props: { title: string; notes: readonly BetaNote[]; open
 }
 
 /** What changed, drawn: the pull request's looping SVG at half size, only ever as an image, in the icon colour. */
-function Visual(props: { visual: NonNullable<BetaNote["visual"]>; label?: string }) {
+export function Visual(props: { visual: NonNullable<BetaNote["visual"]>; label?: string }) {
   const [color, setColor] = createSignal<string>()
   let frame!: HTMLSpanElement
 
@@ -173,11 +173,13 @@ function Visual(props: { visual: NonNullable<BetaNote["visual"]>; label?: string
   )
 }
 
-/** Who made it and its pull request, quietly. */
-function Meta(props: { note: BetaNote; open: (href: string) => void }) {
+/** Who made it and its pull request, quietly; `class` sets the type, the dialog's own scale by default. */
+export function Meta(props: { note: BetaNote; open: (href: string) => void; class?: string }) {
   return (
     <Show when={props.note.author || props.note.pr}>
-      <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] leading-4 font-[400] text-v2-text-text-faint">
+      <div
+        class={`flex min-w-0 flex-wrap items-center gap-x-1.5 ${props.class ?? "text-[12px] leading-4 font-[400] text-v2-text-text-faint"}`}
+      >
         <Show when={props.note.author}>
           {(author) => (
             <span class="flex min-w-0 items-center gap-1.5">

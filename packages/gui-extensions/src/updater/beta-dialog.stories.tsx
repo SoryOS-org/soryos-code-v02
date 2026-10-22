@@ -195,7 +195,7 @@ export const PreviousBuildUnknown = {
   render: () => <Fixture picked={commits} previous="0.0.0-beta-20500" previousCommit={sha(5000)} />,
 }
 
-/** Settings > What's new in beta: every change the build carries, from ⌘K, Settings or the dialog's View all. */
+/** Settings > What's new in beta: every change the build carries, from Settings or the dialog's View all. */
 export const Page = {
   render: () => (
     <SettingsPanel>

@@ -56,7 +56,7 @@ export default defineConfig(async ({ command }) => {
   const nodePtyPkg = nodePtyPackage()
 
   // Beta builds carry their commit and recent history for the updater's "What's new in beta"; the dev server carries
-  // them without asking GitHub, so the page and command can be tried; other channels none.
+  // them without asking GitHub, so the page can be tried; other channels none.
   const betaNotes =
     channel === "beta"
       ? await BetaNotes.enrich(BetaNotes.embed(), { token: process.env.GITHUB_TOKEN })
