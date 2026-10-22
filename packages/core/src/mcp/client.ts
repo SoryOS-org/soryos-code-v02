@@ -213,6 +213,8 @@ export const connect = Effect.fnUntraced(function* (
       )
     }
 
+    typeOutputSchemas(transport)
+
     yield* Effect.tryPromise({
       try: (signal) =>
         client.connect(transport, { timeout: config.timeout?.startup ?? DEFAULT_STARTUP_TIMEOUT, signal }),
@@ -415,6 +417,28 @@ function rejectsUnknownQuery(url: URL) {
   if (/(^|\.)zohomcp\.[a-z.]+$/.test(url.hostname)) return true
   // Loopback servers run on this machine (Figma Desktop's Dev Mode MCP returns 404), so they are not hosted Code Mode servers.
   return url.hostname === "localhost" || url.hostname === "[::1]" || /^127(\.\d+){3}$/.test(url.hostname)
+}
+
+// The SDK rejects the whole tools/list result when one tool's outputSchema has no top-level "type"
+// (for example `$defs` plus `anyOf`), which would take every tool on the server down with it.
+// Declaring such a schema an object keeps the tool; its variants are normally objects.
+function typeOutputSchemas(transport: Transport) {
+  let onmessage = transport.onmessage
+  Object.defineProperty(transport, "onmessage", {
+    configurable: true,
+    get: () => onmessage,
+    set: (handler: Transport["onmessage"]) => {
+      onmessage =
+        handler &&
+        ((message, extra) => {
+          const tools = "result" in message && Array.isArray(message.result.tools) ? message.result.tools : []
+          for (const tool of tools)
+            if (typeof tool?.outputSchema === "object" && tool.outputSchema !== null && !("type" in tool.outputSchema))
+              tool.outputSchema.type = "object"
+          handler(message, extra)
+        })
+    },
+  })
 }
 
 // Absent config is legacy: the SDK sends the plain initialize handshake with no discover probe.
