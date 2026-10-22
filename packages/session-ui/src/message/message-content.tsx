@@ -383,7 +383,8 @@ export function CurrentUserMessageDisplay(props: {
       el.style.setProperty("--user-run-bottom", `${value.bottom}`)
       el.toggleAttribute("data-run-meta-hidden", value.meta === 0)
     },
-    userRunSpring,
+    // Folding a meta line away is instant; the next message's line takes its place as that message grows in.
+    { ...userRunSpring, snap: folded },
   )
 
   const copy = async (text: string) => {

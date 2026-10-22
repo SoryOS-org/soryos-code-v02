@@ -6,9 +6,10 @@ import type {
 } from "@opencode/client/promise"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Option, Predicate, Schema } from "effect"
-import { For, Show, createEffect, createMemo, untrack, type Accessor, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, onCleanup, untrack, type Accessor, type JSX } from "solid-js"
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Icon } from "@opencode/ui/icon"
+import { Spring, frameLoop, prefersReducedMotion } from "@opencode/ui/motion"
 import { springStyle } from "@opencode/ui/motion/solid"
 import { Dynamic } from "solid-js/web"
 import type { SessionUserActions, SessionUserAttachmentReference, SessionUserComment } from "../actions"
@@ -140,6 +141,29 @@ export function createSessionTimelineRowRenderer(input: {
       }
     })
   })
+
+  // A steer sent while the timeline is open grows in. Messages already there when a session loads, and rows the
+  // virtualizer remounts, appear as they are.
+  const seen = { sessionID: "", ids: new Set<string>() }
+  const arrivals = createMemo(() => {
+    const sessionID = input.sessionID()
+    const loaded = seen.sessionID === sessionID && seen.ids.size > 0
+    const arrived = new Set<string>()
+
+    if (seen.sessionID !== sessionID) seen.ids.clear()
+    seen.sessionID = sessionID
+    input.projection.rows().forEach((row) => {
+      if (!Predicate.isTagged(row, "UserMessage") || seen.ids.has(row.userMessageID)) return
+      seen.ids.add(row.userMessageID)
+
+      if (loaded) arrived.add(row.userMessageID)
+    })
+
+    return arrived
+  })
+
+  // The input's pending status lands after its row, so a message sent while the session works counts as a steer.
+  const arriving = (messageID: string) => untrack(() => arrivals().delete(messageID) && input.status().type !== "idle")
 
   const run = (messageID: string) =>
     createMemo(() => runs().get(messageID), undefined, {
@@ -519,8 +543,11 @@ export function createSessionTimelineRowRenderer(input: {
     return { label: message.description ?? message.text }
   }
 
-  const Frame = (props: { row: FramedTimelineRow; children: JSX.Element }) => (
+  const Frame = (props: { row: FramedTimelineRow; grow?: boolean; children: JSX.Element }) => (
     <div
+      ref={(el) => {
+        if (props.grow) growIn(el)
+      }}
       id={Predicate.isTagged(props.row, "UserMessage") ? input.anchor?.(props.row.userMessageID) : undefined}
       data-message-id={props.row.userMessageID}
       data-timeline-row={props.row._tag}
@@ -821,7 +848,7 @@ export function createSessionTimelineRowRenderer(input: {
     )
   }
 
-  // A run's messages sit as close as the iOS app's (4 px); the gap springs as a message joins or leaves.
+  // A run's messages sit as close as the iOS app's (4 px); the gap springs open as a message leaves.
   function TurnGap(props: { messageID: string }) {
     let element: HTMLDivElement | undefined
     const joined = run(props.messageID)
@@ -832,7 +859,8 @@ export function createSessionTimelineRowRenderer(input: {
       (el, value) => {
         el.style.height = `${value.height}px`
       },
-      userRunSpring,
+      // Closing up as a message joins is instant; the joining message grows in instead.
+      { ...userRunSpring, snap: () => !!joined()?.above },
     )
 
     return (
@@ -868,9 +896,10 @@ export function createSessionTimelineRowRenderer(input: {
 
       const context = createMemo(() => input.projection.userContextByID().get(current().userMessageID))
       const joined = run(current().userMessageID)
+      const grow = arriving(current().userMessageID)
 
       return (
-        <Frame row={current()}>
+        <Frame row={current()} grow={grow}>
           <Show when={message()}>
             {(message) => {
               const presentation = () => input.presentation(message())
@@ -1172,4 +1201,39 @@ function outcomeNoticeKey(state: string | undefined) {
   if (state === "cancelled") return "ui.sessionTimeline.notice.cancelled"
 
   return "ui.sessionTimeline.notice.finished"
+}
+
+/** Grows a row from nothing to its natural height, clipping its content on the way. Rows below follow its edge. */
+function growIn(el: HTMLElement) {
+  if (prefersReducedMotion()) return
+  const spring = Spring.fromDuration(0, { duration: 0.2, bounce: 0 })
+  const content = el.firstElementChild
+  let natural = 0
+  el.style.height = "0px"
+  el.style.overflow = "clip"
+  el.toggleAttribute("data-timeline-grow", true)
+
+  const remove = frameLoop.addMeasured(
+    () => {
+      natural = content instanceof HTMLElement ? content.offsetHeight : 0
+    },
+    (dt) => {
+      if (!el.isConnected) return true
+      spring.set(natural)
+      const height = spring.step(dt)
+
+      if (!spring.resting) {
+        el.style.height = `${height}px`
+
+        return true
+      }
+
+      el.style.height = ""
+      el.style.overflow = ""
+      el.toggleAttribute("data-timeline-grow", false)
+
+      return false
+    },
+  )
+  onCleanup(remove)
 }

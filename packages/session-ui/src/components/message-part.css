@@ -333,18 +333,17 @@
     opacity: 0;
     visibility: hidden;
     margin-inline-end: calc(-1 * var(--user-message-transition-gap));
-    transition:
-      grid-template-columns 200ms ease-out,
-      margin-inline-end 200ms ease-out,
-      opacity 200ms ease-out,
-      visibility 0s linear 200ms;
 
+    /* Labels and actions slide in as they arrive and leave at once, like the Pending label on delivery. */
     &[data-active="true"] {
       grid-template-columns: 1fr;
       margin-inline-end: 0;
       opacity: 1;
       visibility: visible;
-      transition-delay: 0s;
+      transition:
+        grid-template-columns 200ms ease-out,
+        margin-inline-end 200ms ease-out,
+        opacity 200ms ease-out;
     }
   }
 
@@ -361,7 +360,9 @@
     overflow: visible;
   }
 
-  :root[data-motion="reduce"] & {
+  /* A growing row settles its labels in place: its pending status can land a few frames after it appears. */
+  :root[data-motion="reduce"] &,
+  [data-timeline-grow] & {
     [data-slot="user-message-copy-wrapper"],
     [data-slot="user-message-meta-tail"],
     [data-slot="user-message-transition"] {
