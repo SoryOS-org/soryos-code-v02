@@ -1,6 +1,6 @@
 {
   "name": "@opencode/session-ui",
-  "version": "2.0.32",
+  "version": "2.1.2",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -47,7 +47,6 @@
     "./v2/*": "./src/v2/components/*.tsx"
   },
   "scripts": {
-    "generate:progress-indicator": "bun script/generate-session-progress-indicator.ts",
     "typecheck": "tsc -b",
     "test": "bun test src --only-failures",
     "test:components": "playwright test --config playwright.components.config.ts",
@@ -65,11 +64,12 @@
   "dependencies": {
     "@kobalte/core": "catalog:",
     "@opencode/client": "workspace:*",
+    "@opencode/patchmark": "workspace:*",
     "@opencode/plugin-genui": "workspace:*",
     "@opencode/ui": "workspace:*",
     "@opencode/util": "workspace:*",
     "@pierre/diffs": "catalog:",
-    "@shikijs/stream": "catalog:",
+    "@pierre/highlights": "catalog:",
     "@solid-primitives/event-listener": "catalog:",
     "@solid-primitives/media": "catalog:",
     "@solid-primitives/resize-observer": "catalog:",
@@ -78,10 +78,8 @@
     "effect": "catalog:",
     "dompurify": "3.4.14",
     "marked": "catalog:",
-    "mermaid": "11.17.2",
     "motion": "12.34.5",
-    "remend": "catalog:",
-    "shiki": "catalog:",
+    "pele": "1.7.0",
     "solid-js": "catalog:",
     "strip-ansi": "7.1.2"
   }

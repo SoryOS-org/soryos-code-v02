@@ -70,6 +70,21 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
+    label: "settings.timeline.row.backgroundActivity.title",
+    description: "settings.timeline.row.backgroundActivity.description",
+    target: "settings-background-activity",
+    section: "settings.timeline.title",
+    keywords: "capsule panel subagent shell background activity position alignment hidden left center right",
+  },
+  {
+    tab: "general",
+    label: "settings.timeline.row.turnDiffs.title",
+    description: "settings.timeline.row.turnDiffs.description",
+    target: "settings-show-turn-diffs",
+    section: "settings.timeline.title",
+  },
+  {
+    tab: "general",
     label: "settings.general.row.showCustomAgents.title",
     target: "settings-show-custom-agents",
     section: "settings.general.section.general",
@@ -105,6 +120,12 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     label: "settings.general.row.terminalFont.title",
     target: "settings-terminal-font",
     keywords: "terminal typeface",
+  },
+  {
+    tab: "appearance",
+    label: "settings.appearance.row.reduceMotion.title",
+    target: "settings-reduce-motion",
+    keywords: "animation accessibility",
   },
   {
     tab: "notifications",
@@ -164,7 +185,8 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
 ]
 
-export const serverSettings: Entry<SettingsServerTab>[] = [
+// Pages showing the selected server, and rows of its card on the Servers page.
+export const serverSettings: Entry<SettingsServerTab | "servers">[] = [
   { tab: "projects", label: "settings.tab.projects" },
   { tab: "workspaces", label: "settings.tab.workspaces", keywords: "workspaces disk usage cleanup delete" },
   { tab: "providers", label: "settings.providers.title", keywords: "connect api key credentials" },
@@ -179,18 +201,11 @@ export const serverSettings: Entry<SettingsServerTab>[] = [
   { tab: "extensions", subtab: "plugins", label: "settings.extensions.tab.plugins" },
   { tab: "extensions", subtab: "skills", label: "settings.extensions.tab.skills" },
   {
-    tab: "general",
+    tab: "servers",
     label: "settings.general.row.shell.title",
     target: "settings-shell",
     description: "settings.general.row.shell.description",
     keywords: "bash zsh powershell",
-  },
-  {
-    tab: "general",
-    label: "settings.server.preferences.websearch.title",
-    target: "settings-websearch",
-    description: "settings.server.preferences.websearch.description",
-    keywords: "web search provider",
   },
 ]
 

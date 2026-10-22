@@ -58,10 +58,6 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path fill-rule="evenodd" clip-rule="evenodd" d="M1.33334 8.00016C1.33334 4.31826 4.31811 1.3335 8.00001 1.3335C11.6819 1.3335 14.6667 4.31826 14.6667 8.00016C14.6667 11.6821 11.6819 14.6668 8.00001 14.6668C4.31811 14.6668 1.33334 11.6821 1.33334 8.00016ZM6.00001 5.29306L5.2929 6.00016L7.2929 8.00016L5.2929 10.0002L6.00001 10.7073L8.00001 8.70727L10 10.7073L10.7071 10.0002L8.70712 8.00016L10.7071 6.00016L10 5.29306L8.00001 7.29306L6.00001 5.29306Z" fill="currentColor"/>`,
   },
-  "sidebar-right": {
-    viewBox: "0 0 20 20",
-    body: `<path d="M2.91536 2.91406H2.36536V2.36406H2.91536V2.91406ZM2.91536 17.0807V17.6307H2.36536V17.0807H2.91536ZM17.082 17.0807H17.632V17.6307H17.082V17.0807ZM17.082 2.91406V2.36406H17.632V2.91406H17.082ZM6.9987 2.91406H6.4487V2.36406H6.9987V2.91406ZM6.9987 17.0807V17.6307H6.4487V17.0807H6.9987ZM2.91536 2.91406H3.46536V17.0807H2.91536H2.36536V2.91406H2.91536ZM2.91536 17.0807V16.5307H17.082V17.0807V17.6307H2.91536V17.0807ZM17.082 17.0807H16.532V2.91406H17.082H17.632V17.0807H17.082ZM17.082 2.91406V3.46406H2.91536V2.91406V2.36406H17.082V2.91406ZM6.9987 2.91406H7.5487V17.0807H6.9987H6.4487V2.91406H6.9987ZM17.082 17.0807L17.082 17.6307L6.9987 17.6307V17.0807V16.5307L17.082 16.5307L17.082 17.0807ZM6.9987 2.91406V2.36406H17.082V2.91406V3.46406H6.9987V2.91406Z" fill="currentColor"/>`,
-  },
   status: {
     viewBox: "0 0 20 20",
     body: `<path d="M2 10V18H18V10M2 10V2H18V10M2 10H18M5 6H9M5 14H9" stroke="currentColor"/>`,
@@ -142,6 +138,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/>`,
   },
+  "outline-chevron-right": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M6.5 11L9.5 8L6.5 5" stroke="currentColor"/>`,
+  },
   "outline-dots": {
     viewBox: "0 0 16 16",
     body: `<path d="M2.5 7.5H3.5V8.5H2.5V7.5Z" stroke="currentColor"/><path d="M7.5 7.5H8.5V8.5H7.5V7.5Z" stroke="currentColor"/><path d="M12.5 7.5H13.5V8.5H12.5V7.5Z" stroke="currentColor"/>`,
@@ -189,6 +189,10 @@ const icons = {
   "outline-copy": {
     viewBox: "0 0 16 16",
     body: `<path d="M4.14908 11.0081H1.76282V1.51758H9.1038V2.55588M14.2225 4.99681H6.75397V14.4873H14.2225V4.99681Z" stroke="currentColor"/>`,
+  },
+  "outline-quote": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M9.5 8.49927C10.8333 8.49927 12.1667 8.49927 13.5 8.49927C13.5 9.74927 13.5 11.2493 13.5 12.4993C12.1667 12.4993 10.8333 12.4993 9.5 12.4993V7C9.5 5 10.5 3.5 13 3.5001" stroke="currentColor"/><path d="M2.5 8.49927C3.83333 8.49927 5.16667 8.49927 6.5 8.49927C6.5 9.74927 6.5 11.2493 6.5 12.4993C5.16667 12.4993 3.83333 12.4993 2.5 12.4993V7C2.5 5 3.5 3.5 6 3.5001" stroke="currentColor"/>`,
   },
   "outline-arrow-left": {
     viewBox: "0 0 16 16",
@@ -273,6 +277,18 @@ const icons = {
   waveform: {
     viewBox: "0 0 16 16",
     body: `<path d="M2 7V9M4.5 5V11M7 2.5V13.5M9.5 4.5V11.5M12 6V10M14.5 7.25V8.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`,
+  },
+  "outline-steer": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M8 14C11.3137 14 14 11.3137 14 8C14 4.68634 11.3137 2 8 2C4.68626 2 2 4.68634 2 8C2 11.3137 4.68626 14 8 14Z" stroke-linecap="round" stroke-linejoin="round" stroke="currentColor"/><path d="M8 3.86328V12.1391C10.2854 12.1391 12.1379 10.2863 12.1379 8.00121C12.1379 5.71608 10.2854 3.86328 8 3.86328Z" fill="currentColor"/>`,
+  },
+  "outline-wave-audio": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M14.5 8.01193V8" stroke-linecap="square" stroke="currentColor"/><path d="M1.5 8.00607V7.99414" stroke-linecap="square" stroke="currentColor"/><path d="M3.66699 10.5141V5.48438" stroke-linecap="square" stroke="currentColor"/><path d="M10.167 10.5141V5.48438" stroke-linecap="square" stroke="currentColor"/><path d="M8 11.6004V4.39844" stroke-linecap="square" stroke="currentColor"/><path d="M12.333 9.20144V6.80078" stroke-linecap="square" stroke="currentColor"/><path d="M5.83301 13.5323V2.4668" stroke-linecap="square" stroke="currentColor"/>`,
+  },
+  comment: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M13.5 2.5H2.5V13.5H4.5L5.5 11.5H13.5V2.5Z" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/>`,
   },
   archive: {
     viewBox: "0 0 16 16",

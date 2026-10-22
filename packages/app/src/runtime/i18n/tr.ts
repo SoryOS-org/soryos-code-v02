@@ -72,7 +72,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Bir dosya seçin",
   "desktop.dialog.saveFile": "Dosyayı kaydedin",
   "desktop.dialog.files": "Dosyalar",
-  "desktop.server.local": "Yerel sunucu",
 
   "desktop.picker.error.notSelected": "Dosya seçici tarafından dosya seçilmedi",
   "desktop.picker.error.sizeLimit": "Seçilen ekler {{limit}} MB sınırını aşıyor",
@@ -111,7 +110,6 @@ export const dict = {
   "command.context.addSelection": "Seçimi bağlama ekle",
   "command.context.addSelection.description": "Mevcut dosyadan seçili satırları ekle",
   "command.input.focus": "Girişi odakla",
-  "command.fileTree.toggle": "Dosya ağacını aç/kapat",
   "command.review.toggle": "İncelemeyi aç/kapat",
   "command.message.previous": "Önceki mesaj",
   "command.message.previous.description": "Önceki kullanıcı mesajına git",
@@ -238,7 +236,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Bir şeyler sorun… "{{example}}"',
   "prompt.mode.shell": "Kabuk",
   "prompt.mode.normal": "İstem",
-  "session.child.promptDisabled": "Alt ajan oturumlarına istem gönderilemez.",
   "session.child.backToParent": "Ana oturuma dön.",
 
   "prompt.action.attachFile": "Dosya ekle",
@@ -744,9 +741,6 @@ export const dict = {
   "session.search.placeholder": "Bul…",
   "session.search.noResults": "Eşleşme yok",
   "titlebar.tabs": "Sekmeler",
-  "titlebar.channel.local": "Yerel",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Deneysel",
   "settings.experimental.description": "Deneysel özellikleri deneyin",
   "settings.tab.about": "Hakkında",

@@ -34,6 +34,10 @@ export const WindowSetTitlebar = Rpc.make("WindowSetTitlebar", {
   },
 })
 
+export const WindowSetTrafficLightsPosition = Rpc.make("WindowSetTrafficLightsPosition", {
+  payload: { x: Schema.Number, y: Schema.Number },
+})
+
 export const WindowRpcs = RpcGroup.make(
   WindowThemeReady,
   WindowGetFocused,
@@ -45,4 +49,5 @@ export const WindowRpcs = RpcGroup.make(
   WindowGetPinchZoomEnabled,
   WindowSetPinchZoomEnabled,
   WindowSetTitlebar,
+  WindowSetTrafficLightsPosition,
 )

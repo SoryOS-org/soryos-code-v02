@@ -64,7 +64,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "選擇檔案",
   "desktop.dialog.saveFile": "儲存檔案",
   "desktop.dialog.files": "檔案",
-  "desktop.server.local": "本機伺服器",
 
   "desktop.picker.error.notSelected": "檔案選擇器未選取檔案",
   "desktop.picker.error.sizeLimit": "所選附件超過 {{limit}} MB 的限制",
@@ -104,7 +103,6 @@ export const dict = {
   "command.context.addSelection": "將選取內容加入上下文",
   "command.context.addSelection.description": "加入目前檔案中選取的行",
   "command.input.focus": "聚焦輸入框",
-  "command.fileTree.toggle": "切換檔案樹",
   "command.review.toggle": "切換檢閱",
   "command.message.previous": "上一則訊息",
   "command.message.previous.description": "跳到上一則使用者訊息",
@@ -233,7 +231,6 @@ export const dict = {
   "prompt.placeholder.shell": "輸入 shell 命令… {{example}}",
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "無法在子代理程式工作階段中輸入提示詞。",
   "session.child.backToParent": "返回主要工作階段。",
 
   "prompt.action.attachFile": "附加檔案",
@@ -720,9 +717,6 @@ export const dict = {
   "session.search.placeholder": "查找...",
   "session.search.noResults": "無匹配",
   "titlebar.tabs": "分頁",
-  "titlebar.channel.local": "本地",
-  "titlebar.channel.dev": "開發",
-  "titlebar.channel.beta": "測試版",
   "settings.tab.experimental": "實驗性",
   "settings.experimental.description": "嘗試實驗性功能",
   "settings.tab.about": "關於",

@@ -43,47 +43,9 @@
 }
 
 .model-dialog {
-  [data-slot="model-dialog-search"] {
-    flex-shrink: 0;
-    padding: 6px;
-  }
-
-  [data-slot="model-dialog-search-box"] {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 32px;
-    padding-inline: 12px 4px;
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--v2-background-bg-layer-02) 60%, transparent);
-    color: var(--v2-icon-icon-muted);
-
-    &:hover,
-    &:focus-within {
-      background: var(--v2-background-bg-layer-02);
-    }
-
-    input {
-      flex: 1;
-      min-width: 0;
-      height: 100%;
-      border: 0;
-      outline: 0;
-      background: transparent;
-      color: var(--v2-text-text-base);
-      font-size: 14px;
-      font-weight: 440;
-      letter-spacing: -0.04px;
-      appearance: none;
-    }
-
-    input::placeholder {
-      color: var(--v2-text-text-faint);
-    }
-
-    input::-webkit-search-cancel-button {
-      display: none;
-    }
+  /* Arrow keys scroll the active row clear of the sticky group title. */
+  .scroll-view__viewport {
+    scroll-padding-top: 28px;
   }
 
   [data-slot="model-dialog-results"] {
@@ -100,18 +62,38 @@
   }
 
   [data-slot="model-dialog-group-title"] {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     flex-shrink: 0;
     align-items: center;
     gap: 6px;
     height: 28px;
-    padding: 0 12px;
+    margin-inline: -6px;
+    padding: 0 18px;
+    background: var(--v2-background-bg-base);
+    container-type: scroll-state;
     color: var(--v2-text-text-faint);
     font-size: 13px;
     font-weight: 530;
     line-height: var(--line-height-compact);
     letter-spacing: -0.25px;
     user-select: none;
+
+    &::after {
+      position: absolute;
+      inset: auto 0 0;
+      border-bottom: 0.5px solid var(--v2-border-border-base);
+      content: "";
+      opacity: 0;
+    }
+
+    @container scroll-state(stuck: top) {
+      &::after {
+        opacity: 1;
+      }
+    }
   }
 
   [data-slot="model-dialog-row"] {
@@ -141,6 +123,10 @@
 
   [data-slot="model-dialog-variant"] {
     color: var(--v2-text-text-muted);
+
+    &[data-default] {
+      color: var(--v2-text-text-faint);
+    }
   }
 
   [data-slot="model-dialog-hints"] {

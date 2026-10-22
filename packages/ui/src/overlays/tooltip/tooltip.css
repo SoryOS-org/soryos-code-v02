@@ -94,7 +94,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-component="tooltip-v2"],
   [data-component="tooltip-v2"][data-closed] {
     animation: none;

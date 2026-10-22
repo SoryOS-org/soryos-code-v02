@@ -8,23 +8,26 @@ import {
   largeCompletedDocument,
 } from "@opencode/session-ui/storybook"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
-import { createMemo, onCleanup, onMount } from "solid-js"
+import { mountMotionPanel } from "@opencode/ui/motion-tuning-panel"
+import { createEffect, createMemo, on, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { SessionPreview } from "@/session/story-model"
+import { SettingsProvider } from "@/settings/model"
 import type { SessionActivityItem } from "./activity-chips"
 
 // The app's default timeline preset.
 const timelineDetail = timelinePresets[2].value
 
+// Ages in milliseconds, so the panel shows seconds, minutes and an hour-long run side by side.
 const subagents = [
-  { id: "ses_child_scroll", agent: "general", description: "Investigate Linux scroll jacking" },
-  { id: "ses_child_audit", agent: "explore", description: "Audit the timeline projection" },
-  { id: "ses_child_search", agent: "explore", description: "Search for shell metadata" },
+  { id: "ses_child_scroll", agent: "alpha", description: "Investigate Linux scroll jacking", age: 12_000 },
+  { id: "ses_child_audit", agent: "beta", description: "Audit the timeline projection", age: 65_000 },
+  { id: "ses_child_search", agent: "beta", description: "Search for shell metadata", age: 3_000 },
 ]
 
 const shells = [
-  { id: "shl_dev", command: "bun run dev -- --port 4444" },
-  { id: "shl_test", command: "bun test --watch src/session" },
+  { id: "shl_dev", command: "bun run dev -- --port 4444", age: 3_720_000 },
+  { id: "shl_test", command: "bun test --watch src/session", age: 341_000 },
 ]
 
 const subagentItem = (index: number): SessionActivityItem => {
@@ -37,6 +40,7 @@ const subagentItem = (index: number): SessionActivityItem => {
     agent: value.agent,
     sessionID: value.id,
     target: value.id,
+    started: Date.now() - value.age,
   }
 }
 
@@ -45,6 +49,7 @@ const shellItem = (index: number): SessionActivityItem => ({
   type: "shell",
   label: shells[index % shells.length].command,
   target: shells[index % shells.length].id,
+  started: Date.now() - shells[index % shells.length].age,
 })
 
 // The timeline follows new work at the bottom, like a pinned session.
@@ -56,20 +61,24 @@ const pin = (behavior: ScrollBehavior) =>
     timeline?.scrollTo({ top: timeline.scrollHeight, behavior })
   }, 150)
 
-const preview = (stage: number, subagentCount: number, shellCount: number) => () => {
-  const value = liveDocument(stages[stage])
+type PreviewArgs = { stage: number; subagents: number; shells: number }
+
+// Driven by args, so moving between these stories updates the same capsule and its transitions play.
+function Preview(props: PreviewArgs) {
+  const value = createMemo(() => liveDocument(stages[props.stage] ?? stages[0]))
 
   onMount(() => pin("auto"))
+  createEffect(on(value, () => pin("smooth"), { defer: true }))
 
   return (
     <SessionPreview
       title="Run background work"
       description="opencode · activity chips"
-      document={value}
+      document={value()}
       timelineDetail={timelineDetail}
       activity={{
-        subagents: Array.from({ length: subagentCount }, (_, index) => subagentItem(index)),
-        shells: Array.from({ length: shellCount }, (_, index) => shellItem(index)),
+        subagents: Array.from({ length: props.subagents }, (_, index) => subagentItem(index)),
+        shells: Array.from({ length: props.shells }, (_, index) => shellItem(index)),
       }}
     />
   )
@@ -214,6 +223,13 @@ function LiveActivity() {
 export default {
   title: "OpenCode/Session/Activity chips",
   id: "session-activity-chips",
+  render: (args: PreviewArgs) => <Preview {...args} />,
+  args: { stage: 0, subagents: 0, shells: 0 },
+  argTypes: {
+    stage: { control: { type: "range", min: 0, max: 8, step: 1 } },
+    subagents: { control: { type: "range", min: 0, max: 12, step: 1 } },
+    shells: { control: { type: "range", min: 0, max: 4, step: 1 } },
+  },
   parameters: {
     layout: "fullscreen",
     docs: {
@@ -225,16 +241,43 @@ export default {
   },
 }
 
-export const NoActivity = { render: preview(0, 0, 0) }
+export const NoActivity = { args: { stage: 0, subagents: 0, shells: 0 } }
 
-export const OneSubagent = { render: preview(1, 1, 0) }
+export const OneSubagent = { args: { stage: 1, subagents: 1, shells: 0 } }
 
-export const TwoSubagents = { render: preview(2, 2, 0) }
+export const TwoSubagents = { args: { stage: 2, subagents: 2, shells: 0 } }
 
-export const OneShell = { render: preview(7, 0, 1) }
+export const OneShell = { args: { stage: 7, subagents: 0, shells: 1 } }
 
-export const SubagentsAndShells = { render: preview(4, 2, 2) }
+export const SubagentsAndShells = { args: { stage: 4, subagents: 2, shells: 2 } }
 
-export const ManySubagents = { render: preview(4, 12, 2) }
+export const ManySubagents = { args: { stage: 4, subagents: 12, shells: 2 } }
 
 export const Live = { render: () => <LiveActivity /> }
+
+// The real composer and activity lane, with the same experiment controls as the app's Knobs workspace.
+export const Experiments = {
+  render: () => <ExperimentPreview />,
+}
+
+function ExperimentPreview() {
+  let panel!: HTMLDivElement
+  onMount(() => onCleanup(mountMotionPanel(panel, { section: "Experiments" })))
+
+  return (
+    <div class="grid grid-cols-[minmax(0,1fr)_340px]">
+      <SettingsProvider>
+        <SessionPreview
+          title="Activity chip"
+          description="Knobs · Experiments"
+          document={{ sessionID: CURRENT_SESSION_ID, messages: [], status: { type: "busy" }, diffs: [] }}
+          activity={{
+            subagents: Array.from({ length: 3 }, (_, i) => subagentItem(i)),
+            shells: [shellItem(0), shellItem(1)],
+          }}
+        />
+      </SettingsProvider>
+      <div ref={panel} class="h-screen overflow-y-auto" />
+    </div>
+  )
+}

@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, type Component } from "solid-js"
+import { Show, createEffect, createMemo, type Component, type JSX } from "solid-js"
 import { Key } from "@solid-primitives/keyed"
 import { createStore } from "solid-js/store"
 import { Button } from "@opencode/ui/button"
@@ -21,6 +21,7 @@ export const SettingsProjects: Component<{
   server: ServerConnection.Any
   active: boolean
   onOpenProject: (project: LocalProject) => void
+  headerAction?: JSX.Element
 }> = (props) => {
   const language = useLanguage()
   const global = useGlobal()
@@ -58,15 +59,18 @@ export const SettingsProjects: Component<{
     <>
       <div class="settings-tab-header" classList={{ "settings-tab-header--stacked": searchable() }}>
         <div class="settings-tab-header-row">
-          <div class="flex flex-col gap-1">
+          <div class="flex min-w-0 flex-col gap-1">
             <h2 class="settings-tab-title">{language.t("settings.projects.title")}</h2>
             <span class="text-11-regular text-v2-text-text-muted">{language.t("settings.projects.description")}</span>
           </div>
-          <Show when={projects().length > 0}>
-            <Button variant="ghost-muted" icon="plus" onClick={addProject}>
-              {language.t("home.project.add")}
-            </Button>
-          </Show>
+          <div class="settings-tab-header-actions">
+            <Show when={projects().length > 0}>
+              <Button variant="ghost-muted" icon="plus" onClick={addProject}>
+                {language.t("home.project.add")}
+              </Button>
+            </Show>
+            {props.headerAction}
+          </div>
         </div>
         <Show when={searchable()}>
           <SettingsSearchField

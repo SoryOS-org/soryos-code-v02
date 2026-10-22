@@ -1,9 +1,6 @@
-import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
-import { useQueries, useQueryClient } from "@tanstack/solid-query"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
-import { createStore } from "solid-js/store"
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, startTransition, type JSX } from "solid-js"
+import { createEffect, createMemo, For, Show, type JSX } from "solid-js"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Dialog, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
@@ -12,33 +9,13 @@ import { Menu } from "@opencode/ui/menu"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { displayName } from "@opencode/ui/project-avatar"
-import { useGlobal } from "@/runtime/server/runtime"
-import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
+import { useServers } from "@/runtime/server/registry"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Persist, persisted } from "@/runtime/persistence/storage"
-import { projectSettingsKey, useSettings } from "@/settings/model"
-import { useLayout } from "@/shell/state/layout"
-import { useTabs } from "@/shell/tabs/tabs"
-import { sessionBusy, sessionRequests } from "@/shell/layout/project-avatar-state"
 import { SessionTabAvatarView } from "@/shell/layout/session-tab-avatar"
-import { pathKey } from "@/workspaces/path-key"
 import { sessionTabTitle } from "./tab-title"
-import { notifySessionTabsRemoved } from "./session-events"
-import { loadHomeSessionIndex } from "@/home/sessions/index"
-import { archiveHomeSession } from "@/home/sessions/archive"
-import { sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { sessionTitle } from "@/session/title"
-import { errorMessage } from "@/shell/layout/helpers"
-import { showToast } from "@/shell/notifications/toast"
-
-// Keep the immutable result opaque so Solid Query does not recursively unwrap every session.
-const selectSessions = (sessions: SessionInfo[]) => () => sessions
-
-// Branch lookups each run git on the server, so load them a few at a time.
-const BRANCH_BATCH = 4
-
-// The Home index excludes archived sessions, so the inbox loads the newest archived ones separately.
-const ARCHIVED_LIMIT = 50
+import { createSessionInbox, inboxArchived, inboxBusy, type InboxEntry, type InboxStatus } from "./inbox-model"
 
 // `since` is when the inbox was first used; Recent only lists sessions that finished a run after it.
 const InboxState = Persistence.struct({
@@ -46,149 +23,31 @@ const InboxState = Persistence.struct({
   since: Persistence.optional(Schema.Number),
 })
 
-type InboxStatus = "approval" | "input" | "working" | "failed" | "done" | "ready"
-
-type InboxEntry = {
-  key: string
-  conn: ServerConnection.Any
-  server: ServerConnection.Key
-  ctx: ReturnType<ReturnType<typeof useGlobal>["ensureServerCtx"]>
-  session: SessionInfo
-  status: InboxStatus
-}
-
+/** The experimental Inbox interface mode: the session inbox in place of vertical tabs. */
 export function SidebarInbox() {
-  const global = useGlobal()
-  const servers = useServers()
-  const settings = useSettings()
-  const layout = useLayout()
-  const tabs = useTabs()
   const language = useLanguage()
   const dialog = useDialog()
+  const inbox = createSessionInbox({ archived: true })
 
   const [state, setState, , ready] = persisted(Persist.global("sidebar.inbox"), InboxState, {
     workingExpanded: true,
   })
 
-  const [now, setNow] = createSignal(Date.now())
-  const timer = setInterval(() => setNow(Date.now()), 1_000)
-  onCleanup(() => clearInterval(timer))
-
-  const queryClient = useQueryClient()
-  const connections = createMemo(() => servers.visible.map((conn) => ({ conn, ctx: global.ensureServerCtx(conn) })))
-
-  // The inbox stays mounted and rarely refetches the index, so drop sessions the server no longer has.
-  const forget = (conn: ServerConnection.Any, sessionID: string) => {
-    queryClient.setQueryData<SessionInfo[]>(["home-sessions", conn], (current) =>
-      current?.filter((session) => session.id !== sessionID),
-    )
-    queryClient.setQueryData<SessionInfo[]>(["inbox-archived-sessions", conn], (current) =>
-      current?.filter((session) => session.id !== sessionID),
-    )
-  }
-
-  createEffect(() => {
-    connections().forEach((item) => {
-      onCleanup(item.ctx.data.on("session.deleted", (event) => forget(item.conn, event.data.sessionID)))
-    })
-  })
-
-  // Shares the Home query cache so renames and deletions there refresh the inbox too.
-  const queries = useQueries(() => ({
-    queries: connections().map((item) => ({
-      queryKey: ["home-sessions", item.conn] as const,
-      enabled: item.ctx.sdk.connection.status() === "connected",
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        loadHomeSessionIndex((input, options) => item.ctx.sdk.api.session.list(input, options), signal),
-      retry: false,
-      staleTime: 30_000,
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      select: selectSessions,
-    })),
-  }))
-
-  const archivedQueries = useQueries(() => ({
-    queries: connections().map((item) => ({
-      queryKey: ["inbox-archived-sessions", item.conn] as const,
-      enabled: item.ctx.sdk.connection.status() === "connected",
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        item.ctx.sdk.api.session
-          .list({ limit: ARCHIVED_LIMIT, order: "desc", parentID: null, archived: true }, { signal })
-          .then((response) => response.data),
-      retry: false,
-      staleTime: 30_000,
-      refetchOnMount: true,
-      refetchOnReconnect: true,
-      select: selectSessions,
-    })),
-  }))
-
-  const entries = createMemo(() =>
-    connections()
-      .flatMap((item, index) => {
-        const data = item.ctx.data
-        const notification = item.ctx.notification.session
-        const server = ServerConnection.key(item.conn)
-
-        // A root session counts as working while any session in its family is busy.
-        const busyRoots = new Set(
-          [...data.session.list().map((session) => session.id), ...data.session.active()]
-            .filter((id) => sessionBusy(data, id))
-            .map((id) => data.session.root(id)),
-        )
-
-        const status = (session: SessionInfo): InboxStatus => {
-          const project = projectSettingsKey(item.ctx.sdk.scope, session.projectID)
-          const requests = sessionRequests(data, session.id, true, settings.permissions.autoApproves(project))
-
-          if (requests.permission) return "approval"
-
-          if (requests.form) return "input"
-
-          if (busyRoots.has(session.id)) return "working"
-
-          if (!notification.unread(session.id, session)) return "ready"
-
-          return session.outcome === "failed" ? "failed" : "done"
-        }
-
-        // Locally known sessions come last so live archive and unarchive events win over cached indexes.
-        const sessions = new Map(
-          [...(queries[index]?.data?.() ?? []), ...(archivedQueries[index]?.data?.() ?? []), ...data.session.list()].map(
-            (session) => [session.id, session] as const,
-          ),
-        )
-
-        return data.session.apply([...sessions.values()].filter((session) => !session.parentID)).map(
-          (session): InboxEntry => ({
-            key: `${server}\0${session.id}`,
-            conn: item.conn,
-            server,
-            ctx: item.ctx,
-            session,
-            status: status(session),
-          }),
-        )
-      })
-      .toSorted((a, b) => b.session.time.updated - a.session.time.updated),
-  )
-
   const sections = createMemo(() => {
-    const list = entries()
+    const list = inbox.entries()
     // The most recently finished session comes first.
     const finished = list
       .filter((entry) => {
         const since = state.since
 
-        return !busy(entry.status) && since !== undefined && (entry.session.time.idle ?? 0) >= since
+        return !inboxBusy(entry.status) && since !== undefined && (entry.session.time.idle ?? 0) >= since
       })
       .toSorted((a, b) => (b.session.time.idle ?? 0) - (a.session.time.idle ?? 0))
 
     return {
       needs: list.filter((entry) => entry.status === "approval" || entry.status === "input"),
-      inbox: finished.filter((entry) => !archived(entry)),
-      archived: finished.filter(archived),
+      inbox: finished.filter((entry) => !inboxArchived(entry)),
+      archived: finished.filter(inboxArchived),
       working: list.filter((entry) => entry.status === "working"),
     }
   })
@@ -206,134 +65,18 @@ export function SidebarInbox() {
     if (ready() && state.since === undefined) setState("since", Date.now())
   })
 
-  // Rows are keyed by stable strings so live session updates do not remount them.
-  const byKey = createMemo(() => new Map(entries().map((entry) => [entry.key, entry])))
-
-  const active = createMemo(() => {
-    const route = layout.route()
-
-    if (route.type !== "session") return
-
-    return { server: route.server, sessionId: route.sessionId }
-  })
-
-  const selected = (entry: InboxEntry) => {
-    const current = active()
-
-    return (
-      current?.server === entry.server &&
-      (current.sessionId === entry.session.id || entry.ctx.data.session.root(current.sessionId) === entry.session.id)
-    )
-  }
-
-  // Git info is not stored on the session, so eagerly load it for every shown row and mark each location
-  // settled once its load ends.
-  const [vcs, setVcs] = createStore({ settled: {} as Record<string, true> })
-  const queued = new Set<string>()
-  const queue: InboxEntry[] = []
-  let draining = false
-
-  const drain = async () => {
-    if (draining) return
-    draining = true
-
-    while (queue.length) {
-      await Promise.all(
-        queue.splice(0, BRANCH_BATCH).map((entry) =>
-          entry.ctx.data.location.vcs
-            .sync(entry.session.location)
-            .catch(() => undefined)
-            .then(() => setVcs("settled", locationKey(entry), true)),
-        ),
-      )
-    }
-
-    draining = false
-  }
-
+  // Git info is not stored on the session, so eagerly load it for every shown row.
   createEffect(() => {
     const visible = sections()
 
-    ;[...visible.needs, ...visible.working, ...visible.inbox, ...visible.archived].forEach((entry) => {
-      const key = locationKey(entry)
-
-      if (queued.has(key)) return
-      queued.add(key)
-      queue.push(entry)
-    })
-    void drain()
+    inbox.loadBranches([...visible.needs, ...visible.working, ...visible.inbox, ...visible.archived])
   })
-
-  const branchLoading = (entry: InboxEntry) =>
-    !vcs.settled[locationKey(entry)] && !entry.ctx.data.location.vcs.info(entry.session.location)
-
-  const open = (entry: InboxEntry) => {
-    const directory = entry.ctx.projects.forSession(entry.session)?.worktree ?? entry.session.location.directory
-    void entry.ctx.data.session.message.sync(entry.session.id).catch((error: unknown) => {
-      if (isSessionNotFoundError(error)) forget(entry.conn, entry.session.id)
-    })
-    void startTransition(() => {
-      tabs.select(tabs.addSessionTab({ server: entry.server, sessionId: entry.session.id }))
-      entry.ctx.data.session.remember(entry.session)
-      entry.ctx.projects.touch(directory)
-    })
-  }
-
-  // Move the session between the cached indexes so it changes section before either refetches.
-  const move = (entry: InboxEntry, archivedAt: number | undefined) => {
-    const session = { ...entry.session, time: { ...entry.session.time, archived: archivedAt } }
-
-    forget(entry.conn, entry.session.id)
-    queryClient.setQueryData<SessionInfo[]>(
-      [archivedAt === undefined ? "home-sessions" : "inbox-archived-sessions", entry.conn],
-      (current) => current && [session, ...current],
-    )
-  }
-
-  const requestFailed = (cause: unknown) =>
-    showToast({
-      title: language.t("common.requestFailed"),
-      description: errorMessage(cause, language.t("common.requestFailed")),
-    })
-
-  const archive = (entry: InboxEntry) =>
-    archiveHomeSession({
-      server: entry.server,
-      session: entry.session,
-      archive: (sessionID) => entry.ctx.sdk.api.session.update({ sessionID, archived: true }),
-      remove: () => move(entry, Date.now()),
-      onError: requestFailed,
-    })
-
-  const unarchive = (entry: InboxEntry) =>
-    entry.ctx.sdk.api.session
-      .update({ sessionID: entry.session.id, archived: false })
-      .then(() => move(entry, undefined))
-      .catch(requestFailed)
-
-  const remove = (entry: InboxEntry) => {
-    const ids = sessionTreeIDs(entry.ctx.data.session.list(), entry.session.id)
-
-    return entry.ctx.data.session
-      .remove(entry.session.id)
-      .then(() => {
-        forget(entry.conn, entry.session.id)
-        notifySessionTabsRemoved({ server: entry.server, directory: entry.session.location.directory, sessionIDs: ids })
-      })
-      .catch((cause) =>
-        showToast({
-          title: language.t("session.delete.failed.title"),
-          description: errorMessage(cause, language.t("session.delete.failed.title")),
-        }),
-      )
-  }
 
   function DeleteDialog(props: { entry: InboxEntry }) {
     const confirm = async () => {
-      await remove(props.entry)
+      await inbox.remove(props.entry)
       dialog.close()
     }
-
     return (
       <Dialog fit>
         <DialogHeader hideClose>
@@ -359,17 +102,19 @@ export function SidebarInbox() {
   const rows = (list: InboxEntry[]) => (
     <For each={list.map((entry) => entry.key)}>
       {(key) => (
-        <Show when={byKey().get(key)}>
+        <Show when={inbox.byKey().get(key)}>
           {(entry) => (
             <InboxRow
               entry={entry()}
-              selected={selected(entry())}
-              now={now()}
-              branchLoading={branchLoading(entry())}
-              archived={archived(entry())}
-              onOpen={() => open(entry())}
-              onArchive={() => void archive(entry())}
-              onUnarchive={() => void unarchive(entry())}
+              selected={inbox.selected(entry())}
+              now={inbox.now()}
+              branchLoading={inbox.branchLoading(entry())}
+              branch={inbox.branch(entry())}
+              worktree={inbox.inWorktree(entry())}
+              archived={inboxArchived(entry())}
+              onOpen={() => inbox.open(entry())}
+              onArchive={() => void inbox.archive(entry())}
+              onUnarchive={() => void inbox.unarchive(entry())}
               onDelete={() => dialog.show(() => <DeleteDialog entry={entry()} />)}
             />
           )}
@@ -391,7 +136,9 @@ export function SidebarInbox() {
           when={sections().inbox.length > 0}
           fallback={
             <Show
-              when={sections().needs.length === 0 && sections().working.length === 0 && sections().archived.length === 0}
+              when={
+                sections().needs.length === 0 && sections().working.length === 0 && sections().archived.length === 0
+              }
             >
               <div class="px-1.5 py-2 text-[13px] leading-4 text-v2-text-text-faint">
                 {language.t("sidebar.inbox.empty")}
@@ -425,7 +172,7 @@ export function SidebarInbox() {
           />
           <div class="flex min-h-0 flex-col gap-px overflow-y-auto">
             {/* A collapsed shelf still shows the session that is open. */}
-            {rows(sections().working.filter((entry) => state.workingExpanded || selected(entry)))}
+            {rows(sections().working.filter((entry) => state.workingExpanded || inbox.selected(entry)))}
           </div>
         </div>
       </Show>
@@ -479,6 +226,8 @@ function InboxRow(props: {
   selected: boolean
   now: number
   branchLoading: boolean
+  branch: string | undefined
+  worktree: boolean
   archived: boolean
   onOpen: () => void
   onArchive: () => void
@@ -486,16 +235,13 @@ function InboxRow(props: {
   onDelete: () => void
 }) {
   const language = useLanguage()
+  const servers = useServers()
   const project = createMemo(() => props.entry.ctx.projects.forSession(props.entry.session))
   const status = () => props.entry.status
   const unread = () => status() !== "ready" && status() !== "working"
 
-  const worktree = () => inWorktree(props.entry)
-
-  const branch = () => props.entry.ctx.data.location.vcs.info(props.entry.session.location)?.branch.current ?? undefined
-
-  // Only sessions on a remote server are marked.
-  const remote = () => !props.entry.ctx.isLocal
+  // Sessions on the current server are not marked.
+  const tag = () => servers.tag(props.entry.conn)
 
   const compact = (seconds: number) => {
     if (seconds < 3600) return language.plural("sidebar.inbox.elapsed.minutes", Math.floor(seconds / 60))
@@ -587,7 +333,7 @@ function InboxRow(props: {
         >
           {sessionTabTitle(props.entry.session.title, language.t("session.tab.session"))}
         </span>
-        <Show when={props.branchLoading || branch() || worktree() || remote()}>
+        <Show when={props.branchLoading || props.branch || props.worktree || tag()}>
           <span class="flex h-4 w-full min-w-0 items-center gap-1 text-[12px] leading-4 text-v2-text-text-faint">
             <Show when={props.branchLoading}>
               <span
@@ -595,11 +341,11 @@ function InboxRow(props: {
                 class="h-2.5 w-24 max-w-full animate-pulse rounded-full bg-v2-background-bg-layer-03"
               />
             </Show>
-            <Show when={!props.branchLoading && (branch() || worktree())}>
+            <Show when={!props.branchLoading && (props.branch || props.worktree)}>
               <span class="flex min-w-0 items-center gap-1">
                 {/* The worktree icon stands in for the branch icon to mark sessions outside the project checkout. */}
-                <Icon name={worktree() ? "outline-worktree" : "branch"} size="small" class="shrink-0" />
-                <Show when={branch()}>
+                <Icon name={props.worktree ? "outline-worktree" : "branch"} size="small" class="shrink-0" />
+                <Show when={props.branch}>
                   {(name) => (
                     <span dir="ltr" class="min-w-0 truncate">
                       {name()}
@@ -608,10 +354,12 @@ function InboxRow(props: {
                 </Show>
               </span>
             </Show>
-            <Show when={remote()}>
-              <Tooltip placement="right" value={serverName(props.entry.conn)} class="ms-auto flex shrink-0">
-                <Icon name="server" size="small" aria-label={serverName(props.entry.conn)} />
-              </Tooltip>
+            <Show when={tag()}>
+              {(name) => (
+                <Tooltip placement="right" value={name()} class="ms-auto flex shrink-0">
+                  <Icon name="server" size="small" aria-label={name()} />
+                </Tooltip>
+              )}
             </Show>
           </span>
         </Show>
@@ -630,22 +378,4 @@ function InboxRow(props: {
       </Menu.Context.Portal>
     </Menu.Context>
   )
-}
-
-function archived(entry: InboxEntry) {
-  return typeof entry.session.time.archived === "number"
-}
-
-function busy(status: InboxStatus) {
-  return status === "working" || status === "approval" || status === "input"
-}
-
-function locationKey(entry: InboxEntry) {
-  return `${entry.server}\0${pathKey(entry.session.location.directory)}`
-}
-
-function inWorktree(entry: InboxEntry) {
-  const root = entry.ctx.projects.forSession(entry.session)?.worktree
-
-  return !!root && pathKey(root) !== pathKey(entry.session.location.directory)
 }

@@ -11,12 +11,16 @@
 @source "../../../../session-ui/src";
 @source "../../../../gui-extensions/src";
 @source not "../../../../session-ui/src/**/*.test.{ts,tsx}";
-@source "../../../../storybook";
+@source "../../../../stories";
 @source "../../../src";
 @source not "../../../src/assets";
 @source not "../../../src/i18n";
 @source not "../../../src/**/*.test.{ts,tsx}";
 @import "./utilities.css";
+
+/* The app resolves its reduce motion setting, including the system preference, into this attribute. */
+@custom-variant motion-reduce (&:where(:root[data-motion="reduce"] *));
+@custom-variant motion-safe (&:where(:root:not([data-motion="reduce"]) *));
 
 @import "../index.css";
 

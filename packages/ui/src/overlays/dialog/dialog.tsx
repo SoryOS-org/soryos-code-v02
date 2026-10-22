@@ -1,5 +1,13 @@
 import { CloseButton, Content, Description, Title } from "@kobalte/core/dialog"
-import { type ComponentProps, type JSXElement, type ParentProps, Show, children, createEffect, splitProps } from "solid-js"
+import {
+  type ComponentProps,
+  type JSXElement,
+  type ParentProps,
+  Show,
+  children,
+  createEffect,
+  splitProps,
+} from "solid-js"
 import { useDialogLayer } from "../../context/dialog"
 import { useI18n } from "../../context/i18n"
 import "./dialog.css"
@@ -121,6 +129,11 @@ export function Dialog(props: DialogProps) {
           onPointerDownOutside={(event) => {
             if (local.preventBackdropDismiss) event.preventDefault()
           }}
+          onInteractOutside={(event) => {
+            const target = event.target
+
+            if (layer?.container && target instanceof Node && !layer.container.contains(target)) event.preventDefault()
+          }}
           classList={{
             ...local.classList,
             [local.class ?? ""]: !!local.class,
@@ -137,6 +150,7 @@ export function Dialog(props: DialogProps) {
             setTimeout(() => {
               const autofocus = content.querySelector<HTMLElement>("[autofocus]")
               const active = document.activeElement
+
               const kept =
                 active instanceof HTMLElement &&
                 active !== content &&
@@ -144,9 +158,11 @@ export function Dialog(props: DialogProps) {
                 !active.closest('[data-slot="dialog-close-button"]')
                   ? active
                   : undefined
+
               const field = Array.from(content.querySelectorAll<HTMLElement>(TEXT_FIELD)).find(
                 (element) => element.getClientRects().length > 0,
               )
+
               const target = autofocus ?? kept ?? field ?? content
               target.focus({ preventScroll: true })
             })

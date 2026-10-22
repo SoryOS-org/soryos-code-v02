@@ -3,7 +3,6 @@ import { dict } from "@opencode/ui/i18n/en"
 import en from "@/runtime/i18n/en"
 import { settingsSearchIndex, type SettingsSearchServer } from "./search-index"
 import { rankSettings } from "./search-results"
-import type { SettingsView } from "./surface"
 
 const strings = new Map(Object.entries({ ...dict, ...en }))
 
@@ -14,11 +13,10 @@ const servers: SettingsSearchServer[] = [
   { key: "remote", name: "Build server", connected: true, projects: [project] },
 ]
 
-const root: SettingsView = { type: "root", tab: "general" }
-
 function index(input: Partial<Parameters<typeof settingsSearchIndex>[0]> = {}) {
   return settingsSearchIndex({
     servers,
+    selected: "local",
     desktop: false,
     browser: false,
     mobile: false,
@@ -28,13 +26,12 @@ function index(input: Partial<Parameters<typeof settingsSearchIndex>[0]> = {}) {
 }
 
 describe("settings search index", () => {
-  test("uses concrete server identity and adapts single-server destinations", () => {
-    const multi = rankSettings("models", index(), root).filter((item) => item.topLevel)
+  test("indexes the selected server's pages and names it only when there are several servers", () => {
+    const multi = rankSettings("models", index({ selected: "remote" })).filter((item) => item.topLevel)
     expect(multi.map((item) => item.view)).toEqual([
-      { type: "server", server: "local", tab: "models", target: undefined, subtab: undefined },
-      { type: "server", server: "remote", tab: "models", target: undefined, subtab: undefined },
+      { type: "root", server: "remote", tab: "models", target: undefined, subtab: undefined },
     ])
-    const single = rankSettings("models", index({ servers: [servers[0]] }), root).find((item) => item.topLevel)!
+    const single = rankSettings("models", index({ servers: [servers[0]] })).find((item) => item.topLevel)!
     expect(single.server).toBe("local")
     expect(single.view).toEqual({ type: "root", tab: "models", target: undefined, subtab: undefined })
   })
@@ -42,13 +39,13 @@ describe("settings search index", () => {
   test("keeps unavailable servers discoverable without advertising unloaded settings", () => {
     const items = index({ servers: [{ ...servers[0], connected: false }] })
     expect(items.filter((item) => item.server).map((item) => item.id)).toEqual(["server:local"])
-    expect(rankSettings("Local server", items, root)[0].view).toEqual({
+    expect(rankSettings("Local server", items)[0].view).toEqual({
       type: "root",
       tab: "servers",
       target: undefined,
       subtab: undefined,
     })
-    expect(rankSettings("font", items, root)).toHaveLength(3)
+    expect(rankSettings("font", items)).toHaveLength(3)
   })
 
   test("only advertises settings supported by this platform", () => {
@@ -71,79 +68,74 @@ describe("settings search index", () => {
       items.map((item) => item.id),
     )
     expect(
-      rankSettings("agent", items, root)
+      rankSettings("agent", items)
         .filter((item) => item.title === "Agent")
         .map((item) => item.page),
     ).toEqual(["Desktop notifications", "Sound effects"])
-    expect(rankSettings("follow-up behavior", items, root)[0].page).toBe("Preferences / General")
+    expect(rankSettings("follow-up behavior", items)[0].page).toBe("Preferences / General")
+    expect(rankSettings("capsule", items)[0].view).toMatchObject({
+      tab: "general",
+      target: "settings-background-activity",
+    })
     expect(items.some((item) => item.view.target === "settings-project-startup")).toBe(false)
   })
 
   test("retains project avatars and excludes color when a custom icon owns its appearance", () => {
     const withIcon = { ...project, icon: { color: "orange", override: "data:image/png;base64,example" } }
     const items = index({ servers: [{ ...servers[0], projects: [withIcon] }] })
-    expect(rankSettings("opencode", items, root)[0].projectInfo).toEqual(withIcon)
-    expect(rankSettings("opencode color", items, root)).toEqual([])
+    expect(rankSettings("opencode", items)[0].projectInfo).toEqual(withIcon)
+    expect(rankSettings("opencode color", items)).toEqual([])
   })
 })
 
 describe("settings search ranking", () => {
   test("prioritizes top-level pages and omits generic project-setting copies", () => {
-    expect(rankSettings("work", index({ servers: [servers[0]] }), root).map((item) => item.title)).toEqual([
+    expect(rankSettings("work", index({ servers: [servers[0]] })).map((item) => item.title)).toEqual([
       "Worktrees",
       "Default environment",
     ])
-    expect(rankSettings("mcps", index(), root).map((item) => item.view.type)).toEqual(["server", "server"])
-    expect(rankSettings("project name", index(), root)).toEqual([])
-    expect(rankSettings("startup", index(), root)).toEqual([])
+    expect(rankSettings("mcps", index()).map((item) => item.view)).toEqual([
+      { type: "root", server: "local", tab: "extensions", target: undefined, subtab: "mcps" },
+    ])
+    expect(rankSettings("project name", index())).toEqual([])
+    expect(rankSettings("startup", index())).toEqual([])
   })
 
-  test("qualifies project settings by project name and supports explicit server names", () => {
-    const matches = rankSettings("opencode name", index(), root)
-    expect(matches.map((item) => item.view.target)).toEqual(["settings-project-name", "settings-project-name"])
-    expect(rankSettings("Build server opencode name", index(), root).map((item) => item.server)).toEqual(["remote"])
-    expect(rankSettings("opencode skills", index(), root).map((item) => item.view.subtab)).toEqual(["skills", "skills"])
+  test("qualifies project settings by project name on the selected server", () => {
+    expect(rankSettings("opencode name", index()).map((item) => item.view.target)).toEqual(["settings-project-name"])
+    expect(rankSettings("opencode name", index({ selected: "remote" })).map((item) => item.server)).toEqual([
+      "remote",
+    ])
+    expect(rankSettings("opencode skills", index()).map((item) => item.view.subtab)).toEqual(["skills"])
   })
 
   test("project names alone find projects, including names that are setting labels", () => {
     const items = index({ servers: [{ ...servers[0], projects: [{ ...project, name: "Skills" }] }] })
     expect(
-      rankSettings("skills", items, root)
+      rankSettings("skills", items)
         .filter((item) => item.project)
         .map((item) => item.entity),
     ).toEqual([true])
-    expect(rankSettings("opencode", index(), root).map((item) => item.entity)).toEqual([true, true])
+    expect(rankSettings("opencode", index()).map((item) => item.entity)).toEqual([true])
   })
 
   test("normalizes whitespace, case, and Unicode in qualified names", () => {
     const items = index({ servers: [{ ...servers[0], projects: [{ ...project, name: "Open Code" }] }] })
-    expect(rankSettings("  ＯＰＥＮ   ＣＯＤＥ   name  ", items, root).map((item) => item.view.target)).toEqual([
+    expect(rankSettings("  ＯＰＥＮ   ＣＯＤＥ   name  ", items).map((item) => item.view.target)).toEqual([
       "settings-project-name",
     ])
   })
 
   test("does not search paths or use the Projects category to match unrelated names", () => {
     const items = index({ servers: [{ ...servers[0], projects: [{ ...project, name: "codename" }] }] })
-    expect(rankSettings("project name", items, root).some((item) => item.project)).toBe(false)
-    expect(rankSettings("/projects/opencode", items, root)).toEqual([])
-  })
-
-  test("ranks equivalent matches by origin without merging different servers", () => {
-    const origin: SettingsView = {
-      type: "project",
-      server: "remote",
-      project: project.worktree,
-      tab: "general",
-      parent: "server",
-    }
-
-    expect(rankSettings("opencode name", index(), origin).map((item) => item.server)).toEqual(["remote", "local"])
+    expect(rankSettings("project name", items).some((item) => item.project)).toBe(false)
+    expect(rankSettings("/projects/opencode", items)).toEqual([])
   })
 
   test("supports synonyms and fuzzy title matches while rejecting unrelated queries", () => {
-    expect(rankSettings("dark mode", index(), root)[0].view.target).toBe("settings-color-scheme")
-    expect(rankSettings("termfont", index(), root)[0].title).toBe("Terminal Font")
-    expect(rankSettings("  ", index(), root)).toEqual([])
-    expect(rankSettings("zzzzzzzzz", index(), root)).toEqual([])
+    expect(rankSettings("dark mode", index())[0].view.target).toBe("settings-color-scheme")
+    expect(rankSettings("termfont", index())[0].title).toBe("Terminal Font")
+    expect(rankSettings("  ", index())).toEqual([])
+    expect(rankSettings("zzzzzzzzz", index())).toEqual([])
   })
 })

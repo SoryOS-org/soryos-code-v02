@@ -61,7 +61,6 @@ export const dict = {
   "desktop.dialog.saveFile": "Simpan berkas",
   "desktop.dialog.files": "Berkas",
 
-  "desktop.server.local": "Server lokal",
 
   "desktop.picker.error.notSelected": "Berkas tidak dipilih melalui pemilih",
   "desktop.picker.error.sizeLimit": "Lampiran yang dipilih melebihi batas {{limit}} MB",
@@ -101,7 +100,6 @@ export const dict = {
   "command.context.addSelection": "Tambahkan pilihan ke konteks",
   "command.context.addSelection.description": "Tambahkan baris yang dipilih dari berkas saat ini",
   "command.input.focus": "Fokuskan masukan",
-  "command.fileTree.toggle": "Alihkan pohon berkas",
   "command.review.toggle": "Alihkan tinjauan",
   "command.message.previous": "Pesan sebelumnya",
   "command.message.previous.description": "Pergi ke pesan pengguna sebelumnya",
@@ -234,7 +232,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Tanyakan apa saja… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Sesi subagen tidak dapat diberi prompt.",
   "session.child.backToParent": "Kembali ke sesi utama.",
 
   "prompt.action.attachFile": "Tambah berkas",
@@ -739,9 +736,6 @@ export const dict = {
   "session.search.placeholder": "Menemukan...",
   "session.search.noResults": "Tidak ada kecocokan",
   "titlebar.tabs": "tab",
-  "titlebar.channel.local": "Lokal",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Eksperimental",
   "settings.experimental.description": "Coba fitur eksperimental",
   "settings.tab.about": "Tentang",

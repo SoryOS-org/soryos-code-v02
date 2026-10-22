@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 // Moved from packages/app/e2e/regression/session-timeline-projection.spec.ts
 story("renders every admitted tool family and hides timeline-only exclusions", async ({ mount }) => {
@@ -179,6 +179,21 @@ story("opens an execution's code and output from its View code action", async ({
   await expect(dialog.getByRole("button", { name: "Copy output" })).toBeVisible()
 })
 
+story("reveals the View code action while hovering anywhere over the execution", async ({ mount }) => {
+  const timeline = await mount("current-session-terminal-work--execute-code")
+  const tool = timeline.locator('[data-timeline-part-id="tool_execute_long_call"]')
+  const action = tool.locator('[data-slot="basic-tool-action"]')
+  await timeline.page().mouse.move(0, 0)
+  await expect(action).toHaveCSS("opacity", "0")
+
+  // The calls sit below the header, so hovering them proves the whole tool reveals the action.
+  await tool.locator('[data-slot="execute-tool-call"]').first().hover()
+  await expect(action).toHaveCSS("opacity", "1")
+
+  await timeline.page().mouse.move(0, 0)
+  await expect(action).toHaveCSS("opacity", "0")
+})
+
 story("keeps long execute calls inside the tool and shows the script output", async ({ mount }) => {
   const timeline = await mount("current-session-terminal-work--execute-code")
   const tool = timeline.locator('[data-timeline-part-id="tool_execute_long_call"]')
@@ -198,9 +213,12 @@ story("keeps long execute calls inside the tool and shows the script output", as
 
   const overflow = await tool.evaluate((element) => {
     const calls = element.querySelector('[data-component="execute-tool-calls"]')
+
     if (!calls) return Number.NaN
+
     return calls.getBoundingClientRect().right - element.getBoundingClientRect().right
   })
+
   expect(overflow).toBeLessThanOrEqual(0)
 })
 

@@ -10,6 +10,7 @@ import { useWorkspaceLocation } from "@/workspaces/location"
 import { sessionPermissionRequest, sessionFormRequest, sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { createWebSearchRequest } from "./websearch"
 import { createSessionBackground } from "@/session/requests/background"
+import { createSteerBackground } from "@/session/requests/steer-background"
 import { useData } from "@/runtime/server/current"
 
 export function createSessionRequestModel() {
@@ -27,13 +28,21 @@ export function createSessionRequestModel() {
       () => undefined,
     )
   })
-  createEffect(() => {
-    const id = params.id
 
-    if (!id || serverSDK.connection.status() !== "connected") return
-    void Promise.all(
-      sessionTreeIDs(data.session.list(), id).map((sessionID) => data.session.form.sync(sessionID)),
-    ).catch(() => undefined)
+  // Only a running Session can hold a pending form, and events keep loaded forms current. Comparing by value
+  // keeps every session update in a large subagent tree from re-requesting forms.
+  const formSessions = createMemo(
+    () =>
+      sessionTreeIDs(data.session.list(), params.id).filter(
+        (id) => id === params.id || data.session.status(id) === "running",
+      ),
+    [],
+    { equals: (a, b) => a.join() === b.join() },
+  )
+
+  createEffect(() => {
+    if (serverSDK.connection.status() !== "connected") return
+    void Promise.all(formSessions().map((sessionID) => data.session.form.sync(sessionID))).catch(() => undefined)
   })
 
   const formRequest = createMemo((): FormInfo | undefined => {
@@ -117,6 +126,12 @@ export function createSessionRequestModel() {
     })
   }
 
+  const steer = createSteerBackground({
+    sessionID: () => params.id,
+    blocking,
+    move: (sessionID) => serverSDK.api.session.background({ sessionID }),
+  })
+
   const [store, setStore] = createStore<{ responding: string | undefined }>({ responding: undefined })
 
   const permissionResponding = createMemo(() => {
@@ -158,6 +173,7 @@ export function createSessionRequestModel() {
       blocking,
       tasks,
       move: moveToBackground,
+      steer,
     },
     decide,
   }

@@ -60,7 +60,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Odaberi datoteku",
   "desktop.dialog.saveFile": "Sačuvaj datoteku",
   "desktop.dialog.files": "Datoteke",
-  "desktop.server.local": "Lokalni server",
 
   "desktop.picker.error.notSelected": "Datoteka nije odabrana u izborniku",
   "desktop.picker.error.sizeLimit": "Odabrani prilozi premašuju ograničenje od {{limit}} MB",
@@ -99,7 +98,6 @@ export const dict = {
   "command.context.addSelection": "Dodaj odabir u kontekst",
   "command.context.addSelection.description": "Dodaj odabrane linije iz trenutne datoteke",
   "command.input.focus": "Fokusiraj polje za unos",
-  "command.fileTree.toggle": "Prikaži/sakrij stablo datoteka",
   "command.review.toggle": "Prikaži/sakrij pregled",
   "command.message.previous": "Prethodna poruka",
   "command.message.previous.description": "Idi na prethodnu korisničku poruku",
@@ -226,7 +224,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pitaj bilo šta… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Sesijama podagenta nije moguće slati upite.",
   "session.child.backToParent": "Nazad na glavnu sesiju.",
 
   "prompt.action.attachFile": "Dodaj datoteke",
@@ -735,9 +732,6 @@ export const dict = {
   "session.search.placeholder": "Pronađi...",
   "session.search.noResults": "Nema podudaranja",
   "titlebar.tabs": "Kartice",
-  "titlebar.channel.local": "Lokalno",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Eksperimentalno",
   "settings.experimental.description": "Isprobajte eksperimentalne funkcije",
   "settings.tab.about": "O programu",

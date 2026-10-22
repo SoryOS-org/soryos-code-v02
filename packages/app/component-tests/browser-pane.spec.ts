@@ -1,4 +1,4 @@
-import { expect, sourceURL, story } from "../../storybook/playwright/story"
+import { expect, sourceURL, story } from "../../stories/playwright/story"
 
 const source = (path: string) => sourceURL(new URL(path, import.meta.url))
 
@@ -63,6 +63,22 @@ story("hides the native view immediately while the pane stays mounted", async ({
   expect(visible).toBe("false")
   await expect(root.locator("#browser-panel")).toHaveCount(1)
   await toggle.click()
+  await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
+})
+
+story("hides the native view from the first frame a panel moves until it lands", async ({ page }) => {
+  const root = page.getByTestId("browser-pane-fixture")
+  const motion = root.getByRole("button", { name: "Toggle panel motion", exact: true })
+
+  // Read in the same task as the click: a native view left up for even one frame floats over the moving app.
+  const visible = await motion.evaluate((element) => {
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+
+    return document.querySelector('[data-testid="native-Alpha"]')?.getAttribute("data-visible")
+  })
+
+  expect(visible).toBe("false")
+  await motion.click()
   await expect(root.getByTestId("native-Alpha")).toHaveAttribute("data-visible", "true")
 })
 
@@ -517,14 +533,6 @@ story("adds the whole page to the session and keeps the draft when the button is
   await expect(editor).toHaveValue("Check the header layout")
   await editor.press("Enter")
   await expect(root.getByTestId("fixture-comments").getByRole("listitem")).toHaveText([/: Check the header layout$/])
-})
-
-story("focuses the address field when the page uses the address shortcut", async ({ page }) => {
-  const root = page.getByTestId("browser-pane-fixture")
-  await root.getByRole("button", { name: "Address shortcut", exact: true }).click()
-  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
-  await expect(address).toBeFocused()
-  await expect(address).toHaveJSProperty("selectionEnd", "https://alpha.example/".length)
 })
 
 story("shows the page's cookies in the site information and clears them", async ({ page }) => {

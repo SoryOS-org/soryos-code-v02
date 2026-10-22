@@ -239,7 +239,7 @@ test("keeps the side panel's tabs and selection when the session moves", async (
     await page.keyboard.press("ControlOrMeta+Shift+P")
 
     const dialog = page.getByRole("dialog")
-    const search = dialog.getByRole("textbox")
+    const search = dialog.getByRole("combobox")
     await search.fill(name)
     await expect(dialog.getByRole("option", { name: `/ ${name}.md`, exact: true })).toHaveAttribute(
       "aria-selected",

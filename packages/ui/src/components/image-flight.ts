@@ -5,34 +5,43 @@ import { Spring, type DurationOptions } from "../motion"
  *
  * The flying image is laid out once at `base` and only ever transformed, so the flight runs on transform and
  * clip-path alone. A frame says where the whole image would be drawn (`image`, always the image's own aspect ratio),
- * which part of it shows (`clip`), and the corner radius of that visible part, all in viewport pixels. Each of those
- * numbers rides its own spring, so the visible corners and crop move evenly on screen.
+ * which part of it shows (`clip`), and the corner radius of that visible part, all in viewport pixels. The preview's
+ * panel flies with it as one surface (`surface`, with its own corner radius) that grows out of the visible image, and
+ * `lift` says how far it has become the panel: 0 on the page, 1 open. Each of those numbers rides its own spring, so
+ * the visible corners, crop and panel move evenly on screen.
  */
 
 export type Box = { x: number; y: number; width: number; height: number }
 
-export type FlightFrame = { image: Box; clip: Box; radius: number }
+export type FlightFrame = { image: Box; clip: Box; radius: number; surface: Box; surfaceRadius: number; lift: number }
 
 /**
- * Claude's preview, fitted frame by frame: one critically damped spring for both directions, launched with a push of
- * this many times the remaining distance per second. A spring from rest starts too slowly to match.
+ * One critically damped spring for both directions, launched with a push of `KICK` times the remaining distance per
+ * second, since a spring from rest starts too slowly. The shape is Claude's preview, fitted frame by frame at 0.2 s,
+ * slowed to 0.3 s.
  */
-export const FLIGHT_SPRING = { duration: 0.2, bounce: 0 }
+export const FLIGHT_SPRING = { duration: 0.3, bounce: 0 }
 
-export const KICK = { open: 14, close: 32.5 }
+/**
+ * The launch push on `FLIGHT_SPRING`: Claude's 14 and 32.5 per second at 0.2 s, scaled to 0.3 s so the shape holds.
+ * Other durations scale it the same way.
+ */
+export const KICK = { open: 28 / 3, close: 65 / 3 }
 
 /** A flight frame with one spring per edge, so heading somewhere new mid-flight keeps the velocity it already has. */
 export function createFlight(frame: FlightFrame) {
   const springs = values(frame).map((value) => Spring.fromDuration(value, FLIGHT_SPRING))
 
   return {
-    /** Heads for `frame` on `tuning`, adding a launch velocity of `kick` times the remaining distance per second. */
+    /** Heads for `frame` on `tuning`, launched with a `KICK` push scaled to the spring's duration. */
     to(frame: FlightFrame, kick: number, tuning: DurationOptions = FLIGHT_SPRING) {
+      const push = (kick * FLIGHT_SPRING.duration) / tuning.duration
+
       values(frame).forEach((target, index) => {
         const spring = springs[index]
         spring.omega = (2 * Math.PI) / tuning.duration
         spring.zeta = 1 - tuning.bounce
-        spring.set(target, { velocity: spring.velocity + kick * (target - spring.value) })
+        spring.set(target, { velocity: spring.velocity + push * (target - spring.value) })
       })
     },
     /** Advances `dt` seconds; true until every edge has landed. */
@@ -47,12 +56,19 @@ export function createFlight(frame: FlightFrame) {
       return false
     },
     frame(): FlightFrame {
-      const [x, y, width, height, clipX, clipY, clipWidth, clipHeight, radius] = springs.map((spring) => spring.value)
+      const [x, y, width, height, clipX, clipY, clipWidth, clipHeight, radius, ...panel] = springs.map(
+        (spring) => spring.value,
+      )
+
+      const [surfaceX, surfaceY, surfaceWidth, surfaceHeight, surfaceRadius, lift] = panel
 
       return {
         image: { x, y, width, height },
         clip: { x: clipX, y: clipY, width: clipWidth, height: clipHeight },
         radius,
+        surface: { x: surfaceX, y: surfaceY, width: surfaceWidth, height: surfaceHeight },
+        surfaceRadius,
+        lift: lift / 100,
       }
     },
   }
@@ -76,15 +92,25 @@ export function fittedImage(box: Box, natural: { width: number; height: number }
   }
 }
 
-/** The frame of an element showing an image, cropped to the element's box. */
-export function elementFrame(box: Box, natural: { width: number; height: number }, fit: string, radius: number) {
+/**
+ * The frame of an element showing an image, cropped to the element's box and to `visible`, the part of it the page
+ * shows. The panel starts as that visible part.
+ */
+export function elementFrame(
+  box: Box,
+  natural: { width: number; height: number },
+  fit: string,
+  radius: number,
+  visible: Box = box,
+): FlightFrame {
   const image = fittedImage(box, natural, fit)
+  const clip = intersect(intersect(image, box), visible)
 
-  return { image, clip: intersect(image, box), radius }
+  return { image, clip, radius, surface: clip, surfaceRadius: radius, lift: 0 }
 }
 
 /** Styles that move an image laid out at `base` to `frame`, with `transform-origin: 0 0`. */
-export function flightStyle(base: Box, frame: FlightFrame) {
+export function flightStyle(base: Box, frame: Pick<FlightFrame, "image" | "clip" | "radius">) {
   const scale = frame.image.width / base.width
   const top = (frame.clip.y - frame.image.y) / scale
   const right = (frame.image.x + frame.image.width - frame.clip.x - frame.clip.width) / scale
@@ -120,6 +146,13 @@ function values(frame: FlightFrame) {
     frame.clip.width,
     frame.clip.height,
     frame.radius,
+    frame.surface.x,
+    frame.surface.y,
+    frame.surface.width,
+    frame.surface.height,
+    frame.surfaceRadius,
+    // In percent, so the landing threshold, a quarter of a unit, is as fine for it as for the pixels.
+    frame.lift * 100,
   ]
 }
 

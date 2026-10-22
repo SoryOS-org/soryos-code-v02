@@ -3,7 +3,7 @@ import { Schema } from "effect"
 import { ModelState, ServerState } from "./persistence"
 import { Persistence } from "@/runtime/persistence/schema"
 
-const initial = { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, projects: {} }
+const initial = { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, hostnames: {}, projects: {} }
 
 function serverSchema() {
   return Persistence.withInitial(ServerState, initial)
@@ -47,6 +47,7 @@ describe("server persistence schema", () => {
       hidden: {},
       lastProjectID: { local: "project" },
       usedProjectIDs: {},
+      hostnames: {},
       projects: { local: [{ worktree: "/project" }] },
     })
     expect(input.list[1]).toHaveProperty("username", "legacy")

@@ -98,8 +98,8 @@ const note = (step: number) =>
 const panOf = (x: number, width: number) => (width ? (x / width) * 1.6 - 0.8 : 0)
 
 export const PinSound = {
-  /** The wordmark rising in: a gritty stone slide sweeping left to right with pebbles settling under it. */
-  sweep(input: { duration: number; columns: number }) {
+  /** The wordmark rising in: a gritty stone slide sweeping across with pebbles settling under it. */
+  sweep(input: { duration: number; columns: number; reverse?: boolean }) {
     const a = audio()
     if (!a) return
     const c = a.context
@@ -112,8 +112,8 @@ export const PinSound = {
     const grit = c.createBiquadFilter()
     grit.type = "bandpass"
     grit.Q.value = 1.4
-    grit.frequency.setValueAtTime(260, at)
-    grit.frequency.exponentialRampToValueAtTime(1500, end)
+    grit.frequency.setValueAtTime(input.reverse ? 1500 : 260, at)
+    grit.frequency.exponentialRampToValueAtTime(input.reverse ? 260 : 1500, end)
     const body = c.createBiquadFilter()
     body.type = "lowpass"
     body.frequency.value = 2400
@@ -147,6 +147,22 @@ export const PinSound = {
     const a = audio()
     if (!a) return
     pebble(a, a.context.currentTime, { freq: 1100, q: 2.2, gain: 0.14, decay: 0.05, pan: panOf(x, width), thud: 95 })
+  },
+
+  /** The brick breaker ball smashing pins: a clack whose ring climbs the scale with each hit before the paddle. */
+  brick(x: number, width: number, combo: number) {
+    const a = audio()
+    if (!a) return
+    const at = a.context.currentTime
+    pebble(a, at, { freq: 1300, q: 2, gain: 0.1, decay: 0.04, pan: panOf(x, width), thud: 110 })
+    pebble(a, at + 0.004, { freq: note(Math.min(14, combo)), q: 16, gain: 0.06, decay: 0.09, pan: panOf(x, width) })
+  },
+
+  /** The brick breaker ball landing on the paddle: a soft, low knock. */
+  paddle(x: number, width: number) {
+    const a = audio()
+    if (!a) return
+    pebble(a, a.context.currentTime, { freq: 520, q: 1.4, gain: 0.12, decay: 0.05, pan: panOf(x, width), thud: 72 })
   },
 
   /** A loose pin bouncing off the composer or the floor. */

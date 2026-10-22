@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
-import type { ConfigEntry, OpenCodeEvent, WorktreeDirectory } from "@opencode/client/promise"
-import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, session } from "../utils/app"
+import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
+import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
 import { mockRemoteServer, mockWorkspace, openSession, openSettings, type WorkspaceInput } from "../utils/workspace"
 
@@ -94,6 +94,143 @@ test("a settings page survives refresh", async ({ page }) => {
   await expect(page).toHaveURL("/settings?tab=appearance")
 })
 
+for (const locale of ["en", "ar"]) {
+  test(`background activity alignment stays physical and persists (${locale})`, async ({ page }) => {
+    const id = "ses_activity_settings"
+    const childID = "ses_activity_settings_child"
+    const stopped: string[] = []
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/interrupt"))
+        stopped.push(request.url())
+      if (request.method() === "DELETE" && new URL(request.url()).pathname.startsWith("/api/shell/"))
+        stopped.push(request.url())
+    })
+    await openSession(page, {
+      name: "Activity settings",
+      sessions: [
+        { id, title: "Activity settings" },
+        { id: childID, parentID: id, title: "Inspect capsule" },
+      ],
+      sessionStatus: { [id]: { type: "busy" }, [childID]: { type: "busy" } },
+      seed: { locale },
+      pageMessages: (): { items: SessionMessageInfo[] } => ({
+        items: [
+          { id: "msg_activity_user", type: "user", text: "Inspect the activity capsule", time: { created: 1 } },
+          {
+            id: "msg_activity_assistant",
+            type: "assistant",
+            agent: "build",
+            model: { id: "model", providerID: "provider" },
+            content: [
+              {
+                type: "tool",
+                id: "call_activity_child",
+                name: "subagent",
+                state: {
+                  status: "running",
+                  input: { agent: "explore", description: "Inspect capsule" },
+                  metadata: { sessionID: childID },
+                },
+                time: { created: 2 },
+              },
+              {
+                type: "tool",
+                id: "call_activity_shell",
+                name: "shell",
+                state: {
+                  status: "completed",
+                  input: { command: "sleep 120" },
+                  content: [{ type: "text", text: "working" }],
+                  metadata: { shellID: "shell_activity_settings", status: "running" },
+                },
+                time: { created: 2, completed: 3 },
+              },
+            ],
+            time: { created: 2 },
+          },
+        ],
+      }),
+      shellCommands: [
+        {
+          id: "shell_activity_settings",
+          status: "running",
+          command: "sleep 120",
+          cwd: "C:/OpenCode/Activity settings",
+          shell: "bash",
+          file: "/tmp/activity.out",
+          metadata: { sessionID: id },
+          time: { started: 2 },
+        },
+      ],
+    })
+    const capsule = page.locator('[data-slot="session-activity-chip"]')
+    const panel = page.locator('[data-slot="session-activity-panel"]')
+    await expect(capsule).toBeVisible()
+    await expect(page.locator("html")).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr")
+
+    for (const value of ["Center", "Right", "Hidden", "Left", "Right"]) {
+      await page.keyboard.press("Control+,")
+      const settings = page.getByTestId("settings-screen")
+      const control = settings.getByLabel("Background activity", { exact: true })
+      await expect(control).toBeVisible()
+      await control.click()
+      const options = page.getByRole("listbox")
+      await expect(options.getByRole("option")).toHaveText(["Hidden", "Left", "Center", "Right"])
+      await options.getByRole("option", { name: value, exact: true }).click()
+      await expect(control).toHaveText(value)
+      await page.goBack()
+      if (value === "Hidden") {
+        await expect(capsule).toHaveCount(0)
+        await expect(panel).toHaveCount(0)
+        continue
+      }
+      await expect(capsule).toBeVisible()
+      await expect
+        .poll(async () => {
+          const anchor = await capsule.boundingBox()
+          const container = await page.locator('[data-component="session-activity-chips"]').boundingBox()
+          if (!anchor || !container) return Infinity
+          return Math.abs(
+            value === "Center"
+              ? anchor.x + anchor.width / 2 - container.x - container.width / 2
+              : value === "Left"
+                ? anchor.x - container.x
+                : anchor.x + anchor.width - container.x - container.width,
+          )
+        })
+        .toBeLessThan(1)
+      await capsule.click()
+      await expect(panel.getByRole("menuitem")).toHaveCount(2)
+      await expect
+        .poll(async () => {
+          const anchor = await capsule.boundingBox()
+          const bounds = await panel.boundingBox()
+          if (!anchor || !bounds) return Infinity
+          return Math.abs(
+            value === "Center"
+              ? anchor.x + anchor.width / 2 - bounds.x - bounds.width / 2
+              : value === "Left"
+                ? anchor.x - bounds.x
+                : anchor.x + anchor.width - bounds.x - bounds.width,
+          )
+        })
+        .toBeLessThan(1)
+      await page.keyboard.press("Escape")
+    }
+    expect(stopped).toEqual([])
+    await expect
+      .poll(() =>
+        page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.backgroundActivity),
+      )
+      .toBe("right")
+    await page.keyboard.press("Control+,")
+    await page.reload()
+    await expect(page.getByTestId("settings-screen").getByLabel("Background activity", { exact: true })).toHaveText(
+      "Right",
+    )
+  })
+}
+
 test("another server's settings page survives refresh", async ({ page }) => {
   await mockRemoteServer(page, { directory: "/remote/settings-demo" })
   const { settings } = await open(page)
@@ -112,7 +249,7 @@ test("another server's settings page survives refresh", async ({ page }) => {
 })
 
 test("single-server settings expose scoped pages without a server picker", async ({ page }) => {
-  const { settings } = await open(page)
+  const { settings } = await open(page, { hostname: "hailmary" })
   await expect(settings.getByRole("tab", { name: "Server", exact: true })).toBeVisible()
   await expect(settings.getByRole("tab", { name: "Servers", exact: true })).toHaveCount(0)
 
@@ -120,6 +257,7 @@ test("single-server settings expose scoped pages without a server picker", async
     await settings.getByRole("tab", { name, exact: true }).click()
     await expect(settings.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true")
     await expect(settings.locator('[data-action="settings-server-select"]')).toHaveCount(0)
+    await expect(settings.getByText(/hailmary|This computer|Local server/i)).toHaveCount(0)
   }
 
   await settings.getByRole("tab", { name: "Server", exact: true }).click()
@@ -132,6 +270,52 @@ test("single-server settings expose scoped pages without a server picker", async
 
   await page.getByRole("option", { name: "bash", exact: true }).click()
   expect((await updated).postDataJSON()).toEqual({ shell: "bash" })
+})
+
+test("several servers share one selected server across per-server pages", async ({ page }) => {
+  const offline = "http://127.0.0.1:4099"
+  await mockRemoteServer(page, {
+    name: "Build server",
+    directory: "/remote/settings-demo",
+    provider: {
+      all: [{ id: "openrouter", name: "OpenRouter", models: { kimi: { id: "kimi", name: "Kimi K2.5" } } }],
+      connected: ["openrouter"],
+      default: { providerID: "openrouter", modelID: "kimi" },
+    },
+    integrations: [{ id: "openrouter", name: "OpenRouter", methods: [{ type: "key" }], connections: [] }],
+  })
+  // Nothing answers on the offline server.
+  await seed(page, {
+    servers: [
+      { url: REMOTE_SERVER, name: "Build server" },
+      { url: offline, name: "Offline box" },
+    ],
+  })
+  const { settings } = await open(page, { hostname: "hailmary" })
+  const switcher = settings.locator('[data-action="settings-server-select"]:visible')
+  const connected = settings.locator('[data-component="connected-providers-section"]')
+
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  // The server the app runs beside is named by its hostname; only the menu that chooses a server adds "This computer".
+  await expect(switcher).toHaveText("Serverhailmary")
+  await expect(connected.getByText("No connected providers")).toBeVisible()
+  await switcher.click()
+  await expect(page.getByRole("menuitemradio")).toHaveText(["hailmary· This computer", "Build server", /^Offline box/])
+  await page.getByRole("menuitemradio", { name: "Build server", exact: true }).click()
+  await expect(connected.getByText("OpenRouter", { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get("server") === REMOTE_SERVER && url.searchParams.get("tab") === "providers",
+  )
+
+  await settings.getByRole("tab", { name: "Models", exact: true }).click()
+  await expect(switcher).toHaveText("ServerBuild server")
+  await expect(settings.getByRole("switch", { name: "Kimi K2.5", exact: true })).toBeVisible()
+
+  await switcher.click()
+  await page.getByRole("menuitemradio", { name: /^Offline box/ }).click()
+  await expect(settings.getByRole("status").filter({ hasText: "Can't reach Offline box" })).toBeVisible()
+  await expect(settings.getByRole("button", { name: "Retry", exact: true })).toBeVisible()
+  await expect(settings.getByRole("button", { name: "Edit server", exact: true })).toBeVisible()
 })
 
 test("project list menus rename, edit, add, and stay inside the scrollport", async ({ page }) => {
@@ -398,6 +582,32 @@ test("the new session shortcut waits for a shortcut recording, then leaves setti
   await expect(page.locator('[data-titlebar-tab][data-active="true"]')).toHaveCount(1)
 })
 
+test("single extension rows stay aligned when switching tabs", async ({ page }) => {
+  const { settings } = await open(page, {
+    mcp: [{ name: "demo-mcp", status: { status: "connected" } }],
+    plugins: [{ id: "demo-plugin", source: { type: "package", target: "demo-plugin" } }],
+    skills: [{ name: "demo-skill", description: "Demo skill", path: "/skills/demo/SKILL.md" }],
+  })
+  await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+  await expect(settings.getByRole("switch", { name: "demo-mcp", exact: true })).toBeChecked()
+  const mcp = settings.getByRole("tabpanel", { name: "MCPs", exact: true }).locator(".settings-extension-row")
+  await expect(mcp).toHaveCount(1)
+  const bounds = await mcp.boundingBox()
+  expect(bounds).not.toBeNull()
+
+  for (const item of [
+    { tab: "Plugins", name: "demo-plugin" },
+    { tab: "Skills", name: "demo-skill" },
+  ]) {
+    await settings.getByRole("tab", { name: item.tab, exact: true }).click()
+    const panel = settings.getByRole("tabpanel", { name: item.tab, exact: true })
+    await expect(panel.getByText(item.name, { exact: true })).toBeVisible()
+    const row = panel.locator(".settings-extension-row")
+    await expect(row).toHaveCount(1)
+    await expect.poll(() => row.boundingBox()).toEqual(bounds)
+  }
+})
+
 test.describe("pages open before slow data", () => {
   test("worktrees", async ({ page }) => {
     const { settings } = await open(page)
@@ -439,6 +649,53 @@ test.describe("pages open before slow data", () => {
     mcp.release()
     await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
     await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
+  })
+
+  test("extensions separate MCP status from details, sign-in, and switch controls", async ({ page, context }) => {
+    const error = "Connection closed: MCP server process exited with code 1"
+    const signIns: string[] = []
+    await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
+
+    const { settings } = await open(page, {
+      mcp: [
+        { name: "blender", status: { status: "failed", error } },
+        { name: "demo-mcp", status: { status: "connected" } },
+        { name: "disabled-mcp", status: { status: "disabled" } },
+        { name: "stripe", integrationID: "stripe-oauth", status: { status: "needs_auth", error: "Sign in required" } },
+      ],
+      integrations: [
+        { id: "stripe-oauth", name: "Stripe", methods: [{ id: "oauth", type: "oauth" }], connections: [] },
+      ],
+      onIntegrationOAuth: (input) => {
+        signIns.push(input.integrationID)
+
+        return { url: "https://auth.example.test/authorize" }
+      },
+    })
+
+    await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+    await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
+    await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
+    await expect(settings.getByRole("switch")).toHaveCount(2)
+    await expect(settings.getByText("Connected", { exact: true })).toBeVisible()
+    await expect(settings.getByText("Disabled", { exact: true })).toBeVisible()
+    await expect(settings.getByText("Failed", { exact: true })).toBeVisible()
+
+    const popup = page.waitForEvent("popup")
+    const signIn = settings.getByRole("button", { name: "Sign in to stripe", exact: true })
+    await expect(signIn).toHaveAttribute("data-component", "button-v2")
+    await expect(signIn.locator("svg")).toHaveCount(0)
+    await signIn.click()
+    await expect(await popup).toHaveURL("https://auth.example.test/authorize")
+    expect(signIns).toEqual(["stripe-oauth"])
+
+    const action = settings.getByRole("button", { name: "Details for blender", exact: true })
+    await expect(action).toHaveText("Details")
+    await expect(action).toHaveAttribute("data-component", "button-v2")
+    await action.click()
+    const details = page.getByRole("dialog", { name: "blender", exact: true })
+    await expect(details).toHaveAccessibleDescription("Connection failed")
+    await expect(details.getByText(error, { exact: true })).toBeVisible()
   })
 
   for (const fails of [false, true]) {
@@ -1280,7 +1537,7 @@ test("the add server dialog keeps focus above fullscreen settings", async ({ pag
   await mockRemoteServer(page, { directory: "/remote/settings-demo" })
   const { settings } = await open(page)
   await expect(page.getByRole("dialog")).toHaveCount(0)
-  await settings.locator('[data-component="settings-nav-group-header"]').filter({ hasText: "Servers" }).hover()
+  await settings.getByRole("tab", { name: "Servers", exact: true }).click()
   await settings.getByRole("button", { name: "Add server" }).click()
 
   const editor = page.getByRole("dialog", { name: "Add server" })
@@ -1315,7 +1572,7 @@ test("the add server dialog pairs from a one-time link and explains a spent one"
   const link = `${paired}/auth/connect/one-time-code`
 
   const addServer = async () => {
-    await settings.locator('[data-component="settings-nav-group-header"]').filter({ hasText: "Servers" }).hover()
+    await settings.getByRole("tab", { name: "Servers", exact: true }).click()
     await settings.getByRole("button", { name: "Add server" }).click()
     const editor = page.getByRole("dialog", { name: "Add server" })
     await editor.getByLabel("Pairing link", { exact: true }).fill(link)
@@ -1327,7 +1584,6 @@ test("the add server dialog pairs from a one-time link and explains a spent one"
   const added = await addServer()
   await expect(added).toBeHidden()
   await expect(settings.getByText(paired, { exact: true })).toBeVisible()
-  await settings.getByRole("button", { name: "Back to settings" }).click()
 
   const spent = await addServer()
   await expect(spent.getByRole("alert")).toHaveText(
@@ -1359,7 +1615,7 @@ test("a pairing code with several addresses keeps the first one that works with 
   }
 
   const { settings } = await open(page)
-  await settings.locator('[data-component="settings-nav-group-header"]').filter({ hasText: "Servers" }).hover()
+  await settings.getByRole("tab", { name: "Servers", exact: true }).click()
   await settings.getByRole("button", { name: "Add server" }).click()
   const editor = page.getByRole("dialog", { name: "Add server" })
   await editor
@@ -1410,6 +1666,13 @@ for (const viewport of [
     await main.hover({ position: { x: 1, y: 200 } })
     await page.mouse.wheel(0, 10000)
     await expect(main).toHaveJSProperty("scrollTop", 0)
+
+    if (viewport.name === "desktop") {
+      // Wheel over the settings gutter scrolls the page beside it.
+      await settings.hover({ position: { x: 16, y: 200 } })
+      await page.mouse.wheel(0, 200)
+      await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    }
 
     const pages = [
       "Preferences",

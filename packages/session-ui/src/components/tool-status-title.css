@@ -76,7 +76,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-component="tool-status-title"] [data-slot="tool-status-swap"],
   [data-component="tool-status-title"] [data-slot="tool-status-tail"] {
     transition-duration: 0ms;

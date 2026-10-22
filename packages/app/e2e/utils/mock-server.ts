@@ -44,6 +44,8 @@ export type MockFileContent =
 
 export interface MockServerConfig {
   server?: string
+  // The machine name `/api/info` reports; omitted like a server that predates it.
+  hostname?: string
   provider: Resolvable<MockProviderCatalog>
   integrations?: Resolvable<unknown[]>
   // Runs on POST /api/credential/:id/activate; the fixture swaps its integrations and catalog to the new account.
@@ -80,7 +82,8 @@ export interface MockServerConfig {
     items: SessionMessageInfo[]
     cursor?: string
   }
-  vcs?: { current: string; default: string }
+  vcs?: { current: string; default: string } | ((directory: string) => { current: string; default: string })
+  branches?: (input: { directory: string; search?: string; limit?: number }) => string[] | Promise<string[]>
   // Initializes the mock project's VCS; without a handler this mutation answers 501.
   onVcsInit?: (input: { directory: string; provider?: string }) => void
   vcsDiff?: unknown[] | ((input: { mode?: string }) => unknown[])
@@ -133,13 +136,14 @@ export interface MockServerConfig {
   fileList?: (path: string) => unknown[] | Promise<unknown[]>
   fileContent?: (path: string) => MockFileContent | Promise<MockFileContent>
   // Paths become directory entries.
-  findFiles?: (input: { query: string; dirs?: string; limit?: number }) => unknown[]
+  findFiles?: (input: { query: string; dirs?: string; limit?: number; directory: string }) => unknown[]
   sessionStatus?: Resolvable<Record<string, { type: string }>>
   inbox?: unknown[] | (() => unknown[])
   onPrompt?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   generate?: (input: { sessionID: string; prompt: string }) => { text: string } | Promise<{ text: string }>
   onInboxChange?: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => void
+  onBackground?: (input: { sessionID: string }) => void
   // Serves `/api/pty*` and mock PTY WebSockets. Created IDs are the first unused `${prefix}<n>` (prefix must start with "pty").
   // `directory` is the owning workspace (Location); `cwd` is the reported working directory (default: `directory`).
   pty?: { prefix?: string; initial?: { id: string; title: string; directory?: string; cwd?: string }[] }
@@ -494,6 +498,28 @@ export function mockMissingLocation(page: Page, directory: string) {
         headers: { "access-control-allow-origin": "*" },
       }),
   )
+}
+
+// Answers the first model list as a cold Location does when its plugins outlast the server's wait.
+export function mockPluginsActivating(page: Page) {
+  const pending = { model: true }
+
+  return page.route(/\/api\/model(\?|$)/, (route) => {
+    if (!pending.model) return route.fallback()
+    pending.model = false
+
+    return route.fulfill({
+      status: 503,
+      // SAFETY: the server's wire body for a plugin wait timeout, which the client decodes into its own error.
+      json: {
+        // oxlint-disable-next-line anti-slop-effect/no-manual-tagged-construction -- see SAFETY above
+        _tag: "ServiceUnavailableError",
+        message: "Location plugins did not finish activating",
+        service: "plugin",
+      },
+      headers: { "access-control-allow-origin": "*" },
+    })
+  })
 }
 
 // Mocks several servers on one page. Each origin gets its own handler and its own SSE transport for events.
@@ -851,6 +877,7 @@ function mockHandlers(
           Effect.succeed({
             version: "2.0.0",
             pid: 1,
+            hostname: config.hostname,
             urls: config.server ? [config.server] : [],
             paths: { tmp: "/tmp/opencode" },
           }),
@@ -1014,10 +1041,14 @@ function mockHandlers(
                 }),
           ),
         formRequests: () => Effect.succeed({ location: location(config), data: resolve(config.forms ?? []) }),
-        vcs: () =>
+        vcs: (ctx) =>
           Effect.succeed({
-            location: location(config),
-            data: { branch: config.vcs ?? { current: "main", default: "main" } },
+            location: location(config, requestDirectory(config, ctx.request)),
+            data: {
+              branch: Predicate.isFunction(config.vcs)
+                ? config.vcs(requestDirectory(config, ctx.request))
+                : (config.vcs ?? { current: "main", default: "main" }),
+            },
           }),
         vcsInit: (ctx) => {
           if (!config.onVcsInit) return unsupported("initialize VCS", "onVcsInit")
@@ -1040,7 +1071,26 @@ function mockHandlers(
           }).pipe(Effect.andThen(noContent))
         },
         vcsStatus: () => Effect.succeed({ location: location(config), data: [] }),
-        vcsBranches: () => Effect.succeed({ location: location(config), data: ["main"] }),
+        vcsBranches: (ctx) => {
+          const query = new URL(ctx.request.url, "http://localhost").searchParams
+          const search = query.get("search") ?? ""
+          const limit = Number(query.get("limit") ?? 50)
+
+          return Effect.promise(() =>
+            Promise.resolve(
+              config.branches?.({
+                directory: requestDirectory(config, ctx.request),
+                search,
+                limit,
+              }) ?? ["main"],
+            ),
+          ).pipe(
+            Effect.map((items) => ({
+              location: location(config, requestDirectory(config, ctx.request)),
+              data: items.filter((branch) => branch.toLowerCase().includes(search.toLowerCase())).slice(0, limit),
+            })),
+          )
+        },
         vcsDiff: (ctx) =>
           Effect.sync(() => ({
             location: location(config),
@@ -1055,18 +1105,23 @@ function mockHandlers(
         fsFind: (ctx) =>
           Effect.promise(() =>
             Promise.resolve(
-              config.findFiles?.({ query: ctx.query.query ?? "", dirs: ctx.query.type, limit: ctx.query.limit }),
+              config.findFiles?.({
+                query: ctx.query.query ?? "",
+                dirs: ctx.query.type,
+                limit: ctx.query.limit,
+                directory: requestDirectory(config, ctx.request),
+              }),
             ),
           ).pipe(
             Effect.map((entries) => ({
-              location: location(config),
+              location: location(config, requestDirectory(config, ctx.request)),
               data: Array.isArray(entries)
                 ? entries.map((entry) =>
                     Predicate.isString(entry)
                       ? {
                           name: entry.split(/[\\/]/).at(-1) ?? entry,
                           path: entry,
-                          absolute: `${config.directory}/${entry}`,
+                          absolute: `${requestDirectory(config, ctx.request)}/${entry}`,
                           type: "directory",
                           ignored: false,
                         }
@@ -1215,14 +1270,27 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        sessionActive: () =>
-          Effect.succeed({
+        sessionActive: () => {
+          const status = resolve(config.sessionStatus ?? {})
+
+          return Effect.succeed({
             data: Object.fromEntries(
-              Object.entries(resolve(config.sessionStatus ?? {})).flatMap(([id, status]) =>
-                status.type === "idle" ? [] : [[id, { type: "running" }]],
-              ),
+              [
+                ...Object.entries(status).flatMap(([id, value]) => (value.type === "idle" ? [] : [id])),
+                ...Object.entries(config.sessionPermissions ?? {}).flatMap(([id, list]) =>
+                  currentPermissions(list).length > 0 && status[id]?.type !== "idle" ? [id] : [],
+                ),
+                ...resolve(config.forms ?? []).flatMap((form) =>
+                  Predicate.isObject(form) &&
+                  Predicate.isString(form.sessionID) &&
+                  status[form.sessionID]?.type !== "idle"
+                    ? [form.sessionID]
+                    : [],
+                ),
+              ].map((id) => [id, { type: "running" as const }]),
             ),
-          }),
+          })
+        },
         sessionGet: (ctx) =>
           Effect.suspend(() => {
             config.onSession?.(ctx.params.sessionID)
@@ -1242,7 +1310,8 @@ function mockHandlers(
           }),
         sessionFormReply: () => noContent,
         sessionFormCancel: () => noContent,
-        sessionBackground: () => noContent,
+        sessionBackground: (ctx) =>
+          Effect.sync(() => config.onBackground?.({ sessionID: ctx.params.sessionID })).pipe(Effect.andThen(noContent)),
         sessionInbox: (ctx) =>
           Effect.sync(() => ({
             data: resolve(config.inbox ?? []).filter(

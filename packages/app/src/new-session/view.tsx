@@ -1,11 +1,13 @@
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { Icon } from "@opencode/ui/icon"
-import { Show, createMemo, createSignal } from "solid-js"
+import { Show, createMemo, createSignal, type JSX } from "solid-js"
+import { createStore } from "solid-js/store"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { getFilename } from "@opencode/util/path"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
@@ -29,8 +31,10 @@ import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useSettings } from "@/settings/model"
 import type { NewSessionWorkspaceController } from "./workspace/controller"
-import { NewSessionPinBoard } from "./pin-board"
-import { NewSessionWordmark } from "./wordmark"
+import { NewSessionBranch } from "./workspace/selector"
+import { NewSessionBrickBreaker } from "./brick-breaker"
+import { NewSessionPinBoard, type PinBoardHandle } from "./pin-board"
+import { NewSessionWordmark, type LodgerBall } from "./wordmark"
 
 const providerTipDismissalDuration = 30 * 24 * 60 * 60 * 1000
 
@@ -42,7 +46,6 @@ export const ProviderTipSchema = Persistence.struct({
   dismissedAt: Schema.Finite,
 })
 
-export const WorkspaceTipSchema = ProviderTipSchema
 
 export function NewSessionView(props: {
   composer: ComposerModel
@@ -57,17 +60,19 @@ export function NewSessionView(props: {
   )
 
   const settings = useSettings()
-  const [wordmark, setWordmark] = createSignal<HTMLDivElement>()
-
-  const select = (value: string) => {
-    props.workspace.selection.set(value)
-
-    if (value !== "main") setOnboarding("used", true)
-  }
+  const [wordmark, setWordmark] = createStore({
+    box: undefined as HTMLDivElement | undefined,
+    mode: "flat" as "flat" | "open" | "closing",
+    game: false,
+  })
+  // Imperative handles for the brick breaker; they are not reactive state.
+  const handles: { board?: PinBoardHandle; ball?: LodgerBall } = {}
+  let panel!: HTMLDivElement
 
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
       <div
+        ref={panel}
         data-component="new-session"
         class="relative isolate flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
       >
@@ -77,21 +82,29 @@ export function NewSessionView(props: {
         />
         <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <NewSessionWordmark ref={setWordmark} />
+            <NewSessionWordmark
+              ref={(box) => setWordmark("box", box)}
+              sound={settings.sounds.interfaceEnabled}
+              onOpen={() => setWordmark("mode", "open")}
+              onClose={() => setWordmark("mode", "closing")}
+              onFlat={() => setWordmark("mode", "flat")}
+              onPlay={(ball) => {
+                handles.ball = ball
+                setWordmark("game", true)
+              }}
+            />
             <div class="mt-8 flex flex-col gap-3">
-              <div
-                data-slot="new-session-composer"
-                classList={{
-                  "rounded-xl border border-v2-border-border-base bg-v2-background-bg-deep": !!props.project.selected(),
-                }}
-              >
-                <Composer model={props.composer} borderUnderlay={!!props.project.selected()} />
+              <div data-slot="new-session-composer" class="flex flex-col gap-1">
+                <div class="relative z-10">
+                  <Composer model={props.composer} />
+                </div>
                 <Show when={props.project.selected()}>
                   {(project) => (
                     <NewSessionLocation
                       project={project()}
                       workspace={props.workspace.bar.visible() ? props.workspace.selection.value() : "main"}
                       root={props.workspace.project.root()}
+                      branch={<NewSessionBranch workspace={props.workspace} onDone={props.composer.restoreFocus} />}
                       onboarding={onboardingReady() && !onboarding.used && props.workspace.bar.visible()}
                       onClick={() =>
                         props.location({
@@ -110,31 +123,38 @@ export function NewSessionView(props: {
             </div>
           </div>
         </div>
-        <Show when={wordmark()}>
-          {(logo) => <NewSessionPinBoard logo={logo()} sound={settings.sounds.interfaceEnabled} />}
+        <Show when={wordmark.mode !== "flat" && wordmark.box}>
+          {(logo) => (
+            <NewSessionPinBoard
+              logo={logo()}
+              sound={settings.sounds.interfaceEnabled}
+              entrance="chain"
+              closing={wordmark.mode === "closing"}
+              ref={(board) => (handles.board = board)}
+            />
+          )}
         </Show>
-        <NewSessionTips
-          selection={props.composer.model.selection}
-          onDone={props.composer.restoreFocus}
-          workspaceEligible={
-            !!props.project.selected() &&
-            props.workspace.bar.visible() &&
-            props.workspace.selection.value() !== "create" &&
-            props.workspace.project.managed() === 0
-          }
-          onWorkspace={() => select("create")}
-        />
+        <Show when={wordmark.game && handles.board && handles.ball && { board: handles.board, ball: handles.ball }}>
+          {(game) => (
+            <NewSessionBrickBreaker
+              panel={panel}
+              board={game().board}
+              ball={game().ball}
+              sound={settings.sounds.interfaceEnabled}
+              onDone={() => {
+                setWordmark("game", false)
+                props.composer.restoreFocus()
+              }}
+            />
+          )}
+        </Show>
+        <NewSessionTips selection={props.composer.model.selection} onDone={props.composer.restoreFocus} />
       </div>
     </div>
   )
 }
 
-function NewSessionTips(props: {
-  selection: ComposerModel["model"]["selection"]
-  onDone: () => void
-  workspaceEligible: boolean
-  onWorkspace: () => void
-}) {
+function NewSessionTips(props: { selection: ComposerModel["model"]["selection"]; onDone: () => void }) {
   const language = useLanguage()
   const dialog = useDialog()
   const sdk = useWorkspaceLocation()
@@ -146,19 +166,6 @@ function NewSessionTips(props: {
     { dismissedAt: 0 },
   )
 
-  const [workspaceState, setWorkspaceState, , workspaceReady] = persisted(
-    Persist.global("new-session.workspace-tip"),
-    WorkspaceTipSchema,
-    { dismissedAt: 0 },
-  )
-
-  const workspaceVisible = createMemo(
-    () =>
-      props.workspaceEligible &&
-      workspaceReady() &&
-      Date.now() - workspaceState.dismissedAt >= providerTipDismissalDuration,
-  )
-
   const providerVisible = createMemo(
     () =>
       providerReady() &&
@@ -166,31 +173,16 @@ function NewSessionTips(props: {
       Date.now() - providerState.dismissedAt >= providerTipDismissalDuration,
   )
 
-  const tip = createMemo<"workspace" | "provider" | undefined>(() => {
-    if (providerVisible()) return "provider"
-
-    if (workspaceVisible()) return "workspace"
-  })
-
-  const displayed = createMemo<"workspace" | "provider" | undefined>((previous) => tip() ?? previous)
+  const tip = providerVisible
   const [ref, setRef] = createSignal<HTMLDivElement>()
 
   const presence = createPresence({
-    show: () => tip() !== undefined,
+    show: tip,
     element: () => ref() ?? null,
   })
 
   const open = () => {
-    const current = tip()
-
-    if (!current) return
-
-    if (current === "workspace") {
-      setWorkspaceState("dismissedAt", Date.now())
-      props.onWorkspace()
-
-      return
-    }
+    if (!tip()) return
 
     void import("@/providers/connect/dialog").then(({ DialogConnectProvider }) => {
       void dialog.show(() => (
@@ -200,15 +192,7 @@ function NewSessionTips(props: {
   }
 
   const dismiss = () => {
-    const current = tip()
-
-    if (!current) return
-
-    if (current === "workspace") {
-      setWorkspaceState("dismissedAt", Date.now())
-
-      return
-    }
+    if (!tip()) return
 
     setProviderState("dismissedAt", Date.now())
   }
@@ -219,7 +203,7 @@ function NewSessionTips(props: {
         <div
           ref={setRef}
           data-component="new-session-tip"
-          data-visible={tip() !== undefined}
+          data-visible={tip()}
           class="group/new-session-tip pointer-events-auto relative flex h-6 max-w-full items-center transition-[opacity,transform] duration-[250ms] ease-[cubic-bezier(0.215,0.61,0.355,1)] motion-reduce:transition-none"
           classList={{ "data-[visible=false]:animate-out fade-out slide-out-to-bottom-4": true }}
         >
@@ -229,7 +213,7 @@ function NewSessionTips(props: {
             onClick={open}
           >
             <span class="truncate">
-              {language.t(displayed() === "workspace" ? "home.workspaceTip" : "home.providerTip")}
+              {language.t("home.providerTip")}
             </span>
             <span class="flex size-6 shrink-0 items-center justify-center" aria-hidden="true">
               <Icon name="chevron-down" size="small" class="-rotate-90" />
@@ -256,12 +240,13 @@ function NewSessionTips(props: {
   )
 }
 
-/** The tray under the Composer: the location picker on the left and the session's directory on the right. */
+/** The composer tray: combined location picker, Git context, and the session's directory. */
 function NewSessionLocation(props: {
   project: PromptProject
   /** "main", "create", or a worktree directory. */
   workspace: string
   root: string
+  branch?: JSX.Element
   onboarding: boolean
   onClick: () => void
 }) {
@@ -283,8 +268,8 @@ function NewSessionLocation(props: {
   }
 
   return (
-    <div class="flex h-9 min-w-0 items-center gap-3 ps-2 pe-2 text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px]">
-      <div class="flex min-w-0 max-w-[60%] shrink-0 @max-[560px]:max-w-full">
+    <div class="relative flex min-h-9 min-w-0 items-center gap-3 ps-2 pe-1.5 text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px]">
+      <div class="flex min-w-0 max-w-full flex-wrap items-center gap-1 py-1.5">
         <Tooltip
           appearance={props.onboarding ? "large" : undefined}
           placement="top"
@@ -310,7 +295,7 @@ function NewSessionLocation(props: {
             data-action="prompt-project"
             aria-haspopup="dialog"
             aria-description={language.t("session.new.workspace.trigger.tooltip")}
-            class="flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-md text-start ps-1 pe-2 text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none"
+            class="flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-sm text-start ps-1.5 pe-2 text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none"
             onClick={props.onClick}
           >
             <ProjectAvatar
@@ -318,12 +303,15 @@ function NewSessionLocation(props: {
               fallback={displayName(props.project)}
               src={getProjectAvatarSource(props.project.id, props.project.icon)}
               variant={getProjectAvatarVariant(props.project.icon?.color)}
+              generated={getProjectAvatarGenerated(props.project)}
             />
             <span class="min-w-0 truncate">{displayName(props.project)}</span>
             <Show when={worktree()}>
               {(name) => (
                 <>
-                  <Icon name="chevron-right" class="-mx-1 shrink-0 text-v2-icon-icon-faint" />
+                  <span class="shrink-0 ps-1 pe-0.5 text-[11px] font-medium text-v2-text-text-faint" aria-hidden="true">
+                    /
+                  </span>
                   <span class="min-w-12 shrink-[1000] truncate">{name()}</span>
                 </>
               )}
@@ -337,10 +325,11 @@ function NewSessionLocation(props: {
             </Show>
           </button>
         </Tooltip>
+        {props.branch}
       </div>
       <Show when={path()}>
         {(directory) => (
-          <div class="flex min-w-0 flex-1 justify-end @max-[560px]:hidden">
+          <div class="flex min-w-0 flex-1 justify-end pe-1.5 @max-[560px]:hidden">
             <Tooltip
               placement="top"
               value={directory()}

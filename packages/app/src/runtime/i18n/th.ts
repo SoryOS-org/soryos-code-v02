@@ -60,7 +60,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "เลือกไฟล์",
   "desktop.dialog.saveFile": "บันทึกไฟล์",
   "desktop.dialog.files": "ไฟล์",
-  "desktop.server.local": "เซิร์ฟเวอร์ภายในเครื่อง",
 
   "desktop.picker.error.notSelected": "ไม่ได้เลือกไฟล์จากตัวเลือกไฟล์",
   "desktop.picker.error.sizeLimit": "ไฟล์แนบที่เลือกมีขนาดเกินขีดจำกัด {{limit}} MB",
@@ -100,7 +99,6 @@ export const dict = {
   "command.context.addSelection": "เพิ่มส่วนที่เลือกไปยังบริบท",
   "command.context.addSelection.description": "เพิ่มบรรทัดที่เลือกจากไฟล์ปัจจุบัน",
   "command.input.focus": "โฟกัสช่องป้อนข้อมูล",
-  "command.fileTree.toggle": "สลับแผนผังไฟล์",
   "command.review.toggle": "สลับการตรวจสอบ",
   "command.message.previous": "ข้อความก่อนหน้า",
   "command.message.previous.description": "ไปที่ข้อความผู้ใช้ก่อนหน้า",
@@ -231,7 +229,6 @@ export const dict = {
   "prompt.placeholder.normal": 'ถามอะไรก็ได้… "{{example}}"',
   "prompt.mode.shell": "เชลล์",
   "prompt.mode.normal": "พรอมต์",
-  "session.child.promptDisabled": "ไม่สามารถส่งพรอมต์ในเซสชันเอเจนต์ย่อยได้",
   "session.child.backToParent": "กลับไปยังเซสชันหลัก",
 
   "prompt.action.attachFile": "แนบไฟล์",
@@ -730,9 +727,6 @@ export const dict = {
   "session.search.placeholder": "หา...",
   "session.search.noResults": "ไม่มีการแข่งขัน",
   "titlebar.tabs": "แท็บ",
-  "titlebar.channel.local": "ท้องถิ่น",
-  "titlebar.channel.dev": "นักพัฒนา",
-  "titlebar.channel.beta": "เบต้า",
   "settings.tab.experimental": "การทดลอง",
   "settings.experimental.description": "ลองใช้คุณสมบัติทดลอง",
   "settings.tab.about": "เกี่ยวกับ",

@@ -28,17 +28,17 @@ test("managed service ports are stable per installation channel", () => {
   expect(ServiceConfig.defaultPort("preview-a", "linux")).not.toBe(ServiceConfig.defaultPort("preview-b", "linux"))
 })
 
-test("managed service ports on Windows stay below the range Windows reserves", () => {
-  expect(ServiceConfig.defaultPort("latest", "win32")).toBe(0xc0de - 4096)
-  expect(ServiceConfig.defaultPort("dev", "win32")).toBe(0xc0de - 4096)
-  expect(ServiceConfig.defaultPort("local", "win32")).toBe(0xc0df - 4096)
+test("managed service ports on Windows stay below the ranges Windows and WSL reserve", () => {
+  expect(ServiceConfig.defaultPort("latest", "win32")).toBe(0x70de)
+  expect(ServiceConfig.defaultPort("dev", "win32")).toBe(0x70de)
+  expect(ServiceConfig.defaultPort("local", "win32")).toBe(0x70df)
   const ports = Array.from({ length: 200 }, (_, index) => ({
     windows: ServiceConfig.defaultPort(`preview-${index}`, "win32"),
     linux: ServiceConfig.defaultPort(`preview-${index}`, "linux"),
   }))
-  expect(ports.some((port) => port.linux >= 0xc000)).toBe(true)
-  expect(ports.every((port) => port.windows >= 10_000 && port.windows < 0xc000)).toBe(true)
-  expect(ports.filter((port) => port.linux < 0xc000 && port.windows !== port.linux)).toEqual([])
+  expect(ports.some((port) => port.linux >= 0x8000)).toBe(true)
+  expect(ports.every((port) => port.windows >= 10_000 && port.windows < 0x8000)).toBe(true)
+  expect(ports.filter((port) => port.linux < 0x8000 && port.windows !== port.linux)).toEqual([])
 })
 
 test("service disabled accepts only booleans without changing configuration on invalid input", async () => {
@@ -359,13 +359,13 @@ test("concurrent service processes elect one server", async () => {
       await fetch(new URL("/api/info", info.url), {
         headers: { authorization: "Basic " + btoa(`opencode:${info.password}`) },
       }).then((response) => response.json()),
-    ).toEqual({
+    ).toMatchObject({
       version: info.version,
       pid: info.pid,
       urls: [info.url],
       // The server reports the canonical tmp directory; Windows os.tmpdir() can be an 8.3 short name.
       paths: { tmp: await fs.realpath(path.join(os.tmpdir(), "opencode")) },
-      capabilities: { persistentPty: process.platform !== "win32" },
+      capabilities: { persistentPty: true },
     })
     const contender = Bun.spawn(command, { env, stderr: "pipe", stdout: "ignore" })
     try {
@@ -767,6 +767,7 @@ function serviceEnv(root: string) {
     ...process.env,
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: transpilerCache,
     HOME: root,
+    OPENCODE_CONFIG_DIR: undefined,
     OPENCODE_DB: path.join(root, "opencode.db"),
     OPENCODE_TEST_HOME: root,
     XDG_CACHE_HOME: path.join(root, "cache"),

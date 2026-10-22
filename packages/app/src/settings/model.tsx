@@ -1,5 +1,6 @@
 import { produce, reconcile, unwrap } from "solid-js/store"
 import { createEffect, createMemo } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
 import { Effect, Option, Predicate, Schema, SchemaGetter } from "effect"
 import { createSimpleContext } from "@opencode/ui/context"
 import { timelinePresets, type TimelineCategory, type TimelineDetail } from "@opencode/session-ui/timeline/detail"
@@ -15,7 +16,11 @@ export type WorkspaceLastUsed = Settings["workspaces"]["lastUsed"][string]
 
 export type FollowUpBehavior = Settings["general"]["followUpBehavior"]
 
+export type BackgroundActivity = Settings["general"]["backgroundActivity"]
+
 export type TabLayout = Settings["appearance"]["tabLayout"]
+
+export type ReduceMotion = Settings["appearance"]["reduceMotion"]
 
 export type NotificationSettings = Settings["notifications"]
 
@@ -99,9 +104,10 @@ const placementOnlySchema = Persistence.struct({ placement: placementSchema })
 const generalSchema = Persistence.struct({
   // Retired preferences without readers; kept so stored values still decode and round-trip.
   autoSave: Persistence.optional(Schema.Boolean),
+  showFileTree: Persistence.optional(Schema.Boolean),
+  showTurnNavigator: Persistence.optional(Schema.Boolean),
   // Owned by the updater extension, which copies it out once; kept so settings rewrites cannot drop it first.
   releaseNotes: Persistence.optional(Schema.Boolean),
-  showFileTree: Schema.Boolean,
   showNavigation: Persistence.optional(Schema.Boolean),
   showSearch: Persistence.optional(Schema.Boolean),
   showTerminal: Persistence.optional(Schema.Boolean),
@@ -116,6 +122,7 @@ const generalSchema = Persistence.struct({
   }),
   showCustomAgents: Schema.Boolean,
   showTurnDiffs: Schema.Boolean,
+  backgroundActivity: Schema.Literals(["off", "left", "center", "right"]),
   // Lets agents render generated UI in the timeline; an experiment users can turn off.
   generatedUI: Schema.Boolean,
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
@@ -132,6 +139,7 @@ const appearanceSchema = Persistence.struct({
   // "inbox" is experimental: the vertical layout with a server-wide session inbox in place of tabs.
   tabLayout: Schema.Literals(["horizontal", "vertical", "inbox"]),
   sidebarOpen: Persistence.optional(Schema.Boolean),
+  reduceMotion: Schema.Literals(["system", "on", "off"]),
 })
 
 const permissionsSchema = Persistence.struct({
@@ -279,15 +287,15 @@ export const settingsPersistence = Persistence.migrate(
 
 export const defaultSettings: Settings = {
   general: {
-    showFileTree: false,
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
     showTurnDiffs: false,
+    backgroundActivity: "left",
     generatedUI: true,
     mobileTitlebarPosition: "top",
     followUpBehavior: "steer",
   },
-  appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
+  appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal", reduceMotion: "system" },
   keybinds: {},
   permissions: { autoApprove: false, autoApproveProjects: {} },
   workspaces: { defaultDestination: "last-used", lastUsed: {} },
@@ -312,7 +320,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   gate: false,
   init: () => {
     const [store, setStore, , ready] = persisted({ key: "settings.v3" }, settingsPersistence, defaultSettings)
-    const showFileTree = withFallback(() => store.general?.showFileTree, defaultSettings.general.showFileTree)
 
     const showCustomAgents = withFallback(
       () => store.general?.showCustomAgents,
@@ -330,6 +337,16 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       void document.fonts?.load(`440 13px ${mono}`).catch(() => undefined)
     })
 
+    const reduceMotion = withFallback(() => store.appearance?.reduceMotion, defaultSettings.appearance.reduceMotion)
+    const systemReducedMotion = createMediaQuery("(prefers-reduced-motion: reduce)")
+
+    // Motion styles key off this attribute instead of the media query so the setting can override the system.
+    createEffect(() => {
+      if (typeof document === "undefined") return
+      const reduce = reduceMotion() === "system" ? systemReducedMotion() : reduceMotion() === "on"
+      document.documentElement.dataset.motion = reduce ? "reduce" : "full"
+    })
+
     const autoApproveDefault = withFallback(
       () => store.permissions?.autoApprove,
       defaultSettings.permissions.autoApprove,
@@ -345,10 +362,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         return store
       },
       general: {
-        showFileTree,
-        setShowFileTree(value: boolean) {
-          setStore("general", "showFileTree", value)
-        },
         timelineDetail: withFallback(() => store.general?.timelineDetail, defaultSettings.general.timelineDetail),
         setTimelineDetail(value: TimelineDetail) {
           setStore("general", "timelineDetail", structuredClone(unwrap(value)))
@@ -360,6 +373,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showTurnDiffs: withFallback(() => store.general?.showTurnDiffs, defaultSettings.general.showTurnDiffs),
         setShowTurnDiffs(value: boolean) {
           setStore("general", "showTurnDiffs", value)
+        },
+        backgroundActivity: withFallback(
+          () => store.general?.backgroundActivity,
+          defaultSettings.general.backgroundActivity,
+        ),
+        setBackgroundActivity(value: BackgroundActivity) {
+          setStore("general", "backgroundActivity", value)
         },
         generatedUI: withFallback(() => store.general?.generatedUI, defaultSettings.general.generatedUI),
         setGeneratedUI(value: boolean) {
@@ -378,7 +398,6 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         },
       },
       visibility: {
-        fileTree: showFileTree,
         customAgents: showCustomAgents,
       },
       appearance: {
@@ -405,6 +424,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         sidebarOpen: withFallback(() => store.appearance?.sidebarOpen, true),
         setSidebarOpen(value: boolean) {
           setStore("appearance", "sidebarOpen", value)
+        },
+        reduceMotion,
+        setReduceMotion(value: ReduceMotion) {
+          setStore("appearance", "reduceMotion", value)
         },
       },
       keybinds: {

@@ -1,20 +1,23 @@
 import type { SessionInfo } from "@opencode/client/promise"
+import type { MountedSession, SessionScreen } from "@opencode/gui-extensions/sdk"
 import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import {
   displayName,
+  getProjectAvatarGenerated,
   getProjectAvatarSource,
   getProjectAvatarVariant,
   ProjectAvatar,
 } from "@opencode/ui/project-avatar"
-import { Tooltip } from "@opencode/ui/tooltip"
-import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useNavigate } from "@solidjs/router"
-import { createMemo, For, Show, type ParentProps } from "solid-js"
+import { createMemo, For, Show, type ComponentProps, type JSX, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
+import { ExtensionSlot } from "@/runtime/extension/render"
+import { containsDirectory, getFilename } from "@opencode/util/path"
 import { useServer } from "@/runtime/server/current"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
+import { ServerLabel } from "@/servers/registry/label"
+import { fileManagerApp } from "@/home/projects/file-manager"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { errorMessage } from "@/shell/layout/helpers"
@@ -22,10 +25,11 @@ import { useLayout, type LocalProject } from "@/shell/state/layout"
 import { tabKey, useTabs } from "@/shell/tabs/tabs"
 import { useSettingsSurface } from "@/settings/surface"
 import { pathKey } from "@/workspaces/path-key"
-import { isProjectDirectory, isWorkspaceDirectory } from "@/workspaces/paths"
+import { isProjectDirectory, workspaceDirectories } from "@/workspaces/paths"
 import { sessionHref } from "@/shell/routes/session"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTitle } from "./title"
+import { SessionHeaderSeparator } from "./header/separator"
 import { SessionWorkingIndicator } from "./header/session-working-indicator"
 import { CollapsedSidebarToggleSpace } from "@/shell/sidebar-toggle"
 import "./session-identity-header.css"
@@ -43,39 +47,107 @@ export function SessionTitleHeader(props: ParentProps) {
       {/* Stuck timeline headers stack above this fade, so it only fades content scrolling under the bar. */}
       <div
         aria-hidden="true"
-        class="pointer-events-none sticky top-12 z-[5] -mt-4 h-4 w-full bg-[linear-gradient(to_bottom,var(--v2-background-bg-base),transparent)]"
+        class="session-header-fade pointer-events-none sticky z-[5] -mt-4 h-4 w-full bg-[linear-gradient(to_bottom,var(--v2-background-bg-base),transparent)]"
       />
     </>
   )
 }
 
-export function SessionProjectMenu(props: {
+export function SessionHeaderLayout(props: ParentProps<{ location: JSX.Element; actions?: JSX.Element }>) {
+  return (
+    <div class="session-header-layout">
+      <div class="session-header-location">{props.location}</div>
+      <div class="session-header-title">{props.children}</div>
+      <Show when={props.actions}>
+        <div class="session-header-actions">{props.actions}</div>
+      </Show>
+    </div>
+  )
+}
+
+/**
+ * Where the session runs: the project and its worktree. Opens a card with the server, the full path and the location's
+ * actions.
+ */
+export function SessionLocation(props: {
   project?: Omit<LocalProject, "expanded">
   directory?: string
-  workspace: boolean
+  /** Child sessions show only the project; their lineage follows. */
+  compact?: boolean
+  /** Adds the separator before the title or lineage that follows. */
+  trailing?: boolean
+  /** Available after the owning session screen mounts; loading headers show location details only. */
+  context?: { session: MountedSession; screen: SessionScreen }
 }) {
   const server = useServer()
+  const servers = useServers()
   const language = useLanguage()
   const platform = usePlatform()
   const layout = useLayout()
   const settingsSurface = useSettingsSurface()
   const navigate = useNavigate()
-
-  const [state, setState] = createStore({
-    open: false,
-    projectTruncated: false,
-    pathTruncated: false,
-    pathFocused: false,
-  })
+  const [store, setStore] = createStore({ open: false })
 
   const projectName = createMemo(() => displayName(props.project ?? { worktree: props.directory ?? "" }))
 
-  const canOpenPath = () =>
-    platform.platform === "desktop" && !!platform.openPath && server.isLocal && !!props.directory
+  const worktree = createMemo(() => {
+    const directory = props.directory
 
-  const openPath = () => {
-    if (!canOpenPath() || !platform.openPath || !props.directory) return
-    void platform.openPath(props.directory).catch((cause: unknown) =>
+    if (!props.project || !directory) return
+    const root = workspaceDirectories(props.project).find((item) => containsDirectory(item, directory))
+
+    return root ? getFilename(root) : undefined
+  })
+
+  const git = () => !!props.project?.vcs
+
+  const branch = () =>
+    props.directory ? server.ctx.data.location.vcs.info({ directory: props.directory })?.branch.current : undefined
+
+  const baseBranch = () =>
+    props.project ? server.ctx.data.location.vcs.info({ directory: props.project.worktree })?.branch.current : undefined
+
+  // Revealing a path only makes sense on the machine the app runs on.
+  const canReveal = () =>
+    platform.platform === "desktop" && !!platform.revealPath && servers.current(server.conn) && !!props.directory
+
+  const onOpenChange = (open: boolean) => {
+    setStore("open", open)
+
+    if (!open || !props.directory || !git()) return
+    void server.ctx.data.location.vcs.sync({ directory: props.directory }).catch(() => undefined)
+
+    if (props.project && props.project.worktree !== props.directory)
+      void server.ctx.data.location.vcs.sync({ directory: props.project.worktree }).catch(() => undefined)
+  }
+
+  const copyPath = async () => {
+    const directory = props.directory
+
+    if (!directory) return
+
+    try {
+      await (platform.writeClipboardText?.(directory) ?? navigator.clipboard.writeText(directory))
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: language.t("common.copied"),
+        description: directory,
+      })
+    } catch (cause) {
+      showToast({
+        variant: "error",
+        title: language.t("common.requestFailed"),
+        description: errorMessage(cause, language.t("common.requestFailed")),
+      })
+    }
+  }
+
+  const reveal = () => {
+    const directory = props.directory
+
+    if (!canReveal() || !platform.revealPath || !directory) return
+    void platform.revealPath(directory).catch((cause: unknown) =>
       showToast({
         title: language.t("common.requestFailed"),
         description: errorMessage(cause, language.t("common.requestFailed")),
@@ -83,133 +155,203 @@ export function SessionProjectMenu(props: {
     )
   }
 
-  const openProjectSettings = () => {
-    const current = props.project
+  const openProject = () => {
+    const project = props.project
 
-    if (!current) return
-    settingsSurface.openProject({
-      server: ServerConnection.key(server.conn),
-      project: current.worktree,
-    })
+    if (!project) return
+    server.ctx.projects.touch(project.worktree)
+    layout.home.setSelection({ server: server.key, directory: project.worktree })
+    navigate("/")
   }
 
-  return (
-    <Menu
-      placement="bottom-start"
-      gutter={4}
-      shift={-10}
-      modal={false}
-      open={state.open}
-      onOpenChange={(open) => setState({ open, pathFocused: false })}
-    >
-      <Tooltip placement="bottom" value={<bdi>{projectName()}</bdi>} class="flex shrink-0">
-        <Menu.Trigger
-          as={IconButton}
-          variant="ghost-muted"
-          aria-label={projectName()}
-          data-slot="session-project-trigger"
-          icon={
-            <span class="text-v2-icon-icon-muted">
-              <Icon name={props.workspace ? "outline-worktree" : "monitor"} />
-            </span>
-          }
-        />
-      </Tooltip>
-      <Menu.Portal>
-        <Menu.Content class="w-max max-w-[min(320px,calc(100vw-16px))]" aria-label={projectName()}>
-          <Tooltip
-            placement="top"
-            gutter={2}
-            disabled={!state.projectTruncated}
-            class="min-w-0 cursor-default"
-            contentClass="session-project-info-tooltip max-w-[min(480px,calc(100vw-16px))] whitespace-normal break-all"
-            value={<bdi>{projectName()}</bdi>}
-          >
-            <Menu.Item
-              class="min-w-0 w-full"
-              disabled={!props.project}
-              onSelect={() => {
-                const project = props.project
+  const openProjectSettings = () => {
+    const project = props.project
 
-                if (!project) return
-                server.ctx.projects.touch(project.worktree)
-                layout.home.setSelection({ server: server.key, directory: project.worktree })
-                navigate("/")
-              }}
-            >
-              <span class="session-project-link-content">
-                <ProjectAvatar
-                  class="shrink-0"
-                  aria-hidden="true"
-                  fallback={projectName()}
-                  src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
-                  variant={getProjectAvatarVariant(props.project?.icon?.color)}
-                />
-                <bdi
-                  ref={(element) =>
-                    createResizeObserver(element, () =>
-                      setState("projectTruncated", element.scrollWidth > element.clientWidth),
-                    )
-                  }
-                  class="min-w-0 truncate text-13-medium"
-                >
-                  {projectName()}
+    if (!project) return
+    settingsSurface.openProject({ server: ServerConnection.key(server.conn), project: project.worktree })
+  }
+
+  const workspace = () => (
+    <SessionLocationDetail icon={worktree() ? "outline-worktree" : "monitor"}>
+      {worktree() ?? language.t("session.new.workspace.local")}
+    </SessionLocationDetail>
+  )
+
+  return (
+    <>
+      <Menu placement="bottom-start" gutter={4} modal={false} onOpenChange={onOpenChange}>
+        <Menu.Trigger
+          data-slot="session-location-trigger"
+          title={[projectName(), worktree()].filter(Boolean).join(" / ")}
+          class="flex h-6 min-w-0 max-w-[60%] shrink items-center gap-1.5 rounded-[6px] px-1 text-start text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-text-text-base"
+        >
+          <ProjectAvatar
+            class="shrink-0"
+            aria-hidden="true"
+            fallback={projectName()}
+            src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
+            variant={getProjectAvatarVariant(props.project?.icon?.color)}
+            generated={getProjectAvatarGenerated(props.project)}
+          />
+          <bdi dir="auto" data-slot="session-location-project" class="min-w-0 truncate">
+            {projectName()}
+          </bdi>
+          <Show when={!props.compact && worktree()}>
+            {(name) => (
+              <>
+                <Icon name="outline-worktree" class="session-location-worktree-icon shrink-0 text-v2-icon-icon-muted" />
+                <bdi dir="auto" data-slot="session-location-worktree" class="min-w-12 shrink-[1000] truncate">
+                  {name()}
                 </bdi>
-              </span>
-            </Menu.Item>
-          </Tooltip>
-          <Tooltip
-            placement="top"
-            gutter={2}
-            disabled={!state.pathTruncated}
-            forceOpen={state.pathFocused && state.pathTruncated ? true : undefined}
-            class="min-w-0 cursor-default"
-            contentClass="session-project-info-tooltip max-w-[min(480px,calc(100vw-16px))] whitespace-normal break-all"
-            value={<bdi dir="ltr">{props.directory}</bdi>}
+              </>
+            )}
+          </Show>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content
+            data-slot="session-location-card"
+            class="w-[320px] max-w-[calc(100vw-16px)]"
+            aria-label={projectName()}
           >
-            {/* Read-only paths stay in keyboard navigation so their full tooltip remains accessible. */}
-            <Menu.Item
-              class="session-project-link min-w-0 w-full cursor-default"
-              disabled={!props.directory}
-              aria-disabled={!canOpenPath()}
-              closeOnSelect={canOpenPath()}
-              onSelect={openPath}
-              onFocus={() => setState("pathFocused", true)}
-              onBlur={() => setState("pathFocused", false)}
-              onKeyDown={(event) => {
-                if (event.key !== "Escape") return
-                event.preventDefault()
-                event.stopPropagation()
-                setState({ open: false, pathFocused: false })
-              }}
-            >
-              <span class="session-project-link-content">
-                <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
-                <bdi
-                  ref={(element) =>
-                    createResizeObserver(element, () =>
-                      setState("pathTruncated", element.scrollWidth > element.clientWidth),
-                    )
-                  }
-                  dir="ltr"
-                  class="min-w-0 truncate text-v2-text-text-muted"
-                >
-                  {props.directory}
-                </bdi>
-              </span>
-              <span data-slot="session-project-open-icon" class="session-project-link-open" aria-hidden="true">
-                <Icon name="arrow-up-right" />
-              </span>
+            <Menu.Item class="min-w-0" disabled={!props.project} onSelect={openProject}>
+              <ProjectAvatar
+                class="shrink-0"
+                aria-hidden="true"
+                fallback={projectName()}
+                src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
+                variant={getProjectAvatarVariant(props.project?.icon?.color)}
+                generated={getProjectAvatarGenerated(props.project)}
+              />
+              <bdi dir="auto" class="min-w-0 truncate font-[530]">
+                {projectName()}
+              </bdi>
             </Menu.Item>
-          </Tooltip>
-          <Menu.Separator />
-          <Menu.Item disabled={!props.project} onSelect={openProjectSettings}>
-            <Icon name="settings-gear" class="text-v2-icon-icon-muted" />
-            {language.t("project.settings.title")}
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu>
+            <Show when={worktree() || git()}>
+              <Show when={props.context} fallback={workspace()}>
+                {(context) => (
+                  <ExtensionSlot
+                    at="session.location.workspace"
+                    fallback={workspace()}
+                    input={{
+                      get session() {
+                        return context().session
+                      },
+                      get screen() {
+                        return context().screen
+                      },
+                      get shown() {
+                        return store.open
+                      },
+                      get label() {
+                        return worktree() ?? language.t("session.new.workspace.local")
+                      },
+                      get icon() {
+                        return worktree() ? "outline-worktree" : "monitor"
+                      },
+                    }}
+                  />
+                )}
+              </Show>
+            </Show>
+            <Show when={git()}>
+              <SessionLocationDetail icon="branch">
+                <Show
+                  when={branch()}
+                  fallback={
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <span class="shrink-0 whitespace-nowrap">{language.t("session.location.noBranch")}</span>
+                      <Show when={baseBranch()}>
+                        {(base) => (
+                          <>
+                            <span class="text-v2-text-text-muted">·</span>
+                            <span class="truncate text-v2-text-text-faint">
+                              {language.t("session.summary.basedOn", { branch: base() })}
+                            </span>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  }
+                >
+                  {branch()}
+                </Show>
+              </SessionLocationDetail>
+            </Show>
+            <Show when={props.context}>
+              {(context) => (
+                <ExtensionSlot
+                  at="session.location.menu"
+                  input={{
+                    get session() {
+                      return context().session
+                    },
+                    get screen() {
+                      return context().screen
+                    },
+                    get shown() {
+                      return store.open
+                    },
+                  }}
+                />
+              )}
+            </Show>
+            <Menu.Separator />
+            <SessionLocationDetail icon="server">
+              <ServerLabel server={server.conn} hint />
+            </SessionLocationDetail>
+            <Show when={props.directory}>
+              {(directory) => (
+                <Menu.Sub gutter={4} overflowPadding={16} overlap>
+                  <Menu.SubTrigger
+                    data-slot="session-location-path"
+                    class="[&_[data-slot=menu-v2-item-chevron]]:text-v2-icon-icon-muted"
+                    style={{ height: "auto", "padding-block": "6px" }}
+                  >
+                    <span class="flex min-w-0 items-start gap-2 text-[12px] leading-4 text-v2-text-text-muted">
+                      <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
+                      <bdi dir="ltr" class="min-w-0 select-text break-all">
+                        {directory()}
+                      </bdi>
+                    </span>
+                  </Menu.SubTrigger>
+                  <Menu.Portal>
+                    <Menu.SubContent class="w-max max-w-[calc(100vw-32px)]" aria-label={directory()}>
+                      <Menu.Item onSelect={() => void copyPath()}>
+                        <Icon name="outline-copy" class="text-v2-icon-icon-muted" />
+                        {language.t("session.location.copyPath")}
+                      </Menu.Item>
+                      <Show when={canReveal()}>
+                        <Menu.Item onSelect={reveal}>
+                          <Icon name="outline-arrow-up-right" class="text-v2-icon-icon-muted" />
+                          {language.t(fileManagerApp(platform.os ?? "unknown").actionLabel)}
+                        </Menu.Item>
+                      </Show>
+                    </Menu.SubContent>
+                  </Menu.Portal>
+                </Menu.Sub>
+              )}
+            </Show>
+            <Menu.Separator />
+            <Menu.Item disabled={!props.project} onSelect={openProjectSettings}>
+              <Icon name="settings-gear" class="text-v2-icon-icon-muted" />
+              {language.t("project.settings.title")}
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu>
+      <Show when={props.trailing}>
+        <SessionHeaderSeparator />
+      </Show>
+    </>
+  )
+}
+
+function SessionLocationDetail(props: ParentProps<{ icon: ComponentProps<typeof Icon>["name"] }>) {
+  return (
+    <div class="flex h-7 min-w-0 items-center gap-2 px-3 text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px] text-v2-text-text-base">
+      <Icon name={props.icon} class="shrink-0 text-v2-icon-icon-muted" />
+      <span class="flex min-w-0 truncate">{props.children}</span>
+    </div>
   )
 }
 
@@ -259,32 +401,20 @@ export function SessionAncestorTrail(props: {
                 data-session-id={ancestor.id}
                 title={ancestor.title}
                 class="max-w-[min(200px,40vw)] shrink-0 truncate text-[13px] font-[530] leading-4 tracking-[-0.04px] text-v2-text-text-faint transition-colors hover:text-v2-text-text-muted"
-                classList={{ "ps-1": index() === 0, "ps-2": index() > 0 }}
+                classList={{ "ps-1": index() === 0 }}
                 onClick={() => open(props.sessionID, ancestor.id)}
               >
                 <bdi dir="auto">{ancestor.title}</bdi>
               </button>
               <Show when={index() < ancestors().length - 1}>
-                <span
-                  data-slot="session-title-separator"
-                  class="-translate-y-[0.5px] shrink-0 ps-2 pe-1 text-[11px] font-medium text-v2-text-text-faint"
-                  aria-hidden="true"
-                >
-                  /
-                </span>
+                <SessionHeaderSeparator before={0} after={0} />
               </Show>
             </>
           )}
         </For>
       </div>
       <Show when={props.trailing}>
-        <span
-          data-slot="session-title-separator"
-          class="-translate-y-[0.5px] shrink-0 ps-2 pe-1 text-[11px] font-medium text-v2-text-text-faint"
-          aria-hidden="true"
-        >
-          /
-        </span>
+        <SessionHeaderSeparator before={0} />
       </Show>
     </div>
   )
@@ -380,15 +510,18 @@ export function SessionIdentityHeader(props: { sessionID: string; session?: Sess
     )
   })
 
-  const workspaceSession = createMemo(() => !!pending() || isWorkspaceDirectory(project(), directory() ?? ""))
-
   return (
     <Show when={title() || parentTitle()}>
       <SessionTitleHeader>
-        <div class="flex h-12 w-full items-center justify-between gap-2">
-          <div class="flex min-w-0 flex-1 items-center gap-1">
-            <div class="flex min-w-0 w-full flex-1 items-center gap-0.5">
-              <SessionProjectMenu project={project()} directory={directory()} workspace={workspaceSession()} />
+        <SessionHeaderLayout
+          location={
+            <>
+              <SessionLocation
+                project={project()}
+                directory={directory()}
+                compact={!!parentID()}
+                trailing={!!(title() || parentID())}
+              />
               <Show when={parentID()}>
                 {(id) => (
                   <SessionAncestorTrail
@@ -399,22 +532,23 @@ export function SessionIdentityHeader(props: { sessionID: string; session?: Sess
                   />
                 )}
               </Show>
-              <SessionWorkingIndicator sessionID={props.sessionID} />
-              <Show when={title()}>
-                {(value) => (
-                  <h1
-                    data-slot={parentID() ? "session-title-child" : undefined}
-                    dir="auto"
-                    class="w-fit truncate rounded-[6px] px-1 py-1 text-[13px] font-[530] leading-4 tracking-[-0.04px] text-v2-text-text-base"
-                    classList={{ "max-w-[45%] shrink-0": !!parentID() }}
-                  >
-                    {value()}
-                  </h1>
-                )}
-              </Show>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <SessionWorkingIndicator sessionID={props.sessionID} />
+          <Show when={title()}>
+            {(value) => (
+              <h1
+                data-slot={parentID() ? "session-title-child" : undefined}
+                dir="auto"
+                class="w-fit truncate rounded-[6px] px-1 py-1 text-[13px] font-[530] leading-4 tracking-[-0.04px] text-v2-text-text-base"
+                classList={{ "max-w-[45%] shrink-0": !!parentID() }}
+              >
+                {value()}
+              </h1>
+            )}
+          </Show>
+        </SessionHeaderLayout>
       </SessionTitleHeader>
     </Show>
   )

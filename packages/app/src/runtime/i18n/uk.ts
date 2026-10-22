@@ -87,7 +87,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Виберіть файл",
   "desktop.dialog.saveFile": "Зберегти файл",
   "desktop.dialog.files": "Файли",
-  "desktop.server.local": "Локальний сервер",
 
   "desktop.picker.error.notSelected": "Засіб вибору не повернув вибраний файл",
   "desktop.picker.error.sizeLimit": "Вибрані вкладення перевищують обмеження в {{limit}} МБ",
@@ -126,7 +125,6 @@ export const dict = {
   "command.context.addSelection": "Додати виділення до контексту",
   "command.context.addSelection.description": "Додати вибрані рядки з поточного файлу",
   "command.input.focus": "Фокус на полі введення",
-  "command.fileTree.toggle": "Перемкнути дерево файлів",
   "command.review.toggle": "Перемкнути огляд",
   "command.message.previous": "Попереднє повідомлення",
   "command.message.previous.description": "Перейти до попереднього повідомлення користувача",
@@ -254,7 +252,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Запитайте що завгодно… "{{example}}"',
   "prompt.mode.shell": "Команда",
   "prompt.mode.normal": "Запит",
-  "session.child.promptDisabled": "Сесії підагентів не можна надсилати запити.",
   "session.child.backToParent": "Назад до основної сесії.",
 
   "prompt.action.attachFile": "Додати файли",
@@ -760,9 +757,6 @@ export const dict = {
   "session.search.placeholder": "Знайти...",
   "session.search.noResults": "Немає збігів",
   "titlebar.tabs": "Вкладки",
-  "titlebar.channel.local": "Локально",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Експериментальний",
   "settings.experimental.description": "Спробуйте експериментальні функції",
   "settings.tab.about": "Про",

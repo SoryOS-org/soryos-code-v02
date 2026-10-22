@@ -131,9 +131,6 @@ export const dict = {
   "session.search.placeholder": "Find...",
   "session.search.noResults": "Ingen resultater",
   "titlebar.tabs": "Faner",
-  "titlebar.channel.local": "Lokal",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Eksperimentel",
   "settings.experimental.description": "Prøv eksperimentelle funktioner",
   "settings.tab.about": "Om",
@@ -231,7 +228,6 @@ export const dict = {
   "command.context.addSelection": "Tilføj markering til kontekst",
   "command.context.addSelection.description": "Tilføj markerede linjer fra den aktuelle fil",
   "command.input.focus": "Fokuser inputfelt",
-  "command.fileTree.toggle": "Skift filtræ",
   "command.review.toggle": "Skift gennemgang",
   "command.message.previous": "Forrige besked",
   "command.message.previous.description": "Gå til den forrige brugerbesked",
@@ -357,7 +353,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Spørg om hvad som helst… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "Der kan ikke sendes prompts til underagentsessioner.",
   "session.child.backToParent": "Tilbage til hovedsessionen.",
 
   "prompt.action.attachFile": "Vedhæft fil",
@@ -802,7 +797,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Vælg en fil",
   "desktop.dialog.saveFile": "Gem fil",
   "desktop.dialog.files": "Filer",
-  "desktop.server.local": "Lokal server",
 
   "desktop.picker.error.notSelected": "Filen blev ikke valgt i filvælgeren",
   "desktop.picker.error.sizeLimit": "De valgte vedhæftede filer overskrider grænsen på {{limit}} MB",

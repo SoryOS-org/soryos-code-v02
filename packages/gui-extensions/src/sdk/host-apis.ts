@@ -4,7 +4,7 @@ import type { Schema } from "effect"
 import type { JSX } from "solid-js"
 import type { Store } from "solid-js/store"
 import type { Cleanup, OS, Persisted, StoreFrom } from "./core"
-import type { IconName, Link } from "./registries"
+import type { IconName, Link, SessionPanelMenuItem } from "./registries"
 
 /**
  * A server the app lists. One ref per id that follows the live connection: read `client`, `data` and `url` from it
@@ -106,6 +106,8 @@ export type FileContent = {
   mimeType?: string
   /** On-disk size when the bytes themselves are not retained. */
   size?: number
+  /** A URL the server streams the file from with range requests, set instead of `bytes` for images, audio and video. */
+  url?: string
 }
 
 /** A range of lines in a file, or in one side of its diff. */
@@ -622,9 +624,9 @@ export interface Sessions {
 /**
  * Where a panel key stands in a session.
  * - `closed`: not in the strip.
- * - `open`: in the strip, not selected.
- * - `active`: selected, with the side region closed.
- * - `visible`: selected and on screen.
+ * - `open`: in the strip, not the tab its pane shows.
+ * - `active`: the tab its pane shows, with the pane hidden (the side region closed, or the bottom pane hidden).
+ * - `visible`: the tab its pane shows, on screen.
  */
 export type PanelState = "closed" | "open" | "active" | "visible"
 
@@ -650,7 +652,7 @@ export interface OpenOptions {
 /**
  * The session layout: side panel tabs, scroll offsets, and the settings and project dialogs. Panel keys are
  * `${extension}:${tab id}`. Nothing throws before the app interface mounts: `ready()` is false, reads return what an
- * empty layout holds (each says its default), and writes (`open`, `close`, `toggle`, `side.toggle`, `scroll.set`,
+ * empty layout holds (each says its default), and writes (`open`, `close`, `toggle`, `hide`, `side.toggle`, `scroll.set`,
  * `settings`, `project`) wait and apply in call order once it mounts.
  */
 export interface Layout {
@@ -684,6 +686,15 @@ export interface Layout {
    */
   toggle(key: string, session: SessionRef): void
   /**
+   * Hides the pane that shows a visible tab without closing the tab: the side region for a tab in the side panes, the
+   * bottom pane for a tab the user moved there. Does nothing unless `state` is "visible". Opening the tab again shows
+   * its pane.
+   *
+   * @param key - `${extension}:${tab id}`.
+   * @param session - The session whose pane hides.
+   */
+  hide(key: string, session: SessionRef): void
+  /**
    * Where a key stands. "closed" while the session's location is unknown and before the app interface mounts.
    * Reactive.
    *
@@ -712,6 +723,16 @@ export interface Layout {
      * @param session - Any session.
      */
     toggle(session: SessionRef): void
+    /**
+     * The + menu's items: every extension's `session.panel` `MenuItem`, in `order`. Use it to list them on a page of
+     * your own, such as a new tab page. Empty before the app interface mounts. Reactive.
+     *
+     * @example
+     * ```ts
+     * const launchers = () => ctx.layout.side.menu().filter((item) => !item.primary && !item.opened)
+     * ```
+     */
+    menu(): readonly SessionPanelMenuItem[]
   }
   /**
    * The inner sidebar preference every side panel shares, which `usePanel().sidebar` also reads inside a panel render.
@@ -771,6 +792,32 @@ export interface Layout {
    * @param title - The picker's title.
    */
   project(server: string, title: string): void
+  /**
+   * Opens a new draft session in a directory on a server with its prompt filled in, for the user to review and send.
+   * The draft opens in its own tab, as a new session from Home does.
+   *
+   * @param input - Where the draft runs and what it asks.
+   *
+   * @example
+   * ```ts
+   * ctx.layout.draft({ server: session.server.id, directory, prompt: ctx.t("setup.prompt") })
+   * ```
+   */
+  draft(input: {
+    /** The server's `ServerRef.id`. */
+    readonly server: string
+    /** The directory the new session runs in. */
+    readonly directory: string
+    /** The prompt the draft starts with. */
+    readonly prompt: string
+  }): void
+  /**
+   * Runs an app command as the command palette does, e.g. `mcp.toggle` (the `/mcp` dialog) or `session.export`.
+   * Does nothing when the command is unavailable or disabled.
+   *
+   * @param id - The app command's id.
+   */
+  command(id: string): void
 }
 
 /**
@@ -947,7 +994,7 @@ export interface Appearance {
   /**
    * The CSS font family the user chose; the default mono font before the app interface mounts. Reactive.
    *
-   * @param kind - `mono`, the terminal and code font.
+   * @param kind - `mono`, the terminal font.
    */
   font(kind: "mono"): string
 }

@@ -245,9 +245,11 @@ test("model dialog toggles a favorite from the keyboard and leads with favorite 
   await expect(sections).toHaveText(["OpenCode"])
   await search.press("Escape")
   await expect(dialog).toBeHidden()
+  // The dialog opens on its first row with the search focused, not on the selected model further down.
   await model.click()
-  await search.press("ArrowUp")
+  await expect(search).toBeFocused()
   await expect(dialog.locator('[data-option-key="favorite:opencode:mobile-c"]')).toHaveAttribute("data-active", "")
+  await expect(dialog.locator('[data-option-key="recent:opencode:mobile-b"]')).not.toHaveAttribute("data-active")
   await search.press("ControlOrMeta+f")
   await expect(sections).toHaveText(["Recent", "OpenCode"])
   await expect(dialog.locator('[data-option-key="opencode:mobile-c"]')).toHaveAttribute("data-active", "")

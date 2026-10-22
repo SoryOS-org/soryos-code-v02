@@ -47,7 +47,7 @@ const document = {
       storyTool("commentary_shell", "shell", "completed", { command: "bun test settings" }, { output: "12 pass" }),
     ]),
     step("msg_commentary_3", 2100, [
-      { type: "text", text: "Tests pass. Writing up the fix.", state: { phase: "commentary" } },
+      { type: "text", text: "Tests pass. Writing up the fix.", native: { phase: "commentary" } },
       {
         type: "text",
         text: "Fixed. Stored settings that lack a category now take that category from the default preset, so the value survives a restart.",

@@ -15,7 +15,6 @@ import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import type { HomeController } from "../model"
 import { useGlobal } from "@/runtime/server/runtime"
-import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useRevealProject } from "./reveal"
 
 export const HomeServersSchema = Schema.Struct({
@@ -80,6 +79,7 @@ export function createHomeProjectsController(home: HomeController) {
     server: {
       list: home.server.list,
       health: home.server.health,
+      label: home.server.label,
       projects: home.project.forServer,
       collapsed: (conn: ServerConnection.Any) => state().collapsed[ServerConnection.key(conn)] ?? false,
       toggleCollapsed: (conn: ServerConnection.Any) => {
@@ -119,15 +119,15 @@ export function createHomeProjectsController(home: HomeController) {
               extensions: ["json"],
             },
             async (file) => {
-              const data = await Schema.decodeUnknownPromise(Schema.fromJsonString(SessionTransfer.Data))(
-                await file.text(),
-              )
+              const data = await Schema.decodeUnknownPromise(
+                Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json)),
+              )(await file.text())
 
               const api = home.server.context(conn).sdk.api.session
 
-              // SAFETY: the payload is SessionTransfer.Data's own encoding, which the import endpoint decodes and validates.
+              // SAFETY: the import endpoint validates the transcript, including exports written by earlier releases.
               const imported = await api.import({
-                ...Schema.encodeSync(SessionTransfer.Data)(data),
+                ...data,
                 location: { directory: project.worktree },
               } as Parameters<typeof api.import>[0])
 

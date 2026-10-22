@@ -1,6 +1,7 @@
 import { createMemo } from "solid-js"
-import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useExtensionServers, type ExtensionServer } from "@/runtime/extension/servers"
+import type { ServerHealth } from "@/runtime/server/health"
 
 export type SettingsServer = {
   key: ServerConnection.Key
@@ -10,7 +11,11 @@ export type SettingsServer = {
   source?: ExtensionServer
 }
 
-export function settingsServers(connections: readonly ServerConnection.Any[], sources: readonly ExtensionServer[]) {
+export function settingsServers(
+  connections: readonly ServerConnection.Any[],
+  sources: readonly ExtensionServer[],
+  label: (connection: ServerConnection.Any) => string,
+) {
   const byKey = new Map(sources.map((item) => [item.key, item]))
   const connected = new Set<string>(connections.map(ServerConnection.key))
 
@@ -21,7 +26,7 @@ export function settingsServers(connections: readonly ServerConnection.Any[], so
 
       return {
         key,
-        name: source?.entry.name ?? (serverName(connection) || key),
+        name: source?.entry.name ?? (label(connection) || key),
         connection: source && source.entry.state !== "ready" ? undefined : connection,
         source,
       }
@@ -50,5 +55,10 @@ export function useSettingsServers() {
   const servers = useServers()
   const extensions = useExtensionServers()
 
-  return createMemo(() => settingsServers(servers.list, extensions.entries()))
+  return createMemo(() => settingsServers(servers.list, extensions.entries(), servers.label))
+}
+
+/** Whether a server's pages can load: it runs and its last health check did not fail. */
+export function settingsServerReachable(server: SettingsServer, health: ServerHealth | undefined) {
+  return !!server.connection && health?.healthy !== false
 }

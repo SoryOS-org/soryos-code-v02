@@ -17,7 +17,7 @@ import {
   currentToolHasLoadedFiles,
 } from "../message/current-tool-state"
 import { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap } from "./timeline-row"
-import { timelineCategory, timelineNoticeRequired, type TimelineDetail } from "./detail"
+import { timelineCategory, timelineNoticePlacement, timelineNoticeRequired, type TimelineDetail } from "./detail"
 
 export { TimelineRow, type PartGroup, type PartRef, type TimelineRowMap }
 
@@ -371,8 +371,7 @@ export namespace Timeline {
       !(detail?.commentary.placement === "hidden" && commentary.has(content)) &&
       isRenderable(content, showReasoning, detail)
 
-    const visibleNotice = (message: Notice) =>
-      !detail || detail.notices.placement !== "hidden" || timelineNoticeRequired(message)
+    const visibleNotice = (message: Notice) => !detail || timelineNoticePlacement(message, detail) !== "hidden"
 
     const visibleTurns = detail
       ? turns.filter((turn) => {
@@ -459,7 +458,8 @@ export namespace Timeline {
               messages.flatMap((message) =>
                 message.type === "compaction" ||
                 message.type === "model-switched" ||
-                message.type === "location-switched"
+                message.type === "location-switched" ||
+                (message.type === "synthetic" && timelineNoticePlacement(message, detail) === "separate")
                   ? [message.id]
                   : [],
               ),
@@ -581,7 +581,11 @@ export namespace Timeline {
       if (isActive && lastAssistant?.retry) rows.push(new TimelineRow.Retry({ userMessageID: turnID }))
       else if (lastAssistant?.error && !isInterrupted(lastAssistant.error))
         rows.push(
-          new TimelineRow.Error({ userMessageID: turnID, text: unwrapErrorMessage(lastAssistant.error.message) }),
+          new TimelineRow.Error({
+            userMessageID: turnID,
+            text: unwrapErrorMessage(lastAssistant.error.message),
+            ...freeLimit(lastAssistant),
+          }),
         )
     }
 
@@ -601,6 +605,7 @@ export namespace Timeline {
               new TimelineRow.Error({
                 userMessageID: turnID,
                 text: unwrapErrorMessage(entry.message.error.message),
+                ...freeLimit(entry.message),
               }),
             )
 
@@ -619,7 +624,7 @@ export namespace Timeline {
 
           return
         case "notice":
-          if (detail?.notices.placement === "hidden" && !timelineNoticeRequired(entry.message)) return
+          if (detail && timelineNoticePlacement(entry.message, detail) === "hidden") return
           appendAssistantSegment(assistantSegment)
           assistantSegment = []
           rows.push(new TimelineRow.Notice({ userMessageID: turnID, messageID: entry.message.id }))
@@ -651,6 +656,31 @@ export namespace Timeline {
   }
 }
 
+const MAX_RETRY_AFTER_MS = 7 * 86_400_000
+
+function freeLimit(
+  message: Pick<SessionMessageAssistant, "error"> & { time: { created: number; completed?: number } },
+) {
+  if (message.error?.type !== "provider.free-limit") return {}
+  const delay = message.error.retryAfterMs
+  const base = message.time.completed ?? message.time.created
+
+  if (
+    delay === undefined ||
+    !Number.isFinite(delay) ||
+    delay < 0 ||
+    delay > MAX_RETRY_AFTER_MS ||
+    !Number.isFinite(base) ||
+    Number.isNaN(new Date(base + delay).getTime())
+  )
+    return { kind: "free-limit" as const }
+
+  return {
+    kind: "free-limit" as const,
+    resetAt: base + delay,
+  }
+}
+
 function isInterrupted(error: SessionMessageAssistant["error"]) {
   return error?.type.toLowerCase().includes("abort") || error?.type.toLowerCase().includes("interrupt")
 }
@@ -675,7 +705,7 @@ function turnCommentary(entries: Entry[], settled: boolean, visible: (content: C
   const commentary = contents.filter(
     (content, index) =>
       content.type === "text" &&
-      (content.state?.phase === "commentary" || (content.state?.phase !== "final_answer" && index < lastTool)),
+      (content.native?.phase === "commentary" || (content.native?.phase !== "final_answer" && index < lastTool)),
   )
 
   const texts = contents.filter((content) => content.type === "text" && visible(content))

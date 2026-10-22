@@ -144,9 +144,6 @@ export const dict = {
   "session.search.placeholder": "Buscar...",
   "session.search.noResults": "No hay coincidencias",
   "titlebar.tabs": "Pestañas",
-  "titlebar.channel.local": "Local",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Experimental",
   "settings.experimental.description": "Prueba funciones experimentales",
   "settings.tab.about": "Acerca de",
@@ -278,7 +275,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Elegir un archivo",
   "desktop.dialog.saveFile": "Guardar archivo",
   "desktop.dialog.files": "Archivos",
-  "desktop.server.local": "Servidor local",
 
   "desktop.picker.error.notSelected": "No se seleccionó ningún archivo en el selector",
   "desktop.picker.error.sizeLimit": "Los adjuntos seleccionados superan el límite de {{limit}} MB",
@@ -317,7 +313,6 @@ export const dict = {
   "command.context.addSelection": "Añadir selección al contexto",
   "command.context.addSelection.description": "Añadir las líneas seleccionadas del archivo actual",
   "command.input.focus": "Enfocar entrada",
-  "command.fileTree.toggle": "Mostrar u ocultar árbol de archivos",
   "command.review.toggle": "Mostrar u ocultar revisión",
   "command.message.previous": "Mensaje anterior",
   "command.message.previous.description": "Ir al mensaje de usuario anterior",
@@ -444,7 +439,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Pregunta cualquier cosa… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "No se pueden enviar prompts a las sesiones de subagentes.",
   "session.child.backToParent": "Volver a la sesión principal.",
 
   "prompt.action.attachFile": "Añadir archivos",

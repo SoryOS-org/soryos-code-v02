@@ -64,7 +64,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "选择文件",
   "desktop.dialog.saveFile": "保存文件",
   "desktop.dialog.files": "文件",
-  "desktop.server.local": "本地服务器",
 
   "desktop.picker.error.notSelected": "文件选择器未选择文件",
   "desktop.picker.error.sizeLimit": "所选附件超过 {{limit}} MB 的限制",
@@ -112,7 +111,6 @@ export const dict = {
 
   "command.input.focus": "聚焦输入框",
 
-  "command.fileTree.toggle": "切换文件树",
 
   "command.review.toggle": "切换审查",
 
@@ -251,7 +249,6 @@ export const dict = {
   "prompt.placeholder.normal": '随便问点什么… "{{example}}"',
   "prompt.mode.shell": "Shell",
   "prompt.mode.normal": "Prompt",
-  "session.child.promptDisabled": "无法向子智能体会话发送提示词。",
   "session.child.backToParent": "返回主会话。",
   "prompt.action.attachFile": "附加文件",
   "prompt.toast.attachmentDuplicate.title": "此文件已上传",
@@ -728,9 +725,6 @@ export const dict = {
   "session.search.placeholder": "查找...",
   "session.search.noResults": "无匹配项",
   "titlebar.tabs": "标签页",
-  "titlebar.channel.local": "本地",
-  "titlebar.channel.dev": "开发",
-  "titlebar.channel.beta": "测试版",
   "settings.tab.experimental": "实验",
   "settings.experimental.description": "尝试实验性功能",
   "settings.tab.about": "关于",

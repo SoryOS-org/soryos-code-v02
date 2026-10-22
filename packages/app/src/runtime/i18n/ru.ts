@@ -60,7 +60,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Выберите файл",
   "desktop.dialog.saveFile": "Сохранить файл",
   "desktop.dialog.files": "Файлы",
-  "desktop.server.local": "Локальный сервер",
 
   "desktop.picker.error.notSelected": "В средстве выбора не выбран файл",
   "desktop.picker.error.sizeLimit": "Размер выбранных вложений превышает лимит {{limit}} МБ",
@@ -99,7 +98,6 @@ export const dict = {
   "command.context.addSelection": "Добавить выделение в контекст",
   "command.context.addSelection.description": "Добавить выбранные строки из текущего файла",
   "command.input.focus": "Перейти к полю ввода",
-  "command.fileTree.toggle": "Переключить дерево файлов",
   "command.review.toggle": "Переключить обзор",
   "command.message.previous": "Предыдущее сообщение",
   "command.message.previous.description": "Перейти к предыдущему сообщению пользователя",
@@ -225,7 +223,6 @@ export const dict = {
   "prompt.placeholder.normal": 'Спросите что угодно… "{{example}}"',
   "prompt.mode.shell": "Оболочка",
   "prompt.mode.normal": "Промпт",
-  "session.child.promptDisabled": "В сессиях субагентов нельзя отправлять запросы.",
   "session.child.backToParent": "Вернуться к основной сессии.",
 
   "prompt.action.attachFile": "Прикрепить файл",
@@ -744,9 +741,6 @@ export const dict = {
   "session.search.placeholder": "Найти...",
   "session.search.noResults": "Нет совпадений",
   "titlebar.tabs": "Вкладки",
-  "titlebar.channel.local": "Локально",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Экспериментальный",
   "settings.experimental.description": "Попробуйте экспериментальные функции",
   "settings.tab.about": "О нас",

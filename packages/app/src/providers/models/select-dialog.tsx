@@ -21,6 +21,7 @@ import { Button } from "@opencode/ui/button"
 import { Badge } from "@opencode/ui/badge"
 import { Dialog, DialogBody, DialogTitle } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Keybind } from "@opencode/ui/keybind"
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -45,6 +46,7 @@ import {
 import { consoleProviderName } from "@/providers/catalog/console"
 import "@/settings/settings.css"
 import "@/shell/commands/dialog.css"
+import "@/shell/palette-menu.css"
 import "./select-dialog.css"
 
 const MobilePanelDrawer = lazy(async () => {
@@ -97,36 +99,50 @@ const ModelList: Component<{
     collapsed: Record<string, boolean>
   }>({
     search: "",
-    active: props.mobile ? (controller.current() ?? "") : "",
+    active: "",
     collapsed: {},
   })
 
-  createEffect(
-    on(
-      () => props.open,
-      (open) => {
-        if (!props.mobile || !open) return
-        setStore({ search: "", active: controller.current() ?? "" })
-      },
-    ),
-  )
   const models = createMemo(() => controller.models(store.search))
   const modelGroups = createMemo(() => controller.groups(models()))
   const managed = createMemo(() => consoleModelGroup(controller.all()))
   const expanded = (provider: string) => store.search.length > 0 || !store.collapsed[provider]
   const managedIDs = createMemo(() => new Set(managed()?.providers.map((provider) => provider.id) ?? []))
 
-  const visibleModels = () =>
-    models().filter(
-      (item) => expanded(item.provider.id) && (!managedIDs().has(item.provider.id) || expanded(CONSOLE_GROUP_KEY)),
-    )
+  // Rows in display order: ProviderModelSections nests every managed provider at the first one's position.
+  const visibleModels = () => {
+    const groups = modelGroups()
+    const first = groups.findIndex((group) => managedIDs().has(group.category))
+
+    return groups.flatMap((group, index) => {
+      if (!managedIDs().has(group.category)) return expanded(group.category) ? group.items : []
+
+      if (index !== first || !expanded(CONSOLE_GROUP_KEY)) return []
+
+      return groups
+        .filter((item) => managedIDs().has(item.category) && expanded(item.category))
+        .flatMap((item) => item.items)
+    })
+  }
 
   let scrollRef: HTMLDivElement | undefined
 
   const setSearch = (value: string) => {
-    const first = controller.models(value).find((item) => value.length > 0 || !store.collapsed[item.provider.id])
-    setStore({ search: value, active: first ? modelKey(first) : "" })
+    setStore("search", value)
+    const first = visibleModels()[0]
+    setStore("active", first ? modelKey(first) : "")
   }
+
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) return
+        setSearch("")
+        scrollRef?.scrollTo(0, 0)
+      },
+    ),
+  )
 
   const moveActive = (delta: number) => {
     const keys = visibleModels().map(modelKey)
@@ -613,7 +629,7 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
 
   const [store, setStore] = createStore({
     search: "",
-    active: controller.current() ?? "",
+    active: "",
     flyout: "",
     keyboard: true,
     navigated: false,
@@ -624,7 +640,6 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
   const [staged, setStaged] = createStore<Record<string, string | null>>({})
 
   let container: HTMLElement | undefined
-  let input: HTMLInputElement | undefined
   let flyoutRef: HTMLDivElement | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(timer))
@@ -653,7 +668,7 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
   const flyoutItem = () => (store.flyout ? rowItem(store.flyout) : undefined)
   const variantsOf = (item: ModelItem) => Object.keys(item.variants ?? {})
 
-  setStore("active", rows().find((row) => modelKey(row.item) === controller.current())?.id ?? "")
+  setStore("active", rows()[0]?.id ?? "")
 
   const variant = (item: ModelItem) =>
     modelKey(item) in staged ? (staged[modelKey(item)] ?? undefined) : controller.variant(item)
@@ -674,8 +689,8 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
   }
 
   const setSearch = (value: string) => {
-    const first = controller.models(value)[0]
-    setStore({ search: value, active: first ? modelKey(first) : "", flyout: "", keyboard: true, navigated: false })
+    setStore({ search: value, flyout: "", keyboard: true, navigated: false })
+    setStore("active", rows()[0]?.id ?? "")
   }
 
   const triangle = createSafeTriangle({
@@ -835,11 +850,13 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         <Show when={row.item.latest}>
           <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
         </Show>
+        {/* The slot keeps its width while hidden, so hovering a row never shifts it. The selected row shows only an explicit variant. */}
         <Show when={variantsOf(row.item).length > 0}>
           <span
             data-slot="model-dialog-variant"
+            data-default={variant(row.item) ? undefined : ""}
             class="w-[72px] shrink-0 truncate text-end capitalize"
-            classList={{ invisible: !selected() && !active() }}
+            classList={{ invisible: !active() && !(selected() && variant(row.item)) }}
           >
             {variant(row.item) ?? language.t("common.default")}
           </span>
@@ -859,57 +876,58 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         <DialogTitle>{language.t("dialog.model.select.title")}</DialogTitle>
       </div>
       <DialogBody class="command-palette-body">
-        <div data-slot="model-dialog-search">
-          <div data-slot="model-dialog-search-box" onClick={() => input?.focus()}>
-            <Icon name="magnifying-glass" size="small" class="shrink-0" />
-            <input
-              ref={(element) => (input = element)}
-              type="search"
-              value={store.search}
-              autofocus
-              placeholder={language.t("dialog.model.search.placeholder")}
-              aria-label={language.t("dialog.model.search.placeholder")}
-              spellcheck={false}
-              autocorrect="off"
-              autocomplete="off"
-              autocapitalize="off"
-              onInput={(event) => setSearch(event.currentTarget.value)}
-              onKeyDown={onKeyDown}
-            />
-            <Show when={store.search.trim()}>
-              <button
-                type="button"
-                class="-me-1 flex size-5 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-faint transition-colors hover:text-v2-icon-icon-base [&>*]:block"
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => setSearch("")}
-                aria-label={language.t("common.clear")}
-              >
-                <Icon name="circle-xmark" />
-              </button>
-            </Show>
-            <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
-              <button
-                type="button"
-                class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                aria-label={language.t("dialog.model.manage")}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={manage}
-              >
-                <Icon name="outline-sliders" size="small" />
-              </button>
-            </Tooltip>
-            <Tooltip placement="top" gutter={4} value={language.t("command.provider.connect")} ignoreSafeArea={false}>
-              <button
-                type="button"
-                class="flex size-7 shrink-0 items-center justify-center rounded-sm bg-transparent text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-icon-icon-base focus-visible:outline-none"
-                aria-label={language.t("command.provider.connect")}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={connect}
-              >
-                <Icon name="plus" size="small" />
-              </button>
-            </Tooltip>
-          </div>
+        <div class="palette-menu-search">
+          <TextInput
+            type="search"
+            appearance="large"
+            value={store.search}
+            autofocus
+            placeholder={language.t("dialog.model.search.placeholder")}
+            aria-label={language.t("dialog.model.search.placeholder")}
+            spellcheck={false}
+            autocorrect="off"
+            autocomplete="off"
+            autocapitalize="off"
+            leadingIcon={<Icon name="magnifying-glass" />}
+            onInput={(event) => setSearch(event.currentTarget.value)}
+            onKeyDown={onKeyDown}
+            trailing={
+              <>
+                <Show when={store.search.trim()}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="circle-xmark" />}
+                    aria-label={language.t("common.clear")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={() => setSearch("")}
+                  />
+                </Show>
+                <Tooltip
+                  placement="top"
+                  gutter={4}
+                  value={language.t("command.provider.connect")}
+                  ignoreSafeArea={false}
+                >
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="plus" />}
+                    aria-label={language.t("command.provider.connect")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={connect}
+                  />
+                </Tooltip>
+                <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="outline-sliders" />}
+                    aria-label={language.t("dialog.model.manage")}
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                    onClick={manage}
+                  />
+                </Tooltip>
+              </>
+            }
+          />
         </div>
         <ScrollView
           class="command-palette-scroll"
@@ -957,16 +975,8 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
         </Show>
         <div data-slot="model-dialog-hints">
           <span>
-            <Keybind keys={["↑", "↓"]} variant="neutral" />
-            {language.t("dialog.model.hint.navigate")}
-          </span>
-          <span>
             <Keybind keys={["←", "→"]} variant="neutral" />
             {language.t("dialog.model.hint.variant")}
-          </span>
-          <span>
-            <Keybind keys={["↵"]} variant="neutral" />
-            {language.t("dialog.model.hint.select")}
           </span>
           <span>
             <Keybind keys={formatKeybindParts("mod+f", language.t)} variant="neutral" />

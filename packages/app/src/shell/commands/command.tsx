@@ -2,7 +2,7 @@ import { createSimpleContext } from "@opencode/ui/context"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { type Accessor, batch, createEffect, createMemo, onCleanup, onMount, untrack } from "solid-js"
 import { createStore, produce, reconcile } from "solid-js/store"
-import { Schema } from "effect"
+import { Predicate, Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -11,7 +11,7 @@ import { keybindRenames } from "@/settings/keybinds/migration"
 import en from "@/runtime/i18n/en"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 
-const IS_MAC = typeof navigator === "object" && /(Mac|iPod|iPhone|iPad)/.test(navigator.platform)
+const IS_MAC = /(Mac|iPod|iPhone|iPad)/.test(globalThis.navigator?.platform ?? "")
 
 const PALETTE_ID = "command.palette"
 
@@ -57,13 +57,22 @@ function normalizeKey(key: string) {
 }
 
 export function keyFromKeyboardEvent(event: KeyboardEvent) {
-  const key = normalizeKey(event.key)
+  const key = normalizeKey(bracketKey(event))
 
   if (!event.altKey || /^[a-z0-9]$/.test(key)) return key
 
   if (!event.code.startsWith("Key") || event.code.length !== 4) return key
 
   return event.code.slice(3).toLowerCase()
+}
+
+// ⇧[ types { on US layouts, so ⇧⌘[ binds as written; a layout that types no ASCII there falls back to the physical key.
+function bracketKey(event: Pick<KeyboardEvent, "key" | "code">) {
+  if (event.key === "{" || event.key === "}") return event.key === "{" ? "[" : "]"
+
+  if (!/^[^\x00-\x7f]$/u.test(event.key) || !/^Bracket(Left|Right)$/.test(event.code)) return event.key
+
+  return event.code === "BracketLeft" ? "[" : "]"
 }
 
 function signature(key: string, ctrl: boolean, meta: boolean, shift: boolean, alt: boolean) {
@@ -94,6 +103,8 @@ export interface CommandOption {
   id: string
   title: string
   description?: string
+  /** Extra words the command palette matches, separated by spaces. */
+  keywords?: string
   category?: string
   /** Section of Settings > Shortcuts. Host commands leave it unset and are placed by id prefix. */
   section?: CommandSection
@@ -110,6 +121,8 @@ export interface CommandOption {
   /** The keybind also fires while a text field has focus. */
   editable?: boolean
   when?: (event: KeyboardEvent) => boolean
+  /** The keybind leaves this event to its target, as if the command had no keybind. */
+  skip?: (event: KeyboardEvent) => boolean
   onSelect?: (source?: "palette" | "keybind" | "slash", input?: string) => void | Promise<void>
   onHighlight?: () => (() => void) | void
 }
@@ -121,11 +134,38 @@ export function commandPaletteOptions(options: CommandOption[]) {
   )
 }
 
-export function resolveKeybindOption(candidates: CommandOption[] | undefined, event: KeyboardEvent) {
-  return candidates?.find((option) => option.when?.(event)) ?? candidates?.find((option) => !option.when)
+/** Maps each keybind signature to its commands. A user's own binding comes before a default on the same keys. */
+export function commandKeymap(options: CommandOption[], custom: (id: string) => boolean) {
+  const map = new Map<string, CommandOption[]>()
+
+  for (const option of options) {
+    if (option.id.startsWith(SUGGESTED_PREFIX)) continue
+
+    if (option.disabled) continue
+
+    if (!option.keybind) continue
+
+    const keybinds = parseKeybind(option.keybind)
+
+    for (const kb of keybinds) {
+      if (!kb.key) continue
+      const sig = signature(kb.key, kb.ctrl, kb.meta, kb.shift, kb.alt)
+      const existing = map.get(sig) ?? []
+
+      map.set(sig, custom(actionId(option.id)) ? [option, ...existing] : [...existing, option])
+    }
+  }
+
+  return map
 }
 
-type CommandSource = "palette" | "keybind" | "slash"
+export function resolveKeybindOption(candidates: CommandOption[] | undefined, event: KeyboardEvent) {
+  const live = candidates?.filter((option) => !option.skip?.(event))
+
+  return live?.find((option) => option.when?.(event)) ?? live?.find((option) => !option.when)
+}
+
+export type CommandSource = "palette" | "keybind" | "slash"
 
 export const CommandCatalogItem = Persistence.struct({
   title: Schema.String,
@@ -262,39 +302,37 @@ function displayKeybindParts(kb: Keybind, t?: (key: KeyLabel) => string) {
 
   if (!kb.key) return parts
 
-  const keys: Record<string, string> = {
-    arrowup: "↑",
-    arrowdown: "↓",
-    arrowleft: "←",
-    arrowright: "→",
-    comma: ",",
-    plus: "+",
-  }
+  const keys = new Map([
+    ["arrowup", "↑"],
+    ["arrowdown", "↓"],
+    ["arrowleft", "←"],
+    ["arrowright", "→"],
+    ["comma", ","],
+    ["plus", "+"],
+  ])
 
-  const named: Record<string, KeyLabel> = {
-    backspace: "common.key.backspace",
-    delete: "common.key.delete",
-    end: "common.key.end",
-    enter: "common.key.enter",
-    esc: "common.key.esc",
-    escape: "common.key.esc",
-    home: "common.key.home",
-    insert: "common.key.insert",
-    pagedown: "common.key.pageDown",
-    pageup: "common.key.pageUp",
-    space: "common.key.space",
-    tab: "common.key.tab",
-  }
+  const named = new Map<string, KeyLabel>([
+    ["backspace", "common.key.backspace"],
+    ["delete", "common.key.delete"],
+    ["end", "common.key.end"],
+    ["enter", "common.key.enter"],
+    ["esc", "common.key.esc"],
+    ["escape", "common.key.esc"],
+    ["home", "common.key.home"],
+    ["insert", "common.key.insert"],
+    ["pagedown", "common.key.pageDown"],
+    ["pageup", "common.key.pageUp"],
+    ["space", "common.key.space"],
+    ["tab", "common.key.tab"],
+  ])
 
   const key = kb.key.toLowerCase()
 
+  const label = named.get(key)
+
   const displayKey =
-    keys[key] ??
-    (named[key]
-      ? keyText(named[key], t)
-      : key.length === 1
-        ? key.toUpperCase()
-        : key.charAt(0).toUpperCase() + key.slice(1))
+    keys.get(key) ??
+    (label ? keyText(label, t) : key.length === 1 ? key.toUpperCase() : key.charAt(0).toUpperCase() + key.slice(1))
 
   parts.push(displayKey)
 
@@ -335,8 +373,8 @@ export const { use: useCommand, provider: CommandProvider } = createSimpleContex
     const settings = useSettings()
     const language = useLanguage()
 
-    const [store, setStore] = createStore({
-      registrations: [] as CommandRegistration[],
+    const [store, setStore] = createStore<{ registrations: CommandRegistration[]; suspendCount: number }>({
+      registrations: [],
       suspendCount: 0,
     })
 
@@ -435,34 +473,7 @@ export const { use: useCommand, provider: CommandProvider } = createSimpleContex
       return new Set(keybinds.map((kb) => signature(kb.key, kb.ctrl, kb.meta, kb.shift, kb.alt)))
     })
 
-    const keymap = createMemo(() => {
-      const map = new Map<string, CommandOption[]>()
-
-      for (const option of options()) {
-        if (option.id.startsWith(SUGGESTED_PREFIX)) continue
-
-        if (option.disabled) continue
-
-        if (!option.keybind) continue
-
-        const keybinds = parseKeybind(option.keybind)
-
-        for (const kb of keybinds) {
-          if (!kb.key) continue
-          const sig = signature(kb.key, kb.ctrl, kb.meta, kb.shift, kb.alt)
-          const existing = map.get(sig)
-
-          if (existing) {
-            existing.push(option)
-            continue
-          }
-
-          map.set(sig, [option])
-        }
-      }
-
-      return map
-    })
+    const keymap = createMemo(() => commandKeymap(options(), (id) => settings.keybinds.get(id) !== undefined))
 
     const optionMap = createMemo(() => {
       const map = new Map<string, CommandOption>()
@@ -517,8 +528,8 @@ export const { use: useCommand, provider: CommandProvider } = createSimpleContex
     function register(cb: () => CommandOption[]): void
     function register(key: string, cb: () => CommandOption[]): void
     function register(key: string | (() => CommandOption[]), cb?: () => CommandOption[]) {
-      const id = typeof key === "string" ? key : undefined
-      const next = typeof key === "function" ? key : cb
+      const id = Predicate.isString(key) ? key : undefined
+      const next = Predicate.isFunction(key) ? key : cb
 
       if (!next) return
       const options = createMemo(next)

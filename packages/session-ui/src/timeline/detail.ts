@@ -114,6 +114,17 @@ export function timelineCategory(
   return "tools"
 }
 
+// Like the TUI, background work reports its outcome as its own row where it finished, never folded into a group.
+// A subagent's outcome follows the subagent setting, so it shows wherever its launch does.
+export function timelineNoticePlacement(message: SessionMessageInfo, detail: TimelineDetail): TimelinePlacement {
+  const source = message.type === "synthetic" ? message.metadata?.source : undefined
+  const placement = source === "subagent" ? detail.subagents.placement : detail.notices.placement
+
+  if (placement === "hidden") return timelineNoticeRequired(message) ? "separate" : "hidden"
+
+  return source === "subagent" || source === "shell" ? "separate" : placement
+}
+
 export function timelineNoticeRequired(message: SessionMessageInfo) {
   if (message.type === "compaction") return message.status !== "completed"
 

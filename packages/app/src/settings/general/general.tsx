@@ -6,7 +6,12 @@ import { TimelineDetailControl } from "@/settings/timeline-detail"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ExtensionSettingsSections } from "@/runtime/extension/settings-page-view"
-import { type FollowUpBehavior, type WorkspaceDefaultDestination, useSettings } from "@/settings/model"
+import {
+  type BackgroundActivity,
+  type FollowUpBehavior,
+  type WorkspaceDefaultDestination,
+  useSettings,
+} from "@/settings/model"
 import { formatKeybind } from "@/shell/commands/command"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
@@ -62,7 +67,11 @@ const WorkspaceDestinationSetting: Component = () => {
   )
 }
 
-export const ShellSetting: Component<{ controller: ShellSettingsController }> = (props) => {
+export const ShellSetting: Component<{
+  controller: ShellSettingsController
+  /** Search reveals the row with the default action; the Servers page names the other servers' rows apart. */
+  action?: string
+}> = (props) => {
   const language = useLanguage()
 
   const options = createMemo(() =>
@@ -78,7 +87,7 @@ export const ShellSetting: Component<{ controller: ShellSettingsController }> = 
       description={language.t("settings.general.row.shell.description")}
     >
       <Select
-        data-action="settings-shell"
+        data-action={props.action ?? "settings-shell"}
         options={options()}
         current={options().find((option) => option.value === props.controller.current()) ?? options()[0]}
         placement="bottom-end"
@@ -122,6 +131,36 @@ const FollowUpBehaviorSetting: Component = () => {
         placement="bottom-end"
         gutter={6}
         onSelect={(option) => option && settings.general.setFollowUpBehavior(option.value)}
+      />
+    </SettingsRow>
+  )
+}
+
+const BackgroundActivitySetting = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+  const options = createMemo((): { value: BackgroundActivity; label: string }[] => [
+    { value: "off", label: language.t("settings.timeline.row.backgroundActivity.off") },
+    { value: "left", label: language.t("settings.timeline.row.backgroundActivity.left") },
+    { value: "center", label: language.t("settings.timeline.row.backgroundActivity.center") },
+    { value: "right", label: language.t("settings.timeline.row.backgroundActivity.right") },
+  ])
+
+  return (
+    <SettingsRow
+      title={language.t("settings.timeline.row.backgroundActivity.title")}
+      description={language.t("settings.timeline.row.backgroundActivity.description")}
+    >
+      <Select
+        data-action="settings-background-activity"
+        aria-label={language.t("settings.timeline.row.backgroundActivity.title")}
+        options={options()}
+        current={options().find((option) => option.value === settings.general.backgroundActivity())}
+        value={(option) => option.value}
+        label={(option) => option.label}
+        placement="bottom-end"
+        gutter={6}
+        onSelect={(option) => option && settings.general.setBackgroundActivity(option.value)}
       />
     </SettingsRow>
   )
@@ -249,12 +288,13 @@ export const SettingsGeneral: Component = () => {
         <section class="settings-section" aria-label={language.t("settings.timeline.title")}>
           <h3 class="settings-section-title">{language.t("settings.timeline.title")}</h3>
           <SettingsList>
-            <div class="py-5">
+            <div class="border-b-[0.5px] border-v2-border-border-base py-5">
               <TimelineDetailControl
                 value={settings.general.timelineDetail()}
                 onChange={settings.general.setTimelineDetail}
               />
             </div>
+            <BackgroundActivitySetting />
             <SettingsRow
               title={language.t("settings.timeline.row.turnDiffs.title")}
               description={language.t("settings.timeline.row.turnDiffs.description")}

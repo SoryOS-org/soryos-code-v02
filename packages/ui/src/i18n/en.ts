@@ -55,6 +55,10 @@ const source = {
   "ui.lineComment.submit": "Comment",
   "ui.lineComment.cancel": "Cancel",
 
+  "ui.commentCard.quote": "Quote",
+  "ui.commentCard.addComment": "Add comment",
+  "ui.commentCard.editComment": "Edit comment",
+
   "ui.sessionTurn.steps.show": "Show steps",
   "ui.sessionTurn.steps.hide": "Hide steps",
   "ui.sessionTurn.summary.response": "Response",
@@ -75,12 +79,15 @@ const source = {
   "ui.sessionTurn.retry.attemptWaiting.other": "Attempt {{attempt}} - retrying in {{count}}s",
   "ui.sessionTurn.retry.attemptRetryingNow": "Attempt {{attempt}} - retrying",
   "ui.sessionTurn.retry.geminiHot": "gemini is way too hot right now",
+  "ui.sessionTurn.freeLimit.title": "You've used today's free messages.",
+  "ui.sessionTurn.freeLimit.lineReset": "You've used today's free messages. They reset at {{time}}.",
   "ui.sessionTurn.error.freeUsageExceeded": "Free usage exceeded",
   "ui.sessionTurn.error.addCredits": "Add credits",
 
   "dialog.usageExceeded.freeTier.title": "Free limit reached",
   "dialog.usageExceeded.freeTier.description":
     "Subscribe to OpenCode Go for reliable access to the best open-source models for $10/month.",
+  "dialog.usageExceeded.freeTier.reset": "Your free messages reset at {{time}}.",
   "dialog.usageExceeded.freeTier.actionLabel": "Subscribe",
   "dialog.usageExceeded.accountRateLimit.title": "Go limit reached",
   "dialog.usageExceeded.accountRateLimit.description":
@@ -146,6 +153,10 @@ const source = {
 
   "ui.promptInput.noMatchingItems": "No matching items",
   "ui.promptInput.commands": "Commands",
+  "ui.promptInput.history": "Prompt history",
+  "ui.promptInput.history.search": "Search prompt history…",
+  "ui.promptInput.history.searchAction": "Search",
+  "ui.promptInput.history.contextOnly": "Prompt with context",
   "ui.promptInput.dropFiles": "Drop files to add",
   "ui.promptInput.dropFiles.image": "Drop images or files to add",
   "ui.promptInput.dropFiles.pdf": "Drop PDFs or files to add",
@@ -197,6 +208,8 @@ const source = {
   "ui.genui.title": "Generated UI",
   "ui.genui.writing": "Writing",
   "ui.genui.submitted": "Submitted in {{title}}:",
+  "ui.genui.sent": "Submitted",
+  "ui.genui.failed": "Couldn't send. Try again.",
   "ui.genui.total": "Total",
   "ui.genui.actual": "Actual",
   "ui.genui.projected": "Projected",
@@ -277,6 +290,7 @@ const source = {
   "ui.message.thought": "Thought",
   "ui.message.duration.seconds": "{{count}}s",
   "ui.message.duration.minutesSeconds": "{{minutes}}m {{seconds}}s",
+  "ui.message.duration.hoursMinutes": "{{hours}}h {{minutes}}m",
   "ui.message.interrupted": "Interrupted",
   "ui.message.modelVariant": "{{model}} ({{variant}})",
   "ui.sessionTimeline.notice.model": "Model",

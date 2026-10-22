@@ -144,7 +144,6 @@ describe("current session timeline rows", () => {
         status: "completed",
         reason: "auto",
         summary: "summary",
-        recent: "recent",
         time: { created: 11 },
       },
     ]
@@ -555,6 +554,69 @@ describe("current session timeline rows", () => {
   })
 
   test.each([
+    ["everything", ["msg_agent", "msg_shell"]],
+    ["detailed", ["msg_agent", "msg_shell"]],
+    ["compact", ["msg_agent", "msg_shell"]],
+    ["quiet", ["msg_agent"]],
+    ["text-only", []],
+  ] as const)("shows background outcomes as their own rows where they finished: %s", (id, notices) => {
+    const step = (messageID: string, created: number) =>
+      ({
+        id: messageID,
+        type: "assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+        content: [storyTool(`${messageID}_read`, "read", "completed", {})],
+        time: { created, completed: created },
+      }) satisfies SessionMessageInfo
+
+    const source: SessionMessageInfo[] = [
+      { id: "msg_user", type: "user", text: "work", time: { created: 1 } },
+      step("msg_before", 2),
+      {
+        id: "msg_agent",
+        type: "synthetic",
+        text: "done",
+        description: "Map the inbox",
+        metadata: { source: "subagent", childID: "ses_child", agent: "explore", state: "completed" },
+        time: { created: 3 },
+      },
+      {
+        id: "msg_shell",
+        type: "synthetic",
+        text: "done",
+        description: "bun test",
+        metadata: { source: "shell", shellID: "sh_1", state: "completed", exit: 0 },
+        time: { created: 4 },
+      },
+      step("msg_after", 5),
+    ]
+
+    const rows = Timeline.constructSessionMessageRows(
+      source,
+      false,
+      { type: "idle" },
+      undefined,
+      false,
+      false,
+      undefined,
+      timelinePresets.find((preset) => preset.id === id)!.value,
+    ).rows
+
+    const keys = rows.map(TimelineRow.key)
+    expect(keys.filter((key) => key.startsWith("notice:"))).toEqual(notices.map((notice) => `notice:${notice}`))
+
+    if (id === "compact")
+      expect(keys).toEqual([
+        "user-message:msg_user",
+        "assistant-part:context:context:msg_before:msg_before_read",
+        "notice:msg_agent",
+        "notice:msg_shell",
+        "assistant-part:context:context:msg_after:msg_after_read",
+      ])
+  })
+
+  test.each([
     ["grouped", "assistant-part:context:context:msg_a1:msg_a1:text:0"],
     ["hidden", "assistant-part:context:context:msg_a1:tool_read"],
   ] as const)("%s commentary keeps the answer of each turn", (placement, group) => {
@@ -572,7 +634,7 @@ describe("current session timeline rows", () => {
       { id: "msg_user", type: "user", text: "fix", time: { created: 1 } },
       step("msg_a1", [{ type: "text", text: "Checking." }, storyTool("tool_read", "read", "completed", {})]),
       step("msg_a2", [
-        { type: "text", text: "Checks pass.", state: { phase: "commentary" } },
+        { type: "text", text: "Checks pass.", native: { phase: "commentary" } },
         { type: "text", text: "Fixed." },
       ]),
       { id: "msg_stop", type: "user", text: "stop", time: { created: 4 } },
@@ -1427,7 +1489,6 @@ describe("current session timeline rows", () => {
         status: "completed",
         reason: "auto",
         summary: "summary",
-        recent: "recent",
         time: { created: 4 },
       },
       messages[2],
@@ -1539,6 +1600,63 @@ describe("current session timeline rows", () => {
         userMessageID: "msg_user",
         text: "Execution was interrupted repeatedly and will not be resumed automatically.",
       }),
+    )
+  })
+
+  test("marks the free usage limit and its reset time, whichever message records the failure", () => {
+    const error = { type: "provider.free-limit", message: "Free usage limit reached.", retryAfterMs: 60_000 }
+    const user = { id: "msg_user", type: "user", text: "prompt", time: { created: 1 } } satisfies SessionMessageInfo
+
+    const assistant = {
+      id: "msg_assistant",
+      type: "assistant",
+      agent: "build",
+      model: { id: "big-pickle", providerID: "opencode" },
+      content: [],
+      finish: "error",
+      error,
+      time: { created: 2, completed: 1_000 },
+    } satisfies SessionMessageAssistant
+
+    const step = [user, assistant] satisfies SessionMessageInfo[]
+
+    const idle = [
+      user,
+      { id: "msg_idle", type: "idle", outcome: "failed", error, time: { created: 2_000 } },
+    ] satisfies SessionMessageInfo[]
+
+    const quota = [
+      user,
+      { ...assistant, error: { type: "provider.quota", message: "Go usage limit exceeded", retryAfterMs: 60_000 } },
+    ] satisfies SessionMessageInfo[]
+
+    expect(Timeline.constructSessionMessageRows(step, true, { type: "idle" }).rows.at(-1)).toEqual(
+      new TimelineRow.Error({
+        userMessageID: "msg_user",
+        text: "Free usage limit reached.",
+        kind: "free-limit",
+        resetAt: 61_000,
+      }),
+    )
+    expect(Timeline.constructSessionMessageRows(idle, true, { type: "idle" }).rows.at(-1)).toMatchObject({
+      kind: "free-limit",
+      resetAt: 62_000,
+    })
+    expect(
+      Timeline.constructSessionMessageRows(
+        [user, { ...assistant, error: { ...error, retryAfterMs: 9_000_000_000_000_000 } }],
+        true,
+        { type: "idle" },
+      ).rows.at(-1),
+    ).toEqual(
+      new TimelineRow.Error({
+        userMessageID: "msg_user",
+        text: "Free usage limit reached.",
+        kind: "free-limit",
+      }),
+    )
+    expect(Timeline.constructSessionMessageRows(quota, true, { type: "idle" }).rows.at(-1)).toEqual(
+      new TimelineRow.Error({ userMessageID: "msg_user", text: "Go usage limit exceeded" }),
     )
   })
 

@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test"
 import { expectPath, holdRoute, NO_PROVIDER, project, REMOTE_SERVER, seed, sessionHref, T0 } from "../utils/app"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
-import { mockRemoteServer, newSessionLocation } from "../utils/workspace"
+import { mockRemoteServer, mockWorkspace, newSessionLocation } from "../utils/workspace"
 import { APP_READY_TIMEOUT, expectAppVisible } from "../utils/waits"
 
 test.use({ serviceWorkers: "block" })
@@ -16,6 +16,63 @@ async function openHome(page: Page, input: Parameters<typeof mockStressTimeline>
   await seed(page, { usedProjects: { local: [fixture.project.id] } })
   await page.goto("/")
 }
+
+test("Home uses the session list for tabs and the session inbox only when selected in Settings", async ({ page }) => {
+  const replies: { sessionID: string; permissionID: string; body: unknown }[] = []
+  const waiting = { id: "ses_home_waiting", title: "Waiting on approval" }
+  const earlier = { id: "ses_home_earlier", title: "Finished earlier" }
+  await mockWorkspace(page, {
+    name: "Home",
+    sessions: [earlier, waiting],
+    sessionStatus: { [waiting.id]: { type: "running" } },
+    sessionPermissions: {
+      [waiting.id]: [
+        { id: "per_home", sessionID: waiting.id, action: "shell", resources: ["git status"], metadata: {}, save: [] },
+      ],
+    },
+    onPermissionReply: (reply) => replies.push(reply),
+  })
+  await page.goto("/")
+  const search = page.getByRole("textbox", { name: /Search sessions/ })
+  const inbox = page.locator('[data-slot="start-row"]')
+  await expect(search).toBeVisible()
+  await expect(row(page, earlier.title)).toBeVisible()
+  await expect(inbox).toHaveCount(0)
+
+  for (const mode of ["Side tabs", "Inbox", "Top tabs", "Inbox"]) {
+    await page.keyboard.press("Control+,")
+    const settings = page.getByTestId("settings-screen")
+    const option = settings.getByRole("radio", { name: mode, exact: true })
+    await settings.getByRole("group", { name: "Interface", exact: true }).getByText(mode, { exact: true }).click()
+    await expect(option).toBeChecked()
+    await settings.getByRole("button", { name: "Back to app", exact: true }).click()
+    await expect(page).toHaveURL("/")
+
+    if (mode === "Inbox") {
+      await expect(inbox.filter({ hasText: earlier.title })).toHaveAttribute("data-status", "ready")
+      await expect(search).toHaveCount(0)
+      await expect(row(page, earlier.title)).toHaveCount(0)
+      continue
+    }
+
+    await expect(search).toBeVisible()
+    await expect(row(page, earlier.title)).toBeVisible()
+    await expect(inbox).toHaveCount(0)
+  }
+
+  await page.reload()
+  const approval = inbox.filter({ hasText: waiting.title })
+  await expect(approval).toHaveAttribute("data-status", "approval")
+  await expect(approval).toContainText("git status")
+  await expect(search).toHaveCount(0)
+  await approval.getByRole("button", { name: "Allow", exact: true }).click()
+  await expect
+    .poll(() => replies)
+    .toEqual([{ sessionID: waiting.id, permissionID: "per_home", body: { decision: "once" } }])
+  await expect(approval).toHaveAttribute("data-status", "working")
+  await inbox.filter({ hasText: earlier.title }).click()
+  await expectPath(page, sessionHref(earlier.id))
+})
 
 test("the session context menu renames, exports, and deletes a Home session", async ({ page }) => {
   await openHome(page)
@@ -111,6 +168,7 @@ const entry = (name: string, active: number, id = `proj_${name}`) =>
 
 async function homeProjects(page: Page, projects: unknown[]) {
   const directory = "C:/OpenCode/home"
+
   const server = await mockOpenCodeServer(page, {
     directory,
     project: project({ id: "proj_home", directory }),
@@ -140,12 +198,14 @@ test("Home lists the used server projects by recent activity, hides them, and li
   const fresh = entry("fresh", 7)
   listed.splice(0, listed.length, fresh, active, listed[0]!, listed[1]!, listed[4]!)
   await view.server.push(
-    [active, archived, fresh].map((data, index) => ({
-      id: `evt_home_project_${index}`,
-      created: T0 + index,
-      type: "project.updated",
-      data,
-    })) as OpenCodeEvent[],
+    [active, archived, fresh].map(
+      (data, index): OpenCodeEvent => ({
+        id: `evt_home_project_${index}`,
+        created: T0 + index,
+        type: "project.updated",
+        data,
+      }),
+    ),
   )
   await expect(view.rows).toHaveText(["oldest", "recent"])
 
@@ -183,6 +243,7 @@ test("Home migrates the directories an older build listed to the server's curren
     entry("api", 1, "proj_api_before_remote"),
     entry("docs", 0),
   ])
+
   await seed(page, {
     legacyProjects: {
       local: [
@@ -309,11 +370,11 @@ const worktree =
   "C:/OpenCode/Worktrees/project-42/long-folder-name-for-checking-wrapped-worktree-paths/another-long-folder-name"
 
 for (const state of [
-  { name: "local", directory: fixture.directory, icon: "monitor" },
-  { name: "worktree", directory: worktree, icon: "outline-worktree" },
-  { name: "unopened worktree", directory: recovery, icon: "outline-worktree", recovery: "unopened" },
+  { name: "local", directory: fixture.directory },
+  { name: "worktree", directory: worktree, worktree: "another-long-folder-name" },
+  { name: "unopened worktree", directory: recovery, worktree: "project-menu-recovery", recovery: "unopened" },
 ]) {
-  test(`the session project menu opens settings and Home for a ${state.name} project`, async ({ page }) => {
+  test(`the session location card opens settings and Home for a ${state.name} project`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     const workspace = state.directory !== fixture.directory
     const messages = Promise.withResolvers<void>()
@@ -338,39 +399,30 @@ for (const state of [
     await page.goto(sessionHref(fixture.targetID))
 
     const header = page.locator("[data-session-title]")
-    const trigger = header.getByRole("button", { name, exact: true })
-    const menu = page.getByRole("menu", { name, exact: true })
+    const trigger = header.locator('[data-slot="session-location-trigger"]')
+    const menu = page.locator('[data-slot="session-location-card"]')
     const projectItem = menu.getByRole("menuitem", { name, exact: true })
-    const pathItem = menu.getByRole("menuitem", { name: state.directory, exact: true })
     const settings = page.getByTestId("settings-screen")
     await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
 
     for (const loaded of state.recovery ? [false, true] : [true]) {
       if (state.recovery && loaded) {
         messages.resolve()
-        await expect(header.getByRole("button", { name: "More options", exact: true })).toBeVisible()
+        await expect(header.getByRole("button", { name: "Session details", exact: true })).toBeVisible()
       }
 
-      await expect(trigger.locator("use")).toHaveAttribute("href", `#opencode-v2-icon-${state.icon}`)
+      await expect(trigger.locator('[data-slot="session-location-project"]')).toHaveText(name)
+      await expect(trigger.locator('[data-slot="session-location-worktree"]')).toHaveText(
+        state.worktree ? [state.worktree] : [],
+      )
       await trigger.click()
-      await expect(menu.getByRole("menuitem")).toHaveText([name, state.directory, "Edit project"])
-      await expect(pathItem).toBeDisabled()
+      await expect(menu.locator('[data-slot="session-location-path"]')).toHaveText(state.directory)
       await page.keyboard.press("Escape")
       await expect(menu).toBeHidden()
       await expect(trigger).toBeFocused()
       await trigger.press("ArrowDown")
       await expect(projectItem).toBeFocused()
-      await page.keyboard.press("ArrowDown")
-      await expect(pathItem).toBeFocused()
-
-      for (const key of ["Enter", "Space"]) {
-        await page.keyboard.press(key)
-        await expect(menu).toBeVisible()
-        await expect(pathItem).toBeFocused()
-      }
-
-      await page.keyboard.press("ArrowDown")
-      await page.keyboard.press("Enter")
+      await menu.getByRole("menuitem", { name: "Edit project", exact: true }).press("Enter")
       await expect(settings.getByRole("textbox", { name: "Project name", exact: true })).toHaveValue(name)
       await settings.getByRole("button", { name: "Back to projects", exact: true }).click()
       await settings.getByRole("button", { name: "Back to app", exact: true }).click()
@@ -387,37 +439,3 @@ for (const state of [
     ).toBeVisible()
   })
 }
-
-test("the project menu path arrow has a glyph when the page has an older icon sprite", async ({ page }) => {
-  await mockStressTimeline(page)
-  await seed(page, { tabs: [fixture.targetID] })
-  // A page cached before the arrow icon shipped carries a sprite without it.
-  await page.route(
-    (url) => url.pathname === sessionHref(fixture.targetID),
-    async (route) => {
-      const response = await route.fetch()
-      await route.fulfill({
-        response,
-        body: (await response.text()).replace(
-          '<div id="root"',
-          '<svg id="opencode-v2-icon-sprite" width="0" height="0" aria-hidden="true"><symbol id="opencode-v2-icon-monitor" viewBox="0 0 16 16"><path d="M1 1h14v14H1z"/></symbol></svg><div id="root"',
-        ),
-      })
-    },
-  )
-  await page.goto(sessionHref(fixture.targetID))
-  const header = page.locator("[data-session-title]")
-  await expect(header.getByRole("heading")).toHaveText(fixture.expected.targetTitle)
-  await header.getByRole("button", { name: fixture.project.name, exact: true }).click()
-
-  const arrow = page
-    .getByRole("menu")
-    .getByRole("menuitem", { name: fixture.directory, exact: true })
-    .locator('[data-slot="session-project-open-icon"]')
-
-  await expect(arrow).toHaveCount(1)
-  await expect
-    .poll(() => arrow.locator("svg").evaluate((element: SVGSVGElement) => element.getBBox().width))
-    .toBeGreaterThan(0)
-  await expect(page.locator("#opencode-v2-icon-sprite")).toHaveCount(1)
-})

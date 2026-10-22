@@ -8,15 +8,24 @@ const workspace = { name: "TerminalInput", pty: {} } satisfies WorkspaceInput
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test("clears the terminal line with Command+Delete", async ({ page }) => {
+test("clears the terminal line with Command+Delete and suppresses printable Command chords", async ({ page }) => {
   const { pty } = await openSession(page, workspace)
   const terminal = page.locator('[data-component="terminal"]')
   await page.keyboard.press("Control+Backquote")
   await expect(terminal.locator("textarea")).toHaveCount(1)
   await expect.poll(() => pty.sockets.length).toBe(1)
 
+  await page.keyboard.press("Meta+k")
+  await page.keyboard.press("Meta+j")
+  await terminal.locator("textarea").evaluate((textarea) => {
+    const clipboardData = new DataTransfer()
+    clipboardData.setData("text/plain", "echo pasted")
+    textarea.dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }))
+  })
+  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("echo pasted")
+
   await page.keyboard.press("Meta+Backspace")
-  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("\x15")
+  await expect.poll(() => pty.sockets[0]!.input.join("")).toBe("echo pasted\x15")
 })
 
 test("reveals the terminal after its first output and hides the native caret", async ({ page }) => {
@@ -142,7 +151,7 @@ test("opens terminals as side panel tabs from the + menu", async ({ page }) => {
     await editor.click()
     await expect(editor).toBeFocused()
     await panel.getByRole("button", { name: "Add tab", exact: true }).click()
-    await page.getByRole("menuitem", { name: /^Terminal/ }).click()
+    await panel.getByRole("button", { name: /^Terminal/ }).click()
   }
 
   for (const number of [2, 3]) {
@@ -170,7 +179,7 @@ test("focuses the terminal opened from the command palette", async ({ page }) =>
   await editor.click()
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const palette = page.getByRole("dialog")
-  const search = palette.getByRole("textbox")
+  const search = palette.getByRole("combobox")
   await expect(search).toBeFocused()
   await search.fill("Toggle terminal")
   await expect(palette.getByRole("option", { name: /^Toggle terminal/ })).toHaveAttribute("aria-selected", "true")

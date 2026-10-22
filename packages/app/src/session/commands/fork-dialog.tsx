@@ -73,6 +73,7 @@ export const DialogFork: Component = () => {
     const restored = extractPromptFromMessage(message, {
       directory: location().directory,
       attachmentName: language.t("common.attachment"),
+      sessionTitle: (id) => data.session.get(id)?.title,
     })
 
     const context = extractPromptContext(message, { directory: location().directory })
@@ -99,13 +100,12 @@ export const DialogFork: Component = () => {
     key: (x) => x.id,
     filterKeys: ["text"],
     onSelect: handleSelect,
-    noInitialSelection: true,
   })
 
   let resultsRef: HTMLDivElement | undefined
 
   const onKeyDown = (event: KeyboardEvent) => {
-    // Nothing is highlighted until the pointer or arrow keys pick a row, so Enter forks from the newest match.
+    // The pointer leaving the rows clears the highlight, so Enter then forks from the newest match.
     if (event.key === "Enter" && !event.isComposing && !list.active()) {
       event.preventDefault()
       handleSelect(list.flat()[0])

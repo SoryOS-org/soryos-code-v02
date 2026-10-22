@@ -4,7 +4,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { isScrollKeyTarget, scrollKey, scrollKeyOwner } from "@opencode/ui/scroll-view"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useNavigate } from "@solidjs/router"
-import { createEffect, createMemo, on, onMount, Show, type Accessor } from "solid-js"
+import { createEffect, createMemo, on, onCleanup, onMount, Show, type Accessor } from "solid-js"
 import { Composer } from "@/composer/composer"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls } from "@/composer/selection"
@@ -18,6 +18,8 @@ import { showToast } from "@/shell/notifications/toast"
 import { errorMessage } from "@/shell/layout/helpers"
 import { useLocal } from "@/providers/models/selection"
 import { usePlatform } from "@/runtime/platform/platform"
+import { uuid } from "@/runtime/persistence/uuid"
+import { contextItemKey } from "@/composer/schema"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { requireServerKey, sessionHref } from "@/shell/routes/session"
 import { useComposerCommands } from "@/composer/commands"
@@ -33,6 +35,9 @@ import { SessionQueuePanel } from "./queue-panel"
 import { SessionActivityChips, type SessionActivityItem } from "./activity-chips"
 import { useOpenSessionRoute } from "../session-identity-header"
 import { resolveSessionComposerSelection } from "./selection"
+import { composerProviderName } from "@/composer/selection"
+import { useProviders } from "@/providers/catalog/providers"
+import { SubagentBar } from "./subagent-bar"
 import { createSessionRequestModel } from "../requests/model"
 import type { Region } from "@/runtime/extension/panels"
 import { SessionLocationMissing } from "./location-missing"
@@ -177,7 +182,10 @@ export function createActiveSessionRegion(input: {
       return
     }
 
-    if (event.key.length !== 1 || event.key === "Unidentified" || event.ctrlKey || event.metaKey) return
+    // Focusing on the ⌘V keydown makes the browser's paste land in the composer through its normal paste path.
+    const paste = (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "v"
+
+    if (event.key.length !== 1 || event.key === "Unidentified" || ((event.ctrlKey || event.metaKey) && !paste)) return
 
     if (state.blocked() || input.session.data.isChild() || !promptRef) return
     promptRef.focus()
@@ -192,6 +200,43 @@ export function createActiveSessionRegion(input: {
   })
 
   const revertMessage: NonNullable<SessionUserActions["revert"]> = ({ messageID }) => revert.to(messageID)
+
+  const recalled = new Set<string>()
+
+  // The free allowance stops a prompt after it was sent. Hand its text back so switching models and resending is one
+  // step, unless the user has already started typing something else.
+  onCleanup(
+    location().event.on("session.step.failed", (event) => {
+      const sessionID = input.session.identity.params.id
+
+      if (!sessionID || event.data.sessionID !== sessionID || event.data.error.type !== "provider.free-limit") return
+
+      if (recalled.has(event.data.assistantMessageID)) return
+      recalled.add(event.data.assistantMessageID)
+
+      if (
+        !prompt.ready() ||
+        !prompt.current().every((part) => part.type === "text" && part.content.length === 0) ||
+        prompt.context.items().length > 0
+      )
+        return
+
+      const messages = input.session.history.messages()
+      const end = messages.findIndex((item) => item.id === event.data.assistantMessageID)
+
+      for (let i = end - 1; i >= 0; i--) {
+        const item = messages[i]
+
+        if (!item || item.type === "shell" || item.type === "idle") return
+
+        if (item.type === "user" && !data.session.input.has(sessionID, item.id)) {
+          revert.recall(item)
+
+          return
+        }
+      }
+    }),
+  )
 
   const notifyFailed = () => {
     showToast({ title: language.t("common.requestFailed") })
@@ -229,7 +274,7 @@ export function createActiveSessionRegion(input: {
       return model ? { id: model.id, providerID: model.provider.id, variant: selection.variant.current() } : undefined
     },
   })
-  command.register("session-palette", () => [
+  command.register("palette", () => [
     {
       id: "command.palette",
       title: language.t("command.palette"),
@@ -270,6 +315,20 @@ export function createActiveSessionRegion(input: {
     drop: {
       active: () => active()?.drop.active() ?? false,
       input: () => active()?.drop.input(),
+    },
+    quote: {
+      // A child session has no composer to quote into, and a shell command takes no quotes.
+      available: () => !input.session.data.isChild() && prompt.capture().mode.current() !== "shell",
+      add: (text: string, comment: boolean) => {
+        const item = { type: "quote" as const, text, commentID: uuid() }
+        prompt.context.add(item)
+
+        if (comment) return prompt.capture().quoteComment.set(contextItemKey(item))
+
+        if (!promptRef) return
+        promptRef.focus()
+        setCursorPosition(promptRef, prompt.cursor() ?? promptLength(prompt.current()))
+      },
     },
     actions: {
       timeline: {
@@ -377,25 +436,66 @@ export function ActiveSessionComposerRegion(props: {
     )
   }
 
+  const providers = useProviders(() => props.session.data.info()?.location.directory)
+
+  const subagentModel = () => {
+    const ref =
+      props.session.data.info()?.model ??
+      props.session.history.messages().findLast((message) => message.type === "assistant")?.model
+
+    if (!ref) return
+    const catalog = providers.all()
+
+    return {
+      provider: composerProviderName(ref.providerID, catalog),
+      name: catalog.get(ref.providerID)?.models[ref.id]?.name.replace("(latest)", "").trim() ?? ref.id,
+      variant: ref.variant,
+    }
+  }
+
+  const subagentStatus = () => {
+    if (props.session.data.working()) return "running"
+
+    return props.session.data.info()?.outcome
+  }
+
   return (
     <SessionComposerRegion
       controller={props.model.region}
+      subagent={
+        <Show when={props.session.data.info()}>
+          {(info) => (
+            <SubagentBar
+              agent={info().agent}
+              model={subagentModel()}
+              status={subagentStatus()}
+              started={info().time.created}
+              ended={subagentStatus() === "running" ? undefined : (info().time.idle ?? info().time.updated)}
+              onBack={props.model.region.openParent}
+            />
+          )}
+        </Show>
+      }
+      above={
+        <Show when={!missing() && !props.session.data.isChild()}>
+          <SessionActivityChips subagents={subagents()} shells={shells()} onOpen={open} onStop={stop} />
+          <SessionQueuePanel queue={props.model.queue} hidden={props.model.region.state.blocked()} />
+        </Show>
+      }
       composer={
         <Show
           when={missing()}
           keyed
           fallback={
-            <div class="relative">
-              <SessionActivityChips subagents={subagents()} shells={shells()} onOpen={open} onStop={stop} />
-              <SessionQueuePanel queue={props.model.queue} />
-              <div class="relative z-10">
-                <Composer
-                  model={props.model.composer}
-                  borderUnderlay
-                  readOnly={props.model.queue.undoing()}
-                  suggestionBoundary={props.suggestionBoundary}
-                />
-              </div>
+            // The container for the composer's `cqw` caps: only the composer re-evaluates as a panel beside it
+            // animates the chat's width.
+            <div class="@container">
+              <Composer
+                model={props.model.composer}
+                borderUnderlay
+                readOnly={props.model.queue.undoing()}
+                suggestionBoundary={props.suggestionBoundary}
+              />
             </div>
           }
         >

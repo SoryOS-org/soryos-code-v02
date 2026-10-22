@@ -2,11 +2,11 @@ import { createMemo } from "solid-js"
 import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { type ServerCtx, useGlobal, useServerCtx } from "@/runtime/server/runtime"
 import { useServerSDK } from "@/runtime/server/client"
-import { serverName, ServerConnection, useServers } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { workspaceSelectionDestination } from "@/workspaces/paths"
 import { useTabs } from "@/shell/tabs/tabs"
-import type { PromptProjectControls } from "./selector"
+import type { PromptProjectControls, PromptServer } from "./selector"
 
 export function createComposerProjectControls(props: { draftId: string; worktree: () => string }) {
   const servers = useServers()
@@ -18,22 +18,43 @@ export function createComposerProjectControls(props: { draftId: string; worktree
   const projectServer = () => serverSDK.server
   const projectServerCtx = useServerCtx(projectServer)
 
-  // Every server project, one per directory: the ones this client has used first, then the rest, each by recency.
-  const ordered = (ctx: ServerCtx) => {
+  // Every server project, one per directory, marked as used by this client or not; the selector orders them.
+  const listed = (ctx: ServerCtx, server?: PromptServer) => {
     const used = ctx.projects.used()
     const ids = new Set(used.map((project) => project.id))
 
-    return [...used, ...ctx.projects.unique().filter((project) => !ids.has(project.id))]
+    return [
+      ...used.map((project) => ({ ...project, used: true, server })),
+      ...ctx.projects
+        .unique()
+        .filter((project) => !ids.has(project.id))
+        .map((project) => ({ ...project, used: false, server })),
+    ]
   }
 
+  function promptServer(connection: ServerConnection.Any): PromptServer {
+    return {
+      key: ServerConnection.key(connection),
+      name: servers.label(connection),
+      hint: servers.hint(connection),
+      kind: servers.current(connection) ? "current" : connection.type === "extension" ? "extension" : "remote",
+      label: connection.label,
+    }
+  }
+
+  // Servers that are down or still connecting contribute nothing.
+  const ready = createMemo(() =>
+    servers.list.filter((connection) => {
+      if (connection.type === "extension" && connection.state !== "ready") return false
+
+      return global.servers.health[ServerConnection.key(connection)]?.healthy !== false
+    }),
+  )
+
   const projects = createMemo(() => {
-    if (servers.list.length <= 1) return ordered(projectServerCtx())
+    if (servers.list.length <= 1) return listed(projectServerCtx())
 
-    return servers.list.flatMap((connection) => {
-      const server = { key: ServerConnection.key(connection), name: serverName(connection) }
-
-      return ordered(global.ensureServerCtx(connection)).map((project) => ({ ...project, server }))
-    })
+    return ready().flatMap((connection) => listed(global.ensureServerCtx(connection), promptServer(connection)))
   })
 
   const selectProject = (directory: string, serverKey?: string, workspace?: string) => {
@@ -74,6 +95,7 @@ export function createComposerProjectControls(props: { draftId: string; worktree
 
   return createMemo<PromptProjectControls>(() => ({
     available: projects(),
+    servers: servers.list.length > 1 ? ready().map(promptServer) : undefined,
     directory: location().directory,
     projectID: location().current?.project.id,
     server: servers.list.length > 1 ? ServerConnection.key(projectServer()) : undefined,

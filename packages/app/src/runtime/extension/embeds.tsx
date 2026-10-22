@@ -12,6 +12,8 @@ type Input = {
   readonly bridge: Bridge | undefined
   readonly zoom: () => number
   readonly dialog: () => boolean
+  /** A panel is moving; native views would float unclipped over the app until it lands. */
+  readonly moving: () => boolean
 }
 
 /** Main-process embeds laid out over the DOM box an extension renders for them. */
@@ -157,7 +159,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
     const top = Math.round(rect.top * zoom)
     const right = Math.round(rect.right * zoom)
     const bottom = Math.round(rect.bottom * zoom)
-    const shown = props.visible && store.visible && !props.input.dialog()
+    const shown = props.visible && store.visible && !props.input.dialog() && !props.input.moving()
     const cover = !!props.frozen || covered(rect)
 
     if (shown && cover) freeze(id)
@@ -217,6 +219,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
       [
         props.input.zoom,
         props.input.dialog,
+        props.input.moving,
         () => store.visible,
         () => props.visible,
         () => props.id,
@@ -227,7 +230,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
 
         // The native views are not clipped by the retained panel's DOM. Hide before the next
         // animation frame so closing the panel cannot leave the embed above the app.
-        if (!props.visible || !store.visible || props.input.dialog() || !props.id) return hide()
+        if (!props.visible || !store.visible || props.input.dialog() || props.input.moving() || !props.id) return hide()
         schedule(300)
       },
     ),

@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("maps grouped and collapsed switches to the timeline settings", async ({ mount }) => {
   const component = await mount("settings-timeline-detail--interactive")

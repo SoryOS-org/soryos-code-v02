@@ -15,6 +15,7 @@ export function HomeProjects(props: {
       projects={props.projects.project.list()}
       selection={props.projects.selection.value()}
       serverHealth={props.projects.server.health}
+      serverLabel={props.projects.server.label}
       projectsForServer={props.projects.server.projects}
       collapsed={props.projects.server.collapsed}
       canRevealProject={props.projects.project.canReveal}

@@ -1,3 +1,31 @@
+.markdown-session-link {
+  display: inline;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--v2-background-bg-layer-02);
+  box-shadow: inset 0 0 0 1px var(--v2-border-border-base);
+  color: var(--text-interactive-base);
+  font: inherit;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.markdown-session-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-session-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.markdown-session-id {
+  font-family: var(--font-family-mono);
+}
+
 [data-component="markdown"] {
   --markdown-inline-code-path-color: var(--v2-text-text-code-path);
   --markdown-inline-code-color: var(--v2-text-text-code-accent);
@@ -66,9 +94,9 @@
   }
 
   h3 {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--v2-text-text-base);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-bold);
     margin-top: 20px;
     margin-bottom: 8px;
     line-height: var(--line-height-large);
@@ -77,12 +105,18 @@
   h4,
   h5,
   h6 {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--v2-text-text-muted);
     font-weight: var(--font-weight-medium);
     margin-top: 20px;
     margin-bottom: 8px;
     line-height: var(--line-height-large);
+  }
+
+  /* A heading's own bottom margin sets the gap to its section, so a block's larger top margin can't push the heading away from it. */
+  :is(h1, h2, h3, h4, h5, h6) + :is(p, ul, ol, blockquote, [data-component]),
+  :is(h1, h2, h3, h4, h5, h6) + [data-component="markdown-code"] > pre {
+    margin-top: 0;
   }
 
   /* Emphasis & Strong: Neutral strong color */
@@ -151,26 +185,6 @@
     cursor: pointer;
   }
 
-  .markdown-session-link {
-    display: inline;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text-interactive-base);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .markdown-session-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .markdown-session-link:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
-  }
-
   &[data-local-links] :not(pre) > code[data-inline-code-kind="path"]:not(a > code) {
     cursor: pointer;
   }
@@ -197,7 +211,6 @@
 
   ol {
     list-style-type: decimal;
-    padding-inline-start: 2.25rem;
   }
 
   li {
@@ -260,10 +273,11 @@
     margin: 32px 0;
   }
 
-  .shiki {
+  .highlights {
     background: var(--color-background-stronger);
     color: var(--text-base);
     font-size: 13px;
+    line-height: 20px;
     padding: 12px;
     border-radius: 6px;
     border: 0.5px solid var(--v2-border-border-base);
@@ -276,6 +290,19 @@
   }
 
   [data-component="markdown-mermaid"] {
+    --pele-bg: var(--v2-background-bg-layer-02);
+    --pele-fg: var(--v2-text-text-base);
+    --pele-muted: var(--v2-text-text-muted);
+    --pele-line: var(--v2-icon-icon-muted);
+    --pele-surface: var(--v2-background-bg-base);
+    --pele-surface-alt: var(--v2-background-bg-layer-03);
+    --pele-border: var(--v2-border-border-strong);
+    --pele-accent: var(--v2-text-text-accent);
+    --pele-critical: var(--v2-state-fg-danger);
+    --pele-error: var(--v2-state-fg-danger);
+    --pele-font: var(--font-family-sans);
+    --pele-font-mono: var(--font-family-mono);
+    --pele-radius: 6px;
     min-height: 96px;
     margin: 12px 0 24px;
     padding: 16px;
@@ -289,8 +316,7 @@
 
   [data-component="markdown-mermaid"] > svg {
     display: block;
-    width: 100%;
-    min-width: 480px;
+    max-width: 100%;
     height: auto;
     margin: 0 auto;
   }
@@ -302,7 +328,7 @@
     display: none;
   }
 
-  [data-component="markdown-code"][data-code-kind="shell"] .shiki {
+  [data-component="markdown-code"][data-code-kind="shell"] .highlights {
     background: var(--markdown-shell-code-background);
     border-color: var(--markdown-shell-code-border);
     color: var(--markdown-shell-code-color);
@@ -441,7 +467,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+:root[data-motion="reduce"] {
   [data-component="markdown"] :is([data-markdown-word], code)[data-markdown-enter] {
     animation: none;
   }

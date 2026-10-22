@@ -177,7 +177,8 @@ function createWorkspace(input: { storage: Storage; server: ServerRef; directory
 
       if (!(event.target instanceof Element)) return
 
-      if (event.target.closest("#terminal-panel")) return
+      // The side region focuses its selected tab trigger or root while switching tabs; only focus leaving it cancels.
+      if (event.target.closest("#terminal-panel, #review-panel")) return
 
       cancelFocus()
     }

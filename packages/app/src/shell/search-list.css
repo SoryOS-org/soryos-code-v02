@@ -113,3 +113,60 @@
   line-height: var(--line-height-compact);
   letter-spacing: -0.04px;
 }
+
+.mcp-dialog .search-list-row {
+  gap: 16px;
+}
+
+.mcp-dialog .search-list-row-text {
+  flex: 1;
+}
+
+.mcp-dialog .search-list-title {
+  flex: 1;
+}
+
+.mcp-trailing {
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.mcp-error-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 4px 8px;
+}
+
+[data-component="dialog-v2"]
+  [data-slot="dialog-container"]
+  .mcp-dialog[data-slot="dialog-content"]
+  .mcp-error-heading
+  > [data-slot="dialog-title-group"] {
+  display: contents;
+}
+
+.mcp-error-heading [data-slot="dialog-title"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.mcp-error-heading [data-slot="dialog-description"] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+@media (max-width: 639px), (hover: none) {
+  .mcp-dialog .search-list-row {
+    height: auto;
+    min-height: 44px;
+    padding-block: 8px;
+  }
+
+  .mcp-dialog .search-list-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

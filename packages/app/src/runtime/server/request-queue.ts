@@ -1,4 +1,4 @@
-type Entry = { method: string; url: string; at: number; slow: boolean }
+type Entry = { method: string; url: string; at: number; slow: boolean; priority: number }
 
 // Chromium allows six connections per origin. The event stream holds one for the life of the
 // connection and health probes use their own fetch, so the app's API calls stay below that or
@@ -86,7 +86,7 @@ export function createRequestQueue(input: {
     return [...inflight].filter((item) => item.slow).length < slowLimit
   }
 
-  // FIFO, except a slow request waits its turn behind faster ones while the slow slots are full.
+  // FIFO within each priority tier, except a slow request waits its turn behind faster ones while the slow slots are full.
   const release = (entry: Entry) => {
     inflight.delete(entry)
     const index = waiting.findIndex((item) => canStart(item.entry))
@@ -111,7 +111,8 @@ export function createRequestQueue(input: {
         resolve()
       }
 
-      waiting.push({ entry, start })
+      const position = waiting.findIndex((item) => item.entry.priority < entry.priority)
+      waiting.splice(position === -1 ? waiting.length : position, 0, { entry, start })
       watcher ??= setTimeout(watch, stallMs)
     })
   }
@@ -119,11 +120,21 @@ export function createRequestQueue(input: {
   const fetch: typeof globalThis.fetch = Object.assign(
     async (resource: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(resource, init)
-      const pathname = new URL(request.url).pathname
+      const url = new URL(request.url)
+      const pathname = url.pathname
 
       // The event stream is long-lived; never count it against the request budget.
       if (pathname === "/api/event") return base(request)
-      const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname) }
+      // Writes go first. Session lists and the first transcript page unblock navigation, so they
+      // go ahead of location reads. Older pages and filtered indexes keep background priority.
+      const initialMessages =
+        /^\/api\/session\/[^/]+\/message$/.test(pathname) &&
+        !url.searchParams.has("cursor") &&
+        !url.searchParams.has("before") &&
+        !url.searchParams.has("type") &&
+        url.searchParams.get("order") !== "asc"
+      const priority = request.method !== "GET" ? 2 : pathname === "/api/session" || initialMessages ? 1 : 0
+      const entry = { method: request.method, url: request.url, at: now(), slow: isSlowRequest(pathname), priority }
       const queued = acquire(entry)
 
       if (queued) await queued

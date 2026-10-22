@@ -1,4 +1,5 @@
 import { createSimpleContext } from "@opencode/ui/context"
+import { useLanguage } from "@/runtime/i18n/language"
 import { batch, createMemo } from "solid-js"
 import { reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import { Persist, persisted } from "@/runtime/persistence/storage"
@@ -23,6 +24,18 @@ export function serverName(conn?: ServerConnection.Any, ignoreDisplayName = fals
   if (conn.displayName && !ignoreDisplayName) return conn.displayName
 
   return conn.http.url.replace(/^https?:\/\//, "").replace(/\/+$/, "")
+}
+
+/**
+ * What switchers and titles call a server: a custom name wins, then, for the server the app runs beside, its
+ * hostname or the fallback; other servers show their address.
+ */
+export function serverLabel(conn: ServerConnection.Any, current?: { hostname?: string; fallback: string }) {
+  if (conn.displayName) return conn.displayName
+
+  if (current) return current.hostname || current.fallback
+
+  return serverName(conn)
 }
 
 function isLocalHost(url: string) {
@@ -194,8 +207,9 @@ export const { use: useServers, provider: ServersProvider } = createSimpleContex
         previousKey: "server.v3",
       },
       ServerState,
-      { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, projects: {} },
+      { list: [], hidden: {}, lastProjectID: {}, usedProjectIDs: {}, hostnames: {}, projects: {} },
     )
+    const language = useLanguage()
 
     const allServers = createMemo((): Array<ServerConnection.Any> => {
       return resolveServerList({ stored: store.list, props: props.servers })
@@ -246,6 +260,18 @@ export const { use: useServers, provider: ServersProvider } = createSimpleContex
       return next
     }
 
+    // The desktop sidecar, or the server that served the web app.
+    const current = (conn: ServerConnection.Any) =>
+      ServerConnection.builtin(conn) || ServerConnection.key(conn) === props.canonicalLocalServer
+
+    const label = (conn: ServerConnection.Any) =>
+      serverLabel(
+        conn,
+        current(conn)
+          ? { hostname: store.hostnames[ServerConnection.key(conn)], fallback: language.t("server.thisComputer") }
+          : undefined,
+      )
+
     return {
       get list() {
         return allServers()
@@ -266,6 +292,22 @@ export const { use: useServers, provider: ServersProvider } = createSimpleContex
       remove,
       canRemove,
       scope,
+      current,
+      /** The name switchers, menus and titles show. */
+      label,
+      /** The name a list row shows next to its item: nothing for the current server or when it is the only one. */
+      tag(conn: ServerConnection.Any) {
+        return allServers().length < 2 || current(conn) ? undefined : label(conn)
+      },
+      /** "This computer" beside the current server's name, unless the name already says it. */
+      hint(conn: ServerConnection.Any) {
+        const text = language.t("server.thisComputer")
+
+        return current(conn) && label(conn) !== text ? text : undefined
+      },
+      setHostname(key: ServerConnection.Key, hostname: string) {
+        if (store.hostnames[key] !== hostname) setStore("hostnames", key, hostname)
+      },
       projects: {
         forServer: projectsForServer,
       },

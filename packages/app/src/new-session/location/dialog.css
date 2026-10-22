@@ -37,3 +37,32 @@
   align-items: center;
   gap: 6px;
 }
+
+/* The project name truncates before its server tag. */
+.new-session-location-name {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-session-location-tag {
+  max-width: 160px;
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.new-session-location-tag [data-slot="icon-svg"] {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.new-session-location-tag > span {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

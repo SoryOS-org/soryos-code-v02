@@ -531,6 +531,13 @@ jobs:
           # The macOS zip (7z deflate, default -mx=7) and DMG (UDZO zlib, default level 9) at level 1.
           if [ "$RUNNER_OS" = "macOS" ]; then echo "ELECTRON_BUILDER_COMPRESSION_LEVEL=1" >> "$GITHUB_ENV"; fi
 
+      # The beta build embeds the subjects of its newest commits for "What's new in beta"
+      # (packages/desktop/scripts/beta-notes.ts). Commits without file contents are enough.
+      - name: Fetch beta history (beta)
+        if: github.ref_name == 'beta'
+        shell: bash
+        run: git fetch --no-tags --filter=blob:none --depth=300 origin "$GITHUB_SHA"
+
       # Beta builds the app before its CLI exists. `bun run build` would run the prebuild hook, which copies the CLI;
       # Prepare runs it once the CLI is here.
       - name: Build (beta)

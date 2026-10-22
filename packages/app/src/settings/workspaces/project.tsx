@@ -11,7 +11,7 @@ import { TextInput } from "@opencode/ui/text-input"
 import { For, Show, createMemo, type Component } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { LocalProject } from "@/shell/state/layout"
-import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { type ServerConnection, useServers } from "@/runtime/server/registry"
 import { useSettingsServers } from "@/settings/servers/inventory"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { projectSettingsKey, useSettings } from "@/settings/model"
@@ -31,6 +31,7 @@ export const SettingsProjectGeneral: Component<{
   const language = useLanguage()
   const model = createEditProjectModel(props)
   const servers = useSettingsServers()
+  const registry = useServers()
 
   return (
     <>
@@ -53,7 +54,7 @@ export const SettingsProjectGeneral: Component<{
               </h2>
               <Show when={servers().length > 1}>
                 <button type="button" class="project-settings-server-link" onClick={() => props.onOpenServer()}>
-                  <bdi dir="auto">{serverName(props.server) || ServerConnection.key(props.server)}</bdi>
+                  <bdi dir="auto">{registry.label(props.server)}</bdi>
                 </button>
               </Show>
             </div>

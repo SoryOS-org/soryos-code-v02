@@ -2,7 +2,14 @@ import { app, BrowserWindow } from "electron"
 import { Effect } from "effect"
 import { WindowRpcs } from "../../shared/ipc-rpc"
 import { IpcPortHandoff } from "../ipc-transport"
-import { getPinchZoomEnabled, setPinchZoomEnabled, setTitlebar, setWindowThemeReady, updateTitlebar } from "../windows"
+import {
+  getPinchZoomEnabled,
+  setPinchZoomEnabled,
+  setTitlebar,
+  setTrafficLightsPosition,
+  setWindowThemeReady,
+  updateTitlebar,
+} from "../windows"
 import { focusWindow, showWindow } from "../windows/focus"
 import { sender } from "./context"
 
@@ -42,6 +49,12 @@ export const windowHandlers = WindowRpcs.toLayer(
           const win = BrowserWindow.fromWebContents(sender(handoff, context))
 
           if (win) setTitlebar(win, theme)
+        }),
+      WindowSetTrafficLightsPosition: (position, context) =>
+        Effect.sync(() => {
+          const win = BrowserWindow.fromWebContents(sender(handoff, context))
+
+          if (win) setTrafficLightsPosition(win, position)
         }),
     })
   }),

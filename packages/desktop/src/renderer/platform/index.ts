@@ -36,6 +36,7 @@ export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWind
     },
     webviewZoom,
     windowFullscreen,
+    setTrafficLightsPosition: (position) => api.setTrafficLightsPosition(position),
     getPinchZoomEnabled: () => api.getPinchZoomEnabled(),
     setPinchZoomEnabled,
     onDragCancel: (callback) => {

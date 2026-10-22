@@ -302,6 +302,18 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       return richTemplateParts(current[key] ?? key, params)
     }
 
+    const activitySummaryRich = (
+      counts: { subagents: number; shells: number },
+      render: (label: string) => JSX.Element,
+    ) => {
+      if (!counts.subagents || !counts.shells) return render(activitySummary(counts))
+
+      return rich("session.activity.summary", {
+        subagents: render(activitySummary({ subagents: counts.subagents, shells: 0 })),
+        shells: render(activitySummary({ subagents: 0, shells: counts.shells })),
+      })
+    }
+
     const list = (items: readonly JSX.Element[]) => localizedListParts(intl(), items)
 
     const label = (value: Locale) => DESKTOP_NATIVE_LABELS[value]
@@ -337,6 +349,7 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       plural,
       pluralForm,
       activitySummary,
+      activitySummaryRich,
       rich,
       list,
       setLocale(next: Locale) {

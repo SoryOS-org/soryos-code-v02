@@ -24,7 +24,7 @@ import type {
 import { useComments } from "@/composer/comments"
 import { useComposerState } from "@/composer/persistence"
 import { useServer } from "@/runtime/server/current"
-import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { sessionInWorkspace, sessionProject, type SessionModel } from "@/session/model"
 import { useFile } from "@/workspaces/files/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -45,6 +45,7 @@ export function createMountedSession(session: SessionModel) {
   const comments = useComments()
   const composer = useComposerState()
   const server = useServer()
+  const servers = useServers()
   const location = useWorkspaceLocation()
   const attachment = useExtensionAttachment()
   // The composer region owns background tasks and is created after the view.
@@ -55,7 +56,7 @@ export function createMountedSession(session: SessionModel) {
       return server.key
     },
     get name() {
-      return serverName(server.conn) || server.key
+      return servers.label(server.conn) || server.key
     },
     get url() {
       return server.ctx.sdk.url

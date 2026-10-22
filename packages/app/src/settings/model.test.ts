@@ -90,10 +90,10 @@ describe("settings schema", () => {
   test("supplies the existing defaults for an empty document", () => {
     expect(decode({})).toEqual({
       general: {
-        showFileTree: false,
         timelineDetail: timelinePresets[2].value,
         showCustomAgents: false,
         showTurnDiffs: false,
+        backgroundActivity: "left",
         generatedUI: true,
         mobileTitlebarPosition: "top",
         followUpBehavior: "steer",
@@ -104,6 +104,7 @@ describe("settings schema", () => {
         sans: "",
         terminal: "",
         tabLayout: "horizontal",
+        reduceMotion: "system",
       },
       keybinds: {},
       permissions: { autoApprove: false, autoApproveProjects: {} },
@@ -129,6 +130,7 @@ describe("settings schema", () => {
         releaseNotes: undefined,
         reasoningMode: 3,
         followUpBehavior: "invalid",
+        backgroundActivity: "invalid",
       },
       appearance: { fontSize: "large", mono: "Custom Mono", tabLayout: "vertical", showProjectName: true },
       permissions: { autoApprove: true, autoApproveProjects: { on: true, off: false, bad: "yes" } },
@@ -143,6 +145,7 @@ describe("settings schema", () => {
       autoSave: false,
       timelineDetail: timelinePresets[2].value,
       followUpBehavior: "steer",
+      backgroundActivity: "left",
     })
     expect(settings.appearance).toEqual({
       fontSize: 14,
@@ -150,6 +153,7 @@ describe("settings schema", () => {
       sans: "",
       terminal: "",
       tabLayout: "vertical",
+      reduceMotion: "system",
     })
     expect(settings.permissions).toEqual({ autoApprove: true, autoApproveProjects: { on: true, off: false } })
     expect(settings.workspaces).toEqual({ defaultDestination: "new", lastUsed: { good: "workspace" } })

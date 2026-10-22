@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, serverName } from "@/runtime/server/registry"
 import type { ExtensionServer } from "@/runtime/extension/servers"
 import { settingsServers } from "./inventory"
 
@@ -23,7 +23,7 @@ const connection: ServerConnection.Extension = {
 
 describe("settings server inventory", () => {
   test("includes contributed servers before they connect", () => {
-    expect(settingsServers([], [ssh])).toEqual([
+    expect(settingsServers([], [ssh], serverName)).toEqual([
       {
         key: ServerConnection.Key.make("ssh:build"),
         name: "Build server",
@@ -34,7 +34,7 @@ describe("settings server inventory", () => {
 
   test("joins a ready contributed server to its live connection and withholds it while disconnected", () => {
     const ready = { ...ssh, entry: { ...ssh.entry, state: "ready" as const } }
-    expect(settingsServers([connection], [ready])).toEqual([
+    expect(settingsServers([connection], [ready], serverName)).toEqual([
       {
         key: ServerConnection.Key.make("ssh:build"),
         name: "Build server",
@@ -42,6 +42,6 @@ describe("settings server inventory", () => {
         source: ready,
       },
     ])
-    expect(settingsServers([connection], [ssh])[0].connection).toBeUndefined()
+    expect(settingsServers([connection], [ssh], serverName)[0].connection).toBeUndefined()
   })
 })

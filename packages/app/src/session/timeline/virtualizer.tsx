@@ -28,8 +28,14 @@ import { createMediaQuery } from "@solid-primitives/media"
 import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { filterVirtualIndexes } from "./virtual-items"
+import { prefersReducedMotion } from "@opencode/ui/motion"
+import { holdLandingWidth } from "@/shell/panel-motion"
 
 const fallbackItemSize = 60
+
+// Reserved below the last row: a 36px lane for the live status row and its background hint, an 8px gap, then a 28px
+// activity pill and its 10px composer gap. Both come and go inside it, so neither moves the rows above.
+const tailSize = 82
 
 const pendingMarkdown = '[data-component="markdown"]:not([data-markdown-ready])'
 
@@ -66,6 +72,9 @@ type Input = {
   onResumeScroll: (behavior?: ScrollBehavior) => void
   setScrollRef: (element: HTMLDivElement | undefined) => void
   setContentRef: (element: HTMLDivElement) => void
+  /** Height of the composer region floating over the timeline's bottom edge, where the timeline fades out. */
+  bottomInset?: Accessor<number>
+  setVisibleRef?: (element: HTMLDivElement | undefined) => void
   onScheduleScrollState: (element: HTMLDivElement) => void
   onPin: () => void
   onUnpin: () => void
@@ -101,6 +110,9 @@ export function createTimelineVirtualizer(input: Input) {
   const initialMeasurements = cached?.measurements
   const coldBottomMount = !initialMeasurements?.length && input.pinned()
   const [listRoot, setListRoot] = createSignal<HTMLDivElement>()
+  const [visibleArea, setVisibleArea] = createSignal<HTMLDivElement>()
+  const [viewRoot, setViewRoot] = createSignal<HTMLDivElement>()
+  const bottomInset = () => input.bottomInset?.() ?? 0
   const [toolOpen, setToolOpen] = createStore<Record<string, boolean | undefined>>(cached?.toolOpen ?? {})
   const patchGroupKeys = cached?.patchGroupKeys ?? new Map<string, string>()
   createEffect(
@@ -187,21 +199,50 @@ export function createTimelineVirtualizer(input: Input) {
   let pointerHeld = false
   let maxScroll = 0
   let virtualContent: HTMLDivElement | undefined
+  let rowLayer: HTMLDivElement | undefined
+  // While a sidebar's spring moves the timeline's edge, rows keep the width they land at, centred on the timeline, so
+  // their text wraps once instead of on every frame. The first column in view (turn gaps span the row) keeps its start
+  // edge where it was.
+  holdLandingWidth(
+    () => rowLayer,
+    () => {
+      const top = listRoot()?.getBoundingClientRect().top ?? 0
+
+      return [
+        ...(rowLayer?.querySelectorAll<HTMLElement>(
+          '[data-timeline-key] [data-timeline-row]:not([data-timeline-row="TurnGap"])',
+        ) ?? []),
+      ].find((row) => row.getBoundingClientRect().bottom > top)
+    },
+  )
   let scrollTop = 0
   let reportOffset: ((offset: number, scrolling: boolean) => void) | undefined
   let reportRect: ((rect: { width: number; height: number }) => void) | undefined
   let batchingColdSizes = false
+
+  const [headerHeight, setHeaderHeight] = createSignal(48)
 
   const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
     get count() {
       return rows().length
     },
     getScrollElement: () => listRoot() ?? null,
+    // The viewport runs on under the composer region. The virtualizer sees only the part above it, which the
+    // inset spacer below the rows keeps consistent with the native scroll range.
     observeElementRect: (instance, callback) => {
-      reportRect = callback
+      reportRect = (rect) => {
+        const root = listRoot()
+        batch(() => {
+          // The container-responsive header can be 48px or 80px.
+          setHeaderHeight(
+            root ? parseFloat(getComputedStyle(root).getPropertyValue("--session-header-height")) || 48 : 48,
+          )
+          callback({ width: rect.width, height: Math.max(0, rect.height - bottomInset()) })
+        })
+      }
 
       return observeElementRect(instance, (rect) => {
-        if (active()) callback(rect)
+        if (active()) reportRect?.(rect)
       })
     },
     // Route navigation detaches and reattaches the scroll element, which drops its offset.
@@ -287,7 +328,11 @@ export function createTimelineVirtualizer(input: Input) {
       // Empty projections still need the bottom spacer for running status.
       return rows().length > 0 ? topOffset() : 0
     },
-    paddingEnd: 64,
+    paddingEnd: tailSize,
+    // Revealed prompts sit below the solid header and its 16px fade.
+    get scrollPaddingStart() {
+      return input.showHeader() ? headerHeight() + 16 : 0
+    },
     get rangeExtractor() {
       return rangeExtractor()
     },
@@ -497,6 +542,7 @@ export function createTimelineVirtualizer(input: Input) {
     if (root) input.setScrollRef(root)
 
     if (virtualContent) input.setContentRef(virtualContent)
+    input.setVisibleRef?.(visibleArea())
     queueMicrotask(() => {
       if (!active() || !root?.isConnected) return
       // A detached view can miss its nonzero ResizeObserver delivery. Publish
@@ -523,11 +569,14 @@ export function createTimelineVirtualizer(input: Input) {
           )
         : -1
 
-      const index = partIndex >= 0 ? partIndex : input.projection.messageRowIndex().get(id)
+      const promptIndex = rows().findIndex((row) => Predicate.isTagged(row, "UserMessage") && row.userMessageID === id)
+
+      const index =
+        partIndex >= 0 ? partIndex : promptIndex >= 0 ? promptIndex : input.projection.messageRowIndex().get(id)
 
       if (index === undefined) return
       prepareNavigation()
-      virtualizer.scrollToIndex(index, { align: "center" })
+      virtualizer.scrollToIndex(index, { align: partIndex >= 0 ? "center" : "start" })
     })
     input.setScrollToEnd?.((behavior) => {
       const root = listRoot()
@@ -542,6 +591,18 @@ export function createTimelineVirtualizer(input: Input) {
       virtualizer.scrollToEnd({ behavior })
     })
   })
+
+  createEffect(
+    on(
+      bottomInset,
+      () => {
+        const root = listRoot()
+
+        if (active() && root?.isConnected) reportRect?.({ width: root.offsetWidth, height: root.offsetHeight })
+      },
+      { defer: true },
+    ),
+  )
 
   let coldPending = coldBottomMount
   let settleQueued = false
@@ -652,6 +713,13 @@ export function createTimelineVirtualizer(input: Input) {
     if (active()) input.setScrollRef(root)
     viewportObserver?.observe(root)
     settleColdBottom()
+    // The scrollbar thumb sits beside the viewport and stops its pointerdown from propagating, so
+    // listen on the ScrollView root in the capture phase: thumb drags are user scrolls too.
+    const scrollView = root.parentElement
+
+    if (!scrollView) return
+    scrollView.addEventListener("pointerdown", handleListPointerDown, { capture: true })
+    onCleanup(() => scrollView.removeEventListener("pointerdown", handleListPointerDown, { capture: true }))
   }
 
   // Upward input is the one intent geometry cannot recover: nudging up while still a pixel from
@@ -721,7 +789,7 @@ export function createTimelineVirtualizer(input: Input) {
 
   // Drag-selecting past the edge and dragging the scrollbar both scroll without a wheel or key,
   // so a held pointer is what separates those from the virtualizer's own measurement adjustments.
-  const handleListPointerDown = (event: PointerEvent & { currentTarget: HTMLDivElement }) => {
+  const handleListPointerDown = (event: PointerEvent) => {
     releaseAnchor()
     input.onUserScroll(event.target)
     pointerHeld = true
@@ -799,8 +867,8 @@ export function createTimelineVirtualizer(input: Input) {
           style={{
             position: "absolute",
             top: `${item().start - topOffset() - rendering.scrollAdjustment}px`,
-            left: "0",
-            width: "100%",
+            left: "calc((100% - var(--panel-hold-width, 100%)) / 2)",
+            width: "var(--panel-hold-width, 100%)",
             height: `${item().size}px`,
             overflow: "clip",
             "overflow-clip-margin": Predicate.isTagged(row(), "TurnGap") ? undefined : "0.5px",
@@ -848,11 +916,16 @@ export function createTimelineVirtualizer(input: Input) {
     }
 
     return (
-      <div class="relative w-full h-full min-w-0">
+      <div
+        ref={setViewRoot}
+        class="relative w-full h-full min-w-0"
+        style={{
+          "--session-timeline-inset": `${bottomInset()}px`,
+        }}
+      >
         <div
-          class="absolute left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-[opacity,translate]"
+          class="absolute bottom-[calc(var(--session-timeline-inset)+32px)] left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-[opacity,translate]"
           classList={{
-            "bottom-8": true,
             "opacity-100 translate-y-0 duration-150 ease-[cubic-bezier(.2,.8,.2,1)]":
               input.scroll().overflow && input.scroll().jump,
             "opacity-0 translate-y-1 motion-reduce:translate-y-0 duration-[110ms] ease-[cubic-bezier(.4,0,1,1)]":
@@ -868,9 +941,7 @@ export function createTimelineVirtualizer(input: Input) {
               "background-color": "color-mix(in srgb, var(--v2-background-bg-base) 92%, transparent)",
               "box-shadow": "var(--v2-elevation-raised), 0px 2px 8px var(--v2-background-bg-base)",
             }}
-            onClick={() =>
-              input.onResumeScroll(matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth")
-            }
+            onClick={() => input.onResumeScroll(prefersReducedMotion() ? "auto" : "smooth")}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path
@@ -884,16 +955,17 @@ export function createTimelineVirtualizer(input: Input) {
         <ScrollView
           data-slot="session-timeline-scroll"
           viewportRef={bindListRoot}
+          thumbContainer={visibleArea()}
+          thumbHoverTarget={viewRoot()}
           onBeforeScroll={prepareNavigation}
           verticalScrollAdjustment={rendering.scrollAdjustment}
           onWheel={handleListWheel}
           onTouchStart={handleListTouchStart}
-          onPointerDown={handleListPointerDown}
           onKeyDown={handleListKeyDown}
           onScroll={handleListScroll}
           onClick={input.onSelectionInteraction}
           class="relative min-w-0 w-full h-full"
-          style={{ "--sticky-accordion-top": input.showHeader() ? "48px" : "0px" }}
+          style={{ "--sticky-accordion-top": input.showHeader() ? "var(--session-header-height, 48px)" : "0px" }}
         >
           <Show when={input.showHeader()} fallback={<div aria-hidden="true" class="h-4 md:hidden" />}>
             {props.header}
@@ -909,19 +981,32 @@ export function createTimelineVirtualizer(input: Input) {
               height: `${virtualizer.getTotalSize() - rendering.scrollAdjustment}px`,
               position: "relative",
               width: "100%",
+              // Rows held wider than the timeline mid-flight don't scroll it sideways.
+              "overflow-x": "clip",
               visibility: coldBottomMount ? "hidden" : undefined,
             }}
           >
-            <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
+            <div ref={rowLayer} class="absolute inset-0">
+              <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
+            </div>
             <div
               data-timeline-row="bottom-spacer"
-              class="h-16 absolute top-0 left-0 w-full"
-              style={{ transform: `translateY(${virtualizer.getTotalSize() - 64 - rendering.scrollAdjustment}px)` }}
+              class="absolute top-0 left-0 w-full"
+              style={{
+                height: `${tailSize}px`,
+                transform: `translateY(${virtualizer.getTotalSize() - tailSize - rendering.scrollAdjustment}px)`,
+              }}
             >
               {props.bottomSpacer}
             </div>
           </div>
+          <div aria-hidden="true" data-timeline-inset class="h-[var(--session-timeline-inset)] shrink-0" />
         </ScrollView>
+        <div
+          ref={setVisibleArea}
+          data-slot="session-timeline-visible"
+          class="pointer-events-none absolute inset-x-0 top-0 bottom-[var(--session-timeline-inset)]"
+        />
       </div>
     )
   }

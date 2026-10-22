@@ -1,6 +1,7 @@
 import { createMemo, lazy, on, onCleanup, Suspense } from "solid-js"
 import { Command, createKeyed, MenuItem, onIdle, Panel, type MountedSession, type PanelTab, type Setup } from "../sdk"
 import type Terminal from "./index"
+import { terminalToggleCommand } from "./index"
 import { createTerminalModel, type TerminalWorkspace } from "./model"
 import { terminalTab, type LocalPTY } from "./state"
 import { terminalTabLabel } from "./title"
@@ -68,12 +69,11 @@ const setup: Setup<typeof Terminal> = (ctx) => {
   ctx.add(
     Command,
     (): Command => ({
-      id: "toggle",
+      ...terminalToggleCommand,
       title: ctx.t("command.toggle"),
       group: ctx.t("command.category.view"),
       section: "terminal",
       featured: true,
-      bind: "ctrl+`",
       slash: { name: "terminal", after: "open" },
       editable: true,
       enabled: routed(),
@@ -86,10 +86,10 @@ const setup: Setup<typeof Terminal> = (ctx) => {
 
         if (!pty) return create(target.session, target.terminal)
 
-        // A visible tab hides with the side region; a narrow screen has no strip, so there the command only shows it.
+        // A visible tab hides with its pane; a narrow screen has no strip, so there the command only shows it.
         if (!layout.narrow() && layout.state(key(terminalTab(pty)), target.session) === "visible") {
           target.terminal.cancelFocus()
-          layout.side.toggle(target.session)
+          layout.hide(key(terminalTab(pty)), target.session)
 
           return
         }
@@ -146,7 +146,7 @@ const setup: Setup<typeof Terminal> = (ctx) => {
     },
     icon: "terminal",
     keybind: "terminal.new",
-    order: 30,
+    order: 20,
     run() {
       const target = current()
 
@@ -280,6 +280,12 @@ const setup: Setup<typeof Terminal> = (ctx) => {
       terminal.open(pty.id)
 
       if (!input.restored) terminal.requestFocus(pty.id)
+    },
+    enter: (input) => {
+      const terminal = model.load(input.session)
+      const pty = terminal.byTab(input.tab.id)
+
+      if (pty) terminal.requestFocus(pty.id)
     },
   })
 }

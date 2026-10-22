@@ -1,8 +1,9 @@
 import type { Page } from "@playwright/test"
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 // A cell of the "c" in the wordmark (column 40, row 2 of the 78×14 pin grid).
 const PIN = { x: 40.5 / 78, y: 2.5 / 14 }
+
 // An empty cell above the "o", clear of every pin, side and shadow at rest.
 const EMPTY = { x: 5.5 / 78, y: 0.5 / 14 }
 
@@ -49,15 +50,18 @@ story("shows a static pin board with reduced motion", async ({ mount, page }) =>
 // back once presented, so the pixel comes from a screenshot decoded in the page.
 async function pinPixel(page: Page, cell = PIN) {
   const box = (await page.locator('[data-slot="wordmark-box"]').boundingBox())!
+
   const shot = await page.screenshot({
     clip: { x: box.x + box.width * cell.x, y: box.y + box.height * cell.y, width: 1, height: 1 },
   })
+
   return page.evaluate(async (png) => {
     const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
     const canvas = new OffscreenCanvas(1, 1)
     const context = canvas.getContext("2d")!
     context.drawImage(image, 0, 0)
     const d = context.getImageData(0, 0, 1, 1).data
+
     return { red: d[0], green: d[1], blue: d[2] }
   }, shot.toString("base64"))
 }
@@ -72,13 +76,16 @@ function requestedFrames(page: Page) {
         const state = { requested: 0, left: 20 }
         window.requestAnimationFrame = (callback) => {
           state.requested++
+
           return watch(callback)
         }
+
         const tick = () => {
           if (--state.left > 0) return watch(tick)
           window.requestAnimationFrame = original
           resolve(state.requested)
         }
+
         watch(tick)
       }),
   )

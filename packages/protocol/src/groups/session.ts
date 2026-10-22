@@ -7,6 +7,7 @@ import { InstructionEntry } from "@opencode/schema/instruction-entry"
 import { Project } from "@opencode/schema/project"
 import { DateTimeUtcFromMillis, NonNegativeInt, PositiveInt } from "@opencode/schema/schema"
 import { Event } from "@opencode/schema/event"
+import { SessionLegacy } from "@opencode/schema/session-legacy"
 import { Context, Schema, SchemaGetter, Struct } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/http-api"
 import {
@@ -68,6 +69,19 @@ const PublicInboxInfo = Schema.Union([
   PublicMove,
 ]).annotate({ identifier: "Session.Inbox.Info" })
 
+// Transcripts exported before v2.1 carry older names for native data. The wire stays plain JSON so any export file
+// is accepted; decoding upgrades those names and then validates the current message shape.
+const ImportedMessages = Schema.Array(Schema.Json).pipe(
+  Schema.decodeTo(Schema.Array(Schema.Unknown), {
+    decode: SchemaGetter.transform(SessionLegacy.messages),
+    encode: SchemaGetter.passthrough({ strict: false }),
+  }),
+  Schema.decodeTo(Schema.Array(PublicSessionMessage), {
+    decode: SchemaGetter.passthrough({ strict: false }),
+    encode: SchemaGetter.passthrough({ strict: false }),
+  }),
+)
+
 const FormCreatePayload = Schema.Struct({
   id: Form.ID.pipe(Schema.optional),
   title: Form.Info.fields.title,
@@ -91,10 +105,6 @@ export const SessionsQuery = Schema.Struct({
     description: "Maximum number of sessions to return. Defaults to the newest 50 sessions.",
   }),
   ...Session.ListFilter.fields,
-  archived: BooleanFromString.pipe(Schema.optional).annotate({
-    description:
-      "Filter by archive state. Use true to return only archived sessions or false to exclude them. Omit to include both.",
-  }),
   cursor: Session.ListCursor.pipe(Schema.optional),
 }).annotate({ identifier: "SessionsQuery" })
 
@@ -168,7 +178,8 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
     .add(
       HttpApiEndpoint.post("session.import", "/api/experimental/session/import", {
         payload: Schema.Struct({
-          ...PublicSessionTransfer.fields,
+          info: PublicSessionTransfer.fields.info,
+          messages: ImportedMessages,
           location: Location.PublicRef.pipe(Schema.optional),
         }),
         success: Schema.Struct({ data: PublicSessionInfo }),
@@ -178,7 +189,7 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           identifier: "experimental.session.import",
           summary: "Import session",
           description:
-            "Import a projected session transcript at the requested location. If parentID is supplied, the parent session must already exist; import parents before children.",
+            "Import a projected session transcript at the requested location. Accepts transcripts exported by earlier releases. If parentID is supplied, the parent session must already exist; import parents before children.",
         }),
       ),
     )

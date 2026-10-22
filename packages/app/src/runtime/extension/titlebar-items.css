@@ -1,0 +1,15 @@
+[data-slot="titlebar-update"] > button {
+  background-color: light-dark(
+    color-mix(in srgb, var(--v2-background-bg-accent) 8%, transparent),
+    color-mix(in srgb, var(--v2-icon-icon-accent) 20%, transparent)
+  );
+}
+
+@media (hover: hover) {
+  [data-slot="titlebar-update"]:hover > button {
+    background-color: light-dark(
+      color-mix(in srgb, var(--v2-background-bg-accent) 12%, var(--v2-background-bg-deep)),
+      color-mix(in srgb, var(--v2-icon-icon-accent) 25%, var(--v2-background-bg-deep))
+    );
+  }
+}

@@ -1,7 +1,18 @@
-import { type Accessor } from "solid-js"
+import { type Accessor, createMemo } from "solid-js"
 import { Icon } from "@opencode/ui/icon"
 import { useLanguage } from "@/runtime/i18n/language"
 import { pathKey } from "@/workspaces/path-key"
+
+/** A server listed in the location dialog; the current server gets no tag. */
+export type PromptServer = {
+  key: string
+  name: string
+  /** "This computer" beside the current server's name in the server picker. */
+  hint?: string
+  kind: "current" | "remote" | "extension"
+  /** The extension's short badge, e.g. "SSH". */
+  label?: string
+}
 
 export type PromptProject = {
   name?: string
@@ -11,11 +22,16 @@ export type PromptProject = {
   sandboxes?: string[]
   worktrees?: { directory: string; strategy?: string }[]
   icon?: { color?: string; url?: string; override?: string }
-  server?: { key: string; name: string }
+  time?: { active: number }
+  /** This client has used the project on its server. */
+  used?: boolean
+  server?: PromptServer
 }
 
 export type PromptProjectControls = {
   available: PromptProject[]
+  /** The ready servers a project can be added to, when more than one server is listed. */
+  servers?: PromptServer[]
   directory: string
   projectID?: string
   server?: string
@@ -40,7 +56,16 @@ export function createPromptProjectController(input: { controls: Accessor<Prompt
     )
   }
 
-  const selected = () => current() ?? input.controls().available[0]
+  // One list across servers: used projects first, then the rest, each by recent activity.
+  const projects = createMemo(() =>
+    input
+      .controls()
+      .available.toSorted(
+        (a, b) => Number(!!b.used) - Number(!!a.used) || (b.time?.active ?? 0) - (a.time?.active ?? 0),
+      ),
+  )
+
+  const selected = () => current() ?? projects()[0]
 
   const matches = (project: PromptProject, other?: PromptProject) =>
     !!other && pathKey(other.worktree) === pathKey(project.worktree) && other.server?.key === project.server?.key
@@ -49,15 +74,8 @@ export function createPromptProjectController(input: { controls: Accessor<Prompt
     selected,
     isSelected: (project: PromptProject) => matches(project, selected()),
     empty: () => input.controls().available.length === 0,
-    projects: () => input.controls().available,
-    servers: () =>
-      input
-        .controls()
-        .available.map((project) => project.server)
-        .filter(
-          (server, index, all): server is NonNullable<typeof server> =>
-            !!server && all.findIndex((item) => item?.key === server.key) === index,
-        ),
+    projects,
+    servers: () => input.controls().servers ?? [],
     labels: {
       add: () => language.t("session.new.project.add"),
       new: () => language.t("session.new.project.new"),

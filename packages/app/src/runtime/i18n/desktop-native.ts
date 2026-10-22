@@ -301,7 +301,6 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.dialog.chooseFile": "Choose a file",
   "desktop.dialog.saveFile": "Save file",
   "desktop.dialog.files": "Files",
-  "desktop.server.local": "Local Server",
   "desktop.onboarding.defaultProject": "Default Project",
 
   "desktop.picker.error.notSelected": "File was not selected by the picker",

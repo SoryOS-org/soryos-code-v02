@@ -28,7 +28,6 @@ export const dict = {
   "command.context.addSelection": "선택 영역을 컨텍스트에 추가",
   "command.context.addSelection.description": "현재 파일에서 선택한 줄을 추가",
   "command.input.focus": "입력창 포커스",
-  "command.fileTree.toggle": "파일 트리 표시/숨기기",
   "command.review.toggle": "검토 표시/숨기기",
   "command.message.previous": "이전 메시지",
   "command.message.previous.description": "이전 사용자 메시지로 이동",
@@ -444,7 +443,6 @@ export const dict = {
   "model.tooltip.provider": "공급자",
   "model.tooltip.reasoning": "추론",
   "common.clear": "지우기",
-  "session.child.promptDisabled": "하위 에이전트 세션에는 프롬프트를 입력할 수 없습니다.",
   "session.child.backToParent": "메인 세션으로 돌아가기.",
 
   "error.page.description.localServerStartup": "로컬 서버를 시작하는 동안 오류가 발생했습니다.",
@@ -557,7 +555,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "파일 선택",
   "desktop.dialog.saveFile": "파일 저장",
   "desktop.dialog.files": "파일",
-  "desktop.server.local": "로컬 서버",
 
   "desktop.picker.error.notSelected": "선택기에서 파일을 선택하지 않았습니다",
   "desktop.picker.error.sizeLimit": "선택한 첨부 파일이 {{limit}} MB 제한을 초과합니다",
@@ -681,9 +678,6 @@ export const dict = {
   "session.search.placeholder": "찾다...",
   "session.search.noResults": "일치하는 항목 없음",
   "titlebar.tabs": "탭",
-  "titlebar.channel.local": "현지의",
-  "titlebar.channel.dev": "데브",
-  "titlebar.channel.beta": "베타",
   "settings.tab.experimental": "실험적",
   "settings.experimental.description": "실험적인 기능을 사용해 보세요",
   "settings.tab.about": "에 대한",

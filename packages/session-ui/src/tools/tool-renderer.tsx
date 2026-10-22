@@ -65,6 +65,7 @@ import {
 } from "../message/current-tool-state"
 import { AssistantReasoningContent, writeClipboard } from "../message/message-content"
 import { followShellOutput } from "./shell-output"
+import { LinkedText } from "../components/linked-text"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -229,7 +230,7 @@ function displayDirectory(path: string | undefined) {
 
 import { resolveFileDiff } from "../components/session-diff"
 
-function taskAgentName(raw: string | undefined, list?: readonly { name: string }[]) {
+export function taskAgentName(raw: string | undefined, list?: readonly { name: string }[]) {
   if (!raw) return undefined
   const key = raw.toLowerCase()
 
@@ -2075,7 +2076,9 @@ function ExecuteOutputRow(props: { output: string }) {
       <Show when={open()}>
         <div data-slot="execute-tool-output">
           <ConsoleOutput copy={props.output} variant="shell">
-            <span data-slot="bash-result">{props.output}</span>
+            <span data-slot="bash-result">
+              <LinkedText text={props.output} />
+            </span>
           </ConsoleOutput>
         </div>
       </Show>
@@ -2152,7 +2155,7 @@ function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
         <Show when={props.error}>
           {(error) => (
             <div data-slot="execute-tool-error" dir="ltr">
-              {error()}
+              <LinkedText text={error()} />
             </div>
           )}
         </Show>
@@ -2207,7 +2210,13 @@ ToolRegistry.register({
       return (
         <ConsoleOutput copy={command()} variant="shell">
           <span data-slot="bash-command">{command()}</span>
-          <Show when={output()}>{(value) => <span data-slot="bash-result">{value()}</span>}</Show>
+          <Show when={output()}>
+            {(value) => (
+              <span data-slot="bash-result">
+                <LinkedText text={value()} />
+              </span>
+            )}
+          </Show>
         </ConsoleOutput>
       )
     }

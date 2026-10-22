@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("resizes the dock to fit different answer counts", async ({ mount }) => {
   const component = await mount("app-current-session-surface--question-answer-counts")

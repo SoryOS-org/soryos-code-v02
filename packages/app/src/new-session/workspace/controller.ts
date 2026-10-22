@@ -170,6 +170,7 @@ export function createNewSessionWorkspaceController(input: {
   )
 
   const projectRoot = createMemo(() => currentProject()?.worktree ?? sdk().directory)
+  const branchDirectory = () => (value() === "create" ? projectRoot() : sdk().directory)
 
   createEffect(() => {
     void Promise.all([
@@ -177,6 +178,10 @@ export function createNewSessionWorkspaceController(input: {
       data.project.sync(),
       data.location.vcs.sync({ directory: sdk().directory }),
     ]).catch(() => undefined)
+  })
+  createEffect(() => {
+    if (value() !== "create" || sameDirectory(projectRoot(), sdk().directory)) return
+    void data.location.vcs.sync({ directory: projectRoot() }).catch(() => undefined)
   })
   // Only the selected worktree feeds the branch label. Syncing every worktree in the inventory boots
   // each one on the server, which then emits `agent.updated` and makes the client run the full
@@ -194,7 +199,7 @@ export function createNewSessionWorkspaceController(input: {
   const branch = createMemo(() =>
     resolveNewSessionBranch({
       worktree: value(),
-      directory: sdk().directory,
+      directory: branchDirectory(),
       createBranch: input.selectedBranch(),
       worktreeBranch: (worktree) => data.location.vcs.info({ directory: worktree })?.branch.current,
     }),
@@ -249,6 +254,7 @@ export function createNewSessionWorkspaceController(input: {
       },
       remember,
       set: select,
+      branch: (branch: string) => input.setSelectedBranch(branch),
       cycle: () => select(cycleNewSessionWorktree({ current: value(), existing: existing() })),
     },
     project: {
@@ -261,6 +267,10 @@ export function createNewSessionWorkspaceController(input: {
       visible,
       branch,
     },
+    branches: (search: string, signal: AbortSignal) =>
+      serverSDK.api.vcs.branch
+        .list({ location: { directory: projectRoot() }, search, limit: 50 }, { signal })
+        .then((response) => response.data),
   }
 }
 

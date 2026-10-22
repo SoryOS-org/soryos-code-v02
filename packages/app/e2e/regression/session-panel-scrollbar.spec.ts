@@ -9,7 +9,7 @@ for (const reducedMotion of [false, true]) {
     const chat = page.locator('[data-slot="session-chat-panel"]')
     const scroll = page.locator('[data-slot="session-timeline-scroll"]')
     const viewport = scroll.locator(".scroll-view__viewport")
-    const thumb = scroll.locator('.scroll-view__thumb[data-orientation="vertical"]')
+    const thumb = page.locator('[data-slot="session-timeline-visible"] .scroll-view__thumb')
     const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
     await expect(thumb).toHaveCount(1)
     await scroll.hover()
@@ -26,7 +26,8 @@ for (const reducedMotion of [false, true]) {
 
       if (opened) await expect(presence).toHaveCSS("transform", "none")
 
-      if (!opened) await expect(presence).toHaveCount(0)
+      // A settled close keeps the side region mounted and skips its contents.
+      if (!opened) await expect(presence).toHaveCSS("content-visibility", "hidden")
       await expect(thumb).toHaveCSS("visibility", "hidden")
       // Late scroll anchoring must not bring the thumb back after the panel has settled.
       await viewport.evaluate(

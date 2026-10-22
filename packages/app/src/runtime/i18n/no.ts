@@ -133,9 +133,6 @@ export const dict = {
   "session.search.placeholder": "Finn...",
   "session.search.noResults": "Ingen treff",
   "titlebar.tabs": "Faner",
-  "titlebar.channel.local": "Lokal",
-  "titlebar.channel.dev": "Dev",
-  "titlebar.channel.beta": "Beta",
   "settings.tab.experimental": "Eksperimentell",
   "settings.experimental.description": "Prøv eksperimentelle funksjoner",
   "settings.tab.about": "Om",
@@ -260,7 +257,6 @@ export const dict = {
   "desktop.dialog.chooseFile": "Velg en fil",
   "desktop.dialog.saveFile": "Lagre fil",
   "desktop.dialog.files": "Filer",
-  "desktop.server.local": "Lokal server",
 
   "desktop.picker.error.notSelected": "Ingen fil ble valgt i filvelgeren",
   "desktop.picker.error.sizeLimit": "De valgte vedleggene overskrider grensen på {{limit}} MB",
@@ -298,7 +294,6 @@ export const dict = {
   "command.context.addSelection": "Legg til markering i kontekst",
   "command.context.addSelection.description": "Legg til valgte linjer fra gjeldende fil",
   "command.input.focus": "Fokuser inndata",
-  "command.fileTree.toggle": "Veksle filtre",
   "command.review.toggle": "Veksle gjennomgang",
   "command.message.previous": "Forrige melding",
   "command.message.previous.description": "Gå til forrige brukermelding",
@@ -765,7 +760,6 @@ export const dict = {
 
   "common.clear": "Tøm",
 
-  "session.child.promptDisabled": "Underagentsesjoner kan ikke motta forespørsler.",
   "session.child.backToParent": "Tilbake til hovedsesjonen.",
 
   "error.page.description.localServerStartup": "Det oppstod en feil under oppstart av den lokale serveren.",

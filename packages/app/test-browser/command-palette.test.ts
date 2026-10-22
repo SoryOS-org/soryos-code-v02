@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test"
 import type { Project } from "@/runtime/server/types"
 import type { SessionInfo } from "@opencode/client/promise"
 import { createRoot } from "solid-js"
-import { createServerSessionEntries } from "@/shell/commands/palette"
+import { createCommandPaletteCommandEntry, createServerSessionEntries } from "@/shell/commands/palette"
+import { matchesCommandPaletteEntry } from "@/shell/commands/dialog"
 import { ServerConnection } from "@/runtime/server/registry"
 import { getProjectAvatarSource } from "@opencode/ui/project-avatar"
 
@@ -119,5 +120,59 @@ describe("command palette sessions", () => {
 
     expect(gets).toEqual([exact.id])
     expect(result).toMatchObject([{ sessionID: exact.id, title: exact.title }])
+  })
+
+  test("matches known and loaded sessions synchronously while remote search is pending", async () => {
+    const server = ServerConnection.Key.make("selected-server")
+
+    const remote = {
+      ...session,
+      id: "session-2",
+      title: "Remote palette session",
+      time: { created: 2, updated: 4 },
+    }
+
+    await createRoot(async (dispose) => {
+      try {
+        const sessions = createServerSessionEntries({
+          server,
+          known: () => [session],
+          projects: () => [project],
+          load: async () => ({ data: [remote] }),
+          get: async () => session,
+          untitled: () => "Untitled",
+          category: () => "Session",
+          recentCategory: () => "Recent sessions",
+        })
+
+        expect(sessions.items("")).toMatchObject([
+          { sessionID: session.id, title: session.title, category: "Recent sessions" },
+        ])
+        expect(sessions.items("palette")).toMatchObject([
+          { sessionID: session.id, title: session.title, category: "Session" },
+        ])
+
+        await sessions.search("remote")
+        expect(sessions.items("palette")).toMatchObject([
+          { sessionID: remote.id, title: remote.title, category: "Session" },
+          { sessionID: session.id, title: session.title, category: "Session" },
+        ])
+      } finally {
+        dispose()
+      }
+    })
+  })
+})
+
+describe("command palette commands", () => {
+  test("match their keywords as well as their title", () => {
+    const entry = createCommandPaletteCommandEntry(
+      { id: "debug.toggle", title: "Toggle debug bar", keywords: "dev bar developer tools diagnostics" },
+      "View",
+    )
+
+    expect(matchesCommandPaletteEntry(entry, "dev bar")).toBe(true)
+    expect(matchesCommandPaletteEntry(entry, "Diagnostics")).toBe(true)
+    expect(matchesCommandPaletteEntry(entry, "terminal")).toBe(false)
   })
 })

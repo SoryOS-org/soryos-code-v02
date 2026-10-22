@@ -81,14 +81,23 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
     // credentials, so its controller waits until health recovers and then starts with the current ones.
     createMemo(() => {
       for (const conn of server.list) {
-        if (serverHealth[ServerConnection.key(conn)]?.unauthorized) continue
+        if (serverHealth.status[ServerConnection.key(conn)]?.unauthorized) continue
         ensureServerCtx(conn)
       }
     })
 
     createEffect(() => {
+      for (const conn of server.list) {
+        const key = ServerConnection.key(conn)
+        const hostname = serverHealth.status[key]?.hostname
+
+        if (hostname) server.setHostname(key, hostname)
+      }
+    })
+
+    createEffect(() => {
       for (const [key] of serverCtxs) {
-        if (serverHealth[key]?.unauthorized || !server.list.find((conn) => ServerConnection.key(conn) === key))
+        if (serverHealth.status[key]?.unauthorized || !server.list.find((conn) => ServerConnection.key(conn) === key))
           disposeServerCtx(key)
       }
     })
@@ -96,7 +105,8 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
     return {
       servers: {
         list: () => server.list,
-        health: serverHealth,
+        health: serverHealth.status,
+        retry: serverHealth.retry,
       },
       models,
       ensureServerCtx(conn: ServerConnection.Any) {
@@ -106,7 +116,7 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
       serverCtx(key: ServerConnection.Key) {
         const conn = server.list.find((item) => ServerConnection.key(item) === key)
 
-        if (!conn || serverHealth[key]?.unauthorized) return
+        if (!conn || serverHealth.status[key]?.unauthorized) return
 
         return ensureServerCtx(conn)
       },

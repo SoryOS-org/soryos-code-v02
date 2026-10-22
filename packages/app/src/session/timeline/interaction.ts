@@ -19,10 +19,13 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     pendingMessage: string | undefined
     scroll: { overflow: boolean; jump: boolean }
     follow: { sessionKey: string; pinned: boolean }
+    /** The composer region's height; the timeline scrolls on underneath it and fades out at its top. */
+    inset: number
     refs: {
       scroller: HTMLDivElement | undefined
       content: HTMLDivElement | undefined
       dock: HTMLDivElement | undefined
+      visible: HTMLDivElement | undefined
     }
   }>({
     messageID: undefined,
@@ -35,10 +38,12 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       sessionKey: session.identity.sessionKey(),
       pinned: true,
     },
+    inset: 0,
     refs: {
       scroller: undefined,
       content: undefined,
       dock: undefined,
+      visible: undefined,
     },
   })
 
@@ -53,7 +58,6 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   }
 
   let scroller: HTMLDivElement | undefined
-  let dockHeight = 0
   // The history entry whose tool call was already revealed.
   let revealed: string | undefined
 
@@ -354,17 +358,20 @@ export function createSessionTimelineInteraction(session: SessionModel) {
   )
   createResizeObserver(
     () => state.refs.dock,
-    ({ height }) => {
-      const next = Math.ceil(height)
+    (_rect, _element, entry) => {
+      // The activity pill floats above the region out of flow, so only the docks, queue and composer count here.
+      const dpr = window.devicePixelRatio || 1
+      const next = Math.round((entry.borderBoxSize[0]?.blockSize ?? 0) * dpr) / dpr
 
-      if (next === dockHeight) return
-      const delta = next - dockHeight
+      if (next === state.inset) return
+      const delta = next - state.inset
 
+      // Measured before the new inset applies: a shrinking region also keeps a reader whose end it uncovers.
       const stick = scroller
-        ? pinned() || scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 10 + Math.max(0, delta)
+        ? pinned() || scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop < 10 + Math.max(0, -delta)
         : false
 
-      dockHeight = next
+      setState("inset", next)
 
       if (stick) scrollToEnd()
 
@@ -388,11 +395,14 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       resume,
       setActiveMessage,
     },
+    inset: () => state.inset,
     lastUserMessage: timeline.lastUserMessage,
     resource: timeline.resource,
     ready: timeline.ready,
     scroll: state.scroll,
     scroller: () => state.refs.scroller,
+    /** The part of the timeline not covered by the composer region. */
+    visible: () => state.refs.visible,
     view: {
       anchor,
       markUserScroll,
@@ -408,6 +418,9 @@ export function createSessionTimelineInteraction(session: SessionModel) {
       },
       setDockRef: (element: HTMLDivElement | undefined) => {
         setState("refs", "dock", element)
+      },
+      setVisibleRef: (element: HTMLDivElement | undefined) => {
+        setState("refs", "visible", element)
       },
       setRevealMessage: (reveal: (id: string, partID?: string) => void) => {
         revealMessage = reveal

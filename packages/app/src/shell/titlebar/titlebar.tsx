@@ -1,7 +1,8 @@
 import { createEffect, createMemo, createResource, Match, Show, Switch, untrack } from "solid-js"
 import { createStore, unwrap } from "solid-js/store"
-import { Dynamic, Portal } from "solid-js/web"
+import { Portal } from "solid-js/web"
 import { useLocation, useNavigate } from "@solidjs/router"
+import { useDialog } from "@opencode/ui/context/dialog"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
@@ -15,7 +16,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
-import { macTrafficLightsBaseWidth, SidebarToggle } from "@/shell/sidebar-toggle"
+import { macVerticalTrafficLights, SidebarToggle } from "@/shell/sidebar-toggle"
 import { SidebarInbox } from "@/shell/titlebar/inbox"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
@@ -31,13 +32,16 @@ import { sessionTabTitle } from "./tab-title"
 import { SessionTabAvatar } from "@/shell/layout/session-tab-avatar"
 import { SessionProgressIndicatorV2 } from "@opencode/session-ui/v2/session-progress-indicator-v2"
 import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
+import { SidebarHover } from "./sidebar-hover"
 import { useSettingsDialog } from "@/settings/command"
 import { rootSession } from "@/shell/routes/session"
-import { TitlebarItem } from "@opencode/gui-extensions/sdk"
-import { useExtensionHost } from "@/runtime/extension/host"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/extension/titlebar-items"
-import devIcon from "../../../../desktop/icons/dev/64x64.png"
-import betaIcon from "../../../../desktop/icons/beta/64x64.png"
+
+export const newTabCommand = { id: "tab.new", keybind: "mod+t,mod+n" }
+
+export const goBackCommand = { id: "common.goBack", keybind: "mod+[" }
+
+export const goForwardCommand = { id: "common.goForward", keybind: "mod+]" }
 
 const titlebarHeight = 36
 
@@ -47,14 +51,16 @@ const minTitlebarZoom = 0.25
 
 const windowsControlsBaseWidth = 138 // 3 native Windows caption buttons at 46px each.
 
+const macTrafficLightsBaseWidth = 68
+
 const macTrafficLightsTopClearance = 28
+
+// Matches the desktop window's `trafficLightPosition`.
+const macTrafficLightsDefaultPosition = { x: 14, y: 14 }
 
 // iOS blurs page content just below the status bar in Home Screen web apps, so with a top safe area the phone
 // titlebar row stays 16px clear of it, as ChatGPT's phone header does. Without one, 8px matches the content gap below.
 const mobileTopClearance = "max(8px, min(16px, env(safe-area-inset-top, 0px) * 1000))"
-
-const channelIndicatorVisible =
-  !!import.meta.env.VITE_OPENCODE_CHANNEL && import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const platform = usePlatform()
@@ -62,6 +68,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const language = useLanguage()
   const settings = useSettings()
   const openSettings = useSettingsDialog()
+  const dialog = useDialog()
   const navigate = useNavigate()
   const location = useLocation()
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -85,6 +92,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   }
 
   const windowsControlsWidth = () => `${windowsControlsBaseWidth / Math.max(titlebarZoom(), 1)}px`
+
+  // The vertical sidebar header's center line scales with zoom, so the 14pt traffic lights follow it. The horizontal
+  // titlebar stays at the window's default position.
+  createEffect(() => {
+    if (!mac()) return
+    void platform.setTrafficLightsPosition?.(
+      macVerticalTabs() ? macVerticalTrafficLights(zoom()) : macTrafficLightsDefaultPosition,
+    )
+  })
 
   const [history, setHistory] = createStore<{
     stack: HistoryLocation[]
@@ -111,7 +127,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   const titlebarItems = useTitlebarItems()
   const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
-  const homeInSidebarHeader = () => !windows() && !macTrafficLights() && !channelIndicatorVisible
+  const homeInSidebarHeader = () => !windows() && !macTrafficLights()
 
   const back = () => {
     const next = backPath(history)
@@ -131,17 +147,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
   command.register(() => [
     {
-      id: "common.goBack",
+      ...goBackCommand,
       title: language.t("common.goBack"),
       category: language.t("command.category.view"),
-      keybind: "mod+[",
       onSelect: back,
     },
     {
-      id: "common.goForward",
+      ...goForwardCommand,
       title: language.t("common.goForward"),
       category: language.t("command.category.view"),
-      keybind: "mod+]",
       onSelect: forward,
     },
   ])
@@ -373,6 +387,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
                 case "settings":
                 case "connect":
+                case "components":
                 case "home": {
                   const selection = layout.home.selection()
 
@@ -431,7 +446,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   data-titlebar-tab-action
                   data-action="vertical-tabs-home"
                   data-state={layout.route().type === "home" ? "pressed" : undefined}
-                  class="group mb-1 flex h-7 w-full shrink-0 items-center gap-1.5 rounded-[6px] ps-1.5 pe-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base data-[state=pressed]:text-v2-text-text-base"
+                  class="group flex h-7 w-full shrink-0 items-center gap-1.5 rounded-[6px] ps-1.5 pe-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base data-[state=pressed]:text-v2-text-text-base"
                   onClick={toggleHome}
                   aria-label={language.t("home.title")}
                   aria-pressed={layout.route().type === "home"}
@@ -443,6 +458,51 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     aria-hidden="true"
                   >
                     <bdi dir="ltr">{command.keybind("home.toggle")}</bdi>
+                  </span>
+                </button>
+              </Show>
+            )
+
+            const searchButton = (vertical = false) => (
+              <Show
+                when={vertical}
+                fallback={
+                  <Tooltip
+                    placement="bottom"
+                    value={
+                      <>
+                        {language.t("command.session.search")}
+                        <Keybind keys={command.keybindParts("sessions.search")} variant="neutral" />
+                      </>
+                    }
+                    class="shrink-0"
+                  >
+                    <IconButton
+                      type="button"
+                      variant="ghost-muted"
+                      size="large"
+                      class="!w-9 shrink-0"
+                      icon={<Icon name="magnifying-glass" />}
+                      onClick={() => command.trigger("sessions.search")}
+                      aria-label={language.t("command.session.search")}
+                    />
+                  </Tooltip>
+                }
+              >
+                <button
+                  type="button"
+                  data-titlebar-tab-action
+                  data-action="vertical-tabs-search"
+                  class="group flex h-7 w-full shrink-0 items-center gap-1.5 rounded-[6px] ps-1.5 pe-2 text-[13px] leading-4 text-v2-text-text-faint hover:text-v2-text-text-base"
+                  onClick={() => command.trigger("sessions.search")}
+                >
+                  <Icon name="magnifying-glass" class="shrink-0" />
+                  <span class="min-w-0 truncate">{language.t("command.session.search")}</span>
+                  <span
+                    class="ms-auto hidden min-w-0 truncate text-v2-text-text-faint group-hover:block group-focus-visible:block"
+                    aria-hidden="true"
+                  >
+                    <bdi dir="ltr">{command.keybind("sessions.search")}</bdi>
                   </span>
                 </button>
               </Show>
@@ -460,6 +520,15 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   toggleHome()
                 },
               },
+              {
+                id: "sessions.search",
+                title: language.t("command.session.search"),
+                category: language.t("command.category.session"),
+                onSelect: async () => {
+                  const { DialogSessionSearch } = await import("@/shell/commands/session-search")
+                  void dialog.show(() => <DialogSessionSearch />)
+                },
+              },
             ])
 
             command.register("tabs", () => {
@@ -467,10 +536,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
               return [
                 {
-                  id: "tab.new",
+                  ...newTabCommand,
                   category: "tab",
                   title: language.t("command.session.new"),
-                  keybind: "mod+t,mod+n",
                   hidden: true,
                   onSelect: openNewTab,
                 },
@@ -537,16 +605,18 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   "ps-3.5": windows(),
                 }}
               >
-                <Show when={!mobile() && (!props.verticalTabs || windows())}>
-                  <ChannelIndicator horizontal />
-                </Show>
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
                 <Show when={windows() && props.verticalTabs}>
                   <SidebarToggle />
                 </Show>
-                <Show when={!mobile() && !props.verticalTabs}>{homeButton()}</Show>
+                <Show when={!mobile() && !props.verticalTabs}>
+                  <div class="flex shrink-0 items-center gap-0">
+                    {homeButton()}
+                    {searchButton()}
+                  </div>
+                </Show>
 
                 <Show
                   when={!mobile()}
@@ -721,13 +791,14 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             mount={mount}
                             ref={(element) => (element.className = "flex size-full min-h-0 flex-col")}
                           >
+                            <SidebarHover />
                             <Show when={!windows()}>
-                              {/* Shares the session header's 48px center line. Without traffic lights or a channel
-                                  icon, Home fills the start so the row doesn't leave an empty band. */}
+                              {/* Shares the session header's 48px center line. Without traffic lights, Home fills the
+                                  start so the row doesn't leave an empty band. */}
                               <div
                                 class="flex w-full shrink-0 gap-2"
                                 classList={{
-                                  "items-start pt-2.5": homeInSidebarHeader(),
+                                  "items-start pt-2.5 pb-1": homeInSidebarHeader(),
                                   "mb-2 h-12 items-center": !homeInSidebarHeader(),
                                 }}
                                 style={{
@@ -741,30 +812,27 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                   {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
                                   <div
                                     class="shrink-0"
-                                    style={{ width: `calc(${macTrafficLightsBaseWidth / zoom()}px - 10px)` }}
+                                    style={{
+                                      width: `calc(${macVerticalTrafficLights(zoom()).width / zoom()}px - 10px)`,
+                                    }}
                                     aria-hidden="true"
                                   />
                                 </Show>
-                                <Show
-                                  when={homeInSidebarHeader()}
-                                  fallback={
-                                    <>
-                                      <ChannelIndicator sidebar />
-                                      <div class="flex-1" />
-                                    </>
-                                  }
-                                >
+                                <Show when={homeInSidebarHeader()} fallback={<div class="flex-1" />}>
                                   <div class="min-w-0 flex-1">{homeButton(true)}</div>
                                 </Show>
-                                <SidebarToggle />
+                                <SidebarToggle handoff="out" />
                               </div>
                             </Show>
-                            <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
-                            <RecentlyClosedTabsMenu
-                              vertical
-                              onNewTab={openNewTab}
-                              keybind={command.keybind("tab.new")}
-                            />
+                            <div class="flex w-full shrink-0 flex-col gap-1">
+                              <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
+                              {searchButton(true)}
+                              <RecentlyClosedTabsMenu
+                                vertical
+                                onNewTab={openNewTab}
+                                keybind={command.keybind("tab.new")}
+                              />
+                            </div>
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Show
@@ -816,51 +884,5 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
         </Match>
       </Switch>
     </header>
-  )
-}
-
-function ChannelIndicator(props: { horizontal?: boolean; sidebar?: boolean }) {
-  const language = useLanguage()
-  const platform = usePlatform()
-  const host = useExtensionHost()
-  const channel = import.meta.env.VITE_OPENCODE_CHANNEL
-
-  if (!channel || channel === "prod") return null
-
-  const label = () => language.t(`titlebar.channel.${channel}`)
-
-  // An extension may turn the badge into a toggle (the debug bar does).
-  const debug = () => host.list(TitlebarItem).find((item) => item.placement === "channel")
-
-  return (
-    <Tooltip
-      placement={props.sidebar ? "right" : "bottom"}
-      value={label()}
-      class={`shrink-0 [app-region:no-drag] ${props.sidebar ? "ms-0.5" : ""} ${props.horizontal ? "me-1.5" : ""} ${props.horizontal && platform.platform === "web" ? "ps-2.5" : ""}`}
-    >
-      <Dynamic
-        component={debug() ? "button" : "div"}
-        type={debug() ? "button" : undefined}
-        data-slot="channel-indicator"
-        class="flex h-7 shrink-0 items-center rounded-[6px] [app-region:no-drag]"
-        classList={{
-          "w-6": props.sidebar,
-          "w-5": !props.sidebar,
-          "cursor-pointer hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02":
-            !!debug(),
-        }}
-        onClick={() => debug()?.run?.()}
-        aria-label={debug()?.label}
-        aria-pressed={debug()?.pressed}
-      >
-        <img
-          src={channel === "beta" ? betaIcon : devIcon}
-          alt={debug() ? "" : label()}
-          class="shrink-0 rounded-[4px] shadow-[var(--v2-elevation-raised)]"
-          classList={{ "size-6": props.sidebar, "size-5": !props.sidebar }}
-          draggable={false}
-        />
-      </Dynamic>
-    </Tooltip>
   )
 }

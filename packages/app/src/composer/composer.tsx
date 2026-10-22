@@ -1,4 +1,4 @@
-import { Show, createMemo } from "solid-js"
+import { Show, createEffect, createMemo, createSignal } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
@@ -27,6 +27,9 @@ export function Composer(props: {
   const language = useLanguage()
 
   const modelName = () => {
+    const preview = props.model.model.preview
+
+    if (preview) return preview.model
     const selection = props.model.model.selection
     const model = selection.current()
 
@@ -45,7 +48,7 @@ export function Composer(props: {
         borderUnderlay={props.borderUnderlay}
         readOnly={props.readOnly}
         class={props.class}
-        modelControlsVisible={!props.model.model.loading}
+        modelControlsVisible={!props.model.model.loading || !!props.model.model.preview}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
         alternateKeybind={[formatKeybind("mod", language.t), "↵"]}
@@ -54,11 +57,12 @@ export function Composer(props: {
         modelControl={
           <ComposerModelControl
             loading={props.model.model.loading}
+            preview={!!props.model.model.preview}
             paid={props.model.model.paid}
             title={language.t("command.model.choose")}
             keybind={command.keybindParts("model.choose")}
             model={props.model.model.selection}
-            providerName={props.model.model.providerName}
+            providerName={props.model.model.preview?.provider ?? props.model.model.providerName}
             modelName={modelName()}
             onClose={props.model.restoreFocus}
             onUnpaidClick={() => dialog.show(() => <DialogSelectModelUnpaid model={props.model.model.selection} />)}
@@ -71,6 +75,7 @@ export function Composer(props: {
 
 function ComposerModelControl(props: {
   loading: boolean
+  preview: boolean
   paid: boolean
   title: string
   keybind: string[]
@@ -80,10 +85,29 @@ function ComposerModelControl(props: {
   onClose: () => void
   onUnpaidClick: () => void
 }) {
-  const shouldAnimate = createMemo<boolean>((previous) => previous ?? props.loading)
+  // A preview paints the chip in its resting state, and the loaded names replace it in place.
+  const shouldAnimate = createMemo<boolean>((previous) => previous ?? (props.loading && !props.preview))
   const mobile = createMediaQuery("(max-width: 767px)")
   const dialog = useDialog()
   const managed = createMemo(() => consoleModelGroup(props.model.list()))
+
+  const open = (detail: number) => {
+    if (!props.paid) return props.onUnpaidClick()
+    // A pointer open keeps focus in the composer, so the dialog returns it to the caret. A keyboard open
+    // (a click with no pointer presses) returns focus to this trigger instead of moving it to the editor.
+    void dialog.show(() => <DialogSelectModel model={props.model} />, detail === 0 ? undefined : props.onClose)
+  }
+
+  // A previewed chip is visible before the catalog loads, so a click on it opens the dialog once loading finishes.
+  const [deferred, setDeferred] = createSignal<number>()
+
+  createEffect(() => {
+    const detail = deferred()
+
+    if (props.loading || detail === undefined) return
+    setDeferred(undefined)
+    open(detail)
+  })
 
   const providerName = (provider: { id: string; name: string }) => {
     const group = managed()
@@ -113,9 +137,10 @@ function ComposerModelControl(props: {
   )
 
   return (
-    <Show when={!props.loading}>
+    <Show when={!props.loading || props.preview}>
       <Tooltip
         inactive={mobile()}
+        openDelay={750}
         contentClass={props.model.current() ? "!p-0 rounded-md" : undefined}
         placement="top"
         gutter={4}
@@ -141,8 +166,9 @@ function ComposerModelControl(props: {
           </Show>
         }
       >
+        {/* While loading, the drawer would open on a catalog that isn't there yet, so the inert chip stands in. */}
         <Show
-          when={mobile()}
+          when={mobile() && !props.loading}
           fallback={
             <Button
               data-action="composer-model"
@@ -152,9 +178,12 @@ function ComposerModelControl(props: {
               class="min-w-0 max-w-[60cqw] justify-start ![font-weight:440]"
               classList={{ "animate-in fade-in": shouldAnimate() }}
               style={{ height: "28px" }}
-              onClick={() => {
-                if (!props.paid) return props.onUnpaidClick()
-                void dialog.show(() => <DialogSelectModel model={props.model} />, props.onClose)
+              onMouseDown={(event: MouseEvent) => event.preventDefault()}
+              onClick={(event: MouseEvent) => {
+                if (!props.loading) return open(event.detail)
+
+                // On mobile this inert chip stands in for the drawer trigger, so a click there is dropped.
+                if (!mobile()) setDeferred(event.detail)
               }}
             >
               {content()}
