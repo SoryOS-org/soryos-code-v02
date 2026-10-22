@@ -43,9 +43,11 @@ const client = {
 }
 
 const api = {
-  form: {
-    reply: async () => ({ data: true }),
-    cancel: async () => ({ data: true }),
+  session: {
+    form: {
+      reply: async () => ({ data: true }),
+      cancel: async () => ({ data: true }),
+    },
   },
 }
 

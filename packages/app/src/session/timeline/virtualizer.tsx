@@ -29,6 +29,7 @@ import type { createTimelineProjection } from "./projection"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { filterVirtualIndexes } from "./virtual-items"
 import { prefersReducedMotion } from "@opencode/ui/motion"
+import { holdLandingWidth } from "@/shell/panel-motion"
 
 const fallbackItemSize = 60
 
@@ -198,6 +199,22 @@ export function createTimelineVirtualizer(input: Input) {
   let pointerHeld = false
   let maxScroll = 0
   let virtualContent: HTMLDivElement | undefined
+  let rowLayer: HTMLDivElement | undefined
+  // While a sidebar's spring moves the timeline's edge, rows keep the width they land at, centred on the timeline, so
+  // their text wraps once instead of on every frame. The first column in view (turn gaps span the row) keeps its start
+  // edge where it was.
+  holdLandingWidth(
+    () => rowLayer,
+    () => {
+      const top = listRoot()?.getBoundingClientRect().top ?? 0
+
+      return [
+        ...(rowLayer?.querySelectorAll<HTMLElement>(
+          '[data-timeline-key] [data-timeline-row]:not([data-timeline-row="TurnGap"])',
+        ) ?? []),
+      ].find((row) => row.getBoundingClientRect().bottom > top)
+    },
+  )
   let scrollTop = 0
   let reportOffset: ((offset: number, scrolling: boolean) => void) | undefined
   let reportRect: ((rect: { width: number; height: number }) => void) | undefined
@@ -850,8 +867,8 @@ export function createTimelineVirtualizer(input: Input) {
           style={{
             position: "absolute",
             top: `${item().start - topOffset() - rendering.scrollAdjustment}px`,
-            left: "0",
-            width: "100%",
+            left: "calc((100% - var(--panel-hold-width, 100%)) / 2)",
+            width: "var(--panel-hold-width, 100%)",
             height: `${item().size}px`,
             overflow: "clip",
             "overflow-clip-margin": Predicate.isTagged(row(), "TurnGap") ? undefined : "0.5px",
@@ -964,10 +981,14 @@ export function createTimelineVirtualizer(input: Input) {
               height: `${virtualizer.getTotalSize() - rendering.scrollAdjustment}px`,
               position: "relative",
               width: "100%",
+              // Rows held wider than the timeline mid-flight don't scroll it sideways.
+              "overflow-x": "clip",
               visibility: coldBottomMount ? "hidden" : undefined,
             }}
           >
-            <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
+            <div ref={rowLayer} class="absolute inset-0">
+              <For each={virtualRowKeys()}>{(rowKey) => <VirtualRow rowKey={rowKey} />}</For>
+            </div>
             <div
               data-timeline-row="bottom-spacer"
               class="absolute top-0 left-0 w-full"

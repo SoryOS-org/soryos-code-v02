@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createSizing } from "./helpers"
 import type { SessionModel } from "./model"
-import { clampSessionPanelWidth, sessionPanelWidthMax } from "./session-panel-width"
+import { clampSessionPanelWidth, sessionPanelWidthCss, sessionPanelWidthMax } from "./session-panel-width"
 
 /** wide asks for the wider session minimum. */
 export function createSessionScreenLayout(session: SessionModel, input: { wide: Accessor<boolean> }) {
@@ -40,7 +40,11 @@ export function createSessionScreenLayout(session: SessionModel, input: { wide: 
   const panelWidth = createMemo(() => {
     if (!tabsOpen()) return "100%"
 
-    return `${resizedWidth()}px`
+    return sessionPanelWidthCss({
+      width: view().session.width(),
+      split: splitSide(),
+      resized: view().session.resized(),
+    })
   })
 
   const panelMax = createMemo(() => {

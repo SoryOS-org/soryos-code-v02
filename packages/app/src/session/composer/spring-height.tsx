@@ -1,8 +1,61 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Accessor, type JSX } from "solid-js"
-import { frameLoop, observeReducedMotion, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  Show,
+  untrack,
+  type Accessor,
+  type JSX,
+} from "solid-js"
+import {
+  frameLoop,
+  observeReducedMotion,
+  prefersReducedMotion,
+  Spring,
+  type DurationOptions,
+} from "@opencode/ui/motion"
+import { motionTuning } from "@opencode/ui/motion-tuning"
 
-const enter: DurationOptions = { duration: 0.4, bounce: 0 }
-const exit: DurationOptions = { duration: 0.3, bounce: 0 }
+const group = "Composer docks"
+const presets = {
+  snappy: { duration: 0.3, bounce: 0 },
+  smooth: { duration: 0.4, bounce: 0 },
+  calm: { duration: 0.55, bounce: 0 },
+}
+// Opening and closing share one height spring, so a dock leaves the way it came.
+const morph = motionTuning.spring("docks.morph", { label: "Height", group, shipped: "smooth", presets })
+const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, shipped: "smooth", presets })
+// A closing face stays opaque until this much of its box is left, then fades out before the box closes.
+const fadeTail = motionTuning.number("docks.fade-tail", {
+  label: "Fade-out tail",
+  group,
+  value: 0.4,
+  min: 0.05,
+  max: 1,
+  step: 0.05,
+})
+const blur = motionTuning.number("docks.blur", {
+  label: "Blur",
+  group,
+  value: 0,
+  min: 0,
+  max: 6,
+  step: 0.5,
+  unit: "px",
+})
+export const queueStagger = motionTuning.number("docks.stagger", {
+  label: "Queue row stagger",
+  group,
+  value: 0,
+  min: 0,
+  max: 0.12,
+  step: 0.005,
+  unit: "s",
+  time: "duration",
+})
 const fade: DurationOptions = { duration: 0.15, bounce: 0 }
 const snap = (px: number, dpr = window.devicePixelRatio || 1) => Math.round(px * dpr) / dpr
 const surface =
@@ -20,7 +73,8 @@ type Face<T> = {
 }
 
 // The composer and the docks that stand in for it as one surface: a new face grows the region to its height on one
-// spring while the old face hands over in place. Faces present on mount rest immediately.
+// spring while the old face closes in its own box above or below it, so the two never draw over each other. Faces
+// present on mount rest immediately.
 export function ComposerMorph<T extends { key: string }>(props: {
   face: T
   children: (face: Accessor<T>) => JSX.Element
@@ -38,21 +92,62 @@ export function ComposerMorph<T extends { key: string }>(props: {
     root?.removeAttribute("data-moving")
     root?.removeAttribute("data-dock-border-underlay")
     root?.style.removeProperty("height")
-    list.forEach((item) =>
-      ["opacity", "transform", "filter", "mask-image"].forEach((prop) => item.el?.style.removeProperty(prop)),
-    )
+    list.forEach((item) => {
+      const content = item.el?.firstElementChild instanceof HTMLElement ? item.el.firstElementChild : undefined
+      ;["position", "inset-inline", "top", "transform", "clip-path", "opacity"].forEach((prop) =>
+        item.el?.style.removeProperty(prop),
+      )
+      ;["transform", "filter", "mask-image"].forEach((prop) => content?.style.removeProperty(prop))
+    })
     setFaces(list.filter((item) => !item.leaving()))
     return false
   }
 
+  // Face heights come from a ResizeObserver; this one read happens only when a flight starts.
   const measure = () => {
     for (const item of untrack(faces)) if (item.el) item.height = item.el.getBoundingClientRect().height
   }
 
-  const paintFace = (item: Face<T>, shown: number) => {
-    if (!item.el) return
-    const p = Math.max(0, Math.min(1, item.presence.value))
-    styleFace(item.el, p, item.leaving() ? 2 : 6, item.height - shown)
+  // Each face gets a box: a closing face keeps its presence's share of its height, and the face coming in takes what is
+  // left of the region. During a flight the faces are stacked with transforms and cut to their boxes with clip-path, so
+  // only the region's own height changes layout. Under reduced motion the closing faces fade out in full first, then
+  // the new face fades in.
+  const paintFaces = (list: Face<T>[], shown: number) => {
+    const reduced = prefersReducedMotion()
+    const leaving = list.filter((item) => item.leaving())
+    const waiting = reduced && leaving.some((item) => item.presence.value > 0.01)
+    const boxes = new Map(
+      leaving.map((item) => [
+        item,
+        reduced ? (waiting ? item.height : 0) : snap(item.height * Math.max(0, Math.min(1, item.presence.value))),
+      ]),
+    )
+    const used = [...boxes.values()].reduce((sum, box) => sum + box, 0)
+    let offset = 0
+    list.forEach((item) => {
+      if (!item.el) return
+      const box = boxes.get(item) ?? (waiting ? 0 : Math.max(0, Math.min(item.height, shown - used)))
+      const content = item.el.firstElementChild instanceof HTMLElement ? item.el.firstElementChild : item.el
+      item.el.style.position = "absolute"
+      item.el.style.insetInline = "0"
+      item.el.style.top = "0"
+      item.el.style.transform = `translateY(${offset}px)`
+      item.el.style.clipPath = `inset(0 0 calc(100% - ${box.toFixed(2)}px) 0)`
+      offset += box
+      const p = item.leaving() ? (reduced ? item.presence.value : box / Math.max(1, item.height)) : item.presence.value
+      styleFace(item.el, Math.max(0, Math.min(1, p)), {
+        dy: item.leaving() ? 0 : 6,
+        out: item.leaving(),
+        hidden: item.height - box,
+        content,
+      })
+    })
+  }
+
+  const regionHeight = (list: Face<T>[], spring: Spring) => {
+    if (!prefersReducedMotion()) return snap(spring.value)
+    const leaving = list.filter((item) => item.leaving() && item.presence.value > 0.01)
+    return leaving.length ? leaving.reduce((sum, item) => sum + item.height, 0) : spring.target
   }
 
   const paint = (dt: number) => {
@@ -60,20 +155,25 @@ export function ComposerMorph<T extends { key: string }>(props: {
     const entering = list.find((item) => !item.leaving())
     if (!root || !height || !entering) return false
 
-    if (entering.el && height.target !== entering.height) height.set(entering.height)
-    if (prefersReducedMotion()) height.snap(entering.height)
+    // A face that just mounted has no height until its ResizeObserver reports one.
+    if (entering.height > 0 && height.target !== entering.height) height.set(entering.height)
+    const reduced = prefersReducedMotion()
+    if (reduced) height.snap(entering.height)
     height.step(dt)
     if (Math.abs(height.value - height.target) < 0.5 && Math.abs(height.velocity) < 5) height.snap(height.target)
+    const waiting = reduced && list.some((item) => item.leaving() && item.presence.value > 0.01)
     list.forEach((item) => {
+      if (waiting && !item.leaving()) return
       item.presence.step(dt)
       if (Math.abs(item.presence.value - item.presence.target) < 0.01 && Math.abs(item.presence.velocity) < 0.05)
         item.presence.snap(item.presence.target)
     })
 
     if (height.resting && list.every((item) => item.presence.resting)) return settle(list)
-    const shown = snap(height.value)
+    const shown = regionHeight(list, height)
+    // Written every frame, never read back: the timeline inset follows the region's real height (as in #57559).
     root.style.height = `${shown}px`
-    list.forEach((item) => paintFace(item, shown))
+    paintFaces(list, shown)
     return true
   }
 
@@ -91,27 +191,33 @@ export function ComposerMorph<T extends { key: string }>(props: {
         const back = next.key === "composer" ? list.find((item) => item.key === next.key) : undefined
         const entering = back ?? face(next, 0)
         const active = list.filter((item) => item === entering || item.presence.value >= 0.01)
+        // The closing box must start at the face's full height, which only a fresh measure knows.
+        measure()
 
         active.forEach((item) => {
           if (item === entering) return
           item.leave(true)
           if (item.el?.contains(document.activeElement) && document.activeElement instanceof HTMLElement)
             document.activeElement.blur()
-          tune(item.presence, reduced ? fade : exit).set(0)
+          // A closing face's box closes on the region's spring, so the boxes always add up to the region.
+          tune(item.presence, reduced ? fade : morph()).set(0)
         })
         entering.set(next)
         entering.leave(false)
-        tune(entering.presence, reduced ? fade : enter).set(1)
-        height ??= Spring.fromDuration(from, enter)
-        tune(height, enter)
-        const shown = snap(height.value)
-        const nextFaces = back ? active : [...active, entering]
+        tune(entering.presence, reduced ? fade : fadeIn()).set(1)
+        height ??= Spring.fromDuration(from, morph())
+        tune(height, morph())
+        // Docks always stack above the composer, whichever is coming or going.
+        const nextFaces = (back ? active : [...active, entering]).toSorted(
+          (a, b) => Number(a.key === "composer") - Number(b.key === "composer"),
+        )
+        const shown = regionHeight(nextFaces, height)
         root.toggleAttribute("data-moving", true)
         root.toggleAttribute("data-dock-border-underlay", true)
         root.style.height = `${shown}px`
-        nextFaces.forEach((item) => paintFace(item, shown))
+        paintFaces(nextFaces, shown)
         setFaces(nextFaces)
-        stop ??= frameLoop.addMeasured(measure, paint)
+        stop ??= frameLoop.add(paint)
       },
       { defer: true },
     ),
@@ -127,13 +233,19 @@ export function ComposerMorph<T extends { key: string }>(props: {
           <div
             ref={(el) => {
               item.el = el
-              if (height) paintFace(item, snap(height.value))
+              const observer = new ResizeObserver((entries) => {
+                const size = entries[0]?.borderBoxSize[0]?.blockSize
+                if (size !== undefined) item.height = size
+              })
+              observer.observe(el)
+              onCleanup(() => observer.disconnect())
+              if (height) paintFaces(untrack(faces), snap(height.value))
             }}
             data-slot="composer-face"
             inert={item.leaving()}
             aria-hidden={item.leaving() || undefined}
             class="shrink-0"
-            classList={{ "pointer-events-none absolute inset-x-0 top-0": item.leaving() }}
+            classList={{ "pointer-events-none": item.leaving() }}
           >
             {props.children(item.value)}
           </div>
@@ -155,11 +267,21 @@ function tune(spring: Spring, options: DurationOptions) {
   return spring
 }
 
-function styleFace(el: HTMLElement, p: number, dy: number, hidden = 0, content = el) {
-  el.style.opacity = `${(p * p).toFixed(4)}`
-  if (prefersReducedMotion()) return
-  content.style.transform = `translateY(${((1 - p) * dy).toFixed(2)}px)`
-  el.style.filter = p < 0.999 ? `blur(${((1 - p) * 4).toFixed(2)}px)` : ""
+// A face coming in eases its opacity in late. A face going out stays opaque until only the fade-out tail of its box is
+// left, then fades, so it is gone just as its box closes.
+function styleFace(
+  el: HTMLElement,
+  p: number,
+  input: { dy: number; out: boolean; hidden?: number; content?: HTMLElement },
+) {
+  const content = input.content ?? el
+  const hidden = input.hidden ?? 0
+  el.style.opacity = `${(input.out ? Math.min(1, p / fadeTail()) : p * p).toFixed(4)}`
+  // Movement, blur and the soft edge go on the content inside the clipping box, never on the box itself, so a blur
+  // can't bleed past it. Before the content mounts there is nothing to move.
+  if (prefersReducedMotion() || content === el) return
+  content.style.transform = `translateY(${((1 - p) * input.dy).toFixed(2)}px)`
+  content.style.filter = p < 0.999 && blur() > 0 ? `blur(${((1 - p) * blur()).toFixed(2)}px)` : ""
   content.style.maskImage =
     hidden > 0 ? `linear-gradient(to top, transparent ${hidden}px, #000 ${hidden + Math.min(24, hidden)}px)` : ""
 }
@@ -171,6 +293,8 @@ export function Grow<T>(props: {
   fade?: boolean
   card?: boolean
   class?: string
+  /** The spring it closes on, when it closes alongside other motion that should share it. */
+  close?: () => DurationOptions
   onClosed?: () => void
   children: JSX.Element | ((item: NonNullable<T>) => JSX.Element)
 }) {
@@ -189,7 +313,7 @@ export function Grow<T>(props: {
         }
         if (!el || (!entering && (!prev || prev[0] === when))) return
         entering = false
-        grow(el, when, props.fade, props.card, () => {
+        grow(el, when, props.fade, props.card, props.close?.(), () => {
           setPresent(false)
           props.onClosed?.()
         })
@@ -206,22 +330,36 @@ export function Grow<T>(props: {
       >
         {(() => {
           const child = props.children
-          return typeof child === "function" ? <Show when={item()} keyed>{child}</Show> : child
+          return typeof child === "function" ? (
+            <Show when={item()} keyed>
+              {child}
+            </Show>
+          ) : (
+            child
+          )
         })()}
       </div>
     </Show>
   )
 }
 
-const growing = new WeakMap<HTMLElement, { spring: Spring; open: boolean; done?: () => void }>()
+const growing = new WeakMap<HTMLElement, { spring: Spring; presence: Spring; open: boolean; done?: () => void }>()
 
-function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean, done?: () => void) {
+function grow(
+  el: HTMLElement,
+  open: boolean,
+  withFade?: boolean,
+  card?: boolean,
+  close?: DurationOptions,
+  done?: () => void,
+) {
   const reduced = prefersReducedMotion()
   const current = growing.get(el)
   if (current) {
     current.open = open
     current.done = done
-    tune(current.spring, reduced ? fade : open ? enter : exit)
+    tune(current.spring, reduced ? fade : open ? morph() : (close ?? morph()))
+    tune(current.presence, reduced ? fade : fadeIn())
     return
   }
 
@@ -229,7 +367,12 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
   const prevMb =
     (!mb && el.previousElementSibling ? parseFloat(getComputedStyle(el.previousElementSibling).marginBottom) : 0) || 0
   const state = {
-    spring: Spring.fromDuration(open ? 0 : el.getBoundingClientRect().height, reduced ? fade : open ? enter : exit),
+    spring: Spring.fromDuration(
+      open ? 0 : el.getBoundingClientRect().height,
+      reduced ? fade : open ? morph() : (close ?? morph()),
+    ),
+    // Opening fades in on its own spring; closing fades with the height, inside the closing box.
+    presence: Spring.fromDuration(open ? 0 : 1, reduced ? fade : fadeIn()),
     open,
     done,
   }
@@ -243,56 +386,108 @@ function grow(el: HTMLElement, open: boolean, withFade?: boolean, card?: boolean
   }
   if ((withFade || reduced) && open) el.style.opacity = "0"
 
-  let full = 0
-  frameLoop.addMeasured(
-    () => {
-      const child = el.firstElementChild
-      if (!(child instanceof HTMLElement)) return
-      const margin = parseFloat(getComputedStyle(child).marginBottom) || 0
-      if (margin < 0) el.style.overflowClipMargin = `${-margin}px`
-      full = child.getBoundingClientRect().height + margin
-    },
-    (dt) => {
-      if (!el.isConnected) {
-        growing.delete(el)
-        return false
-      }
-      const noMotion = prefersReducedMotion()
-      const size = state.open ? full : 0
-      state.spring.set(size).step(dt)
-      if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
+  // The content's height is read once here, then kept current by a ResizeObserver rather than read every frame.
+  const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : undefined
+  const margin = child ? parseFloat(getComputedStyle(child).marginBottom) || 0 : 0
+  if (margin < 0) el.style.overflowClipMargin = `${-margin}px`
+  let full = child ? child.getBoundingClientRect().height + margin : 0
+  const observer = new ResizeObserver((entries) => {
+    const size = entries[0]?.borderBoxSize[0]?.blockSize
+    if (size !== undefined) full = size + margin
+  })
+  if (child) observer.observe(child)
+  frameLoop.add((dt) => {
+    if (!el.isConnected) {
+      observer.disconnect()
+      growing.delete(el)
+      return false
+    }
+    const noMotion = prefersReducedMotion()
+    const size = state.open ? full : 0
+    state.spring.set(size).step(dt)
+    if (Math.abs(state.spring.value - size) < 0.5 && Math.abs(state.spring.velocity) < 5) state.spring.snap(size)
+    const shown = state.open ? 1 : 0
+    state.presence.set(shown).step(dt)
+    if (Math.abs(state.presence.value - shown) < 0.01 && Math.abs(state.presence.velocity) < 0.05)
+      state.presence.snap(shown)
 
-      if (state.spring.resting) {
-        growing.delete(el)
-        finish(el, state.open, state.done)
-        return false
-      }
+    if (state.spring.resting && (!withFade || !state.open || state.presence.resting)) {
+      observer.disconnect()
+      growing.delete(el)
+      finish(el, state.open, state.done)
+      return false
+    }
 
-      const value = snap(Math.max(0, state.spring.value))
-      const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
-      if (!noMotion) {
-        el.style.height = `${value}px`
-        if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
-        if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
-      }
-      if (withFade || noMotion) {
-        const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
-        styleFace(el, p, 4, card ? full - value : 0, child)
-      }
-      return true
-    },
-  )
+    const value = snap(Math.max(0, state.spring.value))
+    const p = Math.max(0, Math.min(1, state.spring.value / Math.max(1, full)))
+    const presence = Math.max(0, Math.min(1, state.presence.value))
+    if (!noMotion) {
+      // Written every frame, never read back: neighbours and the timeline inset follow the real height (as in #57559).
+      el.style.height = `${value}px`
+      if (mb > 0) el.style.marginBottom = `${snap(mb * p)}px`
+      if (prevMb > 0) el.style.marginTop = `${snap(-prevMb * (1 - p))}px`
+    }
+    if (withFade || noMotion) {
+      const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : el
+      styleFace(el, state.open ? presence : p, {
+        dy: state.open ? 4 : 0,
+        out: !state.open,
+        hidden: card ? full - value : 0,
+        content: child,
+      })
+    }
+    return true
+  })
 }
 
 function finish(el: HTMLElement, open: boolean, done?: () => void) {
   const child = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : undefined
   el.removeAttribute("data-moving")
   el.removeAttribute("data-dock-border-underlay")
-  ;["height", "margin-top", "margin-bottom", "overflow-clip-margin", "opacity", "filter", "transform", "mask-image"].forEach(
-    (prop) => {
-      el.style.removeProperty(prop)
-      child?.style.removeProperty(prop)
-    },
-  )
+  ;[
+    "height",
+    "margin-top",
+    "margin-bottom",
+    "overflow-clip-margin",
+    "opacity",
+    "filter",
+    "transform",
+    "mask-image",
+  ].forEach((prop) => {
+    el.style.removeProperty(prop)
+    child?.style.removeProperty(prop)
+  })
   if (!open) done?.()
+}
+
+// Fades `rows` in one after another on the fade-in spring, `step` seconds apart, on the shared frame loop. Returns its
+// cancellation, which clears what it painted.
+export function cascade(rows: HTMLElement[], step: number) {
+  const springs = rows.map(() => Spring.fromDuration(0, fadeIn()))
+  const clear = () =>
+    rows.forEach((el) => ["opacity", "filter", "transform"].forEach((prop) => el.style.removeProperty(prop)))
+  let elapsed = 0
+  const paintRow = (el: HTMLElement, p: number) => {
+    el.style.opacity = `${(p * p).toFixed(4)}`
+    el.style.transform = `translateY(${((1 - p) * 4).toFixed(2)}px)`
+  }
+  rows.forEach((el) => paintRow(el, 0))
+  const stop = frameLoop.add((dt) => {
+    elapsed += dt
+    springs.forEach((spring, index) => {
+      if (elapsed < index * step) return
+      spring.set(1).step(dt)
+      if (Math.abs(spring.value - 1) < 0.01 && Math.abs(spring.velocity) < 0.05) spring.snap(1)
+    })
+    if (springs.every((spring) => spring.value === 1)) {
+      clear()
+      return false
+    }
+    rows.forEach((el, index) => paintRow(el, Math.max(0, Math.min(1, springs[index]!.value))))
+    return true
+  })
+  return () => {
+    stop()
+    clear()
+  }
 }
