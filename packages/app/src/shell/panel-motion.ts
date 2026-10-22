@@ -246,9 +246,9 @@ export function createPanelMotion(input: {
   // A state `sync` asked to show at once, for when the change hasn't reached this motion yet, e.g. inside a batch.
   let snapTo: boolean | undefined
   let flying = false
-  // James's panel animations in progress, if any: its fade and shift in, or holding it hidden while a close lands.
+  // James's panel animations, its shift and fade, held at their end until the flight settles; `fading` while they run.
   let fades: Animation[] = []
-  let hidden: Animation | undefined
+  let fading = false
   // James's layout flight: the panel stays at its landing box, so its only travel is its own shift.
   const [pinned, setPinned] = createSignal(false)
 
@@ -290,8 +290,7 @@ export function createPanelMotion(input: {
     if (!input.open()) setPresent(false)
     fades.forEach((animation) => animation.cancel())
     fades = []
-    hidden?.cancel()
-    hidden = undefined
+    fading = false
     setPinned(false)
 
     if (!input.open()) input.onClosed?.()
@@ -322,8 +321,7 @@ export function createPanelMotion(input: {
           stop = undefined
           fades.forEach((animation) => animation.cancel())
           fades = []
-          hidden?.cancel()
-          hidden = undefined
+          fading = false
           setPinned(false)
           fly(false)
           motion.snap(target)
@@ -344,24 +342,25 @@ export function createPanelMotion(input: {
 
         const instantLayout = james() && jamesLayout() === "off"
 
-        if (now || (!james() && style() === "instant") || (instantLayout && !open)) return snap(open)
+        if (now || (!james() && style() === "instant")) return snap(open)
 
+        // Without layout motion, the layout opens before the panel fades in and closes after it fades out.
         if (instantLayout) {
-          motion.snap(0)
-          paint()
+          stop?.()
+          stop = undefined
+
+          if (open) {
+            motion.snap(0)
+            paint()
+          }
           fly(true)
 
-          return fadeIn()
+          return fadePanel(open)
         }
 
         // James's panel closes at once while its layout lands; it opens with its own fade and shift.
-        if (james() && open) {
-          hidden?.cancel()
-          hidden = undefined
-          fadeIn()
-        }
-
-        if (james() && !open) hide()
+        // James's panel shifts and fades on its own curves, in on open and back out on close.
+        if (james()) fadePanel(open)
 
         setPinned(james())
 
@@ -384,8 +383,8 @@ export function createPanelMotion(input: {
           if (!motion.resting) return true
           stop = undefined
 
-          // A panel still fading in settles when its animations finish.
-          if (fades.length === 0) settle()
+          // A panel still fading settles when its animations finish.
+          if (!fading) settle()
 
           return false
         }
@@ -402,45 +401,56 @@ export function createPanelMotion(input: {
       if (input.open()) input.element?.()?.animate?.({ opacity: [0, 1] }, { duration: 150, easing: ease.out })
     })
 
-  /** James: the panel shifts in and fades up, deferred so a panel that mounts with this open exists first. */
-  const fadeIn = () =>
+  /**
+   * James: the panel shifts in and fades up on open, and shifts back out and fades down on close, then hides once the
+   * flight settles. A reversal turns around from where the panel is. Deferred so a panel that mounts with this open
+   * exists first.
+   */
+  const fadePanel = (open: boolean) =>
     queueMicrotask(() => {
       const element = input.element?.()
 
-      if (!input.open()) return
-      fades.forEach((animation) => animation.cancel())
-      fades = []
+      if (input.open() !== open) return
 
-      if (!element?.animate) return stop ? undefined : settle()
+      if (!element?.animate) return stop ? undefined : snap(open)
 
       const x = (input.offset?.() ?? 0) * (element.matches(":dir(rtl)") ? -1 : 1)
+      const away = { transform: `translateX(${x}px)`, opacity: `${faded}` }
+      const rest = { transform: "none", opacity: "1" }
+      const now = getComputedStyle(element)
+      const start = fades.length > 0 ? { transform: now.transform, opacity: now.opacity } : open ? away : rest
+      const end = open ? rest : away
+      fades.forEach((animation) => animation.cancel())
       const current = [
-        element.animate({ transform: [`translateX(${x}px)`, "none"] }, springEasing(jamesShift())),
         element.animate(
-          { opacity: [faded, 1] },
-          { duration: jamesFadeDuration() * 1000, easing: `cubic-bezier(${jamesFade().join(", ")})` },
+          { transform: [start.transform, end.transform] },
+          { ...springEasing(jamesShift()), fill: "both" },
+        ),
+        element.animate(
+          { opacity: [start.opacity, end.opacity] },
+          {
+            duration: jamesFadeDuration() * 1000,
+            easing: `cubic-bezier(${jamesFade().join(", ")})`,
+            fill: "both",
+          },
         ),
       ]
       fades = current
+      fading = true
       void Promise.all(current.map((animation) => animation.finished)).then(
         () => {
           if (current !== fades) return
-          fades = []
+          fading = false
 
-          if (!stop) settle()
+          // Without a spring still landing the layout, the flight ends here (a close's layout moves now).
+          if (!stop) return snap(input.open())
+
+          // A closed panel is gone once it has faded out, while the layout's spring finishes landing.
+          if (!input.open()) fades.push(element.animate({ opacity: [0, 0] }, { duration: 0, fill: "forwards" }))
         },
         () => undefined,
       )
     })
-
-  /** James: the panel disappears at once and stays hidden until its close lands. */
-  const hide = () => {
-    fades.forEach((animation) => animation.cancel())
-    fades = []
-    const animation = input.element?.()?.animate?.({ opacity: [0, 0] }, { duration: 0, fill: "forwards" })
-
-    if (animation) hidden = animation
-  }
 
   // Repaints at rest when the open size changes, e.g. a resize drag or a window resize.
   createEffect(paint)
@@ -448,7 +458,6 @@ export function createPanelMotion(input: {
   onCleanup(() => {
     stop?.()
     fades.forEach((animation) => animation.cancel())
-    hidden?.cancel()
     fly(false)
     unhold()
   })
