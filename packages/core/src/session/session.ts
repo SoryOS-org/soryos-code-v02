@@ -212,14 +212,21 @@ export const make = Effect.fn("Session.make")(function* () {
           settling.add(sessionID)
           const location = accepted.location
           yield* Effect.gen(function* () {
-            yield* execution.awaitIdle(sessionID)
-            yield* statusLock.withPermit(Effect.gen(function* () {
-              settling.delete(sessionID)
-              // A newer preparation or execution owns the busy period; its own cleanup publishes idle.
-              if (preparing.has(sessionID)) return
-              if (yield* execution.isActive(sessionID)) return
-              yield* bus.publish(SessionStatusEvent.Status, { sessionID, status: { type: "idle" } }, { location })
-            }))
+            while (true) {
+              yield* execution.awaitIdle(sessionID)
+              const settled = yield* statusLock.withPermit(Effect.gen(function* () {
+                // A newer preparation takes over cleanup; a restarted execution still needs this waiter.
+                if (preparing.has(sessionID)) {
+                  settling.delete(sessionID)
+                  return true
+                }
+                if (yield* execution.isActive(sessionID)) return false
+                settling.delete(sessionID)
+                yield* bus.publish(SessionStatusEvent.Status, { sessionID, status: { type: "idle" } }, { location })
+                return true
+              }))
+              if (settled) return
+            }
           }).pipe(Effect.forkIn(scope, { startImmediately: true }))
           return
         }
