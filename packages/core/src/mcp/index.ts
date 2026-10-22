@@ -213,8 +213,7 @@ export const layer = (options?: Options) =>
           })
           .pipe(Scope.provide(scope))
       })
-      const requireServer = Effect.fnUntraced(function* (server: ServerName | string) {
-        const name = ServerName.make(server)
+      const requireServer = Effect.fnUntraced(function* (name: ServerName) {
         const entry = entries.get(name)
         if (!entry) return yield* new NotFoundError({ server: name })
         return { name, entry }
@@ -638,23 +637,26 @@ export const layer = (options?: Options) =>
           yield* state.reload()
         }),
         connect: Effect.fn("MCP.connect")(function* (server) {
-          const target = yield* requireServer(server)
+          const name = ServerName.make(server)
           yield* Effect.gen(function* () {
-            yield* stopServer(target.name, target.entry)
-            yield* startServer(target.name, target.entry)
-          }).pipe(locks.withLock(target.name))
+            const target = yield* requireServer(name)
+            yield* stopServer(name, target.entry)
+            yield* startServer(name, target.entry)
+          }).pipe(locks.withLock(name))
         }),
         disconnect: Effect.fn("MCP.disconnect")(function* (server) {
-          const target = yield* requireServer(server)
+          const name = ServerName.make(server)
           yield* Effect.gen(function* () {
-            yield* stopServer(target.name, target.entry)
+            const target = yield* requireServer(name)
+            yield* stopServer(name, target.entry)
             target.entry.status = { status: "disabled" }
-            yield* bus.publish(McpEvent.StatusChanged, { server: target.name })
-          }).pipe(locks.withLock(target.name))
+            yield* bus.publish(McpEvent.StatusChanged, { server: name })
+          }).pipe(locks.withLock(name))
         }),
         remove: Effect.fn("MCP.remove")(function* (server) {
-          const target = yield* requireServer(server)
-          overrides.set(target.name, false)
+          const name = ServerName.make(server)
+          yield* requireServer(name)
+          overrides.set(name, false)
           yield* state.reload()
         }),
         // Reads report what is connected now; servers still starting contribute once they publish a change.
@@ -664,7 +666,7 @@ export const layer = (options?: Options) =>
             .toSorted((a, b) => a.server.localeCompare(b.server) || a.name.localeCompare(b.name))
         }),
         callTool: Effect.fn("MCP.callTool")(function* (input) {
-          const target = yield* requireServer(input.server)
+          const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
           if (!target.entry.client)
             return yield* new ToolCallError({
@@ -701,7 +703,7 @@ export const layer = (options?: Options) =>
             .toSorted((a, b) => a.server.localeCompare(b.server) || a.name.localeCompare(b.name))
         }),
         prompt: Effect.fn("MCP.prompt")(function* (input) {
-          const target = yield* requireServer(input.server)
+          const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>
@@ -723,13 +725,13 @@ export const layer = (options?: Options) =>
           return mergeCatalogs(catalogs)
         }),
         resources: Effect.fn("MCP.resources")(function* (input) {
-          const target = yield* requireServer(input.server)
+          const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
           if (!target.entry.client) return ResourceCatalog.make({ resources: [], templates: [] })
           return mergeCatalogs([yield* loadCatalog(target.name, target.entry, target.entry.client)])
         }),
         readResource: Effect.fn("MCP.readResource")(function* (input) {
-          const target = yield* requireServer(input.server)
+          const target = yield* requireServer(ServerName.make(input.server))
           yield* target.entry.startup.await
           if (!target.entry.client) return undefined
           const result = yield* recovering(target.name, target.entry, target.entry.client, (connection) =>

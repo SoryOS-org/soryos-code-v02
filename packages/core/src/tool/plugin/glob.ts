@@ -61,16 +61,17 @@ export const Plugin = {
           output: Output,
           execute: (input, context) =>
             Effect.gen(function* () {
+              const searchPath = input.path === "undefined" || input.path === "null" ? undefined : input.path
               const source = { type: "tool" as const, messageID: context.messageID, id: context.id }
-              const target = yield* access.resolve({ path: input.path ?? ".", kind: "directory" })
+              const target = yield* access.resolve({ path: searchPath ?? ".", kind: "directory" })
               yield* access.authorizeExternal([target], context)
               yield* permission.assert({
                 action: name,
                 resources: [input.pattern],
                 save: ["*"],
                 metadata: {
-                  root: input.path ?? ".",
-                  path: input.path,
+                  root: searchPath ?? ".",
+                  path: searchPath,
                   hidden: input.hidden,
                   limit: input.limit,
                 },
@@ -80,12 +81,12 @@ export const Plugin = {
               })
               const type = yield* Environment.typeFollowing(environment.files, target.absolute).pipe(
                 Effect.catchTag("Environment.NotFound", () =>
-                  Effect.fail(new ToolFailure({ message: `Search path does not exist: ${input.path ?? "."}` })),
+                  Effect.fail(new ToolFailure({ message: `Search path does not exist: ${searchPath ?? "."}` })),
                 ),
               )
               if (type !== "directory")
                 return yield* Effect.fail(
-                  new ToolFailure({ message: `Search path is not a directory: ${input.path ?? "."}` }),
+                  new ToolFailure({ message: `Search path is not a directory: ${searchPath ?? "."}` }),
                 )
               const root = target.absolute
               const limit = input.limit ?? FileSystem.DEFAULT_SEARCH_LIMIT
