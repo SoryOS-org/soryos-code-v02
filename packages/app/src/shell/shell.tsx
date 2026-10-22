@@ -19,6 +19,7 @@ import { useServers } from "@/runtime/server/registry"
 import { useTabs } from "@/shell/tabs/tabs"
 import { CollapsedSidebarToggle, measureSidebarToggles, paintCollapsedSlots } from "@/shell/sidebar-toggle"
 import { createPanelMotion, guardClosingFocus, panelOpacity, replayPanelToggle } from "@/shell/panel-motion"
+import { createSidebarPeek } from "@/shell/sidebar-peek"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
 export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
@@ -66,6 +67,14 @@ export default function Layout(props: ParentProps) {
     measure: () => measureSidebarToggles(state.tabsWidth),
     element: () => state.tabsPanel,
     offset: () => -10,
+  })
+
+  const peek = createSidebarPeek({
+    available: () => verticalTabs() && !preferences.appearance.sidebarOpen() && !sidebarMotion.present(),
+    open: preferences.appearance.sidebarOpen,
+    aside: () => state.tabsAside,
+    panel: () => state.tabsPanel,
+    content: () => state.tabsMount,
   })
 
   replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
@@ -158,6 +167,8 @@ export default function Layout(props: ParentProps) {
               id="vertical-tabs-sidebar"
               data-slot="vertical-tabs-sidebar"
               data-state={preferences.appearance.sidebarOpen() ? "open" : "closed"}
+              data-peek={peek.shown() ? "" : undefined}
+              style={{ "--sidebar-peek-width": `${state.tabsWidth}px` }}
               ref={(element) => setState("tabsAside", element)}
               class="relative z-10 h-full min-h-0 shrink-0"
             >
@@ -165,13 +176,15 @@ export default function Layout(props: ParentProps) {
                   a reopen reuses their layout. */}
               <div
                 ref={(element) => setState("tabsPanel", element)}
+                data-slot="vertical-tabs-panel"
                 class="absolute inset-0 overflow-hidden [contain:layout_style_paint]"
-                classList={{ "[content-visibility:hidden]": !sidebarMotion.present() }}
+                classList={{ "[content-visibility:hidden]": !sidebarMotion.present() && !peek.shown() }}
                 // Under James the sidebar keeps its landing width (start edge held) while the layout moves.
                 style={{ width: sidebarMotion.pinned() ? `${state.tabsWidth}px` : undefined }}
               >
                 <div
                   ref={(element) => setState("tabsMount", element)}
+                  data-slot="vertical-tabs-mount"
                   class="absolute inset-y-0 end-0 contain-strict will-change-[opacity] flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
                   style={{
                     width: `${state.tabsWidth}px`,

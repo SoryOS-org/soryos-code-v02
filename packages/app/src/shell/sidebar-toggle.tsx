@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Show } from "solid-js"
+import { createEffect, createSignal, onCleanup, Show } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -8,6 +8,32 @@ import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
+import { motionTuning } from "@opencode/ui/motion-tuning"
+import { sidebarPeekEnabled, sidebarUnread } from "@/shell/sidebar-peek"
+
+// The Sidebar peek experiment shows the closed sidebar's toggle as a menu.
+const [peek, setPeek] = createSignal(sidebarPeekEnabled())
+
+motionTuning.subscribe(() => setPeek(sidebarPeekEnabled()))
+
+const closedIcon = () => (peek() ? "menu" : "layout-left")
+
+// The menu icon's dot for sidebar sessions with unread activity, shown while the sidebar is closed.
+function UnreadBadge(props: { show: boolean; ring: "base" | "deep" }) {
+  return (
+    <Show when={props.show}>
+      <span
+        data-slot="sidebar-toggle-unread"
+        aria-hidden="true"
+        class="pointer-events-none absolute -top-0.5 -end-0.5 size-[7px] rounded-full bg-v2-background-bg-accent"
+        classList={{
+          "shadow-[0_0_0_1.5px_var(--v2-background-bg-base)]": props.ring === "base",
+          "shadow-[0_0_0_1.5px_var(--v2-background-bg-deep)]": props.ring === "deep",
+        }}
+      />
+    </Show>
+  )
+}
 
 // The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`, and the titlebar moves the buttons down to share the
 // header's center line in vertical tabs. macOS 26 and later draw 14px buttons on a 23px pitch, so the zoom button ends
@@ -44,7 +70,8 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
   const keybind = () => command.keybindParts("sidebar.toggle")
   const side = props.handoff
   let full: SVGSVGElement | undefined
-  let outline: SVGSVGElement | undefined
+  let outline: HTMLSpanElement | undefined
+  const unread = () => peek() && !settings.appearance.sidebarOpen() && sidebarUnread()
   const ref =
     side === "out"
       ? collapsedRef((button, closed) => {
@@ -70,6 +97,8 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
     <Tooltip
       class="shrink-0 [app-region:no-drag]"
       placement="bottom"
+      // Held shut while the closed sidebar peeks on hover, where it would cover the peek.
+      forceOpen={peek() && !settings.appearance.sidebarOpen() ? false : undefined}
       value={
         <>
           {language.t("command.sidebar.toggle")}
@@ -87,19 +116,25 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
         class="shrink-0"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => settings.appearance.setSidebarOpen(!settings.appearance.sidebarOpen())}
-        aria-label={language.t("command.sidebar.toggle")}
+        aria-label={language.t(unread() ? "command.sidebar.toggle.unread" : "command.sidebar.toggle")}
         aria-expanded={settings.appearance.sidebarOpen()}
         aria-controls="vertical-tabs-sidebar"
         icon={
           side === "in" ? (
             <span class="relative flex">
               <Icon ref={full} name="layout-left-full" />
-              <Icon ref={outline} name="layout-left" class="absolute inset-0" />
+              <span ref={outline} class="absolute inset-0 flex">
+                <Icon name={closedIcon()} />
+                <UnreadBadge show={unread()} ring="base" />
+              </span>
             </span>
           ) : (
-            <Icon
-              name={side === "out" || (!side && settings.appearance.sidebarOpen()) ? "layout-left-full" : "layout-left"}
-            />
+            <span class="relative flex">
+              <Icon
+                name={side === "out" || (!side && settings.appearance.sidebarOpen()) ? "layout-left-full" : closedIcon()}
+              />
+              <UnreadBadge show={!side && unread()} ring="deep" />
+            </span>
           )
         }
       />

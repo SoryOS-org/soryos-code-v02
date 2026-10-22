@@ -796,6 +796,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                               {/* Shares the session header's 48px center line. Without traffic lights, Home fills the
                                   start so the row doesn't leave an empty band. */}
                               <div
+                                data-slot="sidebar-header"
+                                data-home={homeInSidebarHeader() ? "" : undefined}
                                 class="flex w-full shrink-0 gap-2"
                                 classList={{
                                   "items-start pt-2.5 pb-1": homeInSidebarHeader(),

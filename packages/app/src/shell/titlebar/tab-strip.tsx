@@ -25,6 +25,7 @@ import { sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { sessionTitle } from "@/session/title"
 import { errorMessage } from "@/shell/layout/helpers"
 import { notifySessionTabsRemoved } from "./session-events"
+import { setSidebarUnread } from "@/shell/sidebar-peek"
 import type { SessionInfo } from "@opencode/client/promise"
 
 export const previousSessionCommand = { id: "session.previous", keybind: "alt+arrowup" }
@@ -395,6 +396,13 @@ export function TitlebarTabStrip(props: {
   const [unread, setUnread] = createStore<Record<string, boolean>>({})
   const visibleTabs = createMemo(() => props.tabs.filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
   const visibleTabIds = () => visibleTabs().map(tabKey)
+
+  // Tells the closed sidebar's toggle whether any row here shows its unread dot, which the current tab never does.
+  createEffect(() => {
+    if (!vertical()) return
+    setSidebarUnread(props.tabs.some((tab) => tab !== props.currentTab && !!unread[tabKey(tab)]))
+    onCleanup(() => setSidebarUnread(false))
+  })
 
   command.register("titlebar-tab-cycle", () => [
     {
