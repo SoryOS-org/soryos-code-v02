@@ -31,8 +31,9 @@ export function createPaneDrag(input: {
     const inside = (rect: DOMRect) =>
       rect.width > 0 && rect.height > 0 && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
 
+    // A scrolled strip, or one wider than its animating pane, extends past what is on screen.
     const strip = Array.from(document.querySelectorAll<HTMLElement>("[data-pane-strip]")).find((element) =>
-      inside(element.getBoundingClientRect()),
+      inside(visibleRect(element)),
     )
 
     const stripPane = paneOf(strip?.dataset.paneStrip)
@@ -49,14 +50,19 @@ export function createPaneDrag(input: {
       })
 
       const anchor = (next ?? tabs.at(-1))?.getBoundingClientRect()
-      const bounds = strip.getBoundingClientRect()
+      const bounds = visibleRect(strip)
 
       return {
         pane: stripPane,
         before: next?.dataset.paneTab,
         strip: true,
         rect: anchor
-          ? { left: (next ? anchor.left : anchor.right) - 1, top: anchor.top + 2, width: 2, height: anchor.height - 4 }
+          ? {
+              left: Math.min(Math.max((next ? anchor.left : anchor.right) - 1, bounds.left), bounds.right - 2),
+              top: anchor.top + 2,
+              width: 2,
+              height: anchor.height - 4,
+            }
           : { left: bounds.left + 12, top: bounds.top + 12, width: 2, height: bounds.height - 24 },
       }
     }
@@ -105,10 +111,12 @@ export function createPaneDrag(input: {
       if (!drag.active) {
         drag.active = true
         document.body.style.userSelect = "none"
-        document.body.style.cursor = "grabbing"
       }
 
-      setState({ key, title, x: moved.clientX, y: moved.clientY, target: hit(moved.clientX, moved.clientY, key) })
+      const target = hit(moved.clientX, moved.clientY, key)
+      // Away from any drop target the release cancels, so the cursor stays normal.
+      document.body.style.cursor = target ? "grabbing" : ""
+      setState({ key, title, x: moved.clientX, y: moved.clientY, target })
     }
 
     const finish = (commit: boolean) => {
@@ -190,6 +198,25 @@ export type PaneDrag = ReturnType<typeof createPaneDrag>
 
 function paneOf(value: string | undefined) {
   return SESSION_PANES.find((pane) => pane === value)
+}
+
+/** The element's on-screen rect: its bounding rect clipped by every ancestor that clips overflow. */
+function visibleRect(element: HTMLElement) {
+  const rect = element.getBoundingClientRect()
+  const bounds = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent)
+
+    if (style.overflowX === "visible" && style.overflowY === "visible") continue
+    const clip = parent.getBoundingClientRect()
+    bounds.left = Math.max(bounds.left, clip.left)
+    bounds.top = Math.max(bounds.top, clip.top)
+    bounds.right = Math.min(bounds.right, clip.right)
+    bounds.bottom = Math.min(bounds.bottom, clip.bottom)
+  }
+
+  return new DOMRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top)
 }
 
 function toRect(rect: DOMRect): Rect {
