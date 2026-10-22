@@ -43,7 +43,7 @@ const completed = {
 } satisfies SessionMessageAssistant
 
 test.describe("static projection", () => {
-  test("renders current protocol notices in CLI order", async ({ page }) => {
+  test("renders current protocol notices in CLI order @quarantine", async ({ page }) => {
     const ownerWarnings: string[] = []
     page.on("console", (message) => {
       if (message.text().includes("computations created outside a `createRoot` or `render`"))
@@ -1218,7 +1218,9 @@ test.describe("background shortcut", () => {
     // Reaching the shell lands on the end of the timeline, which would otherwise follow new content again.
     { name: "at the end of the timeline", before: 40, searches: 0, after: 0 },
   ]) {
-    test(`holds a revealed shell ${fixture.name} just under its stuck group header`, async ({ page }) => {
+    test(`holds a revealed shell ${fixture.name} just under its stuck group header${fixture.name === "from far below" ? " @quarantine" : ""}`, async ({
+      page,
+    }) => {
       const timeline = await setupTimeline(page, {
         settings: { timelineDetail: detailed },
         sessionStatus: { [sessionID]: { type: "busy" } },

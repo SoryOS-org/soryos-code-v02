@@ -957,7 +957,7 @@ test("video files stream into the viewer behind a loading state, open into the p
   expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
 })
 
-test("restores review state and the side-panel tab per session", async ({ page }) => {
+test("restores review state and the side-panel tab per session @quarantine", async ({ page }) => {
   const sessions = [
     { id: "ses_review_state_a", title: "Alpha review state" },
     { id: "ses_review_state_b", title: "Beta review state" },

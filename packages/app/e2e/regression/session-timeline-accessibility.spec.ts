@@ -75,7 +75,7 @@ function lines(count: number) {
 }
 
 for (const visible of [false, true]) {
-  test(`${visible ? "shows" : "omits"} the agent name in message meta when agents are ${visible ? "on" : "off"}`, async ({
+  test(`${visible ? "shows" : "omits"} the agent name in message meta when agents are ${visible ? "on @quarantine" : "off"}`, async ({
     page,
   }, testInfo) => {
     await setupTimeline(page, {

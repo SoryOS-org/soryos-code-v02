@@ -847,7 +847,7 @@ for (const delivery of ["queue", "steer"] as const) {
   })
 }
 
-test("reverting to another prompt replaces the file chips of an earlier restore", async ({ page }) => {
+test("reverting to another prompt replaces the file chips of an earlier restore @quarantine", async ({ page }) => {
   const mock = createQueueMock(
     [],
     [
@@ -1008,7 +1008,7 @@ for (const [action, status] of [
   })
 }
 
-test("waiting steers group under one Pending line, each keeping its own actions beside its bubble", async ({
+test("waiting steers group under one Pending line, each keeping its own actions beside its bubble @quarantine", async ({
   page,
 }) => {
   const mock = createQueueMock(

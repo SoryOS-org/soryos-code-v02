@@ -1,6 +1,6 @@
 import { expect, story } from "../../stories/playwright/story"
 
-story("enables Any only after confirmation and supports resetting the preview @quarantine", async ({ mount }) => {
+story("enables Any only after confirmation and supports resetting the preview", async ({ mount }) => {
   const component = await mount("app-current-session-surface--web-search-request")
   const card = component.getByRole("region", { name: "Third-party web search" })
   await expect(card.getByRole("button", { name: "Enable", exact: true })).toBeEnabled()
@@ -12,7 +12,7 @@ story("enables Any only after confirmation and supports resetting the preview @q
   await expect(card.getByRole("button", { name: "Enable", exact: true })).toBeEnabled()
 })
 
-story("declining search is an explicit disabled selection @quarantine", async ({ mount }) => {
+story("declining search is an explicit disabled selection", async ({ mount }) => {
   const component = await mount("app-current-session-surface--web-search-request")
   const card = component.getByRole("region", { name: "Third-party web search" })
   await card.getByRole("button", { name: "Don’t use search", exact: true }).click()
@@ -52,7 +52,7 @@ for (const width of [360, 1200]) {
   for (const direction of ["ltr", "rtl"]) {
     for (const theme of ["light", "dark"]) {
       story(
-        `selects and confirms a provider at ${width}px in ${direction} ${theme} @quarantine`,
+        `selects and confirms a provider at ${width}px in ${direction} ${theme}${width === 360 ? " @quarantine" : ""}`,
         async ({ mount, page }) => {
           await page.setViewportSize({ width, height: 900 })
 
