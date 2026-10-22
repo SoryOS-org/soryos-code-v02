@@ -127,22 +127,22 @@
     }
 
     &.subagent-link {
-      color: var(--text-interactive-base);
+      color: var(--v2-text-text-accent);
       text-decoration: none;
       text-underline-offset: 2px;
       font-weight: var(--font-weight-regular);
 
+      &:visited {
+        color: var(--v2-text-text-accent);
+      }
+
       &:hover {
-        color: var(--text-interactive-base);
+        color: var(--v2-text-text-accent-hover);
         text-decoration: underline;
       }
 
       &:active {
-        color: var(--text-interactive-base);
-      }
-
-      &:visited {
-        color: var(--text-interactive-base);
+        color: var(--v2-text-text-accent);
       }
     }
   }
@@ -327,7 +327,7 @@
     line-height: var(--line-height-compact);
     letter-spacing: var(--letter-spacing-normal);
     text-transform: capitalize;
-    color: var(--text-strong);
+    color: var(--v2-text-text-base);
   }
 
   [data-slot="basic-tool-tool-subtitle"] {

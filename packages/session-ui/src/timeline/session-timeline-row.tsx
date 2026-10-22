@@ -653,7 +653,7 @@ export function createSessionTimelineRowRenderer(input: {
                           component={href() ? "a" : "div"}
                           data-slot="session-timeline-notice"
                           data-outcome={content().outcome}
-                          class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-text-weak ${inset()}`}
+                          class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-v2-text-text-faint ${inset()}`}
                           classList={{ "cursor-pointer hover:text-v2-text-text-base": clickable() }}
                           href={href()}
                           role={clickable() && !href() ? "link" : undefined}
@@ -787,14 +787,14 @@ export function createSessionTimelineRowRenderer(input: {
       <Show when={data.turnDiff && paths().length > 0}>
         <div data-slot="session-turn-diffs" class="flex flex-col gap-2 pt-4">
           <div class="flex h-6 min-w-0 items-center gap-2">
-            <span class="text-14-medium text-text-strong tabular-nums">
+            <span class="text-14-medium text-v2-text-text-base tabular-nums">
               {i18n.plural("ui.sessionTurn.diffs.changed", paths().length)}
             </span>
             <DiffChanges changes={[...(diffs() ?? [])]} />
             <Show when={overflow()}>
               <button
                 type="button"
-                class="ml-auto text-14-regular text-text-interactive-base"
+                class="ml-auto text-14-regular text-v2-text-text-accent"
                 onClick={() => input.disclosure.set(showAllKey(), !showAll())}
               >
                 {showAll() ? i18n.t("ui.sessionTurn.diffs.showLess") : i18n.t("ui.sessionTurn.diffs.showAll")}

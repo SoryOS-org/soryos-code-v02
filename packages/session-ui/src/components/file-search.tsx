@@ -26,22 +26,22 @@ export function FileSearchBar(props: {
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <Icon name="magnifying-glass" size="small" class="text-text-weak shrink-0" />
+        <Icon name="magnifying-glass" size="small" class="text-v2-icon-icon-muted shrink-0" />
         <input
           ref={props.setInput}
           placeholder={i18n.t("ui.fileSearch.placeholder")}
           value={props.query}
-          class="w-40 bg-transparent outline-none text-14-regular text-text-strong placeholder:text-text-weak"
+          class="w-40 bg-transparent outline-none text-14-regular text-v2-text-text-base placeholder:text-v2-text-text-faint"
           onInput={(e) => props.onInput(e.currentTarget.value)}
           onKeyDown={(e) => props.onKeyDown(e as KeyboardEvent)}
         />
-        <div class="shrink-0 text-12-regular text-text-weak tabular-nums text-right" style={{ width: "10ch" }}>
+        <div class="shrink-0 text-12-regular text-v2-text-text-faint tabular-nums text-right" style={{ width: "10ch" }}>
           {props.count ? `${props.index + 1}/${props.count}` : "0/0"}
         </div>
         <div class="flex items-center">
           <button
             type="button"
-            class="size-6 grid place-items-center rounded text-text-weak hover:bg-surface-base-hover hover:text-text-strong disabled:opacity-40 disabled:pointer-events-none"
+            class="size-6 grid place-items-center rounded text-v2-icon-icon-muted hover:bg-surface-base-hover hover:text-v2-icon-icon-base disabled:opacity-40 disabled:pointer-events-none"
             disabled={props.count === 0}
             aria-label={i18n.t("ui.fileSearch.previousMatch")}
             onClick={props.onPrev}
@@ -50,7 +50,7 @@ export function FileSearchBar(props: {
           </button>
           <button
             type="button"
-            class="size-6 grid place-items-center rounded text-text-weak hover:bg-surface-base-hover hover:text-text-strong disabled:opacity-40 disabled:pointer-events-none"
+            class="size-6 grid place-items-center rounded text-v2-icon-icon-muted hover:bg-surface-base-hover hover:text-v2-icon-icon-base disabled:opacity-40 disabled:pointer-events-none"
             disabled={props.count === 0}
             aria-label={i18n.t("ui.fileSearch.nextMatch")}
             onClick={props.onNext}
@@ -60,7 +60,7 @@ export function FileSearchBar(props: {
         </div>
         <button
           type="button"
-          class="size-6 grid place-items-center rounded text-text-weak hover:bg-surface-base-hover hover:text-text-strong"
+          class="size-6 grid place-items-center rounded text-v2-icon-icon-muted hover:bg-surface-base-hover hover:text-v2-icon-icon-base"
           aria-label={i18n.t("ui.fileSearch.close")}
           onClick={props.onClose}
         >
