@@ -2,7 +2,7 @@ export * as SessionRunnerLLM from "./llm.js"
 
 import { Message } from "@opencode/ai"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
-import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
+import { Cause, Clock, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
 import { Bus } from "../../bus.js"
 import { LocationLifecycle } from "../../location-lifecycle.js"
@@ -26,6 +26,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { llmClient } from "../../effect/app-node-platform.js"
 import { StepFailedError } from "../error.js"
 import { SessionRunnerRetry } from "./retry.js"
+import { SessionRunnerHealth } from "./provider-health.js"
 import { SessionStep } from "./step.js"
 import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
@@ -50,6 +51,8 @@ const layer = Layer.effect(
     const plugins = yield* Plugin.Service
     const title = yield* SessionTitle.Service
     const steps = yield* SessionStep.make
+    // Cross-session provider coordination (#55075); one instance per runner layer.
+    const health = yield* SessionRunnerHealth.make
     // Title generation starts once input is visible and must not delay model execution.
     const titles = yield* FiberMap.make<SessionSchema.ID, void, never>()
 
@@ -204,6 +207,10 @@ const layer = Layer.effect(
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
       const retry = yield* SessionRunnerRetry.make(bus, sessionID)
+      const healthKey = SessionRunnerHealth.key(
+        first.model.model.provider,
+        first.model.model.route.providerMetadataKey,
+      )
       let initial: SessionContext.Loaded | undefined = first
       let recoverOverflow = true
       let recoverContinuation = true
@@ -246,14 +253,26 @@ const layer = Layer.effect(
           agent: loaded.agent.id,
           model: loaded.model,
           prepared,
-          retry: (cause, error, proposed) =>
-            retry.decide({
-              cause,
-              error,
-              agent: loaded.agent.id,
-              model: loaded.model.ref,
-              hook: prepared.retry,
-              retry: proposed,
+          retry: (cause, error, proposed, clean) =>
+            Effect.gen(function* () {
+              const decision = yield* retry.decide({
+                cause,
+                error,
+                agent: loaded.agent.id,
+                model: loaded.model.ref,
+                hook: prepared.retry,
+                retry: proposed,
+              })
+              // The shared health record only raises the wait (floor semantics), so the
+              // plugin hook and the per-session retry budget above stay authoritative.
+              return health.coordinate({
+                key: healthKey,
+                sessionID,
+                cause,
+                decision,
+                clean,
+                now: yield* Clock.currentTimeMillis,
+              })
             }),
           recoverContinuation,
           recoverOverflow: Effect.suspend(() =>
@@ -265,7 +284,12 @@ const layer = Layer.effect(
           ),
         })
         const completed = yield* SessionStep.Outcome.$match(outcome, {
-          Completed: (outcome) => Effect.succeed(outcome.needsContinuation),
+          Completed: (outcome) =>
+            Effect.gen(function* () {
+              // A settled provider response clears the route's health record (#55075).
+              health.recordSuccess(healthKey)
+              return outcome.needsContinuation
+            }),
           Retry: (outcome) =>
             retry.wait({
               decision: outcome.decision,
