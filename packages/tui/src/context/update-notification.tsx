@@ -7,7 +7,6 @@ import { errorMessage } from "../util/error"
 import { useExit } from "./exit"
 import { useDialog } from "../ui/dialog"
 import { DialogUpdate } from "../component/dialog-update"
-import { updateRestartNotice } from "../util/presentation"
 
 type ClientNotice = { readonly type: "available" | "installed"; readonly version: string }
 type Notice = ClientNotice & ({ readonly source: "client" } | { readonly source: "server"; readonly remote: boolean })
@@ -91,7 +90,7 @@ export const { use: useUpdateNotification, provider: UpdateNotificationProvider 
     const restart = () => {
       const current = state()
       if (current?.type !== "installed") return
-      exit({ notice: updateRestartNotice(current.version) })
+      exit({ updatedVersion: current.version })
     }
 
     const open = (origin: "manual" | "notification") => {

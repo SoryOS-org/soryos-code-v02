@@ -2821,7 +2821,7 @@ test("restarting after an update tells the user to start OpenCode again", async 
     setup.mockInput.pressEnter()
     await task
 
-    expect(Bun.stripANSI(stdout)).toContain("Updated   OpenCode 2.0.0 · run opencode to start it")
+    expect(Bun.stripANSI(stdout)).toContain("  Updated   OpenCode 2.0.0\n  Restart   opencode\n")
   } finally {
     process.stdout.write = originalWrite
     if (!setup.renderer.isDestroyed) setup.renderer.destroy()

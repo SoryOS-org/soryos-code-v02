@@ -11,6 +11,7 @@ import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { LogProvider, type LogSink } from "./context/log"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
+import { epilogue, type SessionEpilogue } from "./util/presentation"
 import { Selection } from "./util/selection"
 import {
   CliRenderEvents,
@@ -237,8 +238,8 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
       }
     : undefined
   const exit = {
-    epilogue: undefined as string | undefined,
-    notice: undefined as string | undefined,
+    session: undefined as SessionEpilogue | undefined,
+    updatedVersion: undefined as string | undefined,
     reason: undefined as unknown,
   }
   const result = yield* Effect.scoped(
@@ -318,11 +319,11 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                 exit={(input) => {
                   if (renderer.isDestroyed) return
                   exit.reason = input?.reason
-                  exit.notice = input?.notice
+                  exit.updatedVersion = input?.updatedVersion
                   destroyRenderer(renderer)
                 }}
               >
-                <EpilogueProvider set={(value) => (exit.epilogue = value)}>
+                <EpilogueProvider set={(value) => (exit.session = value)}>
                   <TuiAppProvider value={input.app}>
                     <ErrorBoundary
                       fallback={(error, reset) => (
@@ -462,14 +463,14 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
         }
       })
       yield* shutdown.await
-      return { epilogue: exit.epilogue, notice: exit.notice, reason: exit.reason }
+      return { session: exit.session, updatedVersion: exit.updatedVersion, reason: exit.reason }
     }),
   )
   yield* Effect.sync(() => {
     if (result.reason !== undefined)
       process.stderr.write((cliErrorMessage(result.reason) ?? errorFormat(result.reason)) + "\n")
-    if (result.epilogue) process.stdout.write(result.epilogue + "\n")
-    if (result.notice) process.stdout.write(result.notice + "\n")
+    const text = epilogue({ session: result.session, updatedVersion: result.updatedVersion })
+    if (text) process.stdout.write(text + "\n")
   })
 })
 

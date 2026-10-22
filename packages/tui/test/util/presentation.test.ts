@@ -1,13 +1,30 @@
 import { expect, test } from "bun:test"
-import { sessionEpilogue, updateRestartNotice } from "../../src/util/presentation"
+import { epilogue } from "../../src/util/presentation"
+
+const rows = (text: string | undefined) =>
+  Bun.stripANSI(text ?? "")
+    .split("\n")
+    .filter((line) => /^ {2}[A-Z]/.test(line))
+
+test("prints nothing without a session or update", () => {
+  expect(epilogue({})).toBeUndefined()
+})
 
 test("formats session continuation summary", () => {
-  const epilogue = sessionEpilogue({ title: "A session", sessionID: "ses_123" })
-  expect(epilogue).toContain("A session")
-  expect(epilogue).toContain("opencode -s ses_123")
+  expect(rows(epilogue({ session: { title: "A session", sessionID: "ses_123" } }))).toEqual([
+    "  Session   A session",
+    "  Continue  opencode -s ses_123",
+  ])
 })
 
 test("tells the user to start OpenCode again after an update", () => {
-  const notice = updateRestartNotice("2.0.0")
-  expect(Bun.stripANSI(notice)).toBe("  Updated   OpenCode 2.0.0 · run opencode to start it")
+  expect(rows(epilogue({ updatedVersion: "2.0.0" }))).toEqual(["  Updated   OpenCode 2.0.0", "  Restart   opencode"])
+})
+
+test("uses the session continue command as the update restart command", () => {
+  expect(rows(epilogue({ session: { title: "A session", sessionID: "ses_123" }, updatedVersion: "2.0.0" }))).toEqual([
+    "  Updated   OpenCode 2.0.0",
+    "  Session   A session",
+    "  Continue  opencode -s ses_123",
+  ])
 })

@@ -1,7 +1,7 @@
 import { createSimpleContext } from "./helper"
 
-// `notice` is printed after the TUI closes, below any epilogue.
-export type Exit = (input?: { readonly reason?: unknown; readonly notice?: string }) => void
+// `updatedVersion` adds the update restart instructions to the epilogue.
+export type Exit = (input?: { readonly reason?: unknown; readonly updatedVersion?: string }) => void
 
 export const { use: useExit, provider: ExitProvider } = createSimpleContext({
   name: "Exit",
