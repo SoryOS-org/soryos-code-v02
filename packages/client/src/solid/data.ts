@@ -1664,13 +1664,7 @@ export function createData(config: CreateDataInput) {
           ])
           const sessions = [info, ...children]
           batch(() => {
-            setStore(
-              "session",
-              "info",
-              produce((draft) => {
-                for (const session of sessions) draft[session.id] = session
-              }),
-            )
+            for (const session of sessions) setStore("session", "info", session.id, reconcile(session))
             for (const session of sessions) {
               sync.complete(`session:${session.id}`)
               registerSession(session.id)
