@@ -244,7 +244,7 @@ export type McpResourceTemplate = {
   mimeType?: string
 }
 
-export type ConnectTicketToken = { ticket: string; expires_in: number }
+export type PtyTicketConnectToken = { ticket: string; expires_in: number }
 
 export type CredentialKey = { type: "key"; key: string; metadata?: { [x: string]: JsonValue } }
 
@@ -286,8 +286,6 @@ export type SessionStatus =
       next: number
     }
   | { type: "busy" }
-
-export type PtyTicketConnectToken = { ticket: string; expires_in: number }
 
 export type PersistentPtyHandoff = { directory: string; instanceID: string; ticket: string; expiresAt: number }
 
@@ -5250,7 +5248,7 @@ export type McpClientTokenInput = {
   readonly "x-opencode-ticket"?: { readonly "x-opencode-ticket"?: string | undefined }["x-opencode-ticket"]
 }
 
-export type McpClientTokenOutput = { location: LocationPublicRef; data: ConnectTicketToken }
+export type McpClientTokenOutput = { location: LocationPublicRef; data: PtyTicketConnectToken }
 
 export type CredentialListOutput = { data: Array<CredentialEntry> }["data"]
 
