@@ -331,7 +331,7 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
     {
       storage: null,
       persist: "none",
-      // The lab is dev-only, but a dev build can still resolve knobs' production entry, whose panel needs shipping.
+      // Beta is a production build, where knobs resolves its production entry: the panel mounts only when shipped.
       ship: () => import("knobs/panel"),
       defaultLabel: first,
       presets: Object.fromEntries(

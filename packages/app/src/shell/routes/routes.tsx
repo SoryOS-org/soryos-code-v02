@@ -23,8 +23,12 @@ const ConnectServerScreen = lazy(() =>
   import("@/servers/connect/screen").then((module) => ({ default: module.ConnectServerScreen })),
 )
 
-// Development builds only: production drops the import, so the lab, its stories and knobs never ship.
-const ComponentsLab = import.meta.env.DEV ? lazy(() => import("@/components-lab/lab")) : undefined
+// The dev server and Beta only. Both are fixed at build time, so other builds, prod included, drop the import and never
+// contain the lab, its stories or knobs. Beta loads it as its own chunk, only when /components opens.
+const ComponentsLab =
+  import.meta.env.DEV || import.meta.env.VITE_OPENCODE_CHANNEL === "beta"
+    ? lazy(() => import("@/components-lab/lab"))
+    : undefined
 
 const TargetSessionRouteContent = lazy(() =>
   loadSessionRoute().then((module) => ({ default: module.TargetSessionRouteContent })),
