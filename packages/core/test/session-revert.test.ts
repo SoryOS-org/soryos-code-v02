@@ -19,8 +19,8 @@ import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionProjector } from "@opencode/core/session/projector"
 import { SessionStats } from "@opencode/core/session/stats"
-import { SessionTable } from "@opencode/core/session/sql"
-import { eq } from "drizzle-orm"
+import { SessionMessageTable, SessionRevertUsageTable, SessionTable } from "@opencode/core/session/sql"
+import { and, asc, eq } from "drizzle-orm"
 import { Snapshot } from "@opencode/core/snapshot"
 import { Money } from "@opencode/schema/money"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -123,64 +123,85 @@ describe("Session.revert files", () => {
   )
 })
 
+// The production bus only persists events on workerd; local CLI and server runs deliver
+// events in memory with an empty event table. These tests use the default (non-persisting)
+// bus to prove stats keep reverted usage where the CLI and server actually run.
+const itEphemeral = testEffect(
+  AppNodeBuilder.build(
+    LayerNode.group([Database.node, Bus.node, SessionProjector.node, Session.node, LocationServiceMap.node]),
+    [
+      Global.node.replace(tempGlobalLayer),
+      SessionExecution.node.replace(SessionExecution.noopLayer),
+      offlineModels,
+    ],
+  ),
+)
+
 describe("Session.revert stats", () => {
-  it.live(
+  const initProject = (directory: string) =>
+    Effect.promise(async () => {
+      await fs.mkdir(directory, { recursive: true })
+      await $`git init -q`.cwd(directory).quiet()
+    })
+
+  const prompt = Effect.fnUntraced(function* (sessionID: Session.ID, text: string) {
+    const session = yield* Session.Service
+    const database = yield* Database.Service
+    const bus = yield* Bus.Service
+    const admitted = yield* session.prompt({ sessionID, text, resume: false })
+    yield* SessionInbox.promote(database.db, bus, sessionID, "steer")
+    return admitted
+  })
+
+  // One assistant step with fixed usage; returns the assistant message id.
+  const step = Effect.fnUntraced(function* (sessionID: Session.ID) {
+    const bus = yield* Bus.Service
+    const snapshot = yield* Snapshot.Service
+    const before = yield* snapshot.capture()
+    if (!before) throw new Error("Initial snapshot missing")
+    const assistantMessageID = SessionMessage.ID.create()
+    yield* bus.publish(SessionEvent.Step.Started, {
+      sessionID,
+      assistantMessageID,
+      agent: Agent.defaultID,
+      model: { id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") },
+      snapshot: before,
+      started: 0,
+    })
+    const after = yield* snapshot.capture()
+    if (!after) throw new Error("Snapshot missing")
+    yield* bus.publish(SessionEvent.Step.Ended, {
+      sessionID,
+      assistantMessageID,
+      finish: "stop",
+      cost: Money.USD.make(0.5),
+      tokens: { input: 1000, output: 100, reasoning: 10, cache: { read: 5, write: 3 } },
+      snapshot: after,
+      files: yield* snapshot.files({ from: before, to: after }),
+    })
+    return assistantMessageID
+  })
+
+  itEphemeral.live(
     "keeps reverted step usage in stats without double counting session totals",
     () =>
       Effect.gen(function* () {
         const tmp = yield* tmpdirScoped()
         const directory = path.join(tmp.path, "project")
-        yield* Effect.promise(async () => {
-          await fs.mkdir(directory, { recursive: true })
-          await $`git init -q`.cwd(directory).quiet()
-        })
+        yield* initProject(directory)
 
         const session = yield* Session.Service
         const database = yield* Database.Service
-        const bus = yield* Bus.Service
         const created = yield* session.create({ location: { directory: AbsolutePath.make(directory) } })
 
         yield* Effect.gen(function* () {
           const plugins = yield* Plugin.Service
           yield* plugins.awaitActivation
-          const snapshot = yield* Snapshot.Service
 
-          const prompt = (text: string) =>
-            Effect.gen(function* () {
-              const admitted = yield* session.prompt({ sessionID: created.id, text, resume: false })
-              yield* SessionInbox.promote(database.db, bus, created.id, "steer")
-              return admitted
-            })
-
-          const step = Effect.fnUntraced(function* () {
-            const before = yield* snapshot.capture()
-            if (!before) throw new Error("Initial snapshot missing")
-            const assistantMessageID = SessionMessage.ID.create()
-            yield* bus.publish(SessionEvent.Step.Started, {
-              sessionID: created.id,
-              assistantMessageID,
-              agent: Agent.defaultID,
-              model: { id: Model.ID.make("test-model"), providerID: Provider.ID.make("test-provider") },
-              snapshot: before,
-              started: 0,
-            })
-            const after = yield* snapshot.capture()
-            if (!after) throw new Error("Snapshot missing")
-            yield* bus.publish(SessionEvent.Step.Ended, {
-              sessionID: created.id,
-              assistantMessageID,
-              finish: "stop",
-              cost: Money.USD.make(0.5),
-              tokens: { input: 1000, output: 100, reasoning: 10, cache: { read: 5, write: 3 } },
-              snapshot: after,
-              files: yield* snapshot.files({ from: before, to: after }),
-            })
-          })
-
-          yield* prompt("First")
-          yield* step()
-          const second = yield* prompt("Second")
-          yield* step()
+          yield* prompt(created.id, "First")
+          yield* step(created.id)
+          const second = yield* prompt(created.id, "Second")
+          yield* step(created.id)
 
           const before = yield* SessionStats.get({ timezone: "UTC", tools: "none" })
           expect(before.tokens).toEqual({
@@ -192,7 +213,7 @@ describe("Session.revert stats", () => {
 
           // Prompting with a staged revert commits it, deleting the second exchange's message rows.
           yield* session.revert.stage({ sessionID: created.id, messageID: second.id })
-          yield* prompt("Third")
+          yield* prompt(created.id, "Third")
 
           const stats = yield* SessionStats.get({ timezone: "UTC", tools: "none" })
           expect(stats.tokens).toEqual({
@@ -215,6 +236,71 @@ describe("Session.revert stats", () => {
           expect(row?.tokens_cache_read).toBe(10)
           expect(row?.tokens_cache_write).toBe(6)
           expect(row?.cost).toBe(1)
+        }).pipe(Effect.provide(LocationServiceMap.Service.get(created.location)))
+      }),
+    { timeout: 15_000 },
+  )
+
+  itEphemeral.live(
+    "does not recount parent rows a fork copied when the fork reverts them",
+    () =>
+      Effect.gen(function* () {
+        const tmp = yield* tmpdirScoped()
+        const directory = path.join(tmp.path, "project")
+        yield* initProject(directory)
+
+        const session = yield* Session.Service
+        const database = yield* Database.Service
+        const bus = yield* Bus.Service
+        const created = yield* session.create({ location: { directory: AbsolutePath.make(directory) } })
+
+        yield* Effect.gen(function* () {
+          const plugins = yield* Plugin.Service
+          yield* plugins.awaitActivation
+
+          yield* prompt(created.id, "First")
+          yield* step(created.id)
+          yield* prompt(created.id, "Second")
+          const secondStep = yield* step(created.id)
+
+          const forkID = Session.ID.make("ses_revert_stats_fork")
+          yield* bus.publish(SessionEvent.Forked, {
+            sessionID: forkID,
+            parentID: created.id,
+            boundary: { type: "through", messageID: secondStep },
+          })
+
+          // The revert boundary is the fork's copy of the second prompt, not the original.
+          const copied = yield* database.db
+            .select({ id: SessionMessageTable.id })
+            .from(SessionMessageTable)
+            .where(and(eq(SessionMessageTable.session_id, forkID), eq(SessionMessageTable.type, "user")))
+            .orderBy(asc(SessionMessageTable.seq))
+            .all()
+            .pipe(Effect.orDie)
+          expect(copied.length).toBe(2)
+
+          yield* session.revert.stage({ sessionID: forkID, messageID: copied[1].id })
+          yield* prompt(forkID, "Third")
+
+          // The fork's copied second exchange must not be counted again (the filter matches
+          // SessionStats: copied rows belong to the parent's stats). No new usage was produced,
+          // so totals stay exactly where they were.
+          const stats = yield* SessionStats.get({ timezone: "UTC", tools: "none" })
+          expect(stats.tokens).toEqual({
+            input: 2000,
+            output: 200,
+            reasoning: 20,
+            cache: { read: 10, write: 6 },
+          })
+          expect(stats.cost).toBe(Money.USD.make(1))
+
+          const preserved = yield* database.db
+            .select({ id: SessionRevertUsageTable.id })
+            .from(SessionRevertUsageTable)
+            .all()
+            .pipe(Effect.orDie)
+          expect(preserved.length).toBe(0)
         }).pipe(Effect.provide(LocationServiceMap.Service.get(created.location)))
       }),
     { timeout: 15_000 },
