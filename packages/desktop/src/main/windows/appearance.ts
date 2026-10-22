@@ -18,15 +18,13 @@ let backgroundColor: string | undefined
 
 // Zoom is intentionally a single app-wide preference (like a browser profile setting), so every
 // window restores and writes the same key.
-const zoomPersister = createZoomPersister({
-  write: (value) => {
-    try {
-      if (getStore().get(ZOOM_FACTOR_KEY) !== value) getStore().set(ZOOM_FACTOR_KEY, value)
-    } catch {
-      // A locked or read-only settings file must not take the main process down (Windows EPERM).
-      // Losing one zoom write is preferable to an uncaught exception from a timer callback.
-    }
-  },
+const zoomPersister = createZoomPersister((value) => {
+  try {
+    if (getStore().get(ZOOM_FACTOR_KEY) !== value) getStore().set(ZOOM_FACTOR_KEY, value)
+  } catch {
+    // A locked or read-only settings file must not take the main process down (Windows EPERM).
+    // Losing one zoom write is preferable to an uncaught exception from a timer callback.
+  }
 })
 
 app.on("before-quit", () => zoomPersister.flush())

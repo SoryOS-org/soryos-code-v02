@@ -3,27 +3,15 @@ export type ZoomPersister = {
   flush: () => void
 }
 
-type Options = {
-  write: (value: number) => void
-  delay?: number
-  now?: () => number
-  schedule?: (callback: () => void, delay: number) => unknown
-  cancel?: (timer: unknown) => void
-}
+const delay = 250
 
 // Coalesces zoom changes before writing them. The first change is written immediately (keyboard and
 // menu actions are one-shot), while a continuous pinch is collapsed into at most one trailing write
 // per `delay`, so the settings file is not rewritten on every event.
-export function createZoomPersister({
-  write,
-  delay = 250,
-  now = Date.now,
-  schedule = (callback, ms) => setTimeout(callback, ms),
-  cancel = (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
-}: Options): ZoomPersister {
+export function createZoomPersister(write: (value: number) => void): ZoomPersister {
   let lastWritten: number | undefined
   let pending: number | undefined
-  let timer: unknown = undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
   let lastAt = Number.NEGATIVE_INFINITY
 
   function emit(value: number) {
@@ -34,7 +22,7 @@ export function createZoomPersister({
 
   function flush() {
     if (timer !== undefined) {
-      cancel(timer)
+      clearTimeout(timer)
       timer = undefined
     }
 
@@ -42,7 +30,7 @@ export function createZoomPersister({
     pending = undefined
 
     if (value === undefined) return
-    lastAt = now()
+    lastAt = Date.now()
     emit(value)
   }
 
@@ -52,17 +40,17 @@ export function createZoomPersister({
 
     if (timer !== undefined) return
 
-    const elapsed = now() - lastAt
+    const elapsed = Date.now() - lastAt
 
     if (elapsed >= delay) {
-      lastAt = now()
+      lastAt = Date.now()
       pending = undefined
       emit(value)
 
       return
     }
 
-    timer = schedule(flush, delay - elapsed)
+    timer = setTimeout(flush, delay - elapsed)
   }
 
   return { push, flush }
