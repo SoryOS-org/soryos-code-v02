@@ -19,22 +19,32 @@ import { installSseTransport } from "./sse-transport"
 import { expectSessionReady } from "./waits"
 
 export const directory = "C:/OpenCode/TimelineStability"
+
 export const projectID = "proj_timeline_stability"
+
 export const sessionID = "ses_timeline_stability"
+
 export const userID = "msg_1000_timeline_user"
+
 export const assistantID = "msg_1001_timeline_assistant"
+
 export const title = "Timeline visual stability"
+
 export const model = { providerID: "opencode", modelID: "claude-opus-4-6", variant: "max" }
 
 const tokens = { input: 100, output: 200, reasoning: 0, cache: { read: 0, write: 0 } }
 
 type Session = SessionInfo
+
+type JsonRecord = Record<string, JsonValue | undefined>
+
 type TextSeed = {
   id: string
   type: "text"
   text: string
   messageID?: string
 }
+
 type FileSeed = {
   id: string
   type: "file"
@@ -43,51 +53,53 @@ type FileSeed = {
   url: string
   source?: { type: string; path?: string; text?: { value: string; start: number; end: number } }
 }
+
 type AgentSeed = {
   id: string
   type: "agent"
   name: string
   source?: { value: string; start: number; end: number }
 }
+
 type ReasoningSeed = {
   id: string
   type: "reasoning"
   text: string
   time?: { start: number; end?: number }
-  metadata?: Record<string, unknown>
+  metadata?: JsonRecord
   messageID?: string
 }
+
 type ToolSeed = {
   id: string
   type: "tool"
   name: string
   messageID?: string
   executed?: boolean
-  providerState?: Record<string, unknown>
-  providerResultState?: Record<string, unknown>
+  native?: JsonRecord
   state:
-    | { status: "streaming"; input: Record<string, unknown>; raw: string }
+    | { status: "streaming"; input: JsonRecord; raw: string }
     | {
         status: "running"
-        input: Record<string, unknown>
+        input: JsonRecord
         output?: string
         title?: string
-        metadata: Record<string, unknown>
+        metadata: JsonRecord
         time: { start: number }
       }
     | {
         status: "completed"
-        input: Record<string, unknown>
+        input: JsonRecord
         output: string
         title: string
-        metadata: Record<string, unknown>
+        metadata: JsonRecord
         time: { start: number; end: number }
       }
     | {
         status: "error"
-        input: Record<string, unknown>
+        input: JsonRecord
         error: string
-        metadata: Record<string, unknown>
+        metadata: JsonRecord
         time: { start: number; end: number }
       }
 }
@@ -121,9 +133,13 @@ type TimelineServerInput = Partial<
 >
 
 export type TimelineMessage = SessionMessageUser | SessionMessageAssistant
+
 export type TimelineEvent = OpenCodeEvent | readonly OpenCodeEvent[]
+
 export type EventPayload = OpenCodeEvent
+
 export type ToolStatus = ToolSeed["state"]["status"]
+
 export type PartSeed<Owner extends "user" | "assistant"> = Owner extends "user"
   ? TextSeed | FileSeed | AgentSeed
   : TextSeed | ReasoningSeed | ToolSeed
@@ -131,12 +147,13 @@ export type PartSeed<Owner extends "user" | "assistant"> = Owner extends "user"
 type ToolOptions<State extends ToolStatus> = State extends "streaming"
   ? { output?: never; title?: never; metadata?: never; error?: never }
   : State extends "running"
-    ? { title?: string; metadata?: Record<string, unknown>; output?: string; error?: never }
+    ? { title?: string; metadata?: JsonRecord; output?: string; error?: never }
     : State extends "error"
-      ? { error?: string; metadata?: Record<string, unknown>; output?: never; title?: never }
-      : { output?: string; title?: string; metadata?: Record<string, unknown>; error?: never }
+      ? { error?: string; metadata?: JsonRecord; output?: never; title?: never }
+      : { output?: string; title?: string; metadata?: JsonRecord; error?: never }
 
 type PartRef = { messageID: string; type: "text" | "reasoning" | "tool"; ordinal?: number }
+
 type TimelineState = {
   partRefs: Map<string, PartRef>
   nextOrdinals: Map<string, { text: number; reasoning: number }>
@@ -156,13 +173,17 @@ const moduleState: TimelineState = {
   eventSequence: 0,
   durableSequence: -1,
 }
+
 const testStates = new WeakMap<TestInfo, TimelineState>()
 
 function scenario() {
   const info = runningTest()
+
   if (!info) return moduleState
   const existing = testStates.get(info)
+
   if (existing) return existing
+
   const created: TimelineState = {
     partRefs: new Map(moduleState.partRefs),
     nextOrdinals: new Map([...moduleState.nextOrdinals].map(([id, next]) => [id, { ...next }])),
@@ -171,7 +192,9 @@ function scenario() {
     eventSequence: moduleState.eventSequence,
     durableSequence: moduleState.durableSequence,
   }
+
   testStates.set(info, created)
+
   return created
 }
 
@@ -207,20 +230,25 @@ export async function setupTimeline(
   state.eventSequence = 0
   state.durableSequence = -1
   const sessions = input.sessions ?? [session()]
+
   const messages =
     input.sessionMessages ??
     validateTimelineMessages([
       ...(input.seedHistory ? historyMessages(18) : []),
       ...(input.messages ?? [userMessage(), assistantMessage()]),
     ])
+
   const active = messages.findLast((message) => message.type === "assistant")
+
   const initialStatus: SessionStatus =
     active?.type === "assistant" && active.time.completed === undefined ? { type: "busy" } : { type: "idle" }
+
   const transport = await installSseTransport(page, {
     server: SERVER,
     retry: input.eventRetry ?? 20,
     keepalive: input.keepalive,
   })
+
   const mock = await mockOpenCodeServer(page, {
     ...input,
     directory,
@@ -230,6 +258,7 @@ export async function setupTimeline(
     sessionStatus: input.sessionStatus ?? { [sessionID]: initialStatus },
     pageMessages: input.pageMessages ?? (() => ({ items: messages })),
   })
+
   if (input.tabs) await seed(page, { tabs: input.tabs })
   await page.addInitScript((settings) => {
     localStorage.setItem(
@@ -245,13 +274,16 @@ export async function setupTimeline(
       }),
     )
   }, input.settings ?? {})
+
   if (input.locale) {
     await page.addInitScript((locale) => {
       localStorage.setItem("opencode.global.dat:language", JSON.stringify({ locale }))
     }, input.locale)
   }
+
   if (input.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" })
   await page.setViewportSize(input.viewport ?? { width: 1400, height: 900 })
+
   if (input.deviceScaleFactor) {
     const devtools = await page.context().newCDPSession(page)
     const viewport = input.viewport ?? { width: 1400, height: 900 }
@@ -262,9 +294,11 @@ export async function setupTimeline(
       mobile: false,
     })
   }
+
   await page.goto(sessionHref(sessionID))
   await expectSessionReady(page, { server: SERVER, sessionID, title })
   await transport.waitForConnection()
+
   if (input.cpuRate && input.cpuRate > 1) {
     const devtools = await page.context().newCDPSession(page)
     await devtools.send("Emulation.setCPUThrottlingRate", { rate: input.cpuRate })
@@ -273,14 +307,18 @@ export async function setupTimeline(
   // `delay` and `sendAll` pace benchmark workloads only; tests wait for the resulting UI state instead.
   const send = async (input: TimelineEvent, delay = 0) => {
     const events = timelineEvents(input)
+
     if (events.length === 1) await transport.send(events[0]!, { marker: describeEvent(events[0]!) })
+
     if (events.length > 1)
       await transport.burst(
         events,
         events.map((item) => ({ marker: describeEvent(item) })),
       )
+
     if (delay) await page.waitForTimeout(delay)
   }
+
   return {
     transport,
     pty: mock.pty,
@@ -302,9 +340,9 @@ function timelineEvents(input: TimelineEvent) {
 
 function describeEvent(event: OpenCodeEvent) {
   if (event.type.startsWith("session.tool.")) {
-    const data = event.data as { id?: string }
-    return [event.type, data.id].filter(Boolean).join(":")
+    return [event.type, "id" in event.data ? event.data.id : undefined].filter(Boolean).join(":")
   }
+
   return event.type
 }
 
@@ -343,39 +381,49 @@ export function toolCalled(data: Extract<OpenCodeEvent, { type: "session.tool.ca
   return makeEvent("session.tool.called", data)
 }
 
-export function validateTimelineEvent(input: unknown): OpenCodeEvent {
-  if (!input || typeof input !== "object") throw new Error("Timeline event must be an object")
-  if (!("type" in input) || typeof input.type !== "string") throw new Error("Timeline event requires a type")
-  const definition = EventManifest.ServerDefinitions.find((definition) => definition.type === input.type)
-  if (!definition) throw new Error(`Unknown timeline event: ${input.type}`)
+export function validateTimelineEvent(input: OpenCodeEvent | JsonValue): OpenCodeEvent {
+  const header = Schema.decodeUnknownSync(Schema.Struct({ type: Schema.String }))(input)
+  const definition = EventManifest.ServerDefinitions.find((definition) => definition.type === header.type)
+
+  if (!definition) throw new Error(`Unknown timeline event: ${header.type}`)
+
+  // SAFETY: the matching canonical event schema validates the payload; OpenCodeEvent is generated from those schemas.
   return Schema.decodeUnknownSync(definition)(input) as OpenCodeEvent
 }
 
 export function validateTimelineMessages(input: readonly TimelineMessage[]): TimelineMessage[] {
   const messages = input.map((message): TimelineMessage => {
     const decoded = Schema.decodeUnknownSync(SessionMessage.Info)(message)
+
     if (decoded.type !== "user" && decoded.type !== "assistant")
       throw new Error(`Unsupported timeline message type: ${decoded.type}`)
+
     return message
   })
+
   const messageIDs = new Set<string>()
   let parentID: string | undefined
   messages.forEach((message) => {
     if (messageIDs.has(message.id)) throw new Error(`Timeline fixture has duplicate message ID: ${message.id}`)
     messageIDs.add(message.id)
+
     if (message.type === "user") parentID = message.id
+
     if (message.type === "assistant") {
-      const expected = typeof message.metadata?.parentID === "string" ? message.metadata.parentID : parentID
+      const expected = Schema.is(Schema.String)(message.metadata?.parentID) ? message.metadata.parentID : parentID
+
       if (!expected || expected !== parentID)
         throw new Error(`Timeline assistant ${message.id} must reference a parent user in the fixture`)
       const refs = scenario().partRefs
       message.content.forEach((part) => {
         if (part.type !== "tool") return
+
         if (refs.has(part.id) && refs.get(part.id)?.messageID !== message.id)
           throw new Error(`Timeline fixture has duplicate part ID: ${part.id}`)
       })
     }
   })
+
   return messages
 }
 
@@ -383,28 +431,36 @@ export async function waitForVisualSettle(page: Page, selectors: string[], stabl
   await page.waitForFunction(
     ({ selectors, stableFrames }) => {
       const elements = selectors.map((selector) => document.querySelector<HTMLElement>(selector))
+
       if (elements.some((element) => !element)) return false
+
       return new Promise<boolean>((resolve) => {
         let stable = 0
         let previous = ""
+
         const sample = () => {
           const signature = JSON.stringify(
             elements.map((element) => {
               const rect = element!.getBoundingClientRect()
+
               return [Math.round(rect.top * 10), Math.round(rect.bottom * 10), Math.round(rect.height * 10)]
             }),
           )
+
           stable = signature === previous ? stable + 1 : 0
           previous = signature
+
           const ordered = elements
             .slice(1)
             .every(
               (element, index) =>
                 elements[index]!.getBoundingClientRect().bottom <= element!.getBoundingClientRect().top + 0.5,
             )
+
           if (stable >= stableFrames && ordered) return resolve(true)
           requestAnimationFrame(sample)
         }
+
         requestAnimationFrame(sample)
       })
     },
@@ -416,6 +472,7 @@ export function historyMessages(count: number): TimelineMessage[] {
   return Array.from({ length: count }, (_, index) => {
     const value = String(index).padStart(4, "0")
     const historyUserID = `msg_0${value}_history_a_user`
+
     return [
       userMessage(undefined, { id: historyUserID, created: 1690000000000 + index * 10_000 }),
       assistantMessage(
@@ -441,8 +498,10 @@ export function partUpdated(part: PartSeed<"assistant">): readonly OpenCodeEvent
   const startedParts = scenario().startedParts
   const started = startedParts.has(part.id)
   const ref = partRef(part.id, messageID, part.type)
+
   if (part.type === "text") {
     startedParts.add(part.id)
+
     return [
       ...(started
         ? []
@@ -455,17 +514,20 @@ export function partUpdated(part: PartSeed<"assistant">): readonly OpenCodeEvent
       }),
     ]
   }
+
   if (part.type === "reasoning") {
     startedParts.add(part.id)
+
     if (!started && !part.text)
       return [
         makeEvent("session.reasoning.started", {
           sessionID,
           assistantMessageID: messageID,
           ordinal: ref.ordinal!,
-          state: jsonRecord(part.metadata),
+          native: jsonRecord(part.metadata),
         }),
       ]
+
     return [
       ...(started
         ? []
@@ -474,7 +536,7 @@ export function partUpdated(part: PartSeed<"assistant">): readonly OpenCodeEvent
               sessionID,
               assistantMessageID: messageID,
               ordinal: ref.ordinal!,
-              state: jsonRecord(part.metadata),
+              native: jsonRecord(part.metadata),
             }),
           ]),
       makeEvent("session.reasoning.ended", {
@@ -482,22 +544,27 @@ export function partUpdated(part: PartSeed<"assistant">): readonly OpenCodeEvent
         assistantMessageID: messageID,
         ordinal: ref.ordinal!,
         text: part.text,
-        state: jsonRecord(part.metadata),
+        native: jsonRecord(part.metadata),
       }),
     ]
   }
+
   return toolEvents(part, messageID)
 }
 
 export function renderedPartID(partID: string) {
   const ref = scenario().partRefs.get(partID)
+
   if (!ref || ref.type === "tool") return partID
+
   return `${ref.messageID}:${ref.type}:${ref.ordinal}`
 }
 
 export function partDelta(partID: string, delta: string, messageID = assistantID) {
   const ref = scenario().partRefs.get(partID)
+
   if (!ref || ref.type !== "text" || ref.ordinal === undefined) throw new Error(`Unknown text part: ${partID}`)
+
   return makeEvent("session.text.delta", {
     sessionID,
     assistantMessageID: messageID,
@@ -515,6 +582,7 @@ export function messageUpdated(info: SessionMessageAssistant) {
       cost: info.cost,
       tokens: info.tokens,
     })
+
   return makeEvent("session.step.ended", {
     sessionID,
     assistantMessageID: info.id,
@@ -524,11 +592,13 @@ export function messageUpdated(info: SessionMessageAssistant) {
   })
 }
 
-export function status(type: SessionStatus["type"], attempt = 1) {
-  if (type === "busy") return makeEvent("session.execution.started", { sessionID })
-  if (type === "idle") return makeEvent("session.execution.succeeded", { sessionID })
+export function status(type: SessionStatus["type"], attempt = 1, id = sessionID) {
+  if (type === "busy") return makeEvent("session.execution.started", { sessionID: id })
+
+  if (type === "idle") return makeEvent("session.execution.succeeded", { sessionID: id })
+
   return makeEvent("session.retry.scheduled", {
-    sessionID,
+    sessionID: id,
     assistantMessageID: assistantID,
     attempt,
     at: 1700000010000,
@@ -548,45 +618,52 @@ export function stepStarted(message: SessionMessageAssistant) {
 
 export function userMessage(
   parts?: PartSeed<"user">[],
-  input: { id?: string; summary?: unknown; created?: number } = {},
+  input: { id?: string; summary?: JsonValue; created?: number } = {},
 ): SessionMessageUser {
   const id = input.id ?? userID
   const seeds = parts ?? [userText("Build the timeline stability matrix.", { id: `prt_${id}_text` })]
-  return {
+
+  const message: SessionMessageUser = {
     id,
     type: "user",
     time: { created: input.created ?? 1700000000000 },
     text: seeds.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n"),
     files: seeds.flatMap((part) => {
       if (part.type !== "file") return []
+
       const mention = part.source?.text
         ? { text: part.source.text.value, start: part.source.text.start, end: part.source.text.end }
         : undefined
-      return [
-        {
-          data: part.url.match(/^data:[^,]*;base64,(.*)$/)?.[1] ?? "",
-          mime: part.mime,
-          source: part.url.startsWith("data:")
-            ? ({ type: "inline" } as const)
-            : ({ type: "uri", uri: part.source?.path ?? part.url } as const),
-          ...(part.filename ? { name: part.filename } : {}),
-          ...(mention ? { mention } : {}),
-        },
-      ]
+
+      const file: NonNullable<SessionMessageUser["files"]>[number] = {
+        data: part.url.match(/^data:[^,]*;base64,(.*)$/)?.[1] ?? "",
+        mime: part.mime,
+        source: part.url.startsWith("data:")
+          ? { type: "inline" }
+          : { type: "uri", uri: part.source?.path ?? part.url },
+      }
+
+      if (part.filename) file.name = part.filename
+
+      if (mention) file.mention = mention
+
+      return [file]
     }),
     agents: seeds.flatMap((part) => {
       if (part.type !== "agent") return []
-      return [
-        {
-          name: part.name,
-          ...(part.source
-            ? { mention: { text: part.source.value, start: part.source.start, end: part.source.end } }
-            : {}),
-        },
-      ]
+
+      const agent: NonNullable<SessionMessageUser["agents"]>[number] = { name: part.name }
+
+      if (part.source)
+        agent.mention = { text: part.source.value, start: part.source.start, end: part.source.end }
+
+      return [agent]
     }),
-    ...(input.summary === undefined ? {} : { metadata: { summary: input.summary as JsonValue } }),
   }
+
+  if (input.summary !== undefined) message.metadata = { summary: input.summary }
+
+  return message
 }
 
 export function assistantMessage(
@@ -599,26 +676,33 @@ export function assistantMessage(
     created?: number
   } = {},
 ): SessionMessageAssistant {
-  if (input.error && (typeof input.error.type !== "string" || typeof input.error.message !== "string"))
-    throw new Error("Invalid assistant error")
+  if (input.error) Schema.decodeUnknownSync(SessionMessage.Assistant.fields.error)(input.error)
   const id = input.id ?? assistantID
   const created = input.created ?? 1700000001000
   const ordinals = { text: 0, reasoning: 0 }
   const content = parts.map((part) => messageContent(part, id, ordinals))
   scenario().nextOrdinals.set(id, ordinals)
-  return {
+
+  const message: SessionMessageAssistant = {
     id,
     type: "assistant",
     metadata: { parentID: input.parentID ?? userID },
-    time: { created, ...(input.completed === false ? {} : { completed: created + 1_000 }) },
+    time: { created },
     model: { id: model.modelID, providerID: model.providerID, variant: model.variant },
     agent: "build",
     content,
     cost: 0.01,
     tokens,
-    ...(input.completed === false ? {} : { finish: "stop" as const }),
-    ...(input.error ? { error: input.error } : {}),
   }
+
+  if (input.completed !== false) {
+    message.time.completed = created + 1_000
+    message.finish = "stop"
+  }
+
+  if (input.error) message.error = input.error
+
+  return message
 }
 
 export function userText(text: string, input: Partial<Omit<TextSeed, "type" | "text">> = {}): TextSeed {
@@ -627,11 +711,13 @@ export function userText(text: string, input: Partial<Omit<TextSeed, "type" | "t
 
 export function textPart(id: string, text: string): TextSeed {
   partRef(id, assistantID, "text")
+
   return { id, type: "text", text }
 }
 
 export function reasoningPart(id: string, text: string): ReasoningSeed {
   partRef(id, assistantID, "reasoning")
+
   return { id, type: "reasoning", text, time: { start: 1700000001000 } }
 }
 
@@ -639,51 +725,54 @@ export function toolPart(
   id: string,
   tool: string,
   state: "streaming",
-  input: Record<string, unknown>,
+  input: JsonRecord,
   options?: ToolOptions<"streaming">,
 ): ToolSeed
 export function toolPart(
   id: string,
   tool: string,
   state: "running",
-  input: Record<string, unknown>,
+  input: JsonRecord,
   options?: ToolOptions<"running">,
 ): ToolSeed
 export function toolPart(
   id: string,
   tool: string,
   state: "completed",
-  input: Record<string, unknown>,
+  input: JsonRecord,
   options?: ToolOptions<"completed">,
 ): ToolSeed
 export function toolPart(
   id: string,
   tool: string,
   state: "error",
-  input: Record<string, unknown>,
+  input: JsonRecord,
   options?: ToolOptions<"error">,
 ): ToolSeed
 export function toolPart(
   id: string,
   tool: string,
   state: ToolStatus,
-  input: Record<string, unknown>,
+  input: JsonRecord,
   options: ToolOptions<ToolStatus> = {},
 ): ToolSeed {
   const base = { id, type: "tool" as const, name: tool }
+
   if (state === "streaming") return { ...base, state: { status: state, input, raw: "" } }
+
   if (state === "running")
     return {
       ...base,
       state: {
         status: state,
         input,
-        ...(options.output === undefined ? {} : { output: options.output }),
+        output: options.output,
         title: options.title,
         metadata: options.metadata ?? {},
         time: { start: 1700000001000 },
       },
     }
+
   if (state === "error")
     return {
       ...base,
@@ -695,6 +784,7 @@ export function toolPart(
         time: { start: 1700000001000, end: 1700000002000 },
       },
     }
+
   return {
     ...base,
     state: {
@@ -710,8 +800,11 @@ export function toolPart(
 
 export function shell(id: string, state: ToolStatus, output = "", command = `echo ${id}`): ToolSeed {
   if (state === "streaming") return toolPart(id, "shell", state, { command })
+
   if (state === "running") return toolPart(id, "shell", state, { command }, { title: command, output })
+
   if (state === "error") return toolPart(id, "shell", state, { command }, { error: output || undefined })
+
   return toolPart(id, "shell", state, { command }, { title: command, output })
 }
 
@@ -749,6 +842,7 @@ function messageContent(
   ordinals: { text: number; reasoning: number },
 ): SessionMessageAssistant["content"][number] {
   const owner = scenario()
+
   if (part.type === "tool") {
     owner.partRefs.set(part.id, { messageID, type: part.type })
     owner.toolStates.set(part.id, part.state.status)
@@ -756,45 +850,63 @@ function messageContent(
     owner.partRefs.set(part.id, { messageID, type: part.type, ordinal: ordinals[part.type]++ })
     owner.startedParts.add(part.id)
   }
+
   if (part.type === "text") return { type: "text", text: part.text }
-  if (part.type === "reasoning")
-    return {
+
+  if (part.type === "reasoning") {
+    const content: Extract<SessionMessageAssistant["content"][number], { type: "reasoning" }> = {
       type: "reasoning",
       text: part.text,
-      state: jsonRecord(part.metadata),
-      time: part.time
-        ? { created: part.time.start, ...(part.time.end === undefined ? {} : { completed: part.time.end }) }
-        : undefined,
+      native: jsonRecord(part.metadata),
     }
+
+    if (part.time) {
+      content.time = { created: part.time.start }
+
+      if (part.time.end !== undefined) content.time.completed = part.time.end
+    }
+
+    return content
+  }
+
   const state = part.state
   const time = "time" in state ? state.time : undefined
   const completed = state.status === "completed" || state.status === "error" ? state.time.end : undefined
-  const base = {
-    type: "tool" as const,
+
+  const base: Omit<Extract<SessionMessageAssistant["content"][number], { type: "tool" }>, "state"> = {
+    type: "tool",
     id: part.id,
     name: part.name,
     time: {
       created: time?.start ?? 1700000001000,
-      ...(time?.start === undefined ? {} : { ran: time.start }),
-      ...(completed === undefined ? {} : { completed }),
     },
-    ...(part.executed === undefined ? {} : { executed: part.executed }),
-    ...(part.providerState ? { providerState: jsonRecord(part.providerState) } : {}),
-    ...(part.providerResultState ? { providerResultState: jsonRecord(part.providerResultState) } : {}),
   }
+
+  if (time?.start !== undefined) base.time.ran = time.start
+
+  if (completed !== undefined) base.time.completed = completed
+
+  if (part.executed !== undefined) base.executed = part.executed
+
+  if (part.native) base.native = jsonRecord(part.native)
+
   if (state.status === "streaming") return { ...base, state: { status: "streaming", input: state.raw } }
-  if (state.status === "running")
+
+  if (state.status === "running") {
+    const metadata = { ...state.metadata }
+
+    if (state.output !== undefined) metadata.output = state.output
+
     return {
       ...base,
       state: {
         status: "running",
         input: jsonRecord(state.input),
-        metadata: jsonRecord({
-          ...state.metadata,
-          ...(state.output === undefined ? {} : { output: state.output }),
-        }),
+        metadata: jsonRecord(metadata),
       },
     }
+  }
+
   if (state.status === "error")
     return {
       ...base,
@@ -805,6 +917,7 @@ function messageContent(
         metadata: jsonRecord(state.metadata),
       },
     }
+
   return {
     ...base,
     state: {
@@ -819,9 +932,11 @@ function messageContent(
 function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[] {
   const toolStates = scenario().toolStates
   const previous = toolStates.get(part.id)
+
   if (previous === "completed" || previous === "error") return []
 
   const events: OpenCodeEvent[] = []
+
   if (!previous) {
     events.push(
       makeEvent("session.tool.input.started", {
@@ -832,10 +947,13 @@ function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[]
       }),
     )
   }
+
   if (part.state.status === "streaming") {
     toolStates.set(part.id, part.state.status)
+
     return events
   }
+
   if (!previous || previous === "streaming") {
     events.push(
       makeEvent("session.tool.input.ended", {
@@ -850,15 +968,18 @@ function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[]
         id: part.id,
         input: part.state.input,
         executed: part.executed ?? true,
-        state: jsonRecord(part.providerState),
+        native: jsonRecord(part.native),
       }),
     )
   }
+
   if (part.state.status === "running") {
     const metadata = {
       ...part.state.metadata,
-      ...(part.state.output === undefined ? {} : { output: part.state.output }),
     }
+
+    if (part.state.output !== undefined) metadata.output = part.state.output
+
     if (previous === "running" || Object.keys(metadata).length)
       events.push(
         makeEvent("session.tool.progress", {
@@ -869,8 +990,10 @@ function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[]
         }),
       )
     toolStates.set(part.id, part.state.status)
+
     return events
   }
+
   if (part.state.status === "error") {
     events.push(
       makeEvent("session.tool.failed", {
@@ -880,12 +1003,13 @@ function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[]
         error: { type: "ToolError", message: part.state.error },
         metadata: jsonRecord(part.state.metadata),
         executed: part.executed ?? true,
-        resultState: jsonRecord(part.providerResultState),
       }),
     )
     toolStates.set(part.id, part.state.status)
+
     return events
   }
+
   events.push(
     makeEvent("session.tool.success", {
       sessionID,
@@ -894,26 +1018,31 @@ function toolEvents(part: ToolSeed, messageID: string): readonly OpenCodeEvent[]
       content: [{ type: "text", text: part.state.output }],
       metadata: jsonRecord(part.state.metadata),
       executed: part.executed ?? true,
-      resultState: jsonRecord(part.providerResultState),
     }),
   )
   toolStates.set(part.id, part.state.status)
+
   return events
 }
 
 function partRef(id: string, messageID: string, type: PartRef["type"]): PartRef {
   const state = scenario()
   const current = state.partRefs.get(id)
+
   if (current) return current
+
   if (type === "tool") {
     const ref = { messageID, type } satisfies PartRef
     state.partRefs.set(id, ref)
+
     return ref
   }
+
   const next = state.nextOrdinals.get(messageID) ?? { text: 0, reasoning: 0 }
   const ref = { messageID, type, ordinal: next[type]++ } satisfies PartRef
   state.nextOrdinals.set(messageID, next)
   state.partRefs.set(id, ref)
+
   return ref
 }
 
@@ -926,7 +1055,9 @@ function makeEvent<Type extends OpenCodeEvent["type"]>(
   const id = `evt_timeline_${String(sequence).padStart(4, "0")}`
   const base = { id, created: 1700000002000 + sequence, type, data, location: { directory } }
   const definition = EventManifest.ServerDefinitions.find((definition) => definition.type === type)
+
   if (!definition) throw new Error(`Unknown timeline event: ${type}`)
+
   const input =
     definition.durability === "durable"
       ? {
@@ -934,25 +1065,17 @@ function makeEvent<Type extends OpenCodeEvent["type"]>(
           durable: { aggregateID: sessionID, seq: ++state.durableSequence, version: definition.durable.version },
         }
       : base
-  return Schema.decodeUnknownSync(definition)(input) as unknown as OpenCodeEvent
+
+  // SAFETY: the matching canonical event schema validates the payload; OpenCodeEvent is generated from those schemas.
+  return Schema.decodeUnknownSync(definition)(input) as OpenCodeEvent
 }
 
-function jsonRecord(value: Record<string, unknown> | undefined): Record<string, JsonValue> {
+const decodeJsonRecord = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.MutableJson)))
+
+function jsonRecord(value: JsonRecord | undefined): Record<string, JsonValue> {
   if (!value) return {}
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([key, item]) => {
-      const next = jsonValue(item)
-      return next === undefined ? [] : [[key, next]]
-    }),
-  )
-}
 
-function jsonValue(value: unknown): JsonValue | undefined {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value
-  if (typeof value === "number") return Number.isFinite(value) ? value : null
-  if (Array.isArray(value)) return value.map((item) => jsonValue(item) ?? null)
-  if (!value || typeof value !== "object") return
-  return jsonRecord(value as Record<string, unknown>)
+  return decodeJsonRecord(JSON.stringify(value))
 }
 
 function provider() {

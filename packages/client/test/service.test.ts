@@ -3,7 +3,13 @@ import { expect, test } from "bun:test"
 import { Effect, FileSystem } from "effect"
 import { writeFile } from "node:fs/promises"
 import { Service, type EnsureReason } from "../src/effect/service"
-import { expectPortAvailable, serviceFixture } from "./fixture/service-fixture"
+import {
+  catchesSigterm,
+  expectNotListening,
+  serviceFixture,
+  stopSignal,
+  stoppedExitCode,
+} from "./fixture/service-fixture"
 import { accelerate } from "./fixture/service-timing"
 
 const ensure = accelerate(Service.ensure)
@@ -95,7 +101,7 @@ test("replaces an incompatible registered service", async () => {
   const replacement = await Bun.file(registration).json()
   fixture.track(replacement.pid)
 
-  expect(await existing.exited).toBe(0)
+  expect(await existing.exited).toBe(stoppedExitCode)
   expect(replacement.version).toBe("2.1.0-next.1")
   expect(endpoint.url).toBe(replacement.url)
   expect(starts).toEqual(["version-mismatch"])
@@ -112,6 +118,49 @@ test("waits for a registered service to finish starting", async () => {
   expect(process.exitCode).toBe(null)
   await writeFile(registration + ".release", "")
   expect((await result).url).toBe((await Bun.file(registration).json()).url)
+})
+
+test("recovers when the starting service it waits for is stopped", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const starting = fixture.spawn("starting")
+  await fixture.waitForFile()
+  const result = run(ensure({ file: registration, version: "test", command: fixture.command("delayed", "10") }))
+
+  await fixture.waitForFile(registration + ".status-request")
+  await run(stop({ file: registration }))
+  const endpoint = await result
+  const replacement = await Bun.file(registration).json()
+  fixture.track(replacement.pid)
+
+  expect(await starting.exited).toBe(stoppedExitCode)
+  expect(replacement.pid).not.toBe(starting.pid)
+  expect(endpoint.url).toBe(replacement.url)
+})
+
+test("replaces a crashed service whose registration names a dead process", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const crashed = fixture.spawn("graceful")
+  await fixture.waitForFile()
+  crashed.kill("SIGKILL")
+  await crashed.exited
+
+  const starts: EnsureReason[] = []
+  const endpoint = await run(
+    ensure({
+      file: registration,
+      version: "test",
+      command: fixture.command("delayed", "10"),
+      onStart: (reason) => starts.push(reason),
+    }),
+  )
+  const replacement = await Bun.file(registration).json()
+  fixture.track(replacement.pid)
+
+  expect(replacement.pid).not.toBe(crashed.pid)
+  expect(endpoint.url).toBe(replacement.url)
+  expect(starts).toEqual(["missing"])
 })
 
 test("reports a failed registered service without spawning", async () => {
@@ -144,7 +193,7 @@ test("evicts an unresponsive registered service before starting its replacement"
   fixture.track(replacement.pid)
 
   expect((await Bun.file(registration + ".requests").text()).trim().split("\n")).toHaveLength(3)
-  expect(await existing.exited).toBe(0)
+  expect(await existing.exited).toBe(stoppedExitCode)
   expect(replacement.pid).not.toBe(original.pid)
   expect(endpoint.url).toBe(replacement.url)
   expect(await status(endpoint.url)).toMatchObject({ version: "test", pid: replacement.pid })
@@ -158,7 +207,7 @@ test("signals an unresponsive registered service process", async () => {
 
   await run(Service.stop({ file: registration }))
   await process.exited
-  expect(await Bun.file(registration + ".signal").text()).toBe("SIGTERM")
+  expect(await fixture.signal()).toBe(stopSignal)
   expect(await Bun.file(registration).exists()).toBe(false)
 })
 
@@ -171,9 +220,9 @@ test("stop escalates when the registration disappears before the process exits",
 
   await run(stop({ file: registration }))
 
-  expect(await Bun.file(registration + ".signal").text()).toBe("SIGTERM")
+  expect(await fixture.signal()).toBe(stopSignal)
   expect(() => process.kill(original.pid, 0)).toThrow()
-  await expectPortAvailable(original.url)
+  await expectNotListening(original.url)
   expect(await Bun.file(registration).exists()).toBe(false)
   await existing.exited
 }, 15_000)
@@ -193,35 +242,40 @@ test.skipIf(process.platform === "win32")(
   15_000,
 )
 
-test("stop waits for the original process while preserving a newly registered successor", async () => {
-  await using fixture = await serviceFixture()
-  const registration = fixture.registration
-  const existing = fixture.spawn("lingering", "15000")
-  await fixture.waitForFile()
-  const original = await Bun.file(registration).json()
-  // Default timing keeps the grace period open long enough for the successor to register first.
-  const stopping = run(Service.stop({ file: registration }))
-
-  try {
-    await fixture.waitForFile(registration + ".unregistered")
-    const successor = fixture.spawn("graceful")
+// On Windows the original process cannot outlive SIGTERM, so no successor can register before it exits.
+test.skipIf(!catchesSigterm)(
+  "stop waits for the original process while preserving a newly registered successor",
+  async () => {
+    await using fixture = await serviceFixture()
+    const registration = fixture.registration
+    const existing = fixture.spawn("lingering", "15000")
     await fixture.waitForFile()
-    const replacement = await Bun.file(registration).json()
-    expect(existing.exitCode).toBe(null)
-    expect(replacement.pid).toBe(successor.pid)
+    const original = await Bun.file(registration).json()
+    // Default timing keeps the grace period open long enough for the successor to register first.
+    const stopping = run(Service.stop({ file: registration }))
 
-    await stopping
+    try {
+      await fixture.waitForFile(registration + ".unregistered")
+      const successor = fixture.spawn("graceful")
+      await fixture.waitForFile()
+      const replacement = await Bun.file(registration).json()
+      expect(existing.exitCode).toBe(null)
+      expect(replacement.pid).toBe(successor.pid)
 
-    expect(() => process.kill(original.pid, 0)).toThrow()
-    await expectPortAvailable(original.url)
-    expect(await Bun.file(registration).json()).toEqual(replacement)
-    expect(await status(replacement.url)).toMatchObject({ pid: successor.pid })
-    expect(successor.exitCode).toBe(null)
-  } finally {
-    existing.kill("SIGKILL")
-    await stopping
-  }
-}, 20_000)
+      await stopping
+
+      expect(() => process.kill(original.pid, 0)).toThrow()
+      await expectNotListening(original.url)
+      expect(await Bun.file(registration).json()).toEqual(replacement)
+      expect(await status(replacement.url)).toMatchObject({ pid: successor.pid })
+      expect(successor.exitCode).toBe(null)
+    } finally {
+      existing.kill("SIGKILL")
+      await stopping
+    }
+  },
+  20_000,
+)
 
 test("signals an incompatible service before starting its replacement", async () => {
   await using fixture = await serviceFixture()
@@ -238,7 +292,7 @@ test("signals an incompatible service before starting its replacement", async ()
   const replacement = await Bun.file(registration).json()
   fixture.track(replacement.pid)
 
-  expect(await existing.exited).toBe(0)
+  expect(await existing.exited).toBe(stoppedExitCode)
   expect(endpoint.url).toBe(replacement.url)
 })
 
