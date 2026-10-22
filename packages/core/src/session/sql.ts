@@ -98,6 +98,35 @@ export const SessionMessageTable = sqliteTable(
   ],
 )
 
+// Messages removed by a revert commit, copied out before the rows are deleted so SessionStats
+// can keep counting the reverted prompts, steps and usage. Written in the projector, which
+// runs regardless of event persistence (unlike durable events, which only workerd stores).
+export const SessionRevertUsageTable = sqliteTable(
+  "session_revert_usage",
+  {
+    id: text().$type<SessionMessage.ID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    type: text().$type<SessionMessage.Type>().notNull(),
+    time_created: integer().notNull(),
+    model_provider_id: text(),
+    model_id: text(),
+    model_variant: text(),
+    cost: real().notNull().default(0),
+    tokens_input: integer().notNull().default(0),
+    tokens_output: integer().notNull().default(0),
+    tokens_reasoning: integer().notNull().default(0),
+    tokens_cache_read: integer().notNull().default(0),
+    tokens_cache_write: integer().notNull().default(0),
+  },
+  (table) => [
+    index("session_revert_usage_session_time_created_idx").on(table.session_id, table.time_created),
+    index("session_revert_usage_time_created_idx").on(table.time_created),
+  ],
+)
+
 export const SessionPendingTable = sqliteTable(
   "session_pending",
   {
