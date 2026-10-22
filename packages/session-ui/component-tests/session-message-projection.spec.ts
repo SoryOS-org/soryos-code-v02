@@ -105,9 +105,10 @@ story("drops a pending footer at once on delivery with and without hover", async
   await expect(footer).toHaveCSS("opacity", "0")
 })
 
-story("marks pending metadata without badging delivered, starting, or queued prompts", async ({ mount, page }) => {
+story("labels waiting prompts without badging delivered, starting, or queued prompts", async ({ mount, page }) => {
   const timeline = await mount("current-prompt-message--pending")
-  const indicator = timeline.locator('[data-slot="user-message-meta"] [data-slot="user-message-pending"]')
+  const label = timeline.locator('[data-slot="user-message-pending-label"]')
+  const indicator = label.locator('[data-slot="user-message-pending"]')
   const text = timeline.locator('[data-slot="user-message-text"]')
 
   for (const status of ["steering", "stranded", "starting", "queued", "delivered"]) {
@@ -152,9 +153,9 @@ story("marks pending metadata without badging delivered, starting, or queued pro
   await expect(indicator.locator("use")).toHaveAttribute("href", "#opencode-v2-icon-outline-steer")
 
   const icon = await indicator.locator("svg").boundingBox()
-  const label = await timeline.locator('[data-slot="user-message-meta"]').boundingBox()
-  if (!icon || !label) throw new Error("Pending metadata geometry is unavailable")
-  expect(Math.abs(icon.y + icon.height / 2 - label.y - label.height / 2)).toBeLessThan(0.5)
+  const bounds = await label.boundingBox()
+  if (!icon || !bounds) throw new Error("Pending metadata geometry is unavailable")
+  expect(Math.abs(icon.y + icon.height / 2 - bounds.y - bounds.height / 2)).toBeLessThan(0.5)
 
   await expect(voice).toHaveCSS("width", "20px")
   await expect(voice).toHaveCSS("height", "20px")
@@ -172,20 +173,22 @@ story("marks pending metadata without badging delivered, starting, or queued pro
   })
 
   await expect(indicator).toHaveCSS("color", faint)
-  await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveText(/^Pending/)
+  await expect(label).toHaveText("Steering")
   await timeline.getByLabel("Grouped prompts", { exact: true }).check()
   await expect(timeline.locator('[data-run-folded] [data-slot="user-message-copy-wrapper"]')).toBeHidden()
-  await expect(
-    timeline.locator('[data-component="user-message"]:not([data-run-folded]) [data-slot="user-message-pending"]'),
-  ).toBeVisible()
+  await expect(label).toHaveCount(1)
+  await expect(timeline.locator('[data-run-folded] [data-slot="user-message-pending-label"]')).toBeVisible()
   await expect(timeline.getByRole("img", { name: "Pending", exact: true })).toHaveCount(0)
   await timeline.getByLabel("Grouped prompts", { exact: true }).uncheck()
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(indicator).toBeVisible()
   await expect(timeline.locator('[data-slot="user-message-meta-item"]')).toHaveCount(0)
+  await expect(label).toHaveText("Steering")
   await timeline.getByLabel("Prompt text", { exact: true }).uncheck()
   await expect(timeline.getByText("notes.json", { exact: true })).toBeVisible()
   await expect(indicator).toBeVisible()
+  // Like a delivered prompt's, a waiting prompt's actions show on hover.
+  await timeline.locator('[data-component="user-message"]').last().hover()
   await timeline.getByRole("button", { name: "Move to queue", exact: true }).click()
   await expect(indicator).toBeHidden()
 })

@@ -1,6 +1,7 @@
-import { lazy, Show, Suspense } from "solid-js"
-import { Command, Slot, type Setup } from "../sdk"
+import { createSignal, lazy, Show, Suspense } from "solid-js"
+import { Command, createKeyed, Slot, type Setup } from "../sdk"
 import type Debug from "./index"
+import { simulated } from "./simulated"
 
 const setup: Setup<typeof Debug> = (ctx) => {
   const DebugBar = lazy(() => import("./bar"))
@@ -11,6 +12,28 @@ const setup: Setup<typeof Debug> = (ctx) => {
   const bar = ctx.stores.bar
   const visible = () => bar.value.visible
   const motion = () => bar.value.motion
+  const Demo = motionTools ? lazy(() => import("./demo")) : undefined
+  const [demo, setDemo] = createSignal(false)
+  const [section, setSection] = createSignal<string>()
+
+  // Routing a session on Drive's simulated model opens the bar with its Demo panel and the Knobs on Experiments, where
+  // the Timeline card lives, so the controls are in view.
+  if (motionTools)
+    createKeyed(
+      () => {
+        const session = ctx.sessions.current()
+
+        return session?.location && simulated({ ...session, location: session.location }) ? session.key : undefined
+      },
+      () => {
+        void bar.update((draft) => {
+          draft.visible = true
+          draft.motion = true
+        })
+        setSection("Experiments")
+        setDemo(true)
+      },
+    )
 
   const toggle = () => {
     bar.update((draft) => {
@@ -22,6 +45,10 @@ const setup: Setup<typeof Debug> = (ctx) => {
     bar.update((draft) => {
       draft.motion = !draft.motion
     })
+  }
+
+  const toggleDemo = () => {
+    setDemo((value) => !value)
   }
 
   ctx.add(
@@ -45,6 +72,7 @@ const setup: Setup<typeof Debug> = (ctx) => {
               diagnostics={import.meta.env.DEV}
               onClose={toggle}
               motion={Motion ? { open: motion(), toggle: toggleMotion } : undefined}
+              demo={Demo ? { open: demo(), toggle: toggleDemo } : undefined}
               inline
             />
           </Suspense>
@@ -53,7 +81,14 @@ const setup: Setup<typeof Debug> = (ctx) => {
           // The Knobs workspace opens only from the debug bar's KNOBS cell, and shows while the bar does.
           <Show when={visible() && motion()}>
             <Suspense>
-              <Motion title={ctx.t("motion.title")} onClose={toggleMotion} />
+              <Motion title={ctx.t("motion.title")} section={section()} onClose={toggleMotion} />
+            </Suspense>
+          </Show>
+        )}
+        {Demo && (
+          <Show when={visible() && demo()}>
+            <Suspense>
+              <Demo />
             </Suspense>
           </Show>
         )}
