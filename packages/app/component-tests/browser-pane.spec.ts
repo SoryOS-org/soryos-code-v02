@@ -98,6 +98,31 @@ story("paints a still of the page in place of the native view while a panel move
   await expect(still).toHaveCount(0)
 })
 
+story("never flies a still of a page the tab has navigated away from", async ({ page }) => {
+  const root = page.getByTestId("browser-pane-fixture")
+  const motion = root.getByRole("button", { name: "Toggle panel motion", exact: true })
+  const native = root.getByTestId("native-Alpha")
+  const still = root.locator("#browser-panel img")
+  await motion.click()
+  await expect(still).toBeVisible()
+  await motion.click()
+  await expect(native).toHaveAttribute("data-visible", "true")
+  await expect(still).toHaveCount(0)
+
+  await root.getByRole("button", { name: "Hold capture", exact: true }).click()
+  const address = root.getByRole("combobox", { name: "Browser address", exact: true })
+  await address.fill("https://example.com/")
+  await address.press("Enter")
+  await expect(address).toHaveValue("https://example.com/")
+  await expect(native).toHaveAttribute("data-visible", "true")
+  await motion.click()
+  await expect(native).toHaveAttribute("data-visible", "false")
+  await expect(still).toHaveCount(0)
+  // The new page's own still stands in once it arrives.
+  await root.getByRole("button", { name: "Release capture", exact: true }).click()
+  await expect(still).toBeVisible()
+})
+
 story("keeps a still of the page under floating content that covers it", async ({ page }) => {
   const root = page.getByTestId("browser-pane-fixture")
   const still = root.locator("#browser-panel img")

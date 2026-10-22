@@ -1144,6 +1144,11 @@ export interface EmbedProps {
   readonly visible: boolean
   /** Paints a still of the embed in place of the live view, so DOM content can float above it. */
   readonly frozen?: boolean
+  /**
+   * What the embed shows, such as its URL. While a panel moves, the host paints a still of the embed in its place; a
+   * still taken while this had another value is dropped rather than shown.
+   */
+  readonly page?: string
   /** Radius of the bottom corners in CSS pixels. */
   readonly radius?: number
   /** CSS color the rounded corners show; defaults to the app backdrop behind the panel. */

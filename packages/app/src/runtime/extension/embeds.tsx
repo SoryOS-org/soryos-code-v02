@@ -17,8 +17,17 @@ type Input = {
   readonly moving: () => boolean
 }
 
-// A decoded still and where it sits in the box, in CSS pixels.
-type Still = { id: string; x: number; y: number; width: number; height: number; url: string; image: HTMLImageElement }
+// A decoded still of the page the embed showed, and where it sits in the box, in CSS pixels.
+type Still = {
+  id: string
+  page: string | undefined
+  x: number
+  y: number
+  width: number
+  height: number
+  url: string
+  image: HTMLImageElement
+}
 
 /** Main-process embeds laid out over the DOM box an extension renders for them. */
 export function createEmbeds(input: Input): Embeds {
@@ -59,7 +68,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   // The embed the last layout went to; it hides when another one takes the box.
   let placed: string | undefined
   // Where the shown native view sits in the box, in CSS pixels; undefined while it is off screen.
-  let onscreen: Omit<Still, "url" | "image"> | undefined
+  let onscreen: Omit<Still, "page" | "url" | "image"> | undefined
   let warming: ReturnType<typeof setTimeout> | undefined
   let landing: ReturnType<typeof setTimeout> | undefined
   let stilling: string | undefined
@@ -90,18 +99,18 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   }
 
   // A panel flight hides the native view, which no DOM box clips. Keep a recent still for it: one once the shown
-  // view's layout settles, then more while it stays on screen, never one per frame. A page that stops changing is
-  // captured less and less often.
+  // view's layout settles, then more while it stays on screen and the window has focus, never one per frame. A page
+  // that stops changing is captured less and less often.
   const warm = (delay: number) => {
     clearTimeout(warming)
     // Reduced motion lands panels at once, so no flight needs a still.
     warming = setTimeout(() => {
-      if (onscreen && !props.input.moving() && !prefersReducedMotion()) take()
+      if (onscreen && !props.input.moving() && !prefersReducedMotion() && document.hasFocus()) take()
     }, delay)
   }
 
   const take = () => {
-    const placement = onscreen
+    const placement = onscreen && { ...onscreen, page: props.page }
 
     if (!placement || stilling === placement.id) return
     stilling = placement.id
@@ -139,7 +148,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
 
         if (current) stilling = undefined
 
-        if (!url || !ready || !current || props.id !== placement.id) {
+        if (!url || !ready || !current || props.id !== placement.id || props.page !== placement.page) {
           if (url) URL.revokeObjectURL(url)
 
           if (current && onscreen?.id === placement.id) warm(pause)
@@ -343,6 +352,21 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
       fly(true)
     }),
   )
+  // A navigation or reload makes the kept still another page's.
+  createEffect(
+    on(
+      () => props.page,
+      () => {
+        if (store.still) URL.revokeObjectURL(store.still.url)
+        setStore("still", undefined)
+        bytes = 0
+        pause = 3000
+
+        if (onscreen) warm(600)
+      },
+      { defer: true },
+    ),
+  )
   createEffect(
     on(
       [
@@ -386,6 +410,8 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
   onCleanup(() => appearance.disconnect())
   createEventListener(window.matchMedia("(prefers-color-scheme: dark)"), "change", () => schedule(300))
   createEventListener(document, "visibilitychange", () => setStore("visible", document.visibilityState === "visible"))
+  // Stills pause while the window is in the background; the page may have moved on since the last one.
+  createEventListener(window, "focus", () => warm(0))
   onCleanup(() => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     clearTimeout(release)
@@ -400,7 +426,7 @@ function EmbedView(props: EmbedProps & { input: Input; bridge: Bridge }) {
 
   return (
     <div ref={element} class={props.class}>
-      <Show when={store.flying && store.still?.id === props.id && store.still}>
+      <Show when={store.flying && store.still?.id === props.id && store.still?.page === props.page && store.still}>
         {(still) => <div class="absolute inset-0 overflow-hidden pointer-events-none">{still().image}</div>}
       </Show>
       <Show when={store.snapshot?.id === props.id && props.visible && store.snapshot?.url}>

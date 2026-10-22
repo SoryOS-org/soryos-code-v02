@@ -876,6 +876,8 @@ export default function SessionBrowserPane(props: {
         id={embed()}
         visible={shown()}
         frozen={commenting() || noting()}
+        // A navigation, in-page or not, or a reload starting is another page.
+        page={JSON.stringify([state()?.id, state()?.generation, state()?.url, !!state()?.loading])}
         radius={10}
         class="relative min-h-0 flex-1 bg-v2-background-bg-base flex items-center justify-center"
       >
