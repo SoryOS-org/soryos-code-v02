@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { Effect, Ref, Schema, Stream } from "effect"
-import { HttpClientRequest } from "effect/unstable/http"
+import { HttpClientRequest } from "effect/http"
 import {
   Media,
   HttpOptions,
@@ -61,6 +61,54 @@ describe("OpenAI Chat route", () => {
         max_completion_tokens: 20,
         temperature: 0,
       })
+    }),
+  )
+
+  it.effect("omits stream usage options when compatibility disables them", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(
+        LLM.request({ model: LanguageModel.update(model, { compatibility: { streamUsage: false } }), prompt: "Hello" }),
+      )
+
+      expect(prepared.body).not.toHaveProperty("stream_options")
+    }),
+  )
+
+  it.effect("sends store only to OpenAI and Azure unless compatibility opts in", () =>
+    Effect.gen(function* () {
+      const compatible = OpenAICompatible.configure({ baseURL: "https://api.compatible.test/v1", apiKey: "test" })
+      const omitted = yield* compileRequest(
+        LLM.request({ model: compatible.model("compatible-model"), prompt: "Hello", providerOptions: { store: true } }),
+      )
+      const optedIn = yield* compileRequest(
+        LLM.request({
+          model: LanguageModel.update(compatible.model("compatible-model"), {
+            compatibility: { supportsStore: true },
+          }),
+          prompt: "Hello",
+        }),
+      )
+      const openaiHost = yield* compileRequest(
+        LLM.request({
+          model: OpenAICompatible.configure({ baseURL: "https://api.openai.com/v1", apiKey: "test" }).model(
+            "gpt-4o-mini",
+          ),
+          prompt: "Hello",
+        }),
+      )
+      const azure = yield* compileRequest(
+        LLM.request({
+          model: Azure.configure({ baseURL: "https://opencode-test.openai.azure.com/openai/", apiKey: "test" }).chat(
+            "gpt-4o-mini",
+          ),
+          prompt: "Hello",
+        }),
+      )
+
+      expect(omitted.body).not.toHaveProperty("store")
+      expect(optedIn.body.store).toBe(false)
+      expect(openaiHost.body.store).toBe(false)
+      expect(azure.body.store).toBe(false)
     }),
   )
 
@@ -472,6 +520,45 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("replays Gemini thought signatures as tool call extra content", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.user("Weather in Paris and Tokyo?"),
+            Message.assistant([
+              ToolCallPart.make({
+                id: "call_1",
+                name: "lookup",
+                input: { city: "Paris" },
+                providerMetadata: { openai: { extraContent: { google: { thought_signature: "sig_1" } } } },
+              }),
+              ToolCallPart.make({ id: "call_2", name: "lookup", input: { city: "Tokyo" } }),
+            ]),
+            Message.tool({ id: "call_1", name: "lookup", result: "Sunny" }),
+            Message.tool({ id: "call_2", name: "lookup", result: "Rainy" }),
+          ],
+        }),
+      )
+
+      const assistant = prepared.body.messages[1]
+      expect(assistant?.role === "assistant" ? assistant.tool_calls : undefined).toEqual([
+        {
+          id: "call_1",
+          type: "function",
+          function: { name: "lookup", arguments: encodeJson({ city: "Paris" }) },
+          extra_content: { google: { thought_signature: "sig_1" } },
+        },
+        {
+          id: "call_2",
+          type: "function",
+          function: { name: "lookup", arguments: encodeJson({ city: "Tokyo" }) },
+        },
+      ])
+    }),
+  )
+
   it.effect("limits OpenAI and Azure Chat tool call IDs to 40 characters", () =>
     Effect.gen(function* () {
       const id = `call_${"a".repeat(48)}`
@@ -788,6 +875,89 @@ describe("OpenAI Chat route", () => {
         }),
       ).pipe(Effect.flip)
       expect(error.message).toContain("OpenAI Chat does not support media type audio/mpeg")
+    }),
+  )
+
+  it.effect("lowers inline PDFs as file parts", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.user([
+              { type: "text", text: "Summarize these." },
+              { type: "media", media: Media.base64("JVBERi0=", "application/pdf"), filename: "report.pdf" },
+              { type: "media", media: Media.fromDataUrl("data:application/pdf;base64,JVBERi0=") },
+            ]),
+          ],
+        }),
+      )
+      expect(prepared.body.messages).toEqual([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Summarize these." },
+            { type: "file", file: { filename: "report.pdf", file_data: "data:application/pdf;base64,JVBERi0=" } },
+            { type: "file", file: { filename: "document.pdf", file_data: "data:application/pdf;base64,JVBERi0=" } },
+          ],
+        },
+      ])
+    }),
+  )
+
+  it.effect("moves PDFs from tool results into a follow-up user message", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.user("Read the report."),
+            Message.assistant([ToolCallPart.make({ id: "call_pdf", name: "read", input: {} })]),
+            Message.tool({
+              id: "call_pdf",
+              name: "read",
+              resultType: "content",
+              result: [
+                { type: "text", text: "PDF read successfully" },
+                {
+                  type: "file",
+                  mime: "application/pdf",
+                  uri: "data:application/pdf;base64,JVBERi0=",
+                  name: "report.pdf",
+                },
+              ],
+            }),
+          ],
+        }),
+      )
+      expect(prepared.body.messages).toContainEqual({
+        role: "tool",
+        tool_call_id: "call_pdf",
+        content: "PDF read successfully",
+      })
+      expect(prepared.body.messages.at(-1)).toEqual({
+        role: "user",
+        content: [
+          { type: "file", file: { filename: "report.pdf", file_data: "data:application/pdf;base64,JVBERi0=" } },
+        ],
+      })
+    }),
+  )
+
+  it.effect("requires inline data for PDF files", () =>
+    Effect.gen(function* () {
+      const error = yield* compileRequest(
+        LLM.request({
+          model,
+          messages: [
+            Message.user({
+              type: "media",
+              media: Media.url("https://example.com/report.pdf", { mediaType: "application/pdf" }),
+            }),
+          ],
+        }),
+      ).pipe(Effect.flip)
+      expect(error.message).toContain("OpenAI Chat requires inline media")
     }),
   )
 
@@ -1135,21 +1305,19 @@ describe("OpenAI Chat route", () => {
       })
 
       const replay = yield* compileRequest(LLM.request({ model, messages: [response.message] }))
-      expect(replay.body.messages).toEqual([
-        {
-          role: "assistant",
-          content: null,
-          reasoning: "thinking",
-          reasoning_details: details,
-          tool_calls: [
-            {
-              id: "call_1",
-              type: "function",
-              function: { name: "lookup", arguments: '{"query":"weather"}' },
-            },
-          ],
-        },
-      ])
+      expect(replay.body.messages[0]).toEqual({
+        role: "assistant",
+        content: null,
+        reasoning: "thinking",
+        reasoning_details: details,
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "lookup", arguments: '{"query":"weather"}' },
+          },
+        ],
+      })
     }),
   )
 
@@ -1252,18 +1420,16 @@ describe("OpenAI Chat route", () => {
       })
 
       const replay = yield* compileRequest(LLM.request({ model, messages: [response.message] }))
-      expect(replay.body.messages).toEqual([
-        {
-          role: "assistant",
-          content: null,
-          tool_calls: [{ id: "call_1", type: "function", function: { name: "get_time", arguments: "{}" } }],
-          reasoning_content: "Let me think",
-          reasoning_details: [
-            { type: "summary", summary: "Plan tools" },
-            { type: "encrypted", encrypted: "opaque" },
-          ],
-        },
-      ])
+      expect(replay.body.messages[0]).toEqual({
+        role: "assistant",
+        content: null,
+        tool_calls: [{ id: "call_1", type: "function", function: { name: "get_time", arguments: "{}" } }],
+        reasoning_content: "Let me think",
+        reasoning_details: [
+          { type: "summary", summary: "Plan tools" },
+          { type: "encrypted", encrypted: "opaque" },
+        ],
+      })
     }),
   )
 
@@ -1722,6 +1888,78 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("preserves Gemini thought signatures on streamed parallel tool calls", () =>
+    Effect.gen(function* () {
+      // Gemini's OpenAI-compatible endpoint omits `index`, streams each call whole,
+      // and signs only the first call of a parallel batch.
+      const body = sseEvents(
+        deltaChunk({
+          role: "assistant",
+          tool_calls: [
+            {
+              extra_content: { google: { thought_signature: "sig_1" } },
+              id: "call_1",
+              type: "function",
+              function: { name: "lookup", arguments: '{"city":"Paris"}' },
+            },
+          ],
+        }),
+        deltaChunk({
+          role: "assistant",
+          tool_calls: [{ id: "call_2", type: "function", function: { name: "lookup", arguments: '{"city":"Tokyo"}' } }],
+        }),
+        deltaChunk({}, "stop"),
+      )
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup data", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(Effect.provide(fixedResponse(body)))
+
+      expect(response.events.filter(LLMEvent.is.toolCall)).toEqual([
+        {
+          type: "tool-call",
+          id: "call_1",
+          name: "lookup",
+          input: { city: "Paris" },
+          providerExecuted: undefined,
+          providerMetadata: { openai: { extraContent: { google: { thought_signature: "sig_1" } } } },
+        },
+        {
+          type: "tool-call",
+          id: "call_2",
+          name: "lookup",
+          input: { city: "Tokyo" },
+          providerExecuted: undefined,
+          providerMetadata: undefined,
+        },
+      ])
+    }),
+  )
+
+  it.effect("keeps extra content that arrives before the tool identity", () =>
+    Effect.gen(function* () {
+      const body = sseEvents(
+        deltaChunk({
+          tool_calls: [
+            { index: 0, extra_content: { google: { thought_signature: "sig_1" } }, function: { arguments: "{" } },
+          ],
+        }),
+        deltaChunk({ tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup", arguments: "}" } }] }),
+        deltaChunk({}, "tool_calls"),
+      )
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup data", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(Effect.provide(fixedResponse(body)))
+
+      expect(response.events.filter(LLMEvent.is.toolCall).map((event) => event.providerMetadata)).toEqual([
+        { openai: { extraContent: { google: { thought_signature: "sig_1" } } } },
+      ])
+    }),
+  )
+
   it.effect("does not finalize streamed tool calls when content is filtered", () =>
     Effect.gen(function* () {
       const body = sseEvents(
@@ -2015,7 +2253,7 @@ describe("OpenAI Chat route", () => {
       )
 
       expect((yield* Ref.get(events)).some((event) => event.type === "text-delta")).toBeTrue()
-      expect(error.message).toBe("ECONNRESET: socket closed unexpectedly")
+      expect(error.message).toBe("Connection lost while reading the response: ECONNRESET: socket closed unexpectedly")
       expect(error.reason).toMatchObject({
         _tag: "Transport",
         transport: "http",
@@ -2033,7 +2271,7 @@ describe("OpenAI Chat route", () => {
         Effect.flip,
       )
 
-      expect(error.message).toBe("ECONNRESET: socket closed before output")
+      expect(error.message).toBe("Connection lost while reading the response: ECONNRESET: socket closed before output")
       expect(error.reason).toMatchObject({
         _tag: "Transport",
         transport: "http",

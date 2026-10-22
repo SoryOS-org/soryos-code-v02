@@ -534,7 +534,6 @@ describe("run interactive runtime", () => {
         model: { providerID: "test", modelID: "model" },
         variant: undefined,
         files: [],
-        thinking: false,
       },
       {
         createRuntimeLifecycle: async (input) => {
@@ -630,7 +629,6 @@ describe("run interactive runtime", () => {
         model: { providerID: "openai", modelID: "gpt-5" },
         variant: undefined,
         files: [],
-        thinking: false,
       },
       {
         createRuntimeLifecycle: async () => {
@@ -717,7 +715,6 @@ describe("run interactive runtime", () => {
         model: undefined,
         variant: undefined,
         files: [],
-        thinking: false,
       },
       {
         createRuntimeLifecycle: async () => {
@@ -800,7 +797,6 @@ describe("run interactive runtime", () => {
         model: undefined,
         variant: undefined,
         files: [],
-        thinking: false,
       },
       {
         createRuntimeLifecycle: async () => ({

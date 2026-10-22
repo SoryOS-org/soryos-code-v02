@@ -17,11 +17,23 @@ import {
   type Value,
 } from "../interpreter/objects.js"
 import { describeValue } from "../interpreter/references.js"
+import { applyCollectionCallback } from "../interpreter/callback.js"
 import type { Interpreter } from "../interpreter/interpreter.js"
+import { callbackMethods, sortArray } from "./array.js"
 
-/** The bytes a Uint8Array, array, or other iterable of numbers describes; the host array clamps each value. */
-const collectBytes = <R>(ctx: Interpreter<R>, source: Value, name: string): Effect.Effect<Uint8Array, unknown, R> => {
-  if (source instanceof Bytes) return Effect.succeed(new Uint8Array(source.bytes))
+/**
+ * The bytes a Uint8Array, array, or other iterable of numbers describes; the host array clamps each value. As in
+ * TypedArray.from, a mapper sees the original values, after the source is consumed in full.
+ */
+const collectBytes = <R>(
+  ctx: Interpreter<R>,
+  source: Value,
+  name: string,
+  mapper?: Value,
+  thisArg?: Value,
+): Effect.Effect<Uint8Array, unknown, R> => {
+  const apply = mapper === undefined ? undefined : applyCollectionCallback(ctx, mapper, name)
+  if (source instanceof Bytes && apply === undefined) return Effect.succeed(new Uint8Array(source.bytes))
   return Effect.gen(function* () {
     const cursor = yield* ctx.iterate(source)
     if (cursor === undefined) {
@@ -29,13 +41,16 @@ const collectBytes = <R>(ctx: Interpreter<R>, source: Value, name: string): Effe
         `${name} expects a Uint8Array, an array, or an iterable of numbers, received ${describeValue(source)}.`,
       )
     }
-    const values: Array<number> = []
+    const values: Array<Value> = []
     while (true) {
       const step = yield* cursor.next
-      if (step.done) return Uint8Array.from(values)
-      values.push(coerceToNumber(step.value))
+      if (step.done) break
+      values.push(step.value)
       checkArrayLength(values.length)
     }
+    const mapped =
+      apply === undefined ? values : yield* Effect.forEach(values, (value, index) => apply([value, index], thisArg))
+    return Uint8Array.from(mapped, coerceToNumber)
   })
 }
 
@@ -69,7 +84,7 @@ export const uint8ArrayGlobal = <R>(ctx: Interpreter<R>) => {
     }
   }
   methods(builtins, uint8Array, [
-    ["from", 1, (_, args) => Effect.map(collectBytes(ctx, args[0], "Uint8Array.from"), wrap)],
+    ["from", 1, (_, args) => Effect.map(collectBytes(ctx, args[0], "Uint8Array.from", args[1], args[2]), wrap)],
     ["of", 0, (_, args) => wrap(Uint8Array.from(args, coerceToNumber))],
     ["fromBase64", 1, (_, args) => decode("fromBase64", args, (text) => Uint8Array.fromBase64(text))],
     ["fromHex", 1, (_, args) => decode("fromHex", args, (text) => Uint8Array.fromHex(text))],
@@ -77,6 +92,8 @@ export const uint8ArrayGlobal = <R>(ctx: Interpreter<R>) => {
 
   const self = (thisValue: Value, name: string) => receiver(Bytes, thisValue, `Uint8Array.prototype.${name}`)
   const optNumber = (value: Value): number | undefined => (value === undefined ? undefined : coerceToInteger(value))
+  // Uint8Array cannot contain NaN, so non-number search values never match a byte.
+  const search = (value: Value) => (typeof value === "number" ? value : NaN)
   const wrapAll = (items: Array<Value>) => new Arr(builtins.Array, items)
   defineAccessor(proto, "length", (thisValue) => self(thisValue, "length").bytes.length)
   methods(builtins, proto, [
@@ -126,24 +143,36 @@ export const uint8ArrayGlobal = <R>(ctx: Interpreter<R>) => {
       },
     ],
     [
-      "indexOf",
+      "sort",
       1,
-      (thisValue, args) => self(thisValue, "indexOf").bytes.indexOf(coerceToNumber(args[0]), optNumber(args[1])),
+      (thisValue, args) => {
+        const target = self(thisValue, "sort")
+        // Without a comparator, typed arrays sort numerically rather than by string.
+        if (args[0] === undefined) {
+          target.bytes.sort()
+          return target
+        }
+        return Effect.map(sortArray(ctx, [...target.bytes], args[0], "Uint8Array.sort"), (sorted) => {
+          target.bytes.set(Uint8Array.from(sorted, coerceToNumber))
+          return target
+        })
+      },
     ],
+    ["indexOf", 1, (thisValue, args) => self(thisValue, "indexOf").bytes.indexOf(search(args[0]), optNumber(args[1]))],
     [
       "lastIndexOf",
       1,
       (thisValue, args) => {
         const target = self(thisValue, "lastIndexOf").bytes
-        return args[1] === undefined
-          ? target.lastIndexOf(coerceToNumber(args[0]))
-          : target.lastIndexOf(coerceToNumber(args[0]), optNumber(args[1]))
+        return args.length < 2
+          ? target.lastIndexOf(search(args[0]))
+          : target.lastIndexOf(search(args[0]), optNumber(args[1]))
       },
     ],
     [
       "includes",
       1,
-      (thisValue, args) => self(thisValue, "includes").bytes.includes(coerceToNumber(args[0]), optNumber(args[1])),
+      (thisValue, args) => self(thisValue, "includes").bytes.includes(search(args[0]), optNumber(args[1])),
     ],
     [
       "join",
@@ -170,6 +199,13 @@ export const uint8ArrayGlobal = <R>(ctx: Interpreter<R>) => {
             .map(([index, byte]) => wrapAll([index, byte])),
         ),
     ],
+    ...callbackMethods(
+      ctx,
+      "Uint8Array",
+      self,
+      (target) => target.bytes,
+      (values) => wrap(Uint8Array.from(values, coerceToNumber)),
+    ),
   ])
   define(proto, IteratorSymbol, get(proto, "values"), hidden)
   return uint8Array

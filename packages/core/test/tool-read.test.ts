@@ -577,7 +577,10 @@ describe("ReadTool", () => {
     Effect.gen(function* () {
       const registry = yield* Tool.Service
       for (const [error, message] of [
-        [new ReadToolFileSystem.OffsetOutOfRangeError({ offset: 10 }), "Offset 10 is out of range"],
+        [
+          new ReadToolFileSystem.OffsetOutOfRangeError({ offset: 10, lines: 3 }),
+          "Offset 10 is out of range for this file (3 lines)",
+        ],
         [
           new ReadToolFileSystem.PathKindError({ resource: "socket", expected: "a file" }),
           "Path is not a file: socket",
@@ -928,28 +931,6 @@ describe("ReadTool", () => {
       expect(readCalls).toEqual([
         { input: AbsolutePath.make(path.join(process.cwd(), "large.txt")), page: { offset: 2, limit: 1 } },
       ])
-    }),
-  )
-
-  it.effect("rejects unsupported binary discovered by a direct read", () =>
-    Effect.gen(function* () {
-      readResult = {
-        type: "file",
-        uri: "file:///late-binary",
-        name: "late-binary",
-        content: "AAECAw==",
-        encoding: "base64",
-        mime: "application/octet-stream",
-      }
-      const registry = yield* Tool.Service
-
-      expect(
-        yield* executeTool(registry, {
-          sessionID,
-          ...toolIdentity,
-          call: { type: "tool-call", id: "call-direct-binary", name: "read", input: { path: "late-binary" } },
-        }),
-      ).toEqual({ status: "error", error: { type: "unknown", message: "Cannot read binary file: late-binary" } })
     }),
   )
 })
