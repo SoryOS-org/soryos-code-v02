@@ -60,14 +60,6 @@ const rootTabs: Record<SettingsRootTab, true> = {
   about: true,
 }
 
-const serverTabs: Record<SettingsServerTab, true> = {
-  projects: true,
-  workspaces: true,
-  providers: true,
-  models: true,
-  extensions: true,
-}
-
 const projectTabs: Record<SettingsProjectTab, true> = {
   general: true,
   workspaces: true,
@@ -93,7 +85,8 @@ export function parseSettingsView(
   const subtab = params.get("subtab")
   const nested = subtab && isSubtab(subtab) && tab === "extensions" ? subtab : undefined
 
-  if (project && server && isProjectTab(tab)) return { type: "project", server, project, tab, subtab: nested, ...transient }
+  if (project && server && isProjectTab(tab))
+    return { type: "project", server, project, tab, subtab: nested, ...transient }
 
   // Links to a server's own page, which the Servers page replaced, name a server without a tab.
   if (!project && server && !params.has("tab")) return { type: "root", tab: "servers", server, ...transient }
@@ -152,10 +145,6 @@ export function isRootTab(value: string): value is SettingsRootTab {
 /** Host tabs win over an extension page with the same id. */
 export function isExtensionTab(value: string, tabs: ReadonlySet<string>): value is SettingsExtensionTab {
   return !isRootTab(value) && tabs.has(value)
-}
-
-export function isServerTab(value: string): value is SettingsServerTab {
-  return Object.hasOwn(serverTabs, value)
 }
 
 export function isProjectTab(value: string): value is SettingsProjectTab {

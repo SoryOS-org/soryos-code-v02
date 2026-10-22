@@ -58,15 +58,7 @@ const MobilePanelDrawer = lazy(async () => {
   return { default: MobilePanelDrawer }
 })
 
-export type {
-  ComposerAttachment,
-  ComposerComment,
-  ComposerOption,
-  ComposerPersistedState,
-  ComposerSuggestion,
-} from "../types"
-
-export type ComposerMode = "normal" | "shell"
+type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
 
@@ -683,7 +675,7 @@ function composerCursor(editor: HTMLDivElement) {
   return range.toString().length
 }
 
-export function ComposerAttachments(props: {
+function ComposerAttachments(props: {
   attachments: ComposerAttachment[]
   uploads?: Upload[]
   comments?: ComposerComment[]
@@ -912,7 +904,7 @@ export function ComposerAttachments(props: {
   )
 }
 
-export function ComposerEditorAddMenu(props: {
+function ComposerEditorAddMenu(props: {
   disabled?: boolean
   title: string
   keybind?: string[]
@@ -1033,7 +1025,7 @@ function ComposerEditorConfiguredSelect(props: {
   )
 }
 
-export function ComposerEditorSelect(props: {
+function ComposerEditorSelect(props: {
   mobileDrawer?: boolean
   title: string
   keybind?: string[]
@@ -1165,7 +1157,7 @@ export function ComposerEditorSelect(props: {
   )
 }
 
-export function ComposerEditorPopover(props: {
+function ComposerEditorPopover(props: {
   id?: string
   emptyLabel: string
   items: ComposerSuggestion[]
@@ -1481,7 +1473,7 @@ function stopGlyph() {
   return `<rect x="${start}" y="${start}" width="${size}" height="${size}" rx="${radius}" fill="currentColor"/>`
 }
 
-export function ComposerEditorSubmitButton(props: {
+function ComposerEditorSubmitButton(props: {
   mode: ComposerMode
   stopping: boolean
   held?: boolean
@@ -1513,14 +1505,7 @@ export function ComposerEditorSubmitButton(props: {
               }
             >
               {(glyph) => (
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  aria-hidden="true"
-                  innerHTML={glyph()}
-                />
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" innerHTML={glyph()} />
               )}
             </Show>
           )

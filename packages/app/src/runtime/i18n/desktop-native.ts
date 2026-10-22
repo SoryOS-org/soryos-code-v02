@@ -218,10 +218,6 @@ export function detectDesktopNativeLocale(languages: readonly string[]): Desktop
   return "en"
 }
 
-export function desktopNativePluralCategories(locale: DesktopNativeLocale) {
-  return new Intl.PluralRules(DESKTOP_NATIVE_LOCALE_TAGS[locale]).resolvedOptions().pluralCategories
-}
-
 function locale(value: string) {
   try {
     return new Intl.Locale(value).maximize()

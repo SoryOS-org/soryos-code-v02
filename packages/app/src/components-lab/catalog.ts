@@ -4,11 +4,11 @@ import { choice, knob, text, toggle, type Field } from "knobs"
 import type { Component, JSX } from "solid-js"
 
 // Storybook's CSF as the stories in this repository write it: a default meta and named stories with args.
-export type StoryArg = string | number | boolean | null | undefined | object
+type StoryArg = string | number | boolean | null | undefined | object
 
 export type StoryArgs = { [key: string]: StoryArg }
 
-export type StoryRender = (args: StoryArgs) => JSX.Element
+type StoryRender = (args: StoryArgs) => JSX.Element
 
 type ArgType = {
   control?: string | { type?: string; min?: number; max?: number; step?: number }

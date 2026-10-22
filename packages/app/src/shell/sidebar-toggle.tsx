@@ -38,7 +38,7 @@ function UnreadBadge(props: { show: boolean; ring: "base" | "deep" }) {
 // The desktop window sets `trafficLightPosition: { x: 14, y: 14 }`, and the titlebar moves the buttons down to share the
 // header's center line in vertical tabs. macOS 26 and later draw 14px buttons on a 23px pitch, so the zoom button ends
 // 74px from the window edge. macOS 15 and earlier end at 68px.
-export const macTrafficLightsBaseWidth = 74
+const macTrafficLightsBaseWidth = 74
 
 // Vertical tabs center the 14pt traffic lights on the session header's center line, 32px from the top, and inset them as
 // far from the left edge as from the top. The center scales with zoom. Returns window points; `width` is where the zoom
@@ -131,7 +131,9 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
           ) : (
             <span class="relative flex">
               <Icon
-                name={side === "out" || (!side && settings.appearance.sidebarOpen()) ? "layout-left-full" : closedIcon()}
+                name={
+                  side === "out" || (!side && settings.appearance.sidebarOpen()) ? "layout-left-full" : closedIcon()
+                }
               />
               <UnreadBadge show={!side && unread()} ring="deep" />
             </span>

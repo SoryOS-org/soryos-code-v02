@@ -5,7 +5,7 @@ import { uuid } from "@/runtime/persistence/uuid"
 import { FileSelection } from "@/workspaces/files/types"
 import { durableNote, LegacyBrowserNote, NoteComment, QuoteComment, type ContextItem } from "./schema"
 
-export const PromptFileComment = Persistence.struct({
+const PromptFileComment = Persistence.struct({
   type: Schema.optional(Schema.Literal("file")),
   path: Schema.String,
   selection: Persistence.optional(FileSelection),
@@ -14,7 +14,7 @@ export const PromptFileComment = Persistence.struct({
   origin: Persistence.optional(Schema.Literals(["review", "file"])),
 })
 
-export type PromptFileComment = typeof PromptFileComment.Type
+type PromptFileComment = typeof PromptFileComment.Type
 
 export type PromptComment = PromptFileComment | NoteComment | QuoteComment
 

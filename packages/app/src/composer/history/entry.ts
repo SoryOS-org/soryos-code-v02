@@ -5,7 +5,7 @@ import type { PromptHistoryComment, PromptHistoryEntry } from "../schema"
 
 export type { PromptHistoryComment, PromptHistoryEntry } from "../schema"
 
-export const MAX_HISTORY = 100
+const MAX_HISTORY = 100
 
 export type PromptHistoryStoredEntry = PromptHistoryEntry
 

@@ -3,7 +3,7 @@ import { createEffect, createMemo, createResource, on, onCleanup } from "solid-j
 import { createStore } from "solid-js/store"
 import type { OpenCodeEventStream } from "@/runtime/server/client"
 
-export function webSearchProviderField(form: FormInfo) {
+function webSearchProviderField(form: FormInfo) {
   return form.fields.find(
     (field): field is FormStringField => field.type === "string" && field.key === "provider" && !!field.options,
   )

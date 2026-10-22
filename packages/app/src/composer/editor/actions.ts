@@ -10,7 +10,7 @@ import type {
 } from "../types"
 import { isAttachment, promptLength } from "../prompt-parts"
 
-export type ComposerStateStore = [
+type ComposerStateStore = [
   Store<ComposerPersistedState> | Accessor<Store<ComposerPersistedState>>,
   SetStoreFunction<ComposerPersistedState>,
 ]

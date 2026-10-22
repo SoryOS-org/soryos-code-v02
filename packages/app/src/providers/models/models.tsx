@@ -4,7 +4,7 @@ import { createSimpleContext } from "@opencode/ui/context"
 import { useProviders } from "@/providers/catalog/providers"
 import { useGlobal } from "@/runtime/server/runtime"
 
-export type ModelKey = { providerID: string; modelID: string }
+type ModelKey = { providerID: string; modelID: string }
 
 type Visibility = "show" | "hide"
 

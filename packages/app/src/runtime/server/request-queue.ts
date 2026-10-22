@@ -3,27 +3,27 @@ type Entry = { method: string; url: string; at: number; slow: boolean; priority:
 // Chromium allows six connections per origin. The event stream holds one for the life of the
 // connection and health probes use their own fetch, so the app's API calls stay below that or
 // a burst stalls probes and user actions inside the browser where nothing can observe it.
-export const requestQueueLimit = 4
+const requestQueueLimit = 4
 
 // Endpoints that shell out to git or walk the filesystem take seconds on a large repository. They
 // may hold at most this many slots, so a session mount's small reads never queue behind them.
-export const requestQueueSlowLimit = 2
+const requestQueueSlowLimit = 2
 
-export const slowRequestPaths = ["/api/vcs", "/api/worktree"]
+const slowRequestPaths = ["/api/vcs", "/api/worktree"]
 
 // A mount legitimately fires a dozen requests at once; only a request that has waited this long
 // for a slot indicates the server is not keeping up.
-export const requestStallMs = 2_000
+const requestStallMs = 2_000
 
 // A socket that dies while the device sleeps can leave fetch waiting for response headers until the
 // OS gives up on TCP retransmits, which takes minutes. Bound that so a dead request frees its slot
 // instead of wedging every later API call; the body may still stream for as long as it needs.
-export const requestHeadersTimeoutMs = 60_000
+const requestHeadersTimeoutMs = 60_000
 
 // Creating a worktree runs the project's setup script (dependency installs, fetches) before the
 // server answers, so it needs a budget measured in minutes rather than seconds. Cutting it off
 // kills the script midway and leaves a registered but half-initialised worktree behind.
-export const setupRequestHeadersTimeoutMs = 10 * 60_000
+const setupRequestHeadersTimeoutMs = 10 * 60_000
 
 function isSlowRequest(pathname: string) {
   return slowRequestPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))

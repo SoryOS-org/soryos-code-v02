@@ -85,7 +85,7 @@ function signatureFromEvent(event: KeyboardEvent) {
   return signature(keyFromKeyboardEvent(event), event.ctrlKey, event.metaKey, event.shiftKey, event.altKey)
 }
 
-export type KeybindConfig = string
+type KeybindConfig = string
 
 export interface Keybind {
   key: string
@@ -167,7 +167,7 @@ export function resolveKeybindOption(candidates: CommandOption[] | undefined, ev
 
 export type CommandSource = "palette" | "keybind" | "slash"
 
-export const CommandCatalogItem = Persistence.struct({
+const CommandCatalogItem = Persistence.struct({
   title: Schema.String,
   description: Schema.optional(Schema.String),
   category: Schema.optional(Schema.String),
@@ -176,8 +176,6 @@ export const CommandCatalogItem = Persistence.struct({
   slash: Schema.optional(Schema.String),
   hidden: Schema.optional(Schema.Boolean),
 })
-
-export type CommandCatalogItem = typeof CommandCatalogItem.Type
 
 export const CommandCatalog = Schema.Record(Schema.String, Schema.mutableKey(CommandCatalogItem))
 

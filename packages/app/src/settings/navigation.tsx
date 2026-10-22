@@ -10,7 +10,7 @@ import { useSettingsSurface } from "./surface"
 import { SettingsSearch } from "./search"
 import "./search.css"
 
-export type SettingsNavItem = {
+type SettingsNavItem = {
   value: string
   label: string
   icon: ComponentProps<typeof Icon>["name"]

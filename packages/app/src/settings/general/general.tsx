@@ -15,7 +15,8 @@ import {
 import { formatKeybind } from "@/shell/commands/command"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
-import { createShellOptions, type ShellSettingsController } from "./controllers"
+import { createShellOptions } from "./behavior"
+import type { ShellSettingsController } from "./controllers"
 import { InterfaceModeSetting } from "./interface-mode"
 import "@/settings/settings.css"
 

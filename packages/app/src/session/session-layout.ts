@@ -8,7 +8,7 @@ import { base64Encode } from "@opencode/util/encode"
 import { ServerConnection } from "@/runtime/server/registry"
 import { findSessionTab, tabKey, useTabs } from "@/shell/tabs/tabs"
 
-export const useSessionKey = () => {
+const useSessionKey = () => {
   const params = useParams()
   const sdk = useWorkspaceLocation()
   const serverSDK = useServerSDK()

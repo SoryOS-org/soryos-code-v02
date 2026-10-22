@@ -37,7 +37,7 @@ type GlobalStore = {
   reload: undefined | "pending" | "complete"
 }
 
-export const loadLspQuery = (scope: ServerScope, directory: string) =>
+const loadLspQuery = (scope: ServerScope, directory: string) =>
   queryOptions({
     queryKey: [scope, directory, "lsp"] as const,
     // TODO: Restore LSP status when the V2 client exposes an LSP API.
@@ -54,7 +54,7 @@ function makeQueryOptionsApi(scope: ServerScope, serverAPI: () => ServerApi) {
 
 export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 
-export function createServerSyncContextInner(serverSDK: ServerSDK, data: Data) {
+function createServerSyncContextInner(serverSDK: ServerSDK, data: Data) {
   const language = useLanguage()
   const platform = usePlatform()
   const owner = getOwner()
@@ -184,7 +184,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK, data: Data) {
         refetchType: "none",
       })
     },
-    connected: (info) => {
+    connected: () => {
       if (bootstrap.data !== undefined && !bootstrap.isFetching) void bootstrap.refetch()
       // The refresh queue re-syncs two directories at a time, held ones first. Syncing every active
       // directory here as well sent the whole catalog fan-out for all of them at once.

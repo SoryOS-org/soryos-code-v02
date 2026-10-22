@@ -48,9 +48,7 @@ export function providerFormDefaults(fields: ReadonlyArray<FormField> | undefine
 
       if (actual === undefined) return false
 
-      const equal = Array.isArray(actual)
-        ? actual.some((item) => item === condition.value)
-        : actual === condition.value
+      const equal = Array.isArray(actual) ? actual.some((item) => item === condition.value) : actual === condition.value
 
       return condition.op === "eq" ? equal : !equal
     })
@@ -628,5 +626,3 @@ export function createProviderConnectionController(options: {
     },
   }
 }
-
-export type ProviderConnectionController = ReturnType<typeof createProviderConnectionController>

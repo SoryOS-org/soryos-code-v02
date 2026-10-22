@@ -23,7 +23,7 @@ const MENU_LIMIT = 10
 const SECTION_LIMIT = 5
 
 /** A closed tab's icon, title and, for a file, its folder. */
-export function ClosedTabVisual(props: { entry: ClosedSideTab }): JSX.Element {
+function ClosedTabVisual(props: { entry: ClosedSideTab }): JSX.Element {
   const detail = () => (props.entry.file ? getDirectory(props.entry.file).replace(/\/$/, "") : props.entry.detail)
   const icon = () => (props.entry.icon && isIconName(props.entry.icon) ? props.entry.icon : "file-document")
 

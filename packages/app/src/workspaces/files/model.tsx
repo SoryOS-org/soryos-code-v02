@@ -26,15 +26,9 @@ import { useServerSDK } from "@/runtime/server/client"
 import { formatServerError } from "@/runtime/server/errors"
 import { createFileTreeStore } from "./tree-store"
 import { invalidateFromWatcher } from "./watcher"
-import {
-  selectionFromLines,
-  type FileState,
-  type FileSelection,
-  type FileViewState,
-  type SelectedLineRange,
-} from "./types"
+import { selectionFromLines, type FileState, type FileSelection, type SelectedLineRange } from "./types"
 
-export type { FileSelection, SelectedLineRange, FileViewState, FileState }
+export type { FileSelection, SelectedLineRange, FileState }
 
 export { selectionFromLines }
 
