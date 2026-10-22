@@ -98,6 +98,13 @@ This configuration is distinct from `cli.json`. Use the
 [CLI settings reference](https://opencode.ai/v2/docs/cli/config) for terminal
 preferences, especially themes and keybindings.
 
+Configuration changes apply without restarting OpenCode. The service watches
+discovered config files and reloads agents, commands, skills, instructions, MCP
+servers, plugins, and other config-driven features shortly after a save, and
+the TUI picks up `cli.json` edits the same way. To force a full reload, tell the
+user to run `/reload` in the TUI. Do not tell the user to restart OpenCode or
+its service after editing configuration.
+
 Do not guess field names or shapes. Fetch the V2 configuration guide and its
 linked topic guide as the source of truth, and preserve unrelated settings when
 editing an existing file. Keep the published `$schema` URL in configuration
@@ -168,7 +175,8 @@ to a background OpenCode service, which owns sessions, configuration, plugins,
 permissions, and tool execution.
 
 OpenCode normally discovers or starts the shared background service
-automatically. If the service is stuck or unhealthy, restart it:
+automatically. Restart it only if it is stuck or unhealthy, not to apply
+configuration changes:
 
 ```sh
 opencode service restart
