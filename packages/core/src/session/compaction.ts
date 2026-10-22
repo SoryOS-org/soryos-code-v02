@@ -66,8 +66,11 @@ export type Outcome =
 
 export interface Interface extends State.Transformable<Editor> {
   readonly compact: (trigger: Trigger) => Effect.Effect<Outcome>
-  /** Starts a background summary when the context nears the threshold. Never waits for it. */
-  readonly precompute: (context: SessionContext.Loaded) => Effect.Effect<void>
+  /**
+   * Starts a background summary when the context nears the threshold. Never waits for it. Loads `context` only when
+   * background summaries are on.
+   */
+  readonly precompute: <E>(context: Effect.Effect<SessionContext.Loaded, E>) => Effect.Effect<void, E>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
@@ -104,6 +107,10 @@ type Precomputed = {
   readonly keepID: SessionMessage.ID
   readonly model: SessionContext.Loaded["model"]["ref"]
   readonly initial: string
+  /** The longest tail since `keepID` that compaction still accepts beside this summary. */
+  readonly tailLimit: number
+  /** Background summaries that failed since the last compaction, this one included once it has. */
+  readonly failures: number
   readonly usage: SessionUsage.Recorded[]
   readonly fiber: Fiber.Fiber<Result, Failure>
 }
@@ -135,6 +142,8 @@ const PRECOMPUTE_MIN_TOKENS = 64_000
  */
 const PRECOMPUTED_TAIL_MIN = 30_000
 const PRECOMPUTED_TAIL_SHARE = 0.25
+/** Failed background summaries after which no new one starts until the next compaction. */
+const PRECOMPUTE_MAX_FAILURES = 2
 
 const SUMMARY_TEMPLATE = `You MUST use this format for your response (you may omit sections that aren't applicable). Do not include the <template> tags in your response.
 <template>
@@ -280,6 +289,10 @@ export const layer = Layer.effect(
           : model.cap
 
       const selected = model.context === context ? trigger : { ...trigger, context: model.context }
+      // The runner opened the manual compaction's message when it delivered the `/compact` item. An automatic one
+      // opens here, before any wait, so a background summary still being written shows as a running compaction.
+      if (trigger.reason !== "manual")
+        yield* bus.publish(SessionEvent.Compaction.Started, { sessionID: context.session.id, reason: "auto" })
       const swapped = held ? yield* usePrecomputed(selected, held, budget, settings) : undefined
       const compaction = swapped
         ? Effect.succeed(swapped)
@@ -298,11 +311,16 @@ export const layer = Layer.effect(
      * Once the context passes `PRECOMPUTE_RATIO` of the ceiling, summarizes everything before the latest response in
      * the background. That is the prefix the provider just processed, so the summary request reads it from the prompt
      * cache. The summary is held, not applied: swapping it in now would rewrite the prefix and throw away the cache
-     * for every step until compaction is actually due. One summary is held per Session until compaction takes it.
+     * for every step until compaction is actually due. One summary is held per Session until compaction takes it, or
+     * until it fails or falls too far behind, when a newer response replaces it.
      */
-    const precompute = Effect.fn("SessionCompaction.precompute")(function* (context: SessionContext.Loaded) {
+    const precompute = Effect.fn("SessionCompaction.precompute")(function* <E>(
+      load: Effect.Effect<SessionContext.Loaded, E>,
+    ) {
       const settings = state.get()
-      if (!settings.precompute || !settings.auto || context.model.compaction?.type === "native") return
+      if (!settings.precompute || !settings.auto) return
+      const context = yield* load
+      if (context.model.compaction?.type === "native") return
       const ceiling = calculateCeiling(context.model.limit, settings.buffer)
       if (!Number.isFinite(ceiling) || due(context, ceiling)) return
       if (estimateContext(context) < ceiling * PRECOMPUTE_RATIO) return
@@ -314,8 +332,19 @@ export const layer = Layer.effect(
 
       const sessionID = context.session.id
       const existing = precomputed.get(sessionID)
-      if (existing && heldIndex(existing, context) >= 0) return
-      if (existing) yield* Fiber.interrupt(existing.fiber)
+      const exit = existing?.fiber.pollUnsafe()
+      const failed = exit !== undefined && Exit.isFailure(exit)
+      const failures = (existing?.failures ?? 0) + (failed ? 1 : 0)
+      if (existing) {
+        const index = heldIndex(existing, context)
+        if (index >= 0 && !failed && tailTokens(context, index) <= existing.tailLimit) return
+        // Summarizing up to the same response again would repeat the same request.
+        if (index >= 0 && (existing.keepID === anchor.id || failures >= PRECOMPUTE_MAX_FAILURES)) return
+        yield* Fiber.interrupt(existing.fiber)
+        precomputed.delete(sessionID)
+      }
+      // After a model switch nothing is cached for the new model yet; wait until its first response has written it.
+      if (anchor.model.id !== context.model.ref.id || anchor.model.variant !== context.model.ref.variant) return
 
       const model = yield* selectModel(context, settings.buffer, false)
       const usage: SessionUsage.Recorded[] = []
@@ -328,6 +357,8 @@ export const layer = Layer.effect(
         keepID: anchor.id,
         model: context.model.ref,
         initial: context.initial,
+        tailLimit: tailLimit(settings.keep, model.cap),
+        failures,
         usage,
         fiber,
       })
@@ -346,15 +377,12 @@ export const layer = Layer.effect(
     ): Effect.fn.Return<Result | undefined> {
       const context = trigger.context
       const index = heldIndex(held, context)
-      const tail = Token.estimate(
-        context.messages.slice(index).map(SessionRecentText.messageToText).filter(Boolean).join("\n\n"),
-      )
       const usable =
         settings.precompute &&
         trigger.reason !== "overflow" &&
         context.model.compaction?.type !== "native" &&
         index >= 0 &&
-        tail <= Math.min(Math.max(settings.keep * 2, PRECOMPUTED_TAIL_MIN), Math.floor(budget * PRECOMPUTED_TAIL_SHARE))
+        tailTokens(context, index) <= tailLimit(settings.keep, budget)
       if (!usable) {
         yield* Fiber.interrupt(held.fiber)
         return undefined
@@ -362,11 +390,8 @@ export const layer = Layer.effect(
 
       const exit = yield* Fiber.await(held.fiber).pipe(Effect.onInterrupt(() => Fiber.interrupt(held.fiber)))
       if (Exit.isFailure(exit)) return undefined
-      const sessionID = context.session.id
       // Background calls were billed as they finished; the compaction's message still shows what it cost.
-      held.usage.forEach((usage) => addSpent(sessionID, usage))
-      if (trigger.reason !== "manual")
-        yield* bus.publish(SessionEvent.Compaction.Started, { sessionID, reason: "auto" })
+      held.usage.forEach((usage) => addSpent(context.session.id, usage))
       return { ...exit.value, metadata: { keepID: held.keepID, ...exit.value.metadata } }
     })
 
@@ -539,10 +564,6 @@ export const layer = Layer.effect(
       background?: Background,
     ): Effect.fn.Return<Result, Failure> {
       const context = trigger.context
-      // The runner opened the manual compaction's message when it delivered the `/compact` item.
-      if (trigger.reason !== "manual" && !background) {
-        yield* bus.publish(SessionEvent.Compaction.Started, { sessionID: context.session.id, reason: "auto" })
-      }
       if (prepared.event.result) return yield* fromHook(context, prepared.event.result, background)
 
       const policy = yield* SessionRunnerRetry.policy(context.session.id)
@@ -859,6 +880,13 @@ const heldIndex = (held: Precomputed, context: SessionContext.Loaded) => {
   if (held.model.variant !== context.model.ref.variant) return -1
   return context.messages.findIndex((message) => message.id === held.keepID)
 }
+
+/** Estimated text a swapped-in summary keeps verbatim: every message from `index` on. */
+const tailTokens = (context: SessionContext.Loaded, index: number) =>
+  Token.estimate(context.messages.slice(index).map(SessionRecentText.messageToText).filter(Boolean).join("\n\n"))
+
+const tailLimit = (keep: number, budget: number) =>
+  Math.min(Math.max(keep * 2, PRECOMPUTED_TAIL_MIN), Math.floor(budget * PRECOMPUTED_TAIL_SHARE))
 
 /** History loads from the latest completed compaction, so a previous one is always the first message. */
 const previousCompaction = (messages: ReadonlyArray<SessionMessage.Info>) => {
