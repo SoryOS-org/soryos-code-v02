@@ -104,6 +104,7 @@ describe("settings schema", () => {
         sans: "",
         terminal: "",
         tabLayout: "horizontal",
+        tabServerGroups: "auto",
       },
       keybinds: {},
       permissions: { autoApprove: false, autoApproveProjects: {} },
@@ -149,6 +150,7 @@ describe("settings schema", () => {
       sans: "",
       terminal: "",
       tabLayout: "vertical",
+      tabServerGroups: "auto",
     })
     expect(settings.permissions).toEqual({ autoApprove: true, autoApproveProjects: { on: true, off: false } })
     expect(settings.workspaces).toEqual({ defaultDestination: "new", lastUsed: { good: "workspace" } })

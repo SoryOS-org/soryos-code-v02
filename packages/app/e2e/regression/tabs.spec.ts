@@ -549,6 +549,31 @@ test("vertical tabs group by server without changing tabs inside a server", asyn
   await expect(page.locator('[data-slot="tab-server-group"]')).toHaveText(["127.0.0.1:4096", "127.0.0.1:4097"])
 })
 
+test("the group tabs by server setting turns grouping off and back on", async ({ page }) => {
+  const sessionA = session({ id: "ses_group_a1", directory: "C:/server-a", title: "A one" })
+  const sessionB = session({ id: "ses_group_b1", directory: "/home/server-b", title: "B one" })
+  await twoServers(page, { a: [sessionA], b: [sessionB] })
+  await seed(page, {
+    settings: { appearance: { tabLayout: "vertical", tabServerGroups: "never" } },
+    tabs: [sessionA.id, { session: sessionB.id, server: REMOTE_SERVER }],
+  })
+  await page.goto(sessionHref(sessionA.id))
+
+  const headers = page.locator('[data-slot="tab-server-group"]')
+  await expect(page.locator("[data-titlebar-tab-slot]")).toHaveCount(2)
+  await expect(headers).toHaveCount(0)
+
+  await page.goto("/settings")
+  const settings = page.getByTestId("settings-screen")
+  const row = settings.locator('[data-action="settings-tab-server-groups"]')
+  await expect(row).toHaveText("Never")
+  await row.click()
+  await page.getByRole("option", { name: "Always", exact: true }).click()
+  await expect(row).toHaveText("Always")
+  await page.goto(sessionHref(sessionA.id))
+  await expect(headers).toHaveText(["127.0.0.1:4096", "127.0.0.1:4097"])
+})
+
 test("a remote tab stays busy while a child session runs", async ({ page }) => {
   const sessionA = session({ id: "ses_server_a", directory: "C:/server-a", title: "Server A session" })
   const sessionB = session({ id: "ses_server_b", directory: "/home/server-b", title: "Server B session" })

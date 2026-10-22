@@ -30,6 +30,12 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
+    label: "settings.appearance.row.tabServerGroups.title",
+    target: "settings-tab-server-groups",
+    keywords: "tabs group server group by server automatic",
+  },
+  {
+    tab: "general",
     label: "settings.workspaces.default.title",
     target: "settings-workspace-destination",
     description: "settings.workspaces.default.description",

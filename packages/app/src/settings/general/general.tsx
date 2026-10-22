@@ -8,6 +8,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { ExtensionSettingsSections } from "@/runtime/extension/settings-page-view"
 import {
   type FollowUpBehavior,
+  type TabServerGroups,
   type TerminalPlacement,
   type WorkspaceDefaultDestination,
   useSettings,
@@ -19,6 +20,8 @@ import { createShellOptions, type ShellSettingsController } from "./controllers"
 import "@/settings/settings.css"
 
 const tabLayoutOptions: ("horizontal" | "vertical")[] = ["horizontal", "vertical"]
+
+const tabServerGroupsOptions: TabServerGroups[] = ["auto", "always", "never"]
 
 const AutoApprovePermissionsSetting: Component = () => {
   const language = useLanguage()
@@ -217,6 +220,29 @@ const TabLayoutSetting = () => {
   )
 }
 
+const TabServerGroupsSetting = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+
+  return (
+    <SettingsRow
+      title={language.t("settings.appearance.row.tabServerGroups.title")}
+      description={language.t("settings.appearance.row.tabServerGroups.description")}
+    >
+      <Select
+        data-action="settings-tab-server-groups"
+        options={tabServerGroupsOptions}
+        current={tabServerGroupsOptions.find((option) => option === settings.appearance.tabServerGroups())}
+        aria-label={language.t("settings.appearance.row.tabServerGroups.title")}
+        placement="bottom-end"
+        gutter={6}
+        label={(option) => language.t(`settings.appearance.row.tabServerGroups.${option}`)}
+        onSelect={(option) => option && settings.appearance.setTabServerGroups(option)}
+      />
+    </SettingsRow>
+  )
+}
+
 export const SettingsGeneral: Component = () => {
   const language = useLanguage()
   const platform = usePlatform()
@@ -244,6 +270,7 @@ export const SettingsGeneral: Component = () => {
       <SettingsList>
         <LanguageSetting />
         <TabLayoutSetting />
+        <TabServerGroupsSetting />
 
         <WorkspaceDestinationSetting />
         <AutoApprovePermissionsSetting />

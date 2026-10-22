@@ -13,6 +13,7 @@ import { useGlobal, useServerCtx, type ServerCtx } from "@/runtime/server/runtim
 import { useLanguage } from "@/runtime/i18n/language"
 import { useCommand } from "@/shell/commands/command"
 import { useTabs } from "@/shell/tabs/tabs"
+import { useSettings } from "@/settings/model"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { createTabComposerState } from "@/composer/persistence"
 import { base64Encode } from "@opencode/util/encode"
@@ -278,6 +279,7 @@ export function TitlebarTabStrip(props: {
   const global = useGlobal()
   const language = useLanguage()
   const command = useCommand()
+  const preferences = useSettings()
   const vertical = () => props.orientation === "vertical"
   let listRef!: HTMLDivElement
   const [visibility, setVisibility] = createStore<Record<string, boolean>>({})
@@ -288,8 +290,10 @@ export function TitlebarTabStrip(props: {
   // own tab order and makes reordering inside a group persist.
   const grouping = createMemo(() => {
     const servers = global.servers.list()
+    const mode = preferences.appearance.tabServerGroups()
 
-    if (!vertical() || servers.length <= 1) return
+    if (!vertical() || mode === "never") return
+    if (mode === "auto" && servers.length <= 1) return
     const names = new Map(servers.map((conn) => [ServerConnection.key(conn), serverName(conn)]))
     const order = [...names.keys()]
 

@@ -722,6 +722,12 @@ export const dict = {
   "settings.appearance.row.tabs.description": "Choose how session tabs are arranged",
   "settings.appearance.row.tabs.horizontal": "Horizontal",
   "settings.appearance.row.tabs.vertical": "Vertical",
+  "settings.appearance.row.tabServerGroups.title": "Group tabs by server",
+  "settings.appearance.row.tabServerGroups.description":
+    "Separate vertical tabs by server. Automatic groups them when more than one server is connected.",
+  "settings.appearance.row.tabServerGroups.auto": "Automatic",
+  "settings.appearance.row.tabServerGroups.always": "Always",
+  "settings.appearance.row.tabServerGroups.never": "Never",
   "settings.notifications.description": "Choose when to receive notifications and hear sounds",
   "settings.shortcuts.description": "Customize shortcuts for common actions",
   "settings.servers.description": "Manage server connections",
