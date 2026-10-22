@@ -249,6 +249,8 @@ export function createPanelMotion(input: {
   // James's panel animations in progress, if any: its fade and shift in, or holding it hidden while a close lands.
   let fades: Animation[] = []
   let hidden: Animation | undefined
+  // James's layout flight: the panel stays at its landing box, so its only travel is its own shift.
+  const [pinned, setPinned] = createSignal(false)
 
   const fly = (next: boolean) => {
     if (flying === next) return
@@ -290,6 +292,7 @@ export function createPanelMotion(input: {
     fades = []
     hidden?.cancel()
     hidden = undefined
+    setPinned(false)
 
     if (!input.open()) input.onClosed?.()
 
@@ -321,6 +324,7 @@ export function createPanelMotion(input: {
           fades = []
           hidden?.cancel()
           hidden = undefined
+          setPinned(false)
           fly(false)
           motion.snap(target)
           paint()
@@ -358,6 +362,8 @@ export function createPanelMotion(input: {
         }
 
         if (james() && !open) hide()
+
+        setPinned(james())
 
         const tuning = james() ? (open ? jamesLayoutOpen() : jamesLayoutClose()) : spring()
         motion.omega = (2 * Math.PI) / tuning.duration
@@ -449,6 +455,7 @@ export function createPanelMotion(input: {
 
   return {
     present,
+    pinned,
     sync: (open: boolean) => {
       if (flying && input.open() === open) return snap(open)
       snapTo = open

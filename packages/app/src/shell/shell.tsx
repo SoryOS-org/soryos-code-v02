@@ -167,6 +167,8 @@ export default function Layout(props: ParentProps) {
                 ref={(element) => setState("tabsPanel", element)}
                 class="absolute inset-0 overflow-hidden [contain:layout_style_paint]"
                 classList={{ "[content-visibility:hidden]": !sidebarMotion.present() }}
+                // Under James the sidebar keeps its landing width (start edge held) while the layout moves.
+                style={{ width: sidebarMotion.pinned() ? `${state.tabsWidth}px` : undefined }}
               >
                 <div
                   ref={(element) => setState("tabsMount", element)}

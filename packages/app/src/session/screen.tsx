@@ -499,12 +499,16 @@ function SessionScreenContent(props: {
             <div
               ref={sidePresence}
               data-slot="session-side-panel-presence"
-              class="z-0 min-w-0 h-full overflow-visible"
-              classList={{
-                "relative flex-1": sideMotion.present(),
-                // Out of the row, so a closed panel takes no space or gap.
-                "absolute inset-y-0 end-0 w-0 [content-visibility:hidden]": !sideMotion.present(),
-              }}
+              class={`z-0 min-w-0 h-full overflow-visible ${
+                !sideMotion.present()
+                  ? // Out of the row, so a closed panel takes no space or gap.
+                    "absolute inset-y-0 end-0 w-0 [content-visibility:hidden]"
+                  : sideMotion.pinned()
+                    ? // Under James the panel stays at its landing box, under the chat, while the chat's width moves.
+                      "absolute inset-y-0 end-0"
+                    : "relative flex-1"
+              }`}
+              style={{ width: sideMotion.pinned() ? screen.side.contentWidth() : undefined }}
             >
               <div
                 ref={sideContent}
