@@ -11,7 +11,6 @@ import { SessionEvent } from "./event.js"
 import { SessionMessage } from "./message.js"
 import { SessionMessageUpdater } from "./message-updater.js"
 import { SessionInbox } from "./inbox.js"
-import { Workspace } from "@opencode/schema/workspace"
 import { InstructionState } from "./instruction-state.js"
 import { SessionInboxTable, SessionMessageTable, SessionTable } from "./sql.js"
 import { InstructionEntry } from "./instruction-entry.js"
@@ -224,16 +223,11 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
         }
         // A summary references the first message it kept, which the fork copied under a new ID.
         const keepID = row.type === "compaction" ? row.data.metadata?.keepID : undefined
-        if (typeof keepID !== "string") return copy
+        if (!Schema.is(SessionMessage.ID)(keepID)) return copy
         const kept = yield* db
           .select({ seq: SessionMessageTable.seq })
           .from(SessionMessageTable)
-          .where(
-            and(
-              eq(SessionMessageTable.session_id, event.data.parentID),
-              eq(SessionMessageTable.id, SessionMessage.ID.make(keepID)),
-            ),
-          )
+          .where(and(eq(SessionMessageTable.session_id, event.data.parentID), eq(SessionMessageTable.id, keepID)))
           .get()
           .pipe(Effect.orDie)
         if (!kept) return copy
@@ -311,7 +305,7 @@ function run(db: DatabaseService, event: MessageEvent) {
                 ? {
                     location: {
                       directory: AbsolutePath.make(row.directory),
-                      workspaceID: row.workspaceID ? Workspace.ID.make(row.workspaceID) : undefined,
+                      workspaceID: row.workspaceID ?? undefined,
                     },
                     projectID: row.projectID,
                     subpath: row.subpath === null ? undefined : RelativePath.make(row.subpath),
@@ -467,7 +461,7 @@ const layer = Layer.effectDiscard(
           .values({
             id: event.data.sessionID,
             project_id: event.data.projectID,
-            workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
+            workspace_id: event.data.location.workspaceID ?? null,
             parent_id: event.data.parentID,
             slug: event.data.slug,
             directory: event.data.location.directory,
@@ -497,7 +491,7 @@ const layer = Layer.effectDiscard(
             directory: event.data.location.directory,
             path: event.data.subpath,
             ...(event.data.projectID ? { project_id: event.data.projectID } : {}),
-            workspace_id: event.data.location.workspaceID ? Workspace.ID.make(event.data.location.workspaceID) : null,
+            workspace_id: event.data.location.workspaceID ?? null,
             time_updated: event.created,
           })
           .where(eq(SessionTable.id, event.data.sessionID))
@@ -645,11 +639,7 @@ const layer = Layer.effectDiscard(
         .pipe(Effect.orDie),
     )
     yield* bus.project(SessionEvent.MessageContentUpdated, (event) => run(db, event))
-    yield* bus.project(SessionEvent.UsageRecorded, (event) =>
-      // Reverted usage reached the session counters when its steps ended; the event only preserves it
-      // for SessionStats after the message rows are deleted, so applying it here would double count.
-      event.data.source === "revert" ? Effect.void : applyUsage(db, event.data.sessionID, event.data),
-    )
+    yield* bus.project(SessionEvent.UsageRecorded, (event) => applyUsage(db, event.data.sessionID, event.data))
     yield* bus.project(SessionEvent.Forked, (event) => projectFork(db, event))
     yield* bus.project(SessionEvent.InboxDelivered, (event) =>
       Effect.gen(function* () {
@@ -776,7 +766,7 @@ const layer = Layer.effectDiscard(
         yield* db
           .update(SessionTable)
           .set({
-            revert: { ...revert, files: revert.files ? [...revert.files] : undefined },
+            revert,
             time_updated: event.created,
           })
           .where(eq(SessionTable.id, event.data.sessionID))
@@ -803,6 +793,36 @@ const layer = Layer.effectDiscard(
           .get()
           .pipe(Effect.orDie)
         if (!boundary) return yield* Effect.die(new Error(`Revert boundary message not found: ${event.data.to}`))
+        // Preserve the reverted rows' prompts, steps and usage for SessionStats before
+        // deleting them. The fork filter matches SessionStats: rows a fork copied from its
+        // parent belong to the parent's stats, not this session's.
+        yield* db
+          .run(
+            sql`
+              INSERT OR IGNORE INTO session_revert_usage (id, session_id, type, time_created, model_provider_id, model_id, model_variant, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write)
+              SELECT
+                message.id,
+                message.session_id,
+                message.type,
+                message.time_created,
+                json_extract(message.data, '$.model.providerID'),
+                json_extract(message.data, '$.model.id'),
+                json_extract(message.data, '$.model.variant'),
+                coalesce(json_extract(message.data, '$.cost'), 0),
+                coalesce(json_extract(message.data, '$.tokens.input'), 0),
+                coalesce(json_extract(message.data, '$.tokens.output'), 0),
+                coalesce(json_extract(message.data, '$.tokens.reasoning'), 0),
+                coalesce(json_extract(message.data, '$.tokens.cache.read'), 0),
+                coalesce(json_extract(message.data, '$.tokens.cache.write'), 0)
+              FROM ${SessionMessageTable} AS message
+              JOIN ${SessionTable} AS session ON session.id = message.session_id
+              WHERE message.type IN ('user', 'assistant')
+                AND message.session_id = ${event.data.sessionID}
+                AND message.seq >= ${boundary.seq}
+                AND (session.fork_session_id IS NULL OR message.time_created >= session.time_created)
+            `,
+          )
+          .pipe(Effect.orDie)
         yield* db
           .delete(SessionMessageTable)
           .where(
