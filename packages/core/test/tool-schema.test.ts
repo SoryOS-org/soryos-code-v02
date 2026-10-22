@@ -493,6 +493,31 @@ test("raw JSON schemas resolve draft-07 definitions", async () => {
   )
 })
 
+test("raw JSON schemas with patterns still validate the rest of the input", async () => {
+  const tool: Info = {
+    name: "patterned",
+    description: "Patterned tool",
+    input: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { session: { type: "string", pattern: "^ses_" }, gist: { type: "string", minLength: 1 } },
+      required: ["session", "gist"],
+      additionalProperties: false,
+    },
+    execute: (input) => Effect.succeed({ content: JSON.stringify(input) }),
+  }
+
+  expect(await Effect.runPromise(execute(tool, { session: "ses_1", gist: "topic" }, context))).toMatchObject({
+    content: [{ type: "text", text: '{"session":"ses_1","gist":"topic"}' }],
+  })
+  expect(await Effect.runPromise(Effect.flip(execute(tool, { session: "ses_1", topic: "topic" }, context)))).toEqual(
+    new Tool.Error({
+      message:
+        'Invalid arguments for tool "patterned":\n- gist: Missing key\n\nArguments provided:\n{\n  "session": "ses_1",\n  "topic": "topic"\n}\n\nUpdate the arguments and call the tool again.',
+    }),
+  )
+})
+
 test("raw JSON schemas pass input through when they cannot be imported", async () => {
   const tool: Info = {
     name: "invalid-schema",

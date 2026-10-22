@@ -105,7 +105,11 @@ const jsonSchema = (schema: JsonSchema.JsonSchema) => {
     (typeof schema.$schema === "string" && schema.$schema.includes("draft-07")) || "definitions" in schema
       ? JsonSchema.fromSchemaDraft07(schema)
       : JsonSchema.fromSchemaDraft2020_12(schema)
-  return Schema.make<Schema.Codec<unknown>>(SchemaRepresentation.fromJsonSchemaDocument(draft).ast)
+  // Plugin and MCP schemas are untrusted, so their regex patterns stay unenforced; the default rejects the whole
+  // document, which turned off validation of every tool with a `pattern` anywhere in its input.
+  return Schema.make<Schema.Codec<unknown>>(
+    SchemaRepresentation.fromJsonSchemaDocument(draft, { patterns: "ignore" }).ast,
+  )
 }
 
 const encodeOutput = (schema: Tool.ValueSchema<any>, value: unknown) => {
