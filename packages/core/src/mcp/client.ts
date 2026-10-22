@@ -276,8 +276,7 @@ export const connect = Effect.fnUntraced(function* (
     // Servers that bundle their own Code Mode (Cloudflare and others) expose raw tools when asked
     // with ?codemode=false, which is what our Code Mode wants. The configured URL stays the OAuth identity.
     const url = new URL(config.url)
-    const addedCodemode =
-      config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
+    const addedCodemode = config.codemode !== false && !url.searchParams.has("codemode") && !rejectsUnknownQuery(url)
     if (addedCodemode) url.searchParams.set("codemode", "false")
     const open = Effect.fnUntraced(function* (url: URL) {
       session.transport = new StreamableHTTPClientTransport(url, {
@@ -333,7 +332,7 @@ export const connect = Effect.fnUntraced(function* (
         Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
       )
     // Listing is read-only, so a transient failure is safe to retry.
-    const list = <A>(what: string, run: () => Promise<A>) =>
+    const list = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       retrying(what, Effect.tryPromise({ try: run, catch: (error) => error })).pipe(
         Effect.mapError(failure),
         Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
@@ -349,23 +348,27 @@ export const connect = Effect.fnUntraced(function* (
       instructions: client.getInstructions()?.trim() || undefined,
       tools: () =>
         advertised("tools")
-          ? list("list MCP tools", () => client.listTools(undefined, catalog)).pipe(Effect.map((r) => r.tools))
+          ? list("list MCP tools", (signal) => client.listTools(undefined, { ...catalog, signal })).pipe(
+              Effect.map((r) => r.tools),
+            )
           : Effect.succeed([]),
       prompts: () =>
         advertised("prompts")
-          ? list("list MCP prompts", () => client.listPrompts(undefined, catalog)).pipe(Effect.map((r) => r.prompts))
+          ? list("list MCP prompts", (signal) => client.listPrompts(undefined, { ...catalog, signal })).pipe(
+              Effect.map((r) => r.prompts),
+            )
           : Effect.succeed([]),
       resources: () =>
         advertised("resources")
-          ? list("list MCP resources", () => client.listResources(undefined, catalog)).pipe(
+          ? list("list MCP resources", (signal) => client.listResources(undefined, { ...catalog, signal })).pipe(
               Effect.map((r) => r.resources),
             )
           : Effect.succeed([]),
       resourceTemplates: () =>
         advertised("resources")
-          ? list("list MCP resource templates", () => client.listResourceTemplates(undefined, catalog)).pipe(
-              Effect.map((r) => r.resourceTemplates),
-            )
+          ? list("list MCP resource templates", (signal) =>
+              client.listResourceTemplates(undefined, { ...catalog, signal }),
+            ).pipe(Effect.map((r) => r.resourceTemplates))
           : Effect.succeed([]),
       readResource: (input) => {
         if (!client.getServerCapabilities()?.resources) return Effect.succeed(undefined)

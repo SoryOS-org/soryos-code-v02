@@ -187,6 +187,8 @@ export const layer = (options?: Options) =>
       // Serializes lifecycle operations per server. Anything taking this lock from a connection
       // callback must stay forked: lifecycle operations close scopes while holding it, firing onClose.
       const locks = KeyedMutex.makeUnsafe<ServerName>()
+      // Attached connections lock separately so a configured server of the same name never contends.
+      const attachedLocks = KeyedMutex.makeUnsafe<ServerName>()
       // Legacy era only: pending URL-mode elicitation forms, settled by notifications/elicitation/complete.
       const urlElicitations = new Map<string, Form.ID>()
 
@@ -551,36 +553,50 @@ export const layer = (options?: Options) =>
         yield* bus.publish(McpEvent.StatusChanged, { server: name })
       })
 
-      // Attached entries lock under their own key so a configured server of the same name never contends.
-      const attachedLock = (name: ServerName) => locks.withLock(ServerName.make(`client:${name}`))
+      const toAttachedTools = (server: ServerName, tools: ReadonlyArray<McpClient.Tool>) =>
+        tools.map((tool): Tool => ({ ...tool, server }))
 
       const detach = Effect.fnUntraced(function* (name: ServerName, entry: AttachedEntry) {
         const stack = attached.get(name) ?? []
         if (!stack.includes(entry)) return
         const remaining = stack.filter((item) => item !== entry)
         const next = remaining.at(-1)
+        // Already detaching; closing the scope must not schedule a second detach.
+        entry.client.onClose(() => {})
+        if (!next) {
+          attached.delete(name)
+          yield* Scope.close(entry.scope, Exit.void)
+          return yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+        }
         // Unlocked reads must never pick a closing connection, so update the stack before closing it.
-        if (next) attached.set(name, remaining)
-        else attached.delete(name)
+        attached.set(name, remaining)
         yield* Scope.close(entry.scope, Exit.void)
-        if (!next) return yield* bus.publish(McpEvent.ToolsChanged, { server: name })
         // Closing an idle connection changes nothing visible.
         if (stack.at(-1) !== entry) return
         // Idle connections ignore tool list changes, so the one taking over lists its tools again. A short
         // timeout keeps a half-open connection from holding the lock; it then keeps its stored tools.
+        const previous = next.tools
         yield* next.client.tools().pipe(
           Effect.timeout(FALLBACK_LIST_TIMEOUT),
           Effect.map((tools) => {
-            next.tools = tools.map((tool): Tool => ({ ...tool, server: name }))
+            next.tools = toAttachedTools(name, tools)
           }),
           Effect.ignore,
         )
-        if (!isDeepStrictEqual(entry.tools, next.tools)) yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+        // Readers may have seen the stored tools in the meantime, so compare against both.
+        if (!isDeepStrictEqual(entry.tools, next.tools) || !isDeepStrictEqual(previous, next.tools))
+          yield* bus.publish(McpEvent.ToolsChanged, { server: name })
       })
 
+      // The handshake runs interruptibly and outside the lock, so a stalled client never blocks detach or
+      // fallback for its name; the lock only guards adding the finished connection to the stack.
       const attach = Effect.fnUntraced(function* (name: ServerName, transport: Transport) {
         const { McpClient } = yield* Effect.promise(() => import("./client.js"))
-        const scope = yield* Scope.fork(root)
+        const scope = yield* Effect.acquireRelease(Scope.fork(root), (scope) => Scope.close(scope, Exit.void))
+        // The client registers its own close only once initialized; closing the scope mid-handshake (caller
+        // interruption or Location shutdown) must still close the transport right away.
+        yield* Scope.addFinalizer(scope, Effect.promise(() => transport.close()).pipe(Effect.ignore))
+        let closed = false
         const result = yield* McpClient.connect(
           name,
           { type: "attached", transport },
@@ -589,6 +605,13 @@ export const layer = (options?: Options) =>
           elicitation,
           options?.clientInfo,
         ).pipe(
+          Effect.tap((connection) =>
+            Effect.sync(() =>
+              connection.onClose(() => {
+                closed = true
+              }),
+            ),
+          ),
           Effect.flatMap((connection) => connection.tools().pipe(Effect.map((tools) => ({ connection, tools })))),
           Effect.provideService(Environment.Service, environment),
           Scope.provide(scope),
@@ -599,26 +622,34 @@ export const layer = (options?: Options) =>
               : new McpClient.ConnectError({ server: name, message: error.message }),
           ),
         )
-        const entry: AttachedEntry = {
-          scope,
-          client: result.connection,
-          tools: result.tools.map((tool): Tool => ({ ...tool, server: name })),
-        }
-        attached.set(name, [...(attached.get(name) ?? []), entry])
-        const locked = <E>(effect: Effect.Effect<void, E>) => fork(effect.pipe(attachedLock(name), Effect.ignore))
-        result.connection.onClose(() => locked(detach(name, entry)))
-        const refresh = result.connection.tools().pipe(
-          Effect.map((tools) => {
-            entry.tools = tools.map((tool): Tool => ({ ...tool, server: name }))
-          }),
-          Effect.andThen(bus.publish(McpEvent.ToolsChanged, { server: name })),
+        const register = Effect.gen(function* () {
+          if (closed) {
+            yield* Scope.close(scope, Exit.void)
+            return yield* new McpClient.ConnectError({ server: name, message: "Connection closed" })
+          }
+          const entry: AttachedEntry = { scope, client: result.connection, tools: toAttachedTools(name, result.tools) }
+          attached.set(name, [...(attached.get(name) ?? []), entry])
+          const locked = <E>(effect: Effect.Effect<void, E>) =>
+            fork(effect.pipe(attachedLocks.withLock(name), Effect.ignore))
+          result.connection.onClose(() => locked(detach(name, entry)))
+          // Bounded like fallback so a connection that stalls after announcing a change cannot hold the lock.
+          const refresh = result.connection.tools().pipe(
+            Effect.timeout(FALLBACK_LIST_TIMEOUT),
+            Effect.map((tools) => {
+              entry.tools = toAttachedTools(name, tools)
+            }),
+            Effect.andThen(bus.publish(McpEvent.ToolsChanged, { server: name })),
+          )
+          result.connection.onToolsChanged(() =>
+            locked(Effect.suspend(() => (attached.get(name)?.at(-1) === entry ? refresh : Effect.void))),
+          )
+          yield* Effect.logInfo("mcp client attached", { server: name, tools: entry.tools.length })
+          yield* bus.publish(McpEvent.ToolsChanged, { server: name })
+          return entry
+        })
+        yield* Effect.acquireRelease(register.pipe(attachedLocks.withLock(name)), (entry) =>
+          detach(name, entry).pipe(attachedLocks.withLock(name)),
         )
-        result.connection.onToolsChanged(() =>
-          locked(Effect.suspend(() => (attached.get(name)?.at(-1) === entry ? refresh : Effect.void))),
-        )
-        yield* Effect.logInfo("mcp client attached", { server: name, tools: entry.tools.length })
-        yield* bus.publish(McpEvent.ToolsChanged, { server: name })
-        return entry
       })
 
       let applied: Map<ServerName, Mcp.ServerConfig> | undefined
@@ -751,37 +782,41 @@ export const layer = (options?: Options) =>
           yield* state.reload()
         }),
         attach: Effect.fn("MCP.attach")(function* (client, transport) {
-          const name = ServerName.make(client)
-          yield* Effect.acquireRelease(attach(name, transport).pipe(attachedLock(name)), (entry) =>
-            detach(name, entry).pipe(attachedLock(name)),
-          )
+          yield* attach(ServerName.make(client), transport)
         }),
         // Reads report what is connected now; servers still starting contribute once they publish a change.
         tools: Effect.fn("MCP.tools")(function* () {
+          const clients = Array.from(attached.values()).flatMap((stack) => stack.at(-1)?.tools ?? [])
+          // Match callTool: an attached client's tool shadows a configured server's tool of the same name.
+          const shadowed = new Set(clients.map((tool) => `${tool.server}\0${tool.name}`))
           return [
-            ...Array.from(entries.values()).flatMap((entry) => entry.tools ?? []),
-            ...Array.from(attached.values()).flatMap((stack) => stack.at(-1)?.tools ?? []),
+            ...Array.from(entries.values())
+              .flatMap((entry) => entry.tools ?? [])
+              .filter((tool) => !shadowed.has(`${tool.server}\0${tool.name}`)),
+            ...clients,
           ].toSorted((a, b) => a.server.localeCompare(b.server) || a.name.localeCompare(b.name))
         }),
         callTool: Effect.fn("MCP.callTool")(function* (input) {
-          // An attached client owns the tools it lists, even when a configured server shares its name.
-          const client = attached.get(ServerName.make(input.server))?.at(-1)
-          if (client?.tools.some((tool) => tool.name === input.name)) {
+          const server = ServerName.make(input.server)
+          // An attached client owns the tools it lists, even when a configured server shares its name, and
+          // owns its name outright when no configured server has it.
+          const client = attached.get(server)?.at(-1)
+          if (client && (client.tools.some((tool) => tool.name === input.name) || !entries.has(server))) {
             const result = yield* client.client
               .callTool({ name: input.name, args: input.args, sessionID: input.sessionID })
               .pipe(
                 Effect.mapError(
                   (error) =>
                     new ToolCallError({
-                      server: ServerName.make(input.server),
+                      server,
                       tool: input.name,
-                      message: `MCP tool "${input.name}" on client "${input.server}" failed: ${error.message}`,
+                      message: `MCP tool "${input.name}" on client "${server}" failed: ${error.message}`,
                     }),
                 ),
               )
-            return { ...result, server: ServerName.make(input.server), tool: input.name }
+            return { ...result, server, tool: input.name }
           }
-          const target = yield* requireServer(input.server)
+          const target = yield* requireServer(server)
           yield* target.entry.startup.await
           if (!target.entry.client)
             return yield* new ToolCallError({

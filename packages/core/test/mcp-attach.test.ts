@@ -170,6 +170,38 @@ it.live("removes an attached entry when its scope closes", () =>
   }),
 )
 
+it.live("fails an attach whose initial tool list fails and closes its transport", () =>
+  Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    const first = yield* clientServer("first", ["open_terminal"])
+    const second = yield* clientServer("second", ["broken"])
+    const failing = failingList(second.client)
+    failing.state.fail = true
+    let closed = false
+    const close = failing.transport.close
+    failing.transport.close = () => {
+      closed = true
+      return close()
+    }
+
+    yield* mcp.attach("tui", first.client)
+    const error = yield* mcp.attach("tui", failing.transport).pipe(Effect.flip)
+    expect(error.message).toContain("list failed")
+    expect(closed).toBe(true)
+    expect((yield* mcp.tools()).map((tool) => tool.name)).toEqual(["open_terminal"])
+  }),
+)
+
+it.live("routes an unknown tool on an attached-only name to the client", () =>
+  Effect.gen(function* () {
+    const mcp = yield* Mcp.Service
+    const client = yield* clientServer("tui", ["open_terminal"])
+
+    yield* mcp.attach("tui", client.client)
+    expect(yield* mcp.callTool({ server: "tui", name: "missing" }).pipe(Effect.flip)).toBeInstanceOf(Mcp.ToolCallError)
+  }),
+)
+
 it.live("removes an attached entry when the client closes the connection", () =>
   Effect.gen(function* () {
     const mcp = yield* Mcp.Service
