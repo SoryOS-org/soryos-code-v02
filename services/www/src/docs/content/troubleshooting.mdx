@@ -111,6 +111,18 @@ grep 'role=server' ~/.local/share/opencode/log/opencode.log
 grep 'run=8fc3b1d5' ~/.local/share/opencode/log/opencode.log
 ```
 
+## Restore a missing data directory target
+
+If startup reports that the data directory is a symlink to a missing target, the error names both paths:
+
+```text
+OpenCode data directory is a symlink to a missing target: "/home/user/.local/share/opencode" -> "/scratch/user/opencode".
+```
+
+Restore the intended target (for example, remount its disk or recover it from a backup), or correct the symlink to point
+to your existing OpenCode data. Then restart OpenCode. It leaves the symlink unchanged and does not create the missing
+target automatically; creating an empty directory will not restore your previous sessions.
+
 ## Capture CPU and memory profiles
 
 On macOS and Linux, you can signal a running OpenCode process to capture diagnostic data. Get the background server PID

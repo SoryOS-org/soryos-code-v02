@@ -3,10 +3,47 @@ import fs from "fs"
 import os from "os"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Context, Effect, Layer } from "effect"
+import { Cause, Context, Effect, Exit, Layer } from "effect"
 import { Global } from "../src/global.js"
 
 describe("global", () => {
+  test("reports a missing data symlink target without changing it", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-symlink-"))
+    try {
+      const data = path.join(root, "data")
+      const target = path.join(root, "missing", "target")
+      fs.symlinkSync(target, data, "dir")
+      const exit = await Effect.runPromise(
+        Effect.scoped(
+          Layer.build(
+            Global.layerWith({
+              data,
+              log: path.join(data, "log"),
+              repos: path.join(data, "repos"),
+              config: path.join(root, "config"),
+              state: path.join(root, "state"),
+              bin: path.join(root, "bin"),
+              tmp: path.join(root, "tmp"),
+            }),
+          ),
+        ).pipe(Effect.exit),
+      )
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) {
+        const message = Cause.pretty(exit.cause)
+        expect(message).toContain("data directory is a symlink to a missing target")
+        expect(message).toContain(JSON.stringify(data))
+        expect(message).toContain(JSON.stringify(target))
+        expect(message).toContain("Restore the target directory or correct the symlink")
+      }
+      expect(fs.readlinkSync(data)).toBe(target)
+      expect(fs.existsSync(target)).toBe(false)
+      expect(fs.existsSync(path.join(root, "config"))).toBe(false)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("importing the module does not create directories", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-global-import-"))
     const directories = ["data", "cache", "config", "state", "tmp"].map((directory) => path.join(root, directory))
