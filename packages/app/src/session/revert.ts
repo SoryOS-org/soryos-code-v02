@@ -53,13 +53,22 @@ export function createSessionRevert(input: {
     const target = prompt.capture()
 
     // An undelivered prompt has no history to rewind. Withdraw it like the TUI
-    // instead of interrupting the work it is waiting behind.
+    // instead of interrupting the work it is waiting behind. Cancel returns 204
+    // for both withdrawal and a promotion race, so probe projected history before
+    // treating the undo as finished.
     if (data.session.input.has(sessionID, message.id)) {
       if (!(await request(() => server.api.session.inbox.cancel({ sessionID, inboxID: message.id })))) return
-      restore(target, message)
-      owner.run(() => input.setActiveMessage(previous))
-
-      return
+      const promoted = await server.api.session.message
+        .get({ sessionID, messageID: message.id })
+        .then(
+          () => true,
+          () => false,
+        )
+      if (!promoted) {
+        restore(target, message)
+        owner.run(() => input.setActiveMessage(previous))
+        return
+      }
     }
 
     // Interrupt acknowledges before the execution settles, and staging a busy Session fails. The

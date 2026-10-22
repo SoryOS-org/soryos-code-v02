@@ -70,6 +70,7 @@ import { statusLabel } from "../../component/dialog-workspace-file-changes"
 import { DialogMessage } from "./dialog-message"
 import { DialogFork } from "./dialog-fork"
 import { DialogTimeline } from "./dialog-timeline"
+import { revertUserMessage, revertUserMessageApi } from "./undo"
 import { DialogGoUpsell } from "../../component/dialog-go-upsell"
 import { useStorage } from "../../context/storage"
 import { Composer } from "./composer"
@@ -1117,19 +1118,17 @@ export function Session(props: {
         }
         const sessionID = route.sessionID
         const target = prompt()
-        void (async () => {
-          if (pendingDeliveries().has(message.id)) {
-            if (!(await mutatePending("cancel", message.id))) return
-          } else {
-            await client.api.session.interrupt({ sessionID })
-            await client.api.session.wait({ sessionID })
-            await client.api.session.revert.stage({ sessionID, messageID: message.id })
-          }
-          target?.set({
-            ...projectedPromptInput(message),
-            pasted: [],
+        void revertUserMessage({
+          pending: data.session.input.has(sessionID, message.id),
+          api: revertUserMessageApi(client.api.session, { sessionID, messageID: message.id }),
+        })
+          .then(() => {
+            target?.set({
+              ...projectedPromptInput(message),
+              pasted: [],
+            })
           })
-        })().catch((error) => toast.show({ message: errorMessage(error), variant: "error", duration: 5000 }))
+          .catch((error) => toast.show({ message: errorMessage(error), variant: "error", duration: 5000 }))
         dialog.clear()
       },
     },
