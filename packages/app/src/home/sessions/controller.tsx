@@ -133,33 +133,25 @@ export function createHomeSessionsController(home: HomeController) {
         projects: () => home.project.forServer(conn),
         server: ServerConnection.key(conn),
         resolveProject: (session) => ctx.projects.forSession(session),
-      }),
+      })
+        // Cap each server before merging so one busy server cannot hide the others.
+        .slice(0, HOME_SESSION_LIMIT),
     )
   })
 
-  // Cap each server before merging so one busy server cannot hide the others.
-  const records = createMemo(() =>
-    connections().flatMap((conn) =>
-      allRecords()
-        .filter((record) => record.server === ServerConnection.key(conn))
-        .slice(0, HOME_SESSION_LIMIT),
+  const groups = createMemo(() =>
+    groupSessions(
+      allRecords(),
+      grouping(),
+      language,
+      (server) => serverName(home.server.list().find((item) => ServerConnection.key(item) === server)),
     ),
   )
 
-  const groups = createMemo(() => groupSessions(records(), grouping(), language, serverNameOf))
   const prefetched = new Set<string>()
 
-  function serverNameOf(server: ServerConnection.Key) {
+  const context = (server: ServerConnection.Key) => {
     const conn = home.server.list().find((item) => ServerConnection.key(item) === server)
-
-    return conn ? serverName(conn) : server
-  }
-
-  const connection = (record: HomeSessionRecord) =>
-    home.server.list().find((conn) => ServerConnection.key(conn) === record.server)
-
-  const context = (record: HomeSessionRecord) => {
-    const conn = connection(record)
 
     return conn ? home.server.context(conn) : undefined
   }
@@ -167,14 +159,14 @@ export function createHomeSessionsController(home: HomeController) {
   const location = (record: HomeSessionRecord) =>
     homeSessionLocation(
       record.session.location.directory,
-      context(record)?.data.location.vcs.info(record.session.location)?.branch.current,
+      context(record.server)?.data.location.vcs.info(record.session.location)?.branch.current,
     )
 
   const syncLocations = (record?: HomeSessionRecord) => {
     if (platform.platform !== "desktop") return
 
     if (record) {
-      void context(record)
+      void context(record.server)
         ?.data.location.vcs.sync(record.session.location)
         .catch(() => undefined)
 
@@ -182,8 +174,8 @@ export function createHomeSessionsController(home: HomeController) {
     }
 
     const locations = new Map(
-      records().flatMap((item) => {
-        const ctx = context(item)
+      allRecords().flatMap((item) => {
+        const ctx = context(item.server)
 
         if (!ctx) return []
         const key = `${item.server}\0${pathKey(item.session.location.directory)}`
@@ -198,20 +190,22 @@ export function createHomeSessionsController(home: HomeController) {
   createEffect(() => {
     // Prefetch the two newest rows per server; an offline server has no query
     // result and keeps showing its cached sessions.
-    connections().forEach((conn) => {
-      const ctx = home.server.context(conn)
-      const key = ServerConnection.key(conn)
+    const counted = new Map<ServerConnection.Key, number>()
 
-      records()
-        .filter((record) => record.server === key)
-        .slice(0, 2)
-        .forEach((record) => {
-          const id = `${key}\0${record.session.id}`
+    allRecords().forEach((record) => {
+      const count = counted.get(record.server) ?? 0
 
-          if (prefetched.has(id)) return
-          prefetched.add(id)
-          void untrack(() => ctx.data.session.sync(record.session.id)).catch(() => {})
-        })
+      if (count >= 2) return
+      counted.set(record.server, count + 1)
+
+      const id = `${record.server}\0${record.session.id}`
+
+      if (prefetched.has(id)) return
+      prefetched.add(id)
+      const ctx = context(record.server)
+
+      if (!ctx) return
+      void untrack(() => ctx.data.session.sync(record.session.id)).catch(() => {})
     })
   })
 
@@ -375,7 +369,7 @@ export function createHomeSessionsController(home: HomeController) {
       language,
     },
     data: {
-      records,
+      records: allRecords,
       groups,
       grouping,
       setGrouping: (value: HomeSessionGrouping) => setPreferences("grouping", value),
@@ -418,10 +412,9 @@ export function createHomeSessionsController(home: HomeController) {
       },
       create: home.project.openNewSession,
       open: (record: HomeSessionRecord, options?: OpenSessionOptions) => {
-        const conn = connection(record)
-        const ctx = conn ? home.server.context(conn) : undefined
+        const ctx = context(record.server)
 
-        if (!conn || !ctx) return
+        if (!ctx) return
         const directory = record.project?.worktree ?? record.session.location.directory
 
         if (!options?.background) void ctx.data.session.message.sync(record.session.id).catch(() => undefined)
@@ -438,7 +431,7 @@ export function createHomeSessionsController(home: HomeController) {
         })
       },
       archive: async (record: HomeSessionRecord) => {
-        const ctx = context(record)
+        const ctx = context(record.server)
 
         if (!ctx) return
         await archiveHomeSession({

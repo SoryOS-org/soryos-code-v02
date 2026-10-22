@@ -286,25 +286,32 @@ export function TitlebarTabStrip(props: {
   const [unread, setUnread] = createStore<Record<string, boolean>>({})
 
   // A vertical strip with several servers reads as one flat list of identical
-  // rows, so it groups by server. Sorting is stable, which keeps each server's
-  // own tab order and makes reordering inside a group persist.
+  // rows, so it groups by server. A stable sort keeps each server's tab order.
   const grouping = createMemo(() => {
     const servers = global.servers.list()
     const mode = preferences.appearance.tabServerGroups()
 
-    if (!vertical() || mode === "never") return
-    if (mode === "auto" && servers.length <= 1) return
-    const names = new Map(servers.map((conn) => [ServerConnection.key(conn), serverName(conn)]))
-    const order = [...names.keys()]
+    if (!vertical() || mode === "never" || (mode === "auto" && servers.length <= 1)) return
 
-    return {
-      names,
-      tabs: props.tabs.toSorted((a, b) => rank(order, a.server) - rank(order, b.server)),
-    }
+    const rank = new Map(servers.map((conn, index) => [ServerConnection.key(conn), index]))
+    const names = new Map(servers.map((conn) => [ServerConnection.key(conn), serverName(conn)]))
+    // A stable sort keeps each server's own tab order, so reordering inside a group persists.
+    const sorted = props.tabs.toSorted(
+      (a, b) => (rank.get(a.server) ?? rank.size) - (rank.get(b.server) ?? rank.size),
+    )
+
+    return sorted.map((tab, index) => ({
+      tab,
+      header: tab.server === sorted[index - 1]?.server ? undefined : (names.get(tab.server) ?? tab.server),
+    }))
   })
 
-  const orderedTabs = () => grouping()?.tabs ?? props.tabs
-  const visibleTabs = createMemo(() => orderedTabs().filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
+  const rows = () => grouping() ?? props.tabs.map((tab) => ({ tab, header: undefined }))
+
+  const visibleTabs = createMemo(() =>
+    rows().flatMap((row) => (row.tab.type === "draft" || visibility[tabKey(row.tab)] ? [row.tab] : [])),
+  )
+
   const visibleTabIds = () => visibleTabs().map(tabKey)
 
   command.register("titlebar-tab-cycle", () => [
@@ -436,8 +443,9 @@ export function TitlebarTabStrip(props: {
             classList={{ "flex-row items-center": !vertical(), "flex-col items-stretch": vertical() }}
             ref={listRef}
           >
-            <For each={orderedTabs()}>
-              {(tab) => {
+            <For each={rows()}>
+              {(row) => {
+                const tab = row.tab
                 const id = tabKey(tab)
                 let ref!: HTMLDivElement
                 const visibleIndex = () => visibleTabs().findIndex((item) => tabKey(item) === id)
@@ -448,20 +456,6 @@ export function TitlebarTabStrip(props: {
 
                   return global.servers.list().find((item) => ServerConnection.key(item) === tab.server)
                 })
-
-                const header = () => {
-                  const groups = grouping()
-
-                  if (!groups) return
-                  const index = orderedTabs().findIndex((item) => tabKey(item) === id)
-
-                  if (index === 0) return groups.names.get(tab.server)
-                  const previous = orderedTabs()[index - 1]
-
-                  if (previous?.server === tab.server) return
-
-                  return groups.names.get(tab.server)
-                }
 
                 const entry =
                   tab.type === "session" ? (
@@ -496,11 +490,9 @@ export function TitlebarTabStrip(props: {
                     />
                   )
 
-                if (!grouping()) return entry
-
                 return (
                   <>
-                    <Show when={header()}>
+                    <Show when={row.header}>
                       {(title) => (
                         <div
                           data-slot="tab-server-group"
@@ -533,12 +525,6 @@ export function TitlebarTabStrip(props: {
       </Show>
     </div>
   )
-}
-
-function rank(order: string[], server: ServerConnection.Key) {
-  const index = order.indexOf(server)
-
-  return index === -1 ? order.length : index
 }
 
 function useTabShortcut(index: () => number, onSelect: () => void) {
