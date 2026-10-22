@@ -1,0 +1,78 @@
+name: anti-vibe task
+description: A unit of fork work (Mentor mode, widgets, gate, tests)
+title: "feat(scope): "
+labels: ["anti-vibe"]
+
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this changes and why, in 1 to 3 sentences.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - core (agent / prompt)
+        - core (tool)
+        - core (permissions / gate)
+        - schema (contract)
+        - tui (widget)
+        - tests
+        - chore / setup
+    validations:
+      required: true
+
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      description: Issue numbers that must land first, or "none".
+      placeholder: "#12, #13"
+    validations:
+      required: true
+
+  - type: textarea
+    id: start
+    attributes:
+      label: Where to start
+      description: Files to read first and any existing code to copy from.
+      placeholder: |
+        - packages/core/src/tool/plugin/question.ts (closest existing tool)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable outcomes. Each should be something a reviewer can verify.
+      value: |
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: Which test fails without this change? See "Tests for fork features" in CLAUDE.md. If a feature-level test is not feasible, say why.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Things a reviewer might expect here that belong in another issue.
+
+  - type: textarea
+    id: questions
+    attributes:
+      label: Open questions
+      description: Decisions to settle before or during the work.

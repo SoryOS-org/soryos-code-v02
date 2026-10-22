@@ -1,0 +1,60 @@
+# Search exclusions for ripgrep-based tools (Claude Code Grep/Glob, opencode's grep/glob).
+# Git, builds, and lint are unaffected. Files here stay readable by explicit path.
+# Rationale lives in CLAUDE.md under "Saving context".
+
+# Out-of-scope products (depend only on @opencode/ui)
+packages/console/
+packages/web/
+packages/stats/
+packages/posts/
+services/www/
+services/changelog/
+infra/
+salesforce/
+sst.config.ts
+sst-env.d.ts
+
+# Generated
+packages/client/src/effect/generated/
+packages/client/src/promise/generated/
+packages/httpapi-codegen/test/generated/
+**/openapi.json
+packages/core/src/models-dev/snapshot.txt
+*.gen.ts
+**/migration/**/snapshot.json
+bun.lock
+**/bun.lock
+
+# Large fixtures and vendored references
+packages/ai/test/fixtures/recordings/
+packages/http-recorder/test/fixtures/
+packages/plugins/figma/skills/figma-use/references/
+
+# Translations (English source stays searchable)
+**/i18n/*.ts
+!**/i18n/en.ts
+!**/i18n/*.test.ts
+!packages/app/src/runtime/i18n/desktop-native.ts
+README.*.md
+.opencode/glossary/
+
+# Upstream release history
+CHANGELOG.md
+STATS.md
+
+# Binary and media assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.icns
+*.svg
+*.mp4
+*.mp3
+*.aac
+*.woff
+*.woff2
+*.ttf
+*.otf
