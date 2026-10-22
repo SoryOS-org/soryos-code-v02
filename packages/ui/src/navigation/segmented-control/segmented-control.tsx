@@ -394,11 +394,3 @@ export function SegmentedControlItem(props: SegmentedControlItemProps) {
     </button>
   )
 }
-
-export const SegmentedControlV2 = SegmentedControl
-
-export const SegmentedControlItemV2 = SegmentedControlItem
-
-export type SegmentedControlV2Props = SegmentedControlProps
-
-export type SegmentedControlItemV2Props = SegmentedControlItemProps

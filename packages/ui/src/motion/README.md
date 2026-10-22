@@ -3,7 +3,7 @@
 Springs, a shared frame loop and DOM animation controllers for the UI packages.
 
 - `@opencode/ui/motion`: physics and DOM controllers. No Solid imports.
-- `@opencode/ui/motion/solid`: Solid primitives (`springStyle`, `slidingHighlight`, `widthMorph`, `numberTween`), plus re-exports of `keyedPresence` and `steppedSlider`.
+- `@opencode/ui/motion/solid`: Solid primitives (`springStyle`, `slidingHighlight`, `widthMorph`, `numberTween`).
 
 ## Provenance
 
@@ -49,8 +49,6 @@ function enter(el: Element, options?: { x?; y?; scale?; duration?; delay?; easin
 function slideFrom(el: HTMLElement, previous: DOMRect, options?: { duration?: number }): void
 const ease: { out: string; pop: string }
 
-function keyedPresence<T, K>(options): { update; keys; get; dispose }
-function steppedSlider(options): { set; configure; value; displayed; dispose }
 function sliderStops(spec)
 function sliderValue(spec, value)
 function sliderStep(spec, value, direction, count?)
@@ -107,41 +105,6 @@ Call Solid helpers inside an owner; they release jobs and observers on cleanup. 
 `widthMorph({ ref, content, watch, spring, inset })` clones content once per target change, measures its hidden `max-content` width in the shared read phase, and removes the clone in the write phase. It writes outer width and gives content `width: 100%`. `watch` must include any state that changes natural content width. The default spring is `0.42 / 0.18`, with `inset: 4`. Give the pill `box-sizing: border-box; padding: 4px`, content `display: flex; min-width: 0`, and keep width and opacity on separate nodes.
 
 `numberTween({ ref, value, format })` springs a number and updates `textContent` only when the formatted text changes.
-
-## Keyed rows retain nodes through exits
-
-```ts
-const rows = keyedPresence({
-  container,
-  key: (spec: ParamSpec) => spec.key,
-  create: (spec) => makeRow(spec),
-  update: (el, spec) => updateRow(el, spec),
-  destroy: (el, spec) => disposeRow(el, spec),
-})
-rows.update(params, { snap: firstRun })
-onCleanup(rows.dispose)
-```
-
-Shared keys retain the same node. Live rows follow input order; outgoing rows stay mounted and inert until their height/opacity animation finishes (entrance 260 ms, exit 220 ms by default). Returning keys reuse their exiting node and start from its measured pose. `destroy` runs only on actual removal or disposal. Duplicate keys throw before mutation. Without WAAPI, or under reduced motion, rows are removed immediately. The container should contain only these rows, and each row wrapper should have no vertical margin or padding so height zero fully collapses it.
-
-## Slider input and paint are separate
-
-```ts
-const slider = steppedSlider({
-  el,
-  spec: { min: 1, max: 5, step: 1 },
-  value: 2,
-  onChange: setLevel, // input only; may write a signal
-  paint: (value, fraction) => {
-    // rAF only; never write a signal
-    fill.style.transform = `scaleX(${fraction})`
-  },
-  resetValue: 2,
-  onCommit: (value) => save(value),
-})
-```
-
-The controller measures its track on pointer down, captures the pointer, and handles release, cancellation and lost capture. Sliders with at most 10 stops spring between stops while dragging; denser sliders follow the pointer exactly. Programmatic values and arrow keys spring unless `snap` or reduced motion applies. Double-click and Backspace reset. Supply an accessible name on `el`; the controller supplies role, range attributes and a tabindex.
 
 ## Verify
 

@@ -307,7 +307,3 @@ export function numberTween(options: {
     options,
   )
 }
-
-export { keyedPresence } from "./presence"
-
-export { steppedSlider } from "./slider"

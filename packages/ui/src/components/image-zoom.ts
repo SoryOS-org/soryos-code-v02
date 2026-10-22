@@ -18,7 +18,7 @@ export type ZoomBounds = {
 export type ZoomPoint = { x: number; y: number }
 
 /** Upper zoom limit, relative to the image's natural pixel size. */
-export const MAX_NATURAL_ZOOM = 8
+const MAX_NATURAL_ZOOM = 8
 
 export const FIT_VIEW: ZoomView = { scale: 1, x: 0, y: 0 }
 

@@ -11,5 +11,3 @@ export * from "./reduced"
 export * from "./waapi"
 
 export * from "./slider"
-
-export * from "./presence"

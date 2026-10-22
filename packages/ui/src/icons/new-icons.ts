@@ -2,7 +2,7 @@ import type { IconName } from "./catalog"
 
 // Artwork for the "New icons" experiment. Each body is the inner markup of a 16×16 SVG drawn with `currentColor`,
 // such as `<path d="…" stroke="currentColor"/>`. An empty body keeps today's artwork for every name it replaces.
-export const newIcons = {
+const newIcons = {
   checkmark: `<path d="M4.5 7.5L7 11.5L11.5 4.5" stroke-linecap="round" stroke-linejoin="round" stroke="currentColor"/>`,
   "circle-checkmark": `<path d="M5 8L7.5 11L11 5.5" stroke-linecap="round" stroke-linejoin="round" stroke="currentColor"/><path d="M14.5 8C14.5 11.5899 11.5899 14.5 8 14.5C4.41015 14.5 1.5 11.5899 1.5 8C1.5 4.41015 4.41015 1.5 8 1.5C11.5899 1.5 14.5 4.41015 14.5 8Z" stroke="currentColor"/>`,
   search: `<path d="M11.5 7C11.5 9.48528 9.48528 11.5 7 11.5C4.51472 11.5 2.5 9.48528 2.5 7C2.5 4.51472 4.51472 2.5 7 2.5C9.48528 2.5 11.5 4.51472 11.5 7Z" stroke="currentColor"/><path d="M13.5 13.5L10.5 10.5" stroke-linecap="round" stroke="currentColor"/>`,
@@ -47,7 +47,7 @@ export const newIcons = {
   providers: `<path d="M13.5 4.5V2.5H11.5M13.5 4.5H15.5M13.5 4.5V8M13.5 8H15.5M13.5 8V8.5V11.5M13.5 11.5V13.5H11.5M13.5 11.5H15.5M2.5 8H0.5M2.5 8V4.5M2.5 8V11.5M2.5 4.5V2.5H4.5M2.5 4.5H0.5M2.5 11.5V13.5H4.5M2.5 11.5H0.5M4.5 13.5V15.5M4.5 13.5H8M8 13.5V15.5M8 13.5H11.5M11.5 13.5V15.5M11.5 2.5V0.5M11.5 2.5H8M8 2.5V0.5M8 2.5H4.5M4.5 2.5V0.5M5.5 10.5V5.5H10.5V10.5H5.5Z" stroke-linecap="round" stroke-linejoin="round" stroke="currentColor"/>`,
 }
 
-export type NewIconName = keyof typeof newIcons
+type NewIconName = keyof typeof newIcons
 
 export const newIconViewBox = "0 0 16 16"
 
