@@ -47,7 +47,13 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useServer } from "@/runtime/server/current"
 import { reviewGlyphFill, SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
-import { createPanelMotion, jamesPanelShift, replayPanelToggle } from "@/shell/panel-motion"
+import {
+  createPanelMotion,
+  holdLandingWidth,
+  jamesPanelShift,
+  panelOpacity,
+  replayPanelToggle,
+} from "@/shell/panel-motion"
 
 export function SessionScreenView(props: { session: SessionModel }) {
   // The timeline cache captures its owner when created, so link handling must be provided above it.
@@ -159,8 +165,11 @@ function SessionScreenContent(props: {
   let sideContent: HTMLDivElement | undefined
   let sideGlyph: SVGPathElement | undefined
   let sideClosed = 0
+  // While the left sidebar moves the side panel's edge, its contents keep the width they land at.
+  holdLandingWidth(() => sideContent)
   // The toggle's pane fills from the panel's edge as far as the panel is open.
   const paintSideGlyph = () => sideGlyph?.setAttribute("transform", reviewGlyphFill(1 - sideClosed))
+
   const sideMotion = createPanelMotion({
     open: sideVisible,
     identity: session.layout.tabKey,
@@ -170,7 +179,7 @@ function SessionScreenContent(props: {
       paintSideGlyph()
 
       // Dims the contents as they leave and fades them in as they arrive.
-      if (sideContent) sideContent.style.opacity = closed === 0 ? "" : `${1 - closed}`
+      if (sideContent) sideContent.style.opacity = panelOpacity(closed)
 
       if (!chat) return
       const open = chatOpenWidth()

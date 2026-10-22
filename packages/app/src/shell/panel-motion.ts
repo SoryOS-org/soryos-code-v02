@@ -1,5 +1,5 @@
 import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-js"
-import { frameLoop, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
+import { ease, frameLoop, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 
 const group = "Sidebars"
@@ -12,9 +12,8 @@ export const panelsMoving = () => flights() > 0
 // The "James" option, chosen in the preset strip beside Snappy, Smooth and Calm, swaps the section's knobs for its own: layout
 // changes in one frame and only the panel moves, a few pixels toward its edge, while it fades. The neighbours beside it
 // glide from their old box to the new one. All run as Web Animations, so the compositor plays them through main-thread
-// work.
-// The shipped sidebar motion; the spring presets and Instant stay one choice away.
-const james = motionTuning.mode("sidebars.james", { label: "James", group, value: true })
+// work. The shared spring ships; James stays one choice away.
+const james = motionTuning.mode("sidebars.james", { label: "James", group })
 
 const springs = () => !james()
 
@@ -38,6 +37,20 @@ const style = motionTuning.choice("sidebars.style", {
   value: "spring",
   labels: { spring: "Spring", instant: "Instant" },
 })
+
+// How far a panel's contents dim at the closed end of a spring flight; they never black out.
+const fadeFloor = motionTuning.number("sidebars.fadeFloor", {
+  label: "Fade floor",
+  group,
+  when: springs,
+  value: 0.5,
+  min: 0,
+  max: 1,
+  step: 0.05,
+})
+
+/** The opacity of a panel's contents `closed` of the way through a spring flight, from 1 down to the fade floor. */
+export const panelOpacity = (closed: number) => (closed === 0 ? "" : `${1 - closed * (1 - fadeFloor())}`)
 
 const jamesShift = motionTuning.spring("sidebars.james.shift", {
   label: "Movement",
@@ -115,6 +128,90 @@ const faded = 0.15
 /** Where a neighbour's content sits: centred content follows its box's centre, start-pinned content its start edge. */
 export type Anchor = "center" | "start"
 
+type Hold = { box: () => HTMLElement | null | undefined; anchor?: () => HTMLElement | null | undefined }
+
+type Landing = {
+  /** Paints where the flight lands, then back where it is. */
+  land: () => void
+  resume: () => void
+  /** Starts counting the flight's remaining travel from here, 1 now and 0 where it lands. */
+  begin: () => void
+  remaining: () => number
+}
+
+const holds = new Set<Hold>()
+
+// The spring flights in progress, and the one whose travel carries the held boxes' shift.
+const landings = new Set<Landing>()
+
+let driver: Landing | undefined
+
+let held: { box: HTMLElement; shift: number }[] = []
+
+/**
+ * Keeps a content box beside the panels at the width it will have once every spring flight lands, so its text wraps
+ * once as a flight starts rather than on every frame while its container's width moves. For the flight, the box gets
+ * `--panel-hold-width`, which its layout uses in place of its container's width. A box that lands at no width, like the
+ * contents of a closing panel, is left to its own layout.
+ *
+ * `anchor` is an element inside the box whose start edge must not jump when the box takes its landing width: the box
+ * shifts by the difference, with a transform, and the shift runs out over the flight.
+ */
+export function holdLandingWidth(box: Hold["box"], anchor?: Hold["anchor"]) {
+  const hold = { box, anchor }
+  holds.add(hold)
+  onCleanup(() => holds.delete(hold))
+}
+
+// Measures every held box with each moving panel painted where it lands. A flight that starts, turns around or lands
+// forces a few layouts here; no frame of a flight reads layout.
+function rehold(next: Landing | undefined) {
+  const flights = [...landings]
+
+  const boxes = flights.length
+    ? [...holds].flatMap((hold) => {
+        const box = hold.box()
+
+        if (!box?.isConnected) return []
+        const anchor = hold.anchor?.()
+
+        return [{ box, anchor, before: anchor ? anchorX(anchor, "start") : undefined }]
+      })
+    : []
+
+  held.forEach((item) => {
+    item.box.style.removeProperty("--panel-hold-width")
+    item.box.style.translate = ""
+  })
+  held = []
+  driver = next
+  driver?.begin()
+
+  if (boxes.length === 0) return
+  flights.forEach((flight) => flight.land())
+  const widths = boxes.map((item) => item.box.getBoundingClientRect().width)
+  flights.forEach((flight) => flight.resume())
+  held = boxes
+    .filter((item, index) => {
+      if (widths[index] === 0) return false
+      item.box.style.setProperty("--panel-hold-width", `${widths[index]}px`)
+
+      return true
+    })
+    .map((item) => ({
+      box: item.box,
+      shift: item.anchor && item.before !== undefined ? item.before - anchorX(item.anchor, "start") : 0,
+    }))
+  shiftHeld()
+}
+
+function shiftHeld() {
+  const remaining = driver?.remaining() ?? 0
+  held.forEach((item) => {
+    if (item.shift !== 0) item.box.style.translate = `${item.shift * remaining}px`
+  })
+}
+
 /** Adds a button that toggles a panel to the Motion workspace's Sidebars section while the panel is mounted. */
 export function replayPanelToggle(input: { id: string; label: string; toggle: () => void }) {
   onCleanup(motionTuning.action({ id: `sidebars.${input.id}`, label: input.label, group, run: input.toggle }))
@@ -136,8 +233,8 @@ export function createPanelMotion(input: {
   /** Reads layout in the frame loop's read phase, before each frame of a flight paints. */
   measure?: () => void
   /**
-   * James: the panel layer that shifts and fades, and how far it shifts, in pixels toward its edge (negative for
-   * the inline-start edge; mirrored in RTL).
+   * The panel layer, which fades in under reduced motion. James shifts and fades it, `offset` pixels toward its edge
+   * (negative for the inline-start edge; mirrored in RTL).
    */
   element?: Accessor<HTMLElement | undefined>
   offset?: () => number
@@ -165,10 +262,30 @@ export function createPanelMotion(input: {
 
   const paint = () => input.paint(Math.min(1, Math.max(0, motion.value / 100)))
 
+  // Where the flight's current leg started, for how much of it remains.
+  let from = 0
+
+  const landing: Landing = {
+    land: () => input.paint(motion.target / 100),
+    resume: paint,
+    begin: () => {
+      from = motion.value
+    },
+    remaining: () =>
+      from === motion.target ? 0 : Math.min(1, Math.max(0, (motion.value - motion.target) / (from - motion.target))),
+  }
+
+  const unhold = () => {
+    if (!landings.delete(landing)) return
+    // Another flight still moving carries the shift from here.
+    rehold(driver === landing ? landings.values().next().value : driver)
+  }
+
   const settle = () => {
     stop?.()
     stop = undefined
     fly(false)
+    unhold()
     const queued = landed
     landed = []
 
@@ -207,13 +324,21 @@ export function createPanelMotion(input: {
           fly(false)
           motion.snap(target)
           paint()
+          // After the snap, so a flight still moving measures this layout's landing.
+          unhold()
 
           if (!open) setPresent(false)
 
           return
         }
 
-        if (now || prefersReducedMotion() || (!james() && style() === "instant")) return snap(open)
+        if (prefersReducedMotion() && !now) {
+          snap(open)
+
+          return open ? reveal() : undefined
+        }
+
+        if (now || (!james() && style() === "instant")) return snap(open)
 
         // James closes at once; only its neighbours glide into place.
         if (james()) return open ? fade() : glide(false, () => snap(false))
@@ -224,10 +349,15 @@ export function createPanelMotion(input: {
         // Retargeting keeps the current position and velocity, so a second toggle mid-flight turns around smoothly.
         motion.set(target)
         fly(true)
+        landings.add(landing)
+        rehold(landing)
+
         // Writes only; anything reading layout this frame does so in the loop's read phase, before this runs.
         const step = (dt: number) => {
           motion.step(dt)
           paint()
+
+          if (driver === landing) shiftHeld()
 
           if (!motion.resting) return true
           stop = undefined
@@ -235,10 +365,18 @@ export function createPanelMotion(input: {
 
           return false
         }
+
         stop ??= input.measure ? frameLoop.addMeasured(input.measure, step) : frameLoop.add(step)
       },
     ),
   )
+
+  /** Reduced motion: the panel, opened at once, fades in without travel. */
+  const reveal = () =>
+    // Deferred so a panel that mounts with this open exists; microtasks run before the next paint.
+    queueMicrotask(() => {
+      if (input.open()) input.element?.()?.animate?.({ opacity: [0, 1] }, { duration: 150, easing: ease.out })
+    })
 
   /** The layout opens at once, gliding its neighbours into place; the panel then shifts in and fades up. */
   const fade = () => {
@@ -316,6 +454,7 @@ export function createPanelMotion(input: {
     stop?.()
     fades.forEach((animation) => animation.cancel())
     fly(false)
+    unhold()
   })
 
   return {

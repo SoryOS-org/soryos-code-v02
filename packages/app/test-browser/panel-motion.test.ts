@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "bun:test"
 import { batch, createRoot, createSignal } from "solid-js"
 import { motionTuning } from "@opencode/ui/motion-tuning"
-import { createPanelMotion, guardClosingFocus, panelsMoving } from "../src/shell/panel-motion"
+import { createPanelMotion, guardClosingFocus, holdLandingWidth, panelsMoving } from "../src/shell/panel-motion"
 
 let frames: Map<number, FrameRequestCallback>
 
@@ -215,6 +215,70 @@ it("reports a flight from its first frame until it lands, for native views to hi
   expect(panelsMoving()).toBe(false)
 })
 
+it("holds content beside the panel at its landing width for the flight, its anchor's edge travelling smoothly", () => {
+  const box = document.createElement("div")
+  const anchor = document.createElement("div")
+  box.append(anchor)
+  document.body.append(box)
+  cleanups.push(() => box.remove())
+  const [open, setOpen] = createSignal(false)
+  const painted = { width: 0 }
+  // The box beside the panel takes what the panel leaves of 1000px; its centred column starts 60px further in once
+  // the box is held at its landing width. happy-dom has no layout.
+  box.getBoundingClientRect = () => new DOMRect(0, 0, 1000 - painted.width, 10)
+  anchor.getBoundingClientRect = () =>
+    new DOMRect(box.style.getPropertyValue("--panel-hold-width") ? 160 : 100, 0, 10, 10)
+  createRoot((dispose) => {
+    cleanups.push(dispose)
+    holdLandingWidth(
+      () => box,
+      () => anchor,
+    )
+    createPanelMotion({ open, paint: (shut) => (painted.width = 300 * (1 - shut)) })
+  })
+
+  setOpen(true)
+  expect(painted.width).toBe(0)
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("700px")
+  // The column's start edge stays where it was, and the shift runs out with the flight.
+  expect(box.style.translate).toBe("-60px")
+  const shifts: number[] = []
+
+  for (let i = 0; i < 6; i++) {
+    frame()
+    shifts.push(parseFloat(box.style.translate))
+  }
+
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("700px")
+  expect(shifts.every((shift, index) => shift > (shifts[index - 1] ?? -60) && shift < 0)).toBe(true)
+
+  setOpen(false)
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("1000px")
+  settle()
+  expect(box.style.getPropertyValue("--panel-hold-width")).toBe("")
+  expect(box.style.translate).toBe("")
+})
+
+it("fades an opening panel in without travel under reduced motion", async () => {
+  document.documentElement.dataset.motion = "reduce"
+  cleanups.push(() => delete document.documentElement.dataset.motion)
+  const played: PropertyIndexedKeyframes[] = []
+  const element = document.createElement("div")
+  Object.defineProperty(element, "animate", { value: (keyframes: PropertyIndexedKeyframes) => played.push(keyframes) })
+  const [open, setOpen] = createSignal(false)
+  const painted = { width: 0 }
+  createRoot((dispose) => {
+    cleanups.push(dispose)
+    createPanelMotion({ open, paint: (shut) => (painted.width = 200 * (1 - shut)), element: () => element })
+  })
+
+  setOpen(true)
+  expect(painted.width).toBe(200)
+  expect(frames.size).toBe(0)
+  await Promise.resolve()
+  expect(played).toEqual([{ opacity: [0, 1] }])
+})
+
 it("moves focus out of a closing panel when the close starts and when it re-enters mid-flight", () => {
   const root = document.createElement("div")
   const inner = document.createElement("button")
@@ -363,18 +427,18 @@ it("swaps the spring knobs for James's while it's on", () => {
       .filter((knob) => knob.group === "Sidebars" && knob.kind !== "mode" && (knob.when?.() ?? true))
       .map((knob) => knob.label)
 
-  expect(shown()).toEqual(["Spring", "Motion"])
+  expect(shown()).toEqual(["Spring", "Motion", "Fade floor"])
   setJames(true)
   expect(shown()).toEqual(["Movement", "Fade", "Fade duration", "Panel shift", "Layout", "Layout open", "Layout close"])
   setJames(false)
-  expect(shown()).toEqual(["Spring", "Motion"])
+  expect(shown()).toEqual(["Spring", "Motion", "Fade floor"])
 })
 
-it("ships James as the default sidebar motion", () => {
+it("ships the spring as the default sidebar motion, with James one choice away", () => {
   const knob = motionTuning.list().find((item) => item.id === "sidebars.james")
 
   expect(knob?.kind).toBe("mode")
-  expect(knob?.initial).toBe(true)
+  expect(knob?.initial).toBe(false)
   // The side panel shifts 30px by default; the left sidebar stays at 10px.
   expect(motionTuning.list().find((item) => item.id === "sidebars.james.panelShift")?.initial).toBe(30)
 })

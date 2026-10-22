@@ -18,7 +18,7 @@ import { useGlobal } from "@/runtime/server/runtime"
 import { useServers } from "@/runtime/server/registry"
 import { useTabs } from "@/shell/tabs/tabs"
 import { CollapsedSidebarToggle, measureSidebarToggles, paintCollapsedSlots } from "@/shell/sidebar-toggle"
-import { createPanelMotion, guardClosingFocus, replayPanelToggle } from "@/shell/panel-motion"
+import { createPanelMotion, guardClosingFocus, panelOpacity, replayPanelToggle } from "@/shell/panel-motion"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
 export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
@@ -59,8 +59,8 @@ export default function Layout(props: ParentProps) {
 
       if (aside) aside.style.width = `${state.tabsWidth * (1 - closed)}px`
 
-      // Dims the contents, background included, as they leave and fade them in as they arrive.
-      if (state.tabsMount) state.tabsMount.style.opacity = closed === 0 ? "" : `${1 - closed}`
+      // Dims the contents, background included, as they leave and brightens them as they arrive.
+      if (state.tabsMount) state.tabsMount.style.opacity = panelOpacity(closed)
       paintCollapsedSlots(closed)
     },
     measure: () => measureSidebarToggles(state.tabsWidth),
