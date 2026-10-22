@@ -19,10 +19,10 @@ export default function SessionBtwPanel(props: { btw: BtwModel; session: Mounted
   const chat = () => props.btw.entry(props.session, props.id)
   const question = () => chat()?.question
   const answer = () => chat()?.answer
-  // A new token for each question/answer, so the copied mark clears when the text changes.
-  const shownQuestion = createMemo(on(question, () => ({})))
-  const shownAnswer = createMemo(on(answer, () => ({})))
-  const [copied, setCopied] = createStore<{ question?: object; answer?: object }>({})
+  // New primitive tokens clear the copied mark when text changes without being proxied by the store.
+  const shownQuestion = createMemo(on(question, () => Symbol()))
+  const shownAnswer = createMemo(on(answer, () => Symbol()))
+  const [copied, setCopied] = createStore<{ question?: symbol; answer?: symbol }>({})
   const isQuestionCopied = () => copied.question === shownQuestion()
   const isAnswerCopied = () => copied.answer === shownAnswer()
   const timefmt = createMemo(() => new Intl.DateTimeFormat(i18n.locale(), { timeStyle: "short" }))
