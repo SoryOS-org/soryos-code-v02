@@ -74,6 +74,7 @@ const layout: Layout = {
   scroll: { get: () => undefined, set() {} },
   settings() {},
   project() {},
+  draft() {},
   command() {},
 }
 
@@ -349,6 +350,7 @@ function standIn(overrides: Partial<Interface>): Interface {
     },
     settings() {},
     project() {},
+    draft() {},
     command() {},
     font: () => "fixture mono",
     routing: () => false,

@@ -670,6 +670,57 @@ test("Extensions lists open on hover, hold course into the open list, and follow
   await expect(summary).toBeHidden()
 })
 
+test("Extensions lists open config files and skills in a side tab and start setup sessions", async ({ page }) => {
+  const global = "C:/Users/kit/.config/opencode/opencode.jsonc"
+  const skill = `${fixture.directory}/.opencode/skills/release-notes/SKILL.md`
+
+  await mockStressTimeline(page, {
+    mcp: [{ name: "atlas-search", status: { status: "connected" } }],
+    plugins: [],
+    skills: [{ id: "release-notes", name: "release-notes", path: skill, content: "Release notes" }],
+    configEntries: [
+      {
+        type: "document",
+        path: global,
+        info: { mcp: { servers: { "atlas-search": { type: "remote", url: "https://atlas.example" } } } },
+      },
+      // An empty project override used to win, so the servers' own file never opened.
+      { type: "document", path: `${fixture.directory}/.opencode/opencode.jsonc`, info: { mcp: {} } },
+    ],
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+  })
+  await page.goto(sessionHref(fixture.targetID))
+  const trigger = page.getByRole("button", { name: "Session details", exact: true })
+  const summary = page.getByRole("dialog", { name: "Session details", exact: true })
+  const row = (name: string) => summary.getByRole("button", { name, exact: true })
+  const list = (name: string) => page.getByRole("group", { name, exact: true })
+
+  await trigger.click()
+  await row("MCP").hover()
+  // A file outside the workspace is read by name from its own directory.
+  const read = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/api/fs/read/opencode.jsonc"))
+  await list("MCP").getByRole("button", { name: "Configuration file", exact: true }).click()
+  expect(new URL((await read).url()).searchParams.get("location[directory]")).toBe("C:/Users/kit/.config/opencode/")
+  await expect(summary).toBeHidden()
+  await expect(page.getByRole("tab", { name: "opencode.jsonc", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByText("contents:opencode.jsonc", { exact: true })).toBeVisible()
+
+  await trigger.click()
+  await row("Skills").hover()
+  await list("Skills").getByRole("button", { name: "release-notes", exact: true }).click()
+  await expect(summary).toBeHidden()
+  await expect(page.getByRole("tab", { name: "SKILL.md", exact: true })).toHaveAttribute("aria-selected", "true")
+
+  // An empty list offers a draft session in the global configuration's directory, its prompt filled in.
+  await trigger.click()
+  await row("Plugins").hover()
+  await list("Plugins").getByRole("button", { name: "Add a plugin with OpenCode", exact: true }).click()
+  await expect(page).toHaveURL(/\/new-session\?/)
+  await expect(page.locator('[data-component="composer-editor"]')).toContainText(
+    "Help me add a plugin to my global OpenCode config.",
+  )
+})
+
 test("multiple desktop connections show the session's server name", async ({ page }) => {
   await mockStressTimeline(page)
   await page.route("http://secondary.test/**", (route) =>

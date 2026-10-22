@@ -25,7 +25,7 @@ export function DetailsHeader(props: {
     <Show when={props.session.project}>
       <DetailsPopover menus={props.menus} active={props.active} open={open()} onOpenChange={setOpen}>
         <Suspense>
-          <Panel session={props.session} shown={open()} />
+          <Panel session={props.session} shown={open()} onClose={() => setOpen(false)} />
         </Suspense>
       </DetailsPopover>
     </Show>

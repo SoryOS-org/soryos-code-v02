@@ -824,6 +824,7 @@ export function mountBrowserRegion(input: RegionHost) {
       scroll: { get: () => undefined, set() {} },
       settings() {},
       project() {},
+      draft() {},
       command() {},
     })
 

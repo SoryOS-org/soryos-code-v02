@@ -62,11 +62,12 @@ type Attached = {
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
-  layout: Omit<Layout, "narrow" | "settings" | "project" | "command" | "stored"> & {
+  layout: Omit<Layout, "narrow" | "settings" | "project" | "draft" | "command" | "stored"> & {
     stored(extension: string, session: SessionRef): readonly string[]
   }
   settings: (page?: string) => void
   project: (server: string, title: string) => void
+  draft: Layout["draft"]
   command: (id: string) => void
   font: Accessor<string>
   routing: Accessor<boolean>
@@ -322,6 +323,7 @@ export function createHostApis() {
       },
       settings: (page) => write((value) => value.settings(page)),
       project: (server, title) => write((value) => value.project(server, title)),
+      draft: (input) => write((value) => value.draft(input)),
       command: (id) => write((value) => value.command(id)),
     }),
     embeds: () => embeds,
@@ -651,6 +653,7 @@ export function createExtensionAttachment(apis: HostApis) {
 
   // Writes made before a session's location is known wait for it rather than being dropped.
   const located = createLocatedWrites()
+
   // Kept per session beside its strip, so the new tab view still lists them after a reload.
   const closed = createClosedTabs({
     list(session) {
@@ -711,10 +714,12 @@ export function createExtensionAttachment(apis: HostApis) {
     const value = stateKey(session)
 
     if (!value) return located.hold(session, () => close(key, session))
+
     const tab = listed(session, value).find((entry) => entry.key === key)?.tab
     const all = layout.panel.state(value).all
     const view = mountedSession(session)
     const currentScreen = screen()
+
     const entry =
       view &&
       tab &&
@@ -840,6 +845,11 @@ export function createExtensionAttachment(apis: HostApis) {
     scope,
     scoped: layout.sessionState.track,
     project: (server, title) => setProjects((pending) => [...pending, { server, title }]),
+    draft: (input) => {
+      const server = servers.list.find((conn) => ServerConnection.key(conn) === input.server)
+
+      if (server) void tabs.newDraft({ server: ServerConnection.key(server), directory: input.directory }, input.prompt)
+    },
     command: (id) => command.trigger(id),
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),

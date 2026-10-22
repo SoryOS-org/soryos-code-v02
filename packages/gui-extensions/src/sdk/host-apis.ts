@@ -793,6 +793,25 @@ export interface Layout {
    */
   project(server: string, title: string): void
   /**
+   * Opens a new draft session in a directory on a server with its prompt filled in, for the user to review and send.
+   * The draft opens in its own tab, as a new session from Home does.
+   *
+   * @param input - Where the draft runs and what it asks.
+   *
+   * @example
+   * ```ts
+   * ctx.layout.draft({ server: session.server.id, directory, prompt: ctx.t("setup.prompt") })
+   * ```
+   */
+  draft(input: {
+    /** The server's `ServerRef.id`. */
+    readonly server: string
+    /** The directory the new session runs in. */
+    readonly directory: string
+    /** The prompt the draft starts with. */
+    readonly prompt: string
+  }): void
+  /**
    * Runs an app command as the command palette does, e.g. `mcp.toggle` (the `/mcp` dialog) or `session.export`.
    * Does nothing when the command is unavailable or disabled.
    *

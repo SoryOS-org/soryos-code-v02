@@ -7,7 +7,6 @@ import { Switch } from "@opencode/ui/switch"
 import { showToast } from "@opencode/ui/toast"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { TruncatedText } from "@opencode/ui/truncated-text"
-import { getDirectory } from "@opencode/util/path"
 import { useMutation } from "@tanstack/solid-query"
 import {
   children,
@@ -25,6 +24,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createKeyed, useDrawer, useExtension, type MountedSession } from "../sdk"
+import { globalConfigDirectory, serviceConfigFile } from "./config-file"
 import { configuredLsps } from "./configured-lsp"
 
 const services = [
@@ -40,6 +40,8 @@ type ServiceProps = {
   session: MountedSession
   directory: string
   shown: boolean
+  /** Closes the details popover, once an action opened something beside it. */
+  onClose?: () => void
 }
 
 /** One service's list: its load state, what its row summarises, and the list itself. */
@@ -77,6 +79,7 @@ export function SessionServerPanel(props: ServiceProps & { mobile?: boolean }) {
           shown={props.shown}
           mobile={props.mobile}
           name={name()}
+          onClose={props.onClose}
         />
       )}
     </Show>
@@ -517,12 +520,7 @@ function useLsp(props: ServiceProps): ServiceSource {
     failed: false,
     retry: () => void refetch(),
     Body: () => (
-      <Show
-        when={names().length}
-        fallback={
-          <ServiceEmpty session={props.session} title={ctx.t("lsp.empty")} directory={props.directory} service="lsp" />
-        }
-      >
+      <Show when={names().length} fallback={<ServiceEmpty owner={props} title={ctx.t("lsp.empty")} service="lsp" />}>
         <For each={names()}>
           {(name) => (
             <div class="session-service-row">
@@ -531,7 +529,8 @@ function useLsp(props: ServiceProps): ServiceSource {
           )}
         </For>
         <div class="session-service-footer">
-          <ServiceConfigLink session={props.session} directory={props.directory} service="lsp" />
+          <span class="session-service-config-separator" role="separator" />
+          <ServiceConfigLink owner={props} service="lsp" />
         </div>
       </Show>
     ),
@@ -583,12 +582,7 @@ function useMcp(props: ServiceProps, close: () => void): ServiceSource {
     },
     retry: () => void refetch(),
     Body: () => (
-      <Show
-        when={servers().length}
-        fallback={
-          <ServiceEmpty session={props.session} title={ctx.t("mcp.empty")} directory={props.directory} service="mcp" />
-        }
-      >
+      <Show when={servers().length} fallback={<ServiceEmpty owner={props} title={ctx.t("mcp.empty")} service="mcp" />}>
         <Index each={servers()}>
           {(server) => {
             const enabled = () => server().status.status !== "disabled"
@@ -676,7 +670,8 @@ function useMcp(props: ServiceProps, close: () => void): ServiceSource {
           }}
         </Index>
         <div class="session-service-footer">
-          <ServiceConfigLink session={props.session} directory={props.directory} service="mcp" />
+          <span class="session-service-config-separator" role="separator" />
+          <ServiceConfigLink owner={props} service="mcp" />
           <button
             type="button"
             class="session-service-config"
@@ -712,6 +707,7 @@ function useCatalog(props: ServiceProps, service: "plugins" | "skills"): Service
             name: pluginLabel(plugin),
             status: plugin.state.status,
             error: plugin.state.status === "failed" ? plugin.state.error : undefined,
+            path: undefined,
           }))
       }
 
@@ -734,6 +730,7 @@ function useCatalog(props: ServiceProps, service: "plugins" | "skills"): Service
             name: skill.name,
             status: undefined,
             error: undefined,
+            path: skill.path,
           }))
 
     return entries.toSorted((a, b) => a.name.localeCompare(b.name))
@@ -770,32 +767,54 @@ function useCatalog(props: ServiceProps, service: "plugins" | "skills"): Service
         when={list().length}
         fallback={
           <ServiceEmpty
-            session={props.session}
+            owner={props}
             title={ctx.t(service === "plugins" ? "plugins.empty" : "skills.empty")}
-            directory={props.directory}
             service={service}
           />
         }
       >
         <For each={list()}>
           {(item) => (
-            <div class="session-service-row" data-status={item.status}>
-              <Show when={item.status}>
-                {(status) => (
-                  <>
-                    <StatusDot status={status()} error={item.error} />
-                    <Show when={status() === "failed"}>
-                      <span class="sr-only">{ctx.t("failed")}</span>
-                    </Show>
-                  </>
-                )}
-              </Show>
-              <TruncatedText text={item.name} class="session-summary-label" />
-            </div>
+            <Show
+              when={item.path}
+              fallback={
+                <div class="session-service-row" data-status={item.status}>
+                  <Show when={item.status}>
+                    {(status) => (
+                      <>
+                        <StatusDot status={status()} error={item.error} />
+                        <Show when={status() === "failed"}>
+                          <span class="sr-only">{ctx.t("failed")}</span>
+                        </Show>
+                      </>
+                    )}
+                  </Show>
+                  <TruncatedText text={item.name} class="session-summary-label" />
+                </div>
+              }
+            >
+              {(path) => (
+                // A skill opens its SKILL.md in a side tab.
+                <button
+                  type="button"
+                  class="session-service-row session-service-file"
+                  onClick={() => {
+                    if (ctx.links.open({ href: path(), session: props.session })) props.onClose?.()
+                  }}
+                >
+                  <Icon name="file-document" class="shrink-0 text-v2-icon-icon-muted" />
+                  <TruncatedText text={item.name} class="session-summary-label" />
+                </button>
+              )}
+            </Show>
           )}
         </For>
         <div class="session-service-footer">
-          <ServiceConfigLink session={props.session} directory={props.directory} service={service} />
+          <span class="session-service-config-separator" role="separator" />
+          <Show when={service === "skills"}>
+            <ServiceSetup owner={props} service={service} />
+          </Show>
+          <ServiceConfigLink owner={props} service={service} />
         </div>
       </Show>
     ),
@@ -866,11 +885,10 @@ function ServiceBody(props: { source: ServiceSource; children: JSX.Element }) {
   )
 }
 
-function ServiceConfigLink(props: { session: MountedSession; directory: string; service: Service }) {
+function ServiceConfigLink(props: { owner: ServiceProps; service: Service }) {
   const ctx = useExtension()
-  const desktop = ctx.desktop
   const system = ctx.system
-  const local = () => props.session.server.local
+  const local = () => props.owner.session.server.local
   const [store, setStore] = createStore({ opening: false, copied: false })
   const label = () => ctx.t(local() ? "configure" : "copyConfigPath")
   // Clears the copied mark two seconds after the latest copy.
@@ -879,31 +897,28 @@ function ServiceConfigLink(props: { session: MountedSession; directory: string; 
   onCleanup(() => clearTimeout(reset))
 
   const activate = async () => {
-    if (store.opening || (local() && !desktop)) return
+    if (store.opening) return
     setStore({ opening: true, copied: false })
-    const directory = props.directory
-    await props.session.server.client.config
-      .get({ location: { directory } })
+    const session = props.owner.session
+    await session.server.client.config
+      .get({ location: { directory: props.owner.directory } })
       .then(async (entries) => {
-        const documents = entries
-          .filter((entry) => entry.type === "document")
-          .filter((entry) => entry.path !== undefined && /\.jsonc?$/.test(entry.path))
+        const path = serviceConfigFile(entries, props.service)
 
-        const path =
-          documents.findLast((entry) => entry.info[props.service] !== undefined)?.path ?? documents.at(-1)?.path
+        if (!path) throw new Error(ctx.t("configFileMissing"))
 
-        if (!local()) {
-          if (!path) throw new Error(ctx.t("configFileMissing"))
-          await system.copy(path)
-          setStore("copied", true)
-          clearTimeout(reset)
-          reset = setTimeout(() => setStore("copied", false), 2000)
+        // A local file opens in a side tab beside the session, inside the workspace or not.
+        if (local()) {
+          if (ctx.links.open({ href: path, session })) return props.owner.onClose?.()
+          await ctx.desktop?.reveal(path)
 
           return
         }
 
-        if (path && (await desktop?.reveal(path))) return
-        await desktop?.launch(path ? getDirectory(path) : directory)
+        await system.copy(path)
+        setStore("copied", true)
+        clearTimeout(reset)
+        reset = setTimeout(() => setStore("copied", false), 2000)
       })
       .catch((error) =>
         showToast({
@@ -916,55 +931,78 @@ function ServiceConfigLink(props: { session: MountedSession; directory: string; 
   }
 
   return (
-    <>
-      <span class="session-service-config-separator" role="separator" />
-      <Show
-        when={!local() || desktop}
-        fallback={
-          <span class="session-service-row">
-            <Icon name="settings-gear" class="shrink-0 text-v2-icon-icon-muted" />
-            {label()}
-          </span>
-        }
+    <Tooltip
+      inactive={local()}
+      value={ctx.t(store.copied ? "ui.message.copied" : "ui.message.copy")}
+      placement="top"
+      getAnchorRect={(anchor) => anchor?.querySelector("svg")?.getBoundingClientRect()}
+      forceOpen={store.copied ? true : undefined}
+      class="w-full"
+    >
+      <button
+        type="button"
+        class="session-service-config"
+        disabled={store.opening}
+        onMouseDown={(event) => {
+          if (!local()) event.preventDefault()
+        }}
+        onClick={() => void activate()}
       >
-        <Tooltip
-          inactive={local()}
-          value={ctx.t(store.copied ? "ui.message.copied" : "ui.message.copy")}
-          placement="top"
-          getAnchorRect={(anchor) => anchor?.querySelector("svg")?.getBoundingClientRect()}
-          forceOpen={store.copied ? true : undefined}
-          class="w-full"
-        >
-          <button
-            type="button"
-            class="session-service-config"
-            disabled={store.opening}
-            onMouseDown={(event) => {
-              if (!local()) event.preventDefault()
-            }}
-            onClick={() => void activate()}
-          >
-            <Icon
-              name={local() ? "settings-gear" : store.copied ? "check" : "outline-copy"}
-              class="shrink-0 text-v2-icon-icon-muted"
-            />
-            <span class="session-summary-label">{label()}</span>
-            <Show when={local()}>
-              <Icon name="arrow-up-right" class="session-service-config-arrow shrink-0" />
-            </Show>
-          </button>
-        </Tooltip>
-      </Show>
-    </>
+        <Icon
+          name={local() ? "settings-gear" : store.copied ? "check" : "outline-copy"}
+          class="shrink-0 text-v2-icon-icon-muted"
+        />
+        <span class="session-summary-label">{label()}</span>
+      </button>
+    </Tooltip>
   )
 }
 
-function ServiceEmpty(props: { session: MountedSession; title: string; directory: string; service: Service }) {
+// Starts a draft session in the global configuration's directory that asks OpenCode to set the service up.
+function ServiceSetup(props: { owner: ServiceProps; service: Service }) {
+  const ctx = useExtension()
+  const [store, setStore] = createStore({ opening: false })
+
+  const start = async () => {
+    if (store.opening) return
+    setStore("opening", true)
+    const session = props.owner.session
+    await session.server.client.config
+      .get({ location: { directory: props.owner.directory } })
+      .then((entries) => {
+        ctx.layout.draft({
+          server: session.server.id,
+          directory: globalConfigDirectory(entries, props.owner.directory),
+          prompt: ctx.t(`setup.${props.service}.prompt`),
+        })
+        props.owner.onClose?.()
+      })
+      .catch((error) =>
+        showToast({
+          variant: "error",
+          title: ctx.t("common.requestFailed"),
+          description: error instanceof Error ? error.message : String(error),
+        }),
+      )
+      .finally(() => setStore("opening", false))
+  }
+
+  return (
+    <button type="button" class="session-service-config" disabled={store.opening} onClick={() => void start()}>
+      <Icon name="plus" class="shrink-0 text-v2-icon-icon-muted" />
+      <span class="session-summary-label">{ctx.t(`setup.${props.service}`)}</span>
+    </button>
+  )
+}
+
+function ServiceEmpty(props: { owner: ServiceProps; title: string; service: Service }) {
   return (
     <div class="session-service-empty">
       <strong>{props.title}</strong>
       <div class="session-service-footer">
-        <ServiceConfigLink session={props.session} directory={props.directory} service={props.service} />
+        <ServiceSetup owner={props.owner} service={props.service} />
+        <span class="session-service-config-separator" role="separator" />
+        <ServiceConfigLink owner={props.owner} service={props.service} />
       </div>
     </div>
   )

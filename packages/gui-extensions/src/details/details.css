@@ -70,6 +70,7 @@
 
 .session-summary-row:focus-visible,
 .session-service-config:focus-visible,
+button.session-service-row:focus-visible,
 .session-mcp-row:focus-within {
   outline: none;
   background: var(--v2-overlay-simple-overlay-hover);
@@ -78,6 +79,7 @@
 @media (hover: hover) {
   button.session-summary-row:hover,
   .session-service-config:not(:disabled):hover,
+  button.session-service-row:hover,
   .session-summary-move:has(> .session-summary-dismiss:hover) > .session-summary-row,
   .session-mcp-row:not([data-disabled]):hover {
     background: var(--v2-overlay-simple-overlay-hover);
@@ -315,15 +317,6 @@
   text-decoration: none;
   cursor: pointer;
 
-  .session-service-config-arrow {
-    opacity: 0;
-    transition: opacity 150ms ease-out;
-  }
-
-  &:is(:hover, :focus-visible) .session-service-config-arrow {
-    opacity: 1;
-  }
-
   &:focus-visible {
     outline: 2px solid var(--v2-border-border-focus);
     outline-offset: 2px;
@@ -499,9 +492,5 @@ div.session-mcp-row {
     scale: none;
     translate: none;
     transition: opacity 0.15s ease-out;
-  }
-
-  .session-service-config .session-service-config-arrow {
-    transition: none;
   }
 }
