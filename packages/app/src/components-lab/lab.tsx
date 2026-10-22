@@ -20,7 +20,7 @@ import { createStore, reconcile } from "solid-js/store"
 import { Dynamic, insert } from "solid-js/web"
 import { DialogProvider } from "@opencode/ui/context/dialog"
 import { useTheme } from "@opencode/ui/theme"
-import { motionGlobals } from "@opencode/ui/motion-tuning"
+import { motionGlobals, motionTuning } from "@opencode/ui/motion-tuning"
 import { choice, defineControls, matchesCombo, toolbar, type Field } from "knobs"
 import { canvas, commandPalette, restyle, split, toast, type CommandPalette } from "knobs/ui"
 import { Tree } from "knobs/ui/solid"
@@ -46,6 +46,7 @@ import {
   type StoryArgs,
   type StoryModule,
 } from "./catalog"
+import { applyMotionPatch, motionFields, motionKey, motionValues, storyMotion } from "./motion"
 
 // How long Play holds each state at full speed. Slow motion doubles it while the motion itself runs 4× longer, so
 // a transition still finishes and Play keeps moving.
@@ -111,31 +112,55 @@ export default function ComponentsLab() {
   const [scheme, setScheme] = createSignal<"dark" | "light">("dark")
   let palette: CommandPalette | undefined
   let toggle: ((id: string) => void) | undefined
+  let focusTree: ((id?: string) => void) | undefined
+  // While browsing the tree by keys, a story that focuses something as it mounts (a dialog, a field) would take the
+  // keys away. A press or Tab anywhere ends browsing; a few returns at most, so a story that traps focus still wins.
+  let browsing = 0
+  // The key behind the latest selection; none for a press.
+  let key: string | undefined
 
   const entries = () => catalog()?.entries ?? []
   const grid = () => params.view === "grid"
   const selected = createMemo(() => (grid() ? undefined : entries().find((entry) => entry.file === params.story)))
-  const open = (file: string) => setParams({ story: file, view: undefined })
+
+  const open = (file: string) => {
+    browsing = stories.contains(document.activeElement) ? 3 : 0
+    setParams({ story: file, view: undefined })
+  }
 
   const rows = createMemo(() => folder(entries(), []))
 
   const search = () => {
-    palette?.dispose()
-    palette = commandPalette({
+    if (palette?.isOpen) return palette.close()
+
+    palette ??= commandPalette({
       hotkey: false,
       recents: false,
       placeholder: language.t("lab.search"),
       look: { theme: scheme() },
-      commands: entries().map((entry) => ({
-        id: entry.file,
-        label: entry.title.split("/").join(" / "),
-        hint: fileName(entry.file),
-        keywords: entry.states.map((state) => state.name),
-        run: () => open(entry.file),
-      })),
+      commands: () =>
+        entries().map((entry) => ({
+          id: entry.file,
+          label: entry.title.split("/").join(" / "),
+          hint: fileName(entry.file),
+          keywords: entry.states.map((state) => state.name),
+          run: () => open(entry.file),
+        })),
     })
     palette.open()
   }
+
+  // The palette takes its look when it's made.
+  createEffect(
+    on(
+      scheme,
+      () => {
+        palette?.dispose()
+        palette = undefined
+      },
+      { defer: true },
+    ),
+  )
 
   // Ahead of the app's own palette, which listens on the document.
   makeEventListener(
@@ -181,15 +206,21 @@ export default function ComponentsLab() {
         label={language.t("lab.components")}
         expanded={rows().map((row) => row.id)}
         selection={params.story ? [params.story] : []}
+        // Digits pick the story's states.
+        typeahead={(key) => !/^[1-9]$/.test(key)}
         onReady={(tree) => {
           // Opens the folders down to the story in the address, and later ones picked from the palette.
           createEffect(() => params.story && tree.reveal(params.story))
           toggle = (id) => tree.expand(id, !tree.isExpanded(id))
+          focusTree = (id) => tree.focus(id)
         }}
+        // Moving by keys selects as it goes, so a folder opens and closes only by a click, Enter, Space or ←/→.
         onSelect={(_, primary) => {
           if (!primary?.startsWith("folder:")) return primary && open(primary)
-          toggle?.(primary)
+
+          if (key === undefined || key === " ") toggle?.(primary)
         }}
+        onActivate={(id) => (id.startsWith("folder:") ? toggle?.(id) : open(id))}
       />
     </Show>
   ))
@@ -218,6 +249,21 @@ export default function ComponentsLab() {
       </Show>
     </Show>
   ))
+
+  makeEventListener(window, "pointerdown", () => ((browsing = 0), (key = undefined)), { capture: true })
+  makeEventListener(
+    window,
+    "keydown",
+    (event) => {
+      key = event.key
+
+      if (event.key === "Tab") browsing = 0
+    },
+    { capture: true },
+  )
+  makeEventListener(stage, "focusin", () => {
+    if (browsing-- > 0) focusTree?.(params.story)
+  })
 
   let element!: HTMLDivElement
 
@@ -280,17 +326,22 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
   // Switching to a state that shares the current render function keeps the mounted instance, so its transitions play.
   const render = () => entry.states[index()]?.render ?? entry.render ?? fallback
   let timer: ReturnType<typeof setTimeout> | undefined
+  // The state Play is moving to. Any other change is a hand's, and a hand's change stops Play.
+  let advancing: number | undefined
 
-  // A state is a variant: its chip, `[` and `]` and Play all apply it, so the panel shows where it is.
+  // A state is a variant: its chip, a digit, `[` and `]` and Play all apply it, so the panel shows where it is.
   const preset = (next: number): void => store.preset(next === 0 ? "default" : (names[next] ?? "default"))
 
   const step = (by: number) => preset((index() + by + names.length) % names.length)
+
+  const pause = () => clearTimeout(timer)
 
   const play = () => {
     clearTimeout(timer)
     timer = setTimeout(
       () => {
-        step(1)
+        advancing = (index() + 1) % names.length
+        preset(advancing)
         play()
       },
       (hold * (motionGlobals.slow.value ? 2 : 1)) / motionGlobals.speed.value,
@@ -303,7 +354,11 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
     first === undefined || rest.length === 0
       ? {}
       : {
-          state: choice(first, [first, ...rest], { variants: true }),
+          state: choice(first, [first, ...rest], {
+            variants: true,
+            // The digit that picks each of the first nine.
+            labels: Object.fromEntries(names.slice(0, 9).map((name, offset) => [name, `${offset + 1}  ${name}`])),
+          }),
           play: toolbar(
             [
               {
@@ -325,52 +380,110 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
           ),
         }
 
-  const store = defineControls(
-    "components-lab",
-    { ...states, ...fields },
-    {
-      storage: null,
-      persist: "none",
-      // Beta is a production build, where knobs resolves its production entry: the panel mounts only when shipped.
-      ship: () => import("knobs/panel"),
-      defaultLabel: first,
-      presets: Object.fromEntries(
-        entry.states.slice(1).map((state, offset) => [state.name, knobArgs(fields, stateArgs(entry, offset + 1))]),
-      ),
-      onChange: (patch, values, meta) => {
-        if (!("state" in patch)) return setArgs(patch)
+  // The story's Knobs join its args here, so the inspector is the one place for its controls. Registering a knob or a
+  // replay button (as the story mounts) rebuilds it where it was.
+  let motion = storyMotion(entry.motion)
+  const [shown, setShown] = createSignal(motion, { equals: (a, b) => motionKey(a) === motionKey(b) })
 
-        // One batch, so a state with its own render function never renders with the previous state's args.
-        const next = Math.max(0, names.indexOf(String(values.state)))
-        batch(() => {
-          setArgs(reconcile(stateArgs(entry, next)))
-          setIndex(next)
-        })
+  const inspect = () => {
+    const own = motionFields(motion, (values) => store.set(values))
 
-        // Undo or a reset moved the state: bring the other knobs to the state's args too.
-        if (meta.source !== "preset") queueMicrotask(() => preset(next))
+    return defineControls(
+      "components-lab",
+      { ...states, ...fields, ...own },
+      {
+        storage: null,
+        persist: "none",
+        // Beta is a production build, where knobs resolves its production entry: the panel mounts only when shipped.
+        ship: () => import("knobs/panel"),
+        defaultLabel: first && rest.length > 0 ? `1  ${first}` : first,
+        presets: Object.fromEntries(
+          entry.states.slice(1).map((state, offset) => [state.name, knobArgs(fields, stateArgs(entry, offset + 1))]),
+        ),
+        onChange: (patch, values, meta) => {
+          // A state leaves the Knobs where they are: they're the story's tuning, not part of a state.
+          if (meta.source === "preset") queueMicrotask(() => store.sync(motionValues(motion)))
+          else applyMotionPatch(motion, patch)
+
+          if (!("state" in patch)) {
+            if (meta.source !== "preset") pause()
+
+            return setArgs(Object.fromEntries(Object.entries(patch).filter(([key]) => key in fields)))
+          }
+
+          // One batch, so a state with its own render function never renders with the previous state's args.
+          const next = Math.max(0, names.indexOf(String(values.state)))
+
+          if (next !== advancing) pause()
+          advancing = undefined
+          batch(() => {
+            setArgs(reconcile(stateArgs(entry, next)))
+            setIndex(next)
+          })
+
+          // Undo or a reset moved the state: bring the other knobs to the state's args too.
+          if (meta.source !== "preset") queueMicrotask(() => preset(next))
+        },
       },
-    },
+    )
+  }
+
+  let store!: ReturnType<typeof inspect>
+
+  createEffect(() => {
+    motion = shown()
+    store = untrack(inspect)
+    store.sync(motionValues(motion))
+    onCleanup(
+      store.mount(props.inspector, {
+        theme: props.scheme,
+        header: { title: false, buttons: ["undo", "redo", "reset"] },
+        variants: false,
+        session: false,
+        empty: language.t("lab.noControls"),
+      }),
+    )
+
+    // Applied rather than matched, so the state's chip stays lit while the Knobs, which no state sets, move.
+    if (rest.length > 0) untrack(() => preset(index()))
+  })
+
+  // Coalesced: a story registers its replay buttons one by one.
+  let queued = false
+  onCleanup(
+    motionTuning.subscribe(() => {
+      if (queued) return
+      queued = true
+      queueMicrotask(() => {
+        queued = false
+        const next = storyMotion(entry.motion)
+
+        if (motionKey(next) !== motionKey(motion)) return setShown(next)
+        store.sync(motionValues(motion))
+      })
+    }),
   )
 
   onCleanup(() => clearTimeout(timer))
 
-  onCleanup(
-    store.mount(props.inspector, {
-      theme: props.scheme,
-      header: { title: false, buttons: ["undo", "redo", "reset"] },
-      variants: false,
-      session: false,
-      empty: language.t("lab.noControls"),
-    }),
-  )
+  makeEventListener(window, "keydown", (event) => {
+    const digit = Number(event.key)
+
+    if (names.length < 2 || !Number.isInteger(digit) || digit < 1 || digit > Math.min(9, names.length)) return
+
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return
+    event.preventDefault()
+    preset(digit - 1)
+  })
 
   return (
     // Contained layout makes the canvas hold its stories' dialogs, which the provider below portals into it.
+    // A press inside the story (its own replay buttons, a dock) stops Play rather than being undone by it.
     <div
       ref={setCanvas}
       class="flex size-full overflow-auto bg-v2-background-bg-base [contain:layout]"
       classList={{ "items-center justify-center p-8": !entry.fullscreen, "flex-col": entry.fullscreen }}
+      onPointerDown={pause}
     >
       <Workspace>
         <Extension file={entry.file}>
@@ -407,7 +520,13 @@ function Stage(props: { entry: LabEntry; inspector: HTMLElement; scheme: "dark" 
 function Workspace(props: { children: JSX.Element }) {
   const servers = useServers()
   const global = useGlobal()
-  const healthy = () => servers.list.find((conn) => global.servers.health[ServerConnection.key(conn)]?.healthy)
+
+  // Kept once picked while the server stays listed: a new pick remounts the story, losing whatever it was showing.
+  const healthy = createMemo((picked?: ServerConnection.Any) =>
+    picked && servers.list.some((conn) => ServerConnection.key(conn) === ServerConnection.key(picked))
+      ? picked
+      : servers.list.find((conn) => global.servers.health[ServerConnection.key(conn)]?.healthy),
+  )
 
   return (
     <Show when={healthy()} keyed fallback={props.children}>
@@ -423,8 +542,16 @@ function Workspace(props: { children: JSX.Element }) {
 function Project(props: { children: JSX.Element }) {
   const server = useServer()
 
+  // The list puts the most recently active project first, and on a busy server that changes every few seconds. The
+  // story keeps the project it started in, so another session's activity never remounts it.
+  const directory = createMemo((picked?: string) => {
+    const list = server.ctx.projects.list()
+
+    return picked && list.some((project) => project.worktree === picked) ? picked : list[0]?.worktree
+  })
+
   return (
-    <Show when={server.ctx.projects.list()[0]?.worktree} keyed fallback={props.children}>
+    <Show when={directory()} keyed fallback={props.children}>
       {(directory) => (
         <ModelsProvider directory={directory}>
           <LocationProvider directory={directory}>
@@ -566,6 +693,10 @@ function Tile(props: { entry: LabEntry }) {
 
 function folderOf(entry: LabEntry) {
   return entry.file.match(/ui\/src\/([^/]+)\//)?.[1] ?? ""
+}
+
+function typing(target: EventTarget | null) {
+  return target instanceof HTMLElement && (target.isContentEditable || !!target.closest("input, textarea, select"))
 }
 
 function pane(content: () => JSX.Element) {

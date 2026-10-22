@@ -6,7 +6,6 @@ import {
 } from "@opencode/session-ui/storybook"
 import { SessionTimeline } from "@opencode/session-ui/timeline"
 import { motionTuning } from "@opencode/ui/motion-tuning"
-import { mountMotionPanel } from "@opencode/ui/motion-tuning-panel"
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
 import { createEffect, on, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -42,24 +41,27 @@ const websearchRequest: FormInfo = {
   fields: [{ key: "choice", type: "string", required: true, custom: false }],
 }
 
-// The real composer region with its docks, queue and subagent bar, driven by the story's args or by the replay
-// buttons in the Motion panel beside it. Answering, dismissing and Esc close docks the way they do in the app.
+// The real composer region with its docks, queue and subagent bar, driven by the story's args or by its replay
+// buttons (the components lab shows them under the Composer docks Knobs). Answering, dismissing and Esc close docks the way they do in the app.
 function ComposerDocksPreview(props: DockArgs) {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+
   const [state, setState] = createStore({
     ...props,
     rows: prompts.slice(0, props.queue).map((_, index) => index),
     revision: 0,
     searchProvider: "exa",
   })
+
   // Grows or trims the queue to `count`, adding the prompts not queued yet.
   const queueTo = (count: number) =>
     setState("rows", (rows) =>
-      [...rows, ...prompts.map((_, index) => index).filter((index) => !rows.includes(index))].slice(
+      [...rows, ...prompts.flatMap((_, index) => (rows.includes(index) ? [] : [index]))].slice(
         0,
         Math.max(0, Math.min(prompts.length, count)),
       ),
     )
+
   const dequeue = (id: string) => setState("rows", (rows) => rows.filter((index) => `queued_${index}` !== id))
 
   createEffect(
@@ -75,6 +77,7 @@ function ComposerDocksPreview(props: DockArgs) {
 
   const replay = (id: string, label: string, run: () => void) =>
     onCleanup(motionTuning.action({ id: `docks.${id}`, label, group: "Composer docks", run }))
+
   replay("question", "Question", () => setState({ question: true, revision: state.revision + 1 }))
   replay("permission", "Permission", () => setState("permission", true))
   replay("websearch", "Web search", () => setState("websearch", true))
@@ -102,8 +105,10 @@ function ComposerDocksPreview(props: DockArgs) {
   })
 
   const blocked = () => state.question || state.permission || state.websearch
+
   // A permission decision also reports a response submit, so only a submit without a decision answers the question.
   let deciding = false
+
   const region = {
     state: {
       questionRequest: () =>
@@ -188,10 +193,6 @@ function ComposerDocksPreview(props: DockArgs) {
             />
           </section>
         </CurrentSessionProviders>
-        <aside
-          class="relative w-[320px] shrink-0 border-l border-border-weak-base"
-          ref={(el) => onCleanup(mountMotionPanel(el, { section: "Composer docks" }))}
-        />
       </div>
     </QueryClientProvider>
   )
@@ -203,10 +204,12 @@ export default {
   component: ComposerDocksPreview,
   parameters: {
     layout: "fullscreen",
+    // The components lab shows these Knobs and their replay buttons in its inspector.
+    motion: ["Composer docks"],
     docs: {
       description: {
         component:
-          "Request docks, the queue and the subagent bar around the composer. Toggle the args, or use the replay buttons in the Motion panel, to open and close each dock and tune its motion live.",
+          "Request docks, the queue and the subagent bar around the composer. Toggle the args, or use the Replay buttons under the Composer docks Knobs, to open and close each dock and tune its motion live.",
       },
     },
   },

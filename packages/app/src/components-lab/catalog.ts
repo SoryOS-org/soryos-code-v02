@@ -23,7 +23,8 @@ type StoryObject = {
   args?: StoryArgs
   argTypes?: { [key: string]: ArgType }
   render?: StoryRender
-  parameters?: { layout?: string }
+  // `motion` names the Knobs (by id, group or card) the story uses, so the inspector shows them beside its args.
+  parameters?: { layout?: string; motion?: readonly string[] }
 }
 
 export type StoryModule = { [name: string]: StoryObject | StoryRender | string[] | undefined }
@@ -39,6 +40,7 @@ export type LabEntry = {
   argTypes: { [key: string]: ArgType }
   render?: StoryRender
   fullscreen: boolean
+  motion: readonly string[]
   states: LabState[]
 }
 
@@ -74,6 +76,7 @@ export function labEntry(file: string, module: StoryModule, source: string): Lab
     },
     render: meta.render,
     fullscreen: meta.parameters?.layout === "fullscreen",
+    motion: meta.parameters?.motion ?? [],
     states,
   }
 }
@@ -89,8 +92,9 @@ export function stateArgs(entry: LabEntry, index: number) {
 }
 
 /**
- * A knob for every arg the meta or a state sets, typed by its argType or else by its value. Text and object args keep
- * the story's values: knobs has no text field.
+ * A knob for every arg the meta or a state sets, typed by its argType or else by its value. Each starts at the first
+ * state's value, which the panel's default preset shows. Text and object args keep the story's values: knobs has no
+ * text field.
  */
 export function labFields(entry: LabEntry) {
   const keys = new Set([
@@ -102,7 +106,7 @@ export function labFields(entry: LabEntry) {
   return Object.fromEntries(
     [...keys].flatMap((key): [string, Field][] => {
       const type = entry.argTypes[key]
-      const value = entry.args[key] ?? entry.states.find((state) => key in state.args)?.args[key]
+      const value = stateArgs(entry, 0)[key] ?? entry.states.find((state) => key in state.args)?.args[key]
       const control = isText(type?.control) ? { type: type.control } : (type?.control ?? {})
       const [first, ...rest] = type?.options ?? []
 

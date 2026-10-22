@@ -701,8 +701,22 @@ export function DialogSelectModel(props: { provider?: string; model?: ModelState
     const box = row.closest('[data-slot="dialog-container"]')?.getBoundingClientRect()
 
     if (!box) return
-    const left = language.direction() === "rtl" ? box.left - 4 - 200 : box.right + 4
-    setStore({ flyout: id, warm: true, position: { left, top: row.getBoundingClientRect().top - 2 } })
+    // Beside the dialog's end edge, else its start edge, else over the dialog: always inside the layer that holds it.
+    const bounds = row.closest("[data-dialog-layer]")?.getBoundingClientRect()
+    const fits = (x: number) => !bounds || (x >= bounds.left && x + 200 <= bounds.right)
+    const end = language.direction() === "rtl" ? box.left - 4 - 200 : box.right + 4
+    const start = language.direction() === "rtl" ? box.right + 4 : box.left - 4 - 200
+    const over = bounds ? Math.max(bounds.left, Math.min(end, bounds.right - 200)) : end
+    const left = fits(end) ? end : fits(start) ? start : over
+    const top = row.getBoundingClientRect().top - 2
+    setStore({ flyout: id, warm: true, position: { left, top } })
+
+    // A fixed element is placed against the viewport unless an ancestor contains it, as a component preview that holds
+    // its dialogs does. Correct by where it landed, before it paints.
+    const placed = flyoutRef?.isConnected ? flyoutRef.getBoundingClientRect() : undefined
+
+    if (placed && (placed.left !== left || placed.top !== top))
+      setStore("position", { left: left * 2 - placed.left, top: top * 2 - placed.top })
   }
 
   const hover = (id: string, row: HTMLElement) => {

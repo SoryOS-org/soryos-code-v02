@@ -1,5 +1,4 @@
-import type { DurationOptions } from "./motion"
-import { motionPresets, motionTuning, type Bezier, type MotionKnob, type MotionPreset } from "./motion-tuning"
+import { motionPresets, motionTuning, type MotionKnob, type MotionPreset } from "./motion-tuning"
 
 const global = "Global"
 
@@ -28,51 +27,17 @@ export function mountMotionPanel(
   }
 
   async function start() {
-    const { action, choice, defineControls, easing, knob, spring, toggle } = await import("knobs")
+    const [{ action, defineControls }, { applyMotion, motionField }] = await Promise.all([
+      import("knobs"),
+      import("./motion-tuning-fields"),
+    ])
 
-    const field = (item: MotionKnob) => {
-      const meta = {
+    const field = (item: MotionKnob) =>
+      motionField(item, {
         label: item.label,
         group: item.card ?? item.group,
         tab: item.group === global ? undefined : item.group,
-      }
-
-      if (item.kind === "spring") return spring(item.initial, meta)
-
-      // Modes never reach here as rows; they sit in the preset strip.
-      if (item.kind === "toggle" || item.kind === "mode") return toggle(item.initial, meta)
-
-      if (item.kind === "easing") return easing(item.initial, meta)
-
-      if (item.kind === "choice") return choice(item.initial, item.options, { ...meta, labels: item.labels })
-
-      return knob(item.initial, { ...meta, min: item.min, max: item.max, step: item.step, unit: item.unit ?? "×" })
-    }
-
-    const apply = (item: MotionKnob, value: MotionKnob["value"]) => {
-      if (item.kind === "spring") {
-        // SAFETY: a spring knob's field is a spring field.
-        return motionTuning.set(item, value as DurationOptions)
-      }
-
-      if (item.kind === "easing") {
-        // SAFETY: an easing knob's field is an easing field.
-        return motionTuning.set(item, [...(value as Bezier)] as Bezier)
-      }
-
-      if (item.kind === "toggle" || item.kind === "mode") {
-        // SAFETY: a toggle knob's field is a toggle field.
-        return motionTuning.set(item, value as boolean)
-      }
-
-      if (item.kind === "choice") {
-        // SAFETY: a choice knob's field is a choice field.
-        return motionTuning.set(item, value as string)
-      }
-
-      // SAFETY: a number knob's field is a number field.
-      motionTuning.set(item, value as number)
-    }
+      })
 
     // Knobs whose `when` doesn't hold are left out; a change to it rebuilds the panel like a new knob would.
     const shown = () => motionTuning.list().filter((item) => item.when?.() ?? true)
@@ -142,7 +107,7 @@ export function mountMotionPanel(
               // SAFETY: each field was made from its knob above, so its value is that knob's kind.
               const value = patch[item.id] as MotionKnob["value"] | undefined
 
-              if (value !== undefined) apply(item, value)
+              if (value !== undefined) applyMotion(item, value)
             }),
         },
       )

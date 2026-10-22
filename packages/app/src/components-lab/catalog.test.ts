@@ -46,3 +46,13 @@ describe("labFields", () => {
     expect(knobArgs(fields, stateArgs(entry, 1))).toEqual({ size: "normal", queued: 3, question: false, label: "Send" })
   })
 })
+
+test("starts each knob at the first state's value", () => {
+  const entry = labEntry(
+    "spinner.stories.tsx",
+    { default: { args: { variant: "radar" } }, Today: { args: { variant: "today" } }, Radar: {} },
+    "export const Today = {}\nexport const Radar = {}",
+  )
+
+  expect(labFields(entry).variant).toEqual(text("today"))
+})

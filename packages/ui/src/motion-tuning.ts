@@ -218,6 +218,7 @@ const speed = register({
   min: 0.25,
   max: 4,
   step: 0.05,
+  unit: "×",
 })
 
 const slow = register({
