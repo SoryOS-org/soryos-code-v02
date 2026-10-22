@@ -1,10 +1,17 @@
 import { expect, test } from "bun:test"
 import { normalizeZoomFactor } from "./zoom-factor"
 
-test("falls back to 1 for missing, invalid or out-of-range values", () => {
-  for (const value of [undefined, null, "1.2", -1, 0, 11, Number.NaN, Number.POSITIVE_INFINITY]) {
+test("falls back to 1 for missing or non-numeric values", () => {
+  for (const value of [undefined, null, "1.2", Number.NaN, Number.POSITIVE_INFINITY]) {
     expect(normalizeZoomFactor(value)).toBe(1)
   }
+})
+
+test("clamps numeric values to the supported range", () => {
+  expect(normalizeZoomFactor(-1)).toBe(0.2)
+  expect(normalizeZoomFactor(0)).toBe(0.2)
+  expect(normalizeZoomFactor(11)).toBe(10)
+  expect(normalizeZoomFactor(1_000)).toBe(10)
 })
 
 test("keeps values inside the supported range", () => {
