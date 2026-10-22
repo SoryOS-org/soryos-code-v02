@@ -4,7 +4,7 @@ import { epilogue } from "../../src/util/presentation"
 const rows = (text: string | undefined) =>
   Bun.stripANSI(text ?? "")
     .split("\n")
-    .filter((line) => /^ {2}[A-Z]/.test(line))
+    .filter((line) => line.trim() && !/[▀▄█]/.test(line))
 
 test("prints nothing without a session or update", () => {
   expect(epilogue({})).toBeUndefined()
@@ -18,12 +18,12 @@ test("formats session continuation summary", () => {
 })
 
 test("tells the user to start OpenCode again after an update", () => {
-  expect(rows(epilogue({ updatedVersion: "2.0.0" }))).toEqual(["  Updated   OpenCode 2.0.0", "  Restart   opencode"])
+  expect(rows(epilogue({ updatedVersion: "2.0.0" }))).toEqual(["  Run opencode to use 2.0.0"])
 })
 
-test("uses the session continue command as the update restart command", () => {
+test("keeps the session continuation after an update", () => {
   expect(rows(epilogue({ session: { title: "A session", sessionID: "ses_123" }, updatedVersion: "2.0.0" }))).toEqual([
-    "  Updated   OpenCode 2.0.0",
+    "  Run opencode to use 2.0.0",
     "  Session   A session",
     "  Continue  opencode -s ses_123",
   ])

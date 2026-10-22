@@ -25,17 +25,18 @@ function wordmark(pad = "") {
 
 export type SessionEpilogue = { readonly title: string; readonly sessionID?: string }
 
-// Printed after the TUI closes. After an update restart the continue command doubles as the restart command.
+// Printed after the TUI closes.
 export function epilogue(input: { readonly session?: SessionEpilogue; readonly updatedVersion?: string }) {
   if (!input.session && !input.updatedVersion) return
   const row = (label: string, value: string) => `  ${dim}${label.padEnd(10, " ")}${reset}${bold}${value}${reset}`
   return [
     ...wordmark("  "),
     "",
-    ...(input.updatedVersion ? [row("Updated", `OpenCode ${input.updatedVersion}`)] : []),
+    ...(input.updatedVersion
+      ? [`  ${dim}Run ${reset}${bold}opencode${reset}${dim} to use ${reset}${bold}${input.updatedVersion}${reset}`, ""]
+      : []),
     ...(input.session
-      ? [row("Session", input.session.title), row("Continue", `opencode -s ${input.session.sessionID}`)]
-      : [row("Restart", "opencode")]),
-    "",
+      ? [row("Session", input.session.title), row("Continue", `opencode -s ${input.session.sessionID}`), ""]
+      : []),
   ].join("\n")
 }
