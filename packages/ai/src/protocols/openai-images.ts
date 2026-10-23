@@ -86,8 +86,8 @@ const StreamEvent = Schema.Union([
 const decodeEvent = route.decodeFrame(StreamEvent)
 const decodeDocument = Schema.decodeUnknownEffect(Schema.fromJsonString(OpenAIImageResponse))
 
-/** `generate` reads the whole JSON response as one frame, with the requested format for responses that omit it. */
-type Frame = string | { readonly document: string; readonly requested: string | undefined }
+/** `generate` reads the whole JSON response as one frame. */
+type Frame = string | { readonly document: string }
 
 // ---------------------------------------------------------------------------
 // 4. Parser state
@@ -180,12 +180,6 @@ const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (request: Me
 // 6. Stream parsing
 // ---------------------------------------------------------------------------
 
-const requestedFormat = (body: MediaProtocol.Body) => {
-  if (body.type === "binary") return undefined
-  const value = body.type === "json" ? body.value.output_format : body.value.get("output_format")
-  return typeof value === "string" ? value : undefined
-}
-
 const usage = (value: Schema.Schema.Type<typeof Usage> | undefined): MediaUsage | undefined =>
   value === undefined
     ? undefined
@@ -198,7 +192,7 @@ const usage = (value: Schema.Schema.Type<typeof Usage> | undefined): MediaUsage 
       }
 
 /** `size` echoes the rendered `WIDTHxHEIGHT`; `auto` or any other value leaves the dimensions unknown. */
-const info = (format: string, size: string | undefined): Media.Info => {
+const info = (format: string | undefined, size: string | undefined): Media.Info => {
   const match = size?.match(/^(\d+)x(\d+)$/)
   return match ? { format, width: Number(match[1]), height: Number(match[2]) } : { format }
 }
@@ -234,9 +228,11 @@ const onDocument = Effect.fnUntraced(function* (frame: Exclude<Frame, string>) {
   const decoded = yield* decodeDocument(frame.document).pipe(
     Effect.mapError((cause) => invalid(`${route.name} returned an invalid response`, cause)),
   )
-  const format = decoded.output_format ?? frame.requested ?? "png"
+  // Compatible hosts may omit `output_format` and ignore the requested one, so the bytes decide unreported types.
+  const format = decoded.output_format
+  const mediaType = format === undefined ? undefined : `image/${format}`
   const images = yield* Effect.forEach(decoded.data, (item, index) =>
-    MediaInput.decodedAsset(invalid, `${route.name} result ${index}`, item.b64_json, `image/${format}`, {
+    MediaInput.decodedAsset(invalid, `${route.name} result ${index}`, item.b64_json, mediaType, {
       info: info(format, decoded.size),
     }),
   )
@@ -281,9 +277,7 @@ export const protocol = MediaProtocol.stream<Request, ImageEvent, Frame, State>(
   frames: (bytes, context) =>
     context.request.mode === "stream"
       ? Framing.sse.frame(bytes)
-      : Framing.document
-          .frame(bytes)
-          .pipe(Stream.map((document) => ({ document, requested: requestedFormat(context.body) }))),
+      : Framing.document.frame(bytes).pipe(Stream.map((document) => ({ document }))),
   initial: () => ({ completed: 0 }),
   step,
   finish,
