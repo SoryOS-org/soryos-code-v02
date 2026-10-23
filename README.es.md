@@ -80,18 +80,7 @@ brew install --cask opencode-desktop
 
 #### Directorio de instalación
 
-El script de instalación respeta el siguiente orden de prioridad para la ruta de instalación:
-
-1. `$OPENCODE_INSTALL_DIR` - Directorio de instalación personalizado
-2. `$XDG_BIN_DIR` - Ruta compatible con la especificación XDG Base Directory
-3. `$HOME/bin` - Directorio binario estándar del usuario (si existe o se puede crear)
-4. `$HOME/.opencode/bin` - Alternativa por defecto
-
-```bash
-# Ejemplos
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/v2/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/v2/install | bash
-```
+El script de instalación instala OpenCode en `$HOME/.opencode/bin`.
 
 ### Agentes
 
