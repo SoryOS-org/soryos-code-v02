@@ -1341,7 +1341,9 @@ test("acknowledges completed MCP URL elicitations without returning internal con
           const result = yield* Fiber.join(call)
           expect(yield* forms.state(form.id)).toEqual({ status: "answered", answer: { elicitation: true } })
           return result
-        }).pipe(Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))))
+        }).pipe(
+          Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))),
+        )
 
         expect(result.structured).toEqual({ action: "accept" })
       }),
@@ -1362,12 +1364,10 @@ test("cancels MCP elicitation forms when the server gives up on them", async () 
           const { form } = yield* Deferred.await(created)
           yield* Fiber.await(call)
           // The server's cancellation and its tool error race; the form settles shortly after either.
-          const state = yield* forms
-            .state(form.id)
-            .pipe(
-              Effect.repeat({ until: (state) => state.status !== "pending", schedule: Schedule.spaced("10 millis") }),
-              Effect.timeout("2 seconds"),
-            )
+          const state = yield* forms.state(form.id).pipe(
+            Effect.repeat({ until: (state) => state.status !== "pending", schedule: Schedule.spaced("10 millis") }),
+            Effect.timeout("2 seconds"),
+          )
           expect(state.status).toBe("cancelled")
         }).pipe(Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))))
       }),
