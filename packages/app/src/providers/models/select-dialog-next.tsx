@@ -670,6 +670,14 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
     void dialog.show(() => <DialogManageModels />)
   }
 
+  const location = useWorkspaceLocation()
+
+  const connect = async () => {
+    const { DialogConnectProvider } = await import("@/providers/connect/dialog")
+    // The model chosen after connecting applies to this composer.
+    void dialog.show(() => <DialogConnectProvider directory={location().directory} selection={props.model} />)
+  }
+
   const triangle = createSafeTriangle({
     flyout: () => (flyoutItem() && flyoutRef?.isConnected ? flyoutRef : undefined),
   })
@@ -913,9 +921,12 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
           <span class="min-w-0 truncate">
             <SearchHighlight text={item().name} />
           </span>
-          {/* Favorites and Recent mix providers, so their rows name one. */}
+          {/* Favorites and Recent mix providers, so their rows name one, with its workspace when its header has one. */}
           <Show when={row.model.group.title}>
             <span class="min-w-0 shrink-[999] truncate text-v2-text-text-faint">{labels.name(item().provider)}</span>
+            <Show when={labels.workspace(item().provider)}>
+              {(workspace) => <Badge class="shrink-0">{workspace()}</Badge>}
+            </Show>
           </Show>
           <Show when={isFreeModel(item())}>
             <Badge class="shrink-0">{language.t("model.tag.free")}</Badge>
@@ -964,14 +975,29 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
             onQuery={setSearch}
             placeholder={language.t("dialog.model.search.placeholder")}
             trailing={
-              <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
-                <IconButton
-                  variant="ghost-muted"
-                  icon={<Icon name="outline-sliders" size="small" />}
-                  aria-label={language.t("dialog.model.manage")}
-                  onClick={manage}
-                />
-              </Tooltip>
+              <>
+                <Tooltip
+                  placement="top"
+                  gutter={4}
+                  value={language.t("command.provider.connect")}
+                  ignoreSafeArea={false}
+                >
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="plus" size="small" />}
+                    aria-label={language.t("command.provider.connect")}
+                    onClick={connect}
+                  />
+                </Tooltip>
+                <Tooltip placement="top" gutter={4} value={language.t("dialog.model.manage")} ignoreSafeArea={false}>
+                  <IconButton
+                    variant="ghost-muted"
+                    icon={<Icon name="outline-sliders" size="small" />}
+                    aria-label={language.t("dialog.model.manage")}
+                    onClick={manage}
+                  />
+                </Tooltip>
+              </>
             }
             items={rows()}
             key={(row) => row.id}
@@ -1044,7 +1070,13 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
               <Keybind keys={formatKeybindParts("mod+f", language.t)} variant="neutral" class="shrink-0" />
             </div>
             <div data-slot="menu-v2-separator" role="separator" />
-            <ModelDetails model={item()} provider={labels.name(item().provider)} compact standalone />
+            {/* The full name, "Workspace / Provider", where a workspace badge tells the connections apart. */}
+            <ModelDetails
+              model={item()}
+              provider={labels.workspace(item().provider) ? item().provider.name : labels.name(item().provider)}
+              compact
+              standalone
+            />
           </div>
         )}
       </Show>

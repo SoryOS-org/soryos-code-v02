@@ -44,7 +44,7 @@
     background: transparent;
   }
 
-  /* The 24px manage button sits 2px from every edge of the 28px row. */
+  /* The 24px buttons sit 2px from every edge of the 28px row. */
   [data-component="search-list"] [data-slot="text-input-v2-trailing"] {
     margin-inline-end: 0;
 
@@ -53,13 +53,14 @@
     }
   }
 
-  [data-component="search-list"] [data-slot="text-input-v2-leading-icon"] {
-    display: none;
+  /* Like a model row: 6px inset, a 16px icon slot and a 6px gap, so the query starts where the model names do. */
+  [data-component="search-list"] [data-slot="search-list-search"] [data-slot="text-input-v2-value"] {
+    gap: 6px;
   }
 
-  /* Row inset, check slot and gap: the query starts where the model names do. */
-  [data-component="search-list"] [data-slot="text-input-v2-input"] {
-    padding-inline-start: 22px;
+  [data-component="search-list"] [data-slot="search-list-search"] [data-slot="text-input-v2-leading-icon"] {
+    width: 22px;
+    padding-inline-start: 6px;
   }
 
   /* The stuck header's gradient replaces it; the list measures sections for it, and here they have no box. */
@@ -69,7 +70,7 @@
 
   /* Arrow keys keep the active row clear of the stuck header. */
   [data-component="search-list"] [data-slot="search-list-scroll"] > .scroll-view__viewport {
-    scroll-padding-top: 32px;
+    scroll-padding-top: 36px;
   }
 
   [data-component="search-list"] [data-slot="search-list-results"] {
@@ -91,10 +92,10 @@
    */
   [data-component="search-list"] [data-slot="search-list-header"] {
     height: auto;
-    padding-block: 12px 2px;
-    padding-inline: 28px 6px;
+    padding-block: 16px 2px;
+    padding-inline: 34px 6px;
     background: var(--v2-background-bg-base);
-    color: var(--v2-text-text-muted);
+    color: var(--v2-text-text-faint);
     font-size: 12px;
     line-height: 18px;
 
@@ -144,14 +145,14 @@
   [data-component="search-list"]
     [data-slot="search-list-section"]:first-child
     > [data-slot="search-list-header"] {
-    padding-top: 16px;
+    padding-top: 20px;
   }
 
   [data-component="search-list"] [data-slot="search-list-row"] {
     justify-content: flex-start;
-    gap: 3px;
+    gap: 6px;
     height: 28px;
-    padding-inline: 3px;
+    padding-inline: 6px 3px;
     border-radius: 6px;
     font-size: 13px;
     font-weight: 440;
