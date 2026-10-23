@@ -34,6 +34,7 @@ function mount() {
       open: () => false,
       aside: () => aside,
       panel: () => panel,
+      width: () => 260,
       paint: () => {},
       continues: () => true,
       whenDocked: (run) => run(),

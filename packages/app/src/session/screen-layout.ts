@@ -55,12 +55,19 @@ export function createSessionScreenLayout(session: SessionModel, input: { wide: 
     return sessionPanelWidthMax({ available: width, split: splitSide(), resized: true })
   })
 
-  const sideContentWidth = createMemo<string>((previous) => {
+  // The side panel's open width, kept through a close as the far end of its travel.
+  const sideWidth = createMemo<number | undefined>((previous) => {
     const width = available()
 
-    if (tabsOpen() && width !== undefined) return `${Math.max(0, width - resizedWidth())}px`
+    if (tabsOpen() && width !== undefined) return Math.max(0, width - resizedWidth())
 
     return previous
+  })
+
+  const sideContentWidth = createMemo<string>((previous) => {
+    const width = sideWidth()
+
+    return width === undefined ? previous : `${width}px`
   }, "100%")
 
   return {
@@ -76,6 +83,7 @@ export function createSessionScreenLayout(session: SessionModel, input: { wide: 
     },
     side: {
       contentWidth: sideContentWidth,
+      width: sideWidth,
       open: tabsOpen,
       tabs: { open: tabsOpen },
     },

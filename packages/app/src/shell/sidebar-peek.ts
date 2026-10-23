@@ -108,6 +108,8 @@ export function createSidebarPeek(input: {
   aside: Accessor<HTMLElement | undefined>
   /** The sidebar's box while it peeks, which doesn't move while the content inside it slides. */
   panel: Accessor<HTMLElement | undefined>
+  /** The sidebar's width, which the matched spring scales its time by like the docked sidebar's. */
+  width: Accessor<number>
   /** Paints how far in the peek has the sidebar, from 0 to 1, on every frame it moves; undefined once it isn't peeking. */
   paint: (shown: number | undefined) => void
   /** Whether docking continues from the peek; otherwise the docked sidebar's own motion takes over at once. */
@@ -151,7 +153,7 @@ export function createSidebarPeek(input: {
 
   // Retargeting keeps the current position and velocity, so a peek that turns around mid-flight stays smooth.
   const run = (target: number) => {
-    const tuning = prefersReducedMotion() ? fade : peekMatched() ? panelSpring() : peekSpring()
+    const tuning = prefersReducedMotion() ? fade : peekMatched() ? panelSpring(input.width()) : peekSpring()
     motion.omega = (2 * Math.PI) / tuning.duration
     motion.zeta = 1 - tuning.bounce
     motion.set(target)

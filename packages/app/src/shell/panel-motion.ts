@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, type Accessor } from "solid-js"
 import { ease, frameLoop, prefersReducedMotion, Spring, type DurationOptions } from "@opencode/ui/motion"
-import { motionTuning } from "@opencode/ui/motion-tuning"
+import { motionGlobals, motionTuning } from "@opencode/ui/motion-tuning"
 
 const group = "Sidebars"
 
@@ -29,8 +29,30 @@ const spring = motionTuning.spring("sidebars", {
   },
 })
 
-/** The shared spring, for motion that must read as the sidebar's own, like its peek. */
-export const panelSpring = spring
+// Each panel's flight takes the shared spring's time scaled by the square root of how far it travels against a 480px
+// panel, so a narrow sidebar doesn't crawl and a wide panel doesn't snap.
+const scaleByDistance = motionTuning.toggle("sidebars.scaleByDistance", {
+  label: "Scale by distance",
+  group: "Experiments",
+  value: true,
+})
+
+const reference = 480
+
+const bounds = { min: 0.15, max: 0.45 }
+
+/**
+ * The shared spring for a panel that travels `distance` pixels, for motion that must read as the sidebar's own, like its
+ * peek. Without a distance, or with scaling off, it is the shared spring as tuned.
+ */
+export function panelSpring(distance?: number, base = spring(), scaled = scaleByDistance()): DurationOptions {
+  if (!scaled || !distance || distance <= 0) return base
+  // The bounds stretch with the global speed and slow motion, like the spring itself.
+  const time = (motionGlobals.slow.value ? 4 : 1) / motionGlobals.speed.value
+  const duration = base.duration * Math.sqrt(distance / reference)
+
+  return { ...base, duration: Math.min(bounds.max * time, Math.max(bounds.min * time, duration)) }
+}
 
 const style = motionTuning.choice("sidebars.style", {
   label: "Motion",
@@ -331,6 +353,8 @@ export function createPanelMotion(input: {
    */
   element?: Accessor<HTMLElement | undefined>
   offset?: () => number
+  /** The width the panel travels across, in pixels, read once as each flight starts; it scales the flight's time. */
+  distance?: () => number | undefined
 }) {
   const [present, setPresent] = createSignal(input.open())
   // Percent closed, so the spring's rest threshold stays well under a pixel.
@@ -459,7 +483,7 @@ export function createPanelMotion(input: {
 
         setPinned(james())
 
-        const tuning = james() ? (open ? jamesLayoutOpen() : jamesLayoutClose()) : spring()
+        const tuning = james() ? (open ? jamesLayoutOpen() : jamesLayoutClose()) : panelSpring(input.distance?.())
         motion.omega = (2 * Math.PI) / tuning.duration
         motion.zeta = 1 - tuning.bounce
         // Retargeting keeps the current position and velocity, so a second toggle mid-flight turns around smoothly.

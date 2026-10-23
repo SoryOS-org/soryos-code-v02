@@ -197,6 +197,7 @@ function SessionScreenContent(props: {
     },
     element: () => sidePresence,
     offset: jamesPanelShift,
+    distance: screen.side.width,
   })
 
   replayPanelToggle({

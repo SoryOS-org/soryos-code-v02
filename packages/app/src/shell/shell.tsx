@@ -121,6 +121,7 @@ export default function Layout(props: ParentProps) {
     // A dock from a peek already shows the sidebar, so reduced motion has nothing to fade in.
     element: () => (peek.handedOff() ? undefined : state.tabsPanel),
     offset: () => -10,
+    distance: () => state.tabsWidth,
   })
 
   const peek = createSidebarPeek({
@@ -128,6 +129,7 @@ export default function Layout(props: ParentProps) {
     open: preferences.appearance.sidebarOpen,
     aside: () => state.tabsAside,
     panel: () => state.tabsPanel,
+    width: () => state.tabsWidth,
     paint: (shown) => {
       sidebar.peek = shown
       paintSidebarContents()
