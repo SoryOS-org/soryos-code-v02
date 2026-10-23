@@ -242,23 +242,78 @@ describe("ModelResolver", () => {
     ),
   )
 
-  it.effect("resolves Bedrock Mantle catalog endpoints from the provider region", () =>
-    withEnv({ AWS_REGION: undefined, AWS_DEFAULT_REGION: undefined }, () =>
-      Effect.gen(function* () {
-        const catalog = model(Provider.aisdk("@ai-sdk/amazon-bedrock/mantle"), {
-          providerID: Provider.ID.amazonBedrock,
-          modelID: "openai.gpt-5.5",
-          settings: { baseURL: "https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1" },
-        })
-        const resolved = yield* ModelResolver.fromCatalogModel({
-          ...catalog,
-          settings: Provider.mergeOverlay({ region: "us-west-2", profile: "dev" }, catalog.settings),
-        })
+  describe("Bedrock Mantle endpoints with a provider region", () => {
+    const resolveWithProviderRegion = () => {
+      const selected = model(Provider.aisdk("@ai-sdk/amazon-bedrock/mantle"), {
+        providerID: Provider.ID.amazonBedrock,
+        modelID: "openai.gpt-5.5",
+        settings: { baseURL: "https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1" },
+      })
+      const provider = Provider.Info.make({
+        ...Provider.Info.empty(selected.providerID),
+        activation: "enabled",
+        package: "@opencode/ai/providers/amazon-bedrock",
+        settings: { region: "us-west-2" },
+      })
+      const layer = ModelResolver.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(Provider.Service, { get: () => Effect.succeed(provider) }),
+            Layer.mock(Model.Service, {}),
+            Layer.mock(Integration.Service, {
+              revision: () => 0,
+              connection: {
+                active: () => Effect.undefined,
+                resolve: () => Effect.die("unused"),
+                key: () => Effect.die("unused"),
+                external: () => Effect.die("unused"),
+                activate: () => Effect.die("unused"),
+                update: () => Effect.die("unused"),
+                remove: () => Effect.die("unused"),
+                status: () => Effect.die("unused"),
+              },
+              oauth: {
+                connect: () => Effect.die("unused"),
+                status: () => Effect.die("unused"),
+                complete: () => Effect.die("unused"),
+                cancel: () => Effect.die("unused"),
+              },
+              command: {
+                connect: () => Effect.die("unused"),
+                status: () => Effect.die("unused"),
+                cancel: () => Effect.die("unused"),
+              },
+            }),
+            Layer.mock(Npm.Service, {}),
+            Layer.mock(AISDK.Service, {
+              hook: { sdk: () => Effect.die("unused"), language: () => Effect.die("unused") },
+            }),
+          ),
+        ),
+      )
+      return ModelResolver.Service.use((resolver) => resolver.resolveModel(selected)).pipe(Effect.provide(layer))
+    }
 
-        expect(resolved.route.endpoint.baseURL).toBe("https://bedrock-mantle.us-west-2.api.aws/openai/v1")
-      }),
-    ),
-  )
+    it.effect("uses the provider region when AWS_REGION is unset", () =>
+      withEnv({ AWS_REGION: undefined }, () =>
+        Effect.gen(function* () {
+          const resolved = yield* resolveWithProviderRegion()
+
+          expect(resolved.model.route.endpoint.baseURL).toBe("https://bedrock-mantle.us-west-2.api.aws/openai/v1")
+        }),
+      ),
+    )
+
+    it.effect("prefers the provider region over AWS_REGION", () =>
+      withEnv({ AWS_REGION: "eu-central-1" }, () =>
+        Effect.gen(function* () {
+          const resolved = yield* resolveWithProviderRegion()
+
+          expect(resolved.model.route.endpoint.baseURL).toBe("https://bedrock-mantle.us-west-2.api.aws/openai/v1")
+        }),
+      ),
+    )
+  })
 
   it.effect("prefers the configured Mantle region over the environment", () =>
     withEnv({ AWS_REGION: "us-east-1" }, () =>

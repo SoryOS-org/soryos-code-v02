@@ -291,15 +291,22 @@ function prepareProviderURL(
   if (!baseURL.includes("${")) return Effect.succeed(baseURL)
   const prepared = baseURL.replace(
     /\$\{([^}]+)\}/g,
-    (placeholder, name: string) => providerVariable(name, settings) ?? placeholder,
+    (placeholder, name: string) => providerVariable(model, name, settings) ?? placeholder,
   )
   const failure = unresolvedProviderVariables(model, prepared)
   return failure ? Effect.fail(failure) : Effect.succeed(prepared)
 }
 
-// The configured Bedrock region wins over the environment, as it does for the native package.
-const providerVariable = (name: string, settings: Readonly<Record<string, unknown>>) =>
-  name === "AWS_REGION" && typeof settings.region === "string" ? settings.region : process.env[name]
+// Bedrock's region is a provider setting while catalog URLs are model settings; the configured region wins over the environment.
+const providerVariable = (model: RuntimeInfo, name: string, settings: Readonly<Record<string, unknown>>) =>
+  name === "AWS_REGION" && isBedrock(model) && typeof settings.region === "string"
+    ? settings.region
+    : process.env[name]
+
+const isBedrock = (model: RuntimeInfo) => {
+  const name = Provider.packageName(model.package)
+  return name?.startsWith("@opencode/ai/providers/amazon-bedrock") || name?.startsWith("@ai-sdk/amazon-bedrock")
+}
 
 function unresolvedProviderVariables(model: RuntimeInfo, baseURL: string) {
   const variables = new Set(Array.from(baseURL.matchAll(/\$\{([^}]+)\}/g), (match) => match[1]))
