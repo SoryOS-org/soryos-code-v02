@@ -140,7 +140,15 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
     // Create session with model
     const session = yield* Effect.promise(async () => {
       const modelStr = process.env["MODEL"]
-      const created = await client.session.create({ location: { directory: cwd }, model: modelStr ? { providerID: modelStr.split("/")[0], id: modelStr.split("/").slice(1).join("/") } : undefined, agent: process.env["AGENT"] || undefined, title: "github run" })
+      let baseModel = modelStr
+      let variant: string | undefined
+      if (modelStr && modelStr.includes("#")) {
+        const parts = modelStr.split("#")
+        baseModel = parts[0]
+        variant = parts[1]
+      }
+      const modelParts = baseModel ? baseModel.split("/") : []
+      const created = await client.session.create({ location: { directory: cwd }, model: baseModel ? { id: modelParts.slice(1).join("/"), providerID: modelParts[0], variant } : undefined, agent: process.env["AGENT"] || undefined, title: "github run" })
       return created
     })
 
@@ -169,7 +177,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         const list = (msgs.data ?? msgs) as any[]
         const assistant = list.find((m: any) => m.type === "assistant")
         if (!assistant) return ""
-        const parts = assistant.content ?? []
+        const parts = assistant.content ?? assistant.parts ?? []
         return parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n\n").trim()
       } catch {
         return ""
@@ -228,7 +236,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         if (isFork && prPayload) {
           const forkRepo = prPayload.head.repo.full_name
           const headRef = prPayload.head.ref
-          try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd) }
+          try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://${pushToken}@github.com/${forkRepo}.git`], cwd) }
           git(["push", "fork", `HEAD:${headRef}`], cwd)
         } else if (prPayload) {
           git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
@@ -241,6 +249,9 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
             console.log(`PR creation failed: ${e?.message || e}`)
           }
         }
+      } catch (e: any) {
+        console.error(`Git operation failed: ${e?.message || e}`)
+        process.exitCode = 1
       } finally {
         if (originalExtra) {
           gitSafe(["config", "--local", "http.https://github.com/.extraheader", originalExtra], cwd)
