@@ -43,6 +43,35 @@ test("reveals the terminal after its first output and hides the native caret", a
   await expect(terminal).toHaveCSS("opacity", "1")
 })
 
+test("quotes selected terminal output into the composer", async ({ page }) => {
+  const { pty, editor } = await openSession(page, workspace)
+  const terminal = page.locator('[data-component="terminal"]')
+  await page.keyboard.press("Control+Backquote")
+  await expect.poll(() => pty.sockets.length).toBe(1)
+  pty.send("$ bun run build\r\nerror: Cannot find module './config'\r\n")
+  await expect(terminal).toHaveCSS("opacity", "1")
+
+  const canvas = terminal.locator("canvas").first()
+  const box = await canvas.boundingBox()
+
+  if (!box) throw new Error("The terminal has no canvas")
+  // From the first output row's start to well into the second.
+  await page.mouse.move(box.x + 2, box.y + 4)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 320, box.y + 26, { steps: 8 })
+  await page.mouse.up()
+
+  const toolbar = page.getByRole("toolbar", { name: "Quote selection" })
+  await expect(toolbar).toBeVisible()
+  await toolbar.getByRole("button", { name: "Quote", exact: true }).click()
+
+  const chips = page.locator('[data-component="composer-attachments"] [data-component="attachment-card"]')
+  await expect(chips).toHaveCount(1)
+  await expect(chips).toContainText("Terminal")
+  await expect(toolbar).toBeHidden()
+  await expect(editor).toBeFocused()
+})
+
 test("routes typing to the composer unless the open terminal is focused", async ({ page }) => {
   const { pty, editor } = await openSession(page, workspace)
   const terminal = page.locator('[data-component="terminal"]')
