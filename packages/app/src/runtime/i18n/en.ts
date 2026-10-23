@@ -724,13 +724,14 @@ export const dict = {
   "settings.notifications.description": "Choose when to receive notifications and hear sounds",
 
   "settings.notifications.push.title": "Background push",
-  "settings.notifications.push.description":
-    "Notify this device even when the app is closed. The server must stay awake. On iPhone and iPad, add OpenCode to the Home Screen first.",
+  "settings.notifications.push.hint":
+    "Your browser will ask for notification permission. On iPhone and iPad, add OpenCode to the Home Screen first; Safari tabs cannot receive push. On Android, Chrome or Edge can ask directly.",
   "settings.notifications.push.server": "Server",
-  "settings.notifications.push.enable": "Enable push",
-  "settings.notifications.push.disable": "Disable push",
-  "settings.notifications.push.enabled": "Push is enabled for this device.",
-  "settings.notifications.push.disabled": "Push is off. Press Enable push to allow notifications.",
+  "settings.notifications.push.serverDescription": "Choose the server that sends notifications to this browser.",
+  "settings.notifications.push.toggle": "Push notifications",
+  "settings.notifications.push.toggleDescription": "Receive notifications while the app is closed.",
+  "settings.notifications.push.enabled": "Push notifications are on for this device.",
+  "settings.notifications.push.disabled": "Push notifications are off. Turn on the switch to allow them.",
   "settings.notifications.push.updating": "Updating push subscription…",
   "settings.notifications.push.insecure": "Push needs HTTPS or localhost.",
   "settings.notifications.push.install": "On iPhone and iPad, add OpenCode to the Home Screen first.",

@@ -1,6 +1,5 @@
 import { Component, Show, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Button } from "@opencode/ui/button"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -110,38 +109,42 @@ export const SettingsNotifications: Component = () => {
             <SettingsList>
               <SettingsRow
                 title={language.t("settings.notifications.push.server")}
-                description={language.t("settings.notifications.push.description")}
+                description={language.t("settings.notifications.push.serverDescription")}
               >
-                <div class="flex flex-wrap items-center gap-2">
-                  <Select
-                    data-action="settings-notifications-push-server"
-                    options={connected()}
-                    current={selected()}
-                    value={(server) => server.key}
-                    label={(server) => server.name}
-                    onSelect={(server) => server && setPushState("key", server.key)}
-                    placement="bottom-end"
-                    gutter={6}
-                  />
-                  <Show when={push()} keyed>
-                    {(controller) => (
-                      <Button
-                        data-action="settings-notifications-push-toggle"
-                        variant="outline"
-                        disabled={controller.state.busy || !controller.ready()}
-                        onClick={() => void (controller.state.enabled ? controller.disable() : controller.enable())}
-                      >
-                        {language.t(
-                          controller.state.enabled
-                            ? "settings.notifications.push.disable"
-                            : "settings.notifications.push.enable",
-                        )}
-                      </Button>
-                    )}
-                  </Show>
-                </div>
+                <Select
+                  data-action="settings-notifications-push-server"
+                  options={connected()}
+                  current={selected()}
+                  value={(server) => server.key}
+                  label={(server) => server.name}
+                  onSelect={(server) => server && setPushState("key", server.key)}
+                  placement="bottom-end"
+                  gutter={6}
+                />
               </SettingsRow>
+              <Show when={push()} keyed>
+                {(controller) => (
+                  <SettingsRow
+                    title={language.t("settings.notifications.push.toggle")}
+                    description={language.t("settings.notifications.push.toggleDescription")}
+                  >
+                    <div data-action="settings-notifications-push-toggle">
+                      <Switch
+                        checked={controller.state.enabled}
+                        disabled={controller.state.busy || !controller.ready()}
+                        hideLabel
+                        onChange={(checked) => void (checked ? controller.enable() : controller.disable())}
+                      >
+                        {language.t("settings.notifications.push.toggle")}
+                      </Switch>
+                    </div>
+                  </SettingsRow>
+                )}
+              </Show>
             </SettingsList>
+            <p class="text-12-regular text-v2-text-text-muted break-words">
+              {language.t("settings.notifications.push.hint")}
+            </p>
             <Show when={push()} keyed>
               {(controller) => (
                 <div role="status" class="text-12-regular text-v2-text-text-muted break-words">
