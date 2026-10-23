@@ -36,8 +36,8 @@ const TREE_UNSAFE_CSS = `
   [data-file-tree-virtualized-root="true"] { padding-block-start: 4px; }
   /* The patched scroll limit counts this padding and the horizontal scrollbar, so neither fights the wheel. */
   [data-file-tree-virtualized-scroll="true"] { padding-block: 0 8px; padding-inline: 8px; overflow-x: auto; }
-  /* Long rows scroll sideways rather than clip; every row is as wide as the widest one rendered. */
-  [data-file-tree-virtualized-list="true"] { width: max-content; min-width: 100%; }
+  /* Long rows scroll sideways rather than clip; every row is as wide as the widest one seen in this row set. */
+  [data-file-tree-virtualized-list="true"] { width: max-content; min-width: max(100%, var(--file-tree-min-width, 0px)); }
   [data-item-section="spacing"] {
     margin-left: 0; margin-right: 0;
     margin-inline-start: calc(var(--trees-spacing-unit) * 0.5 + 1px);
@@ -198,6 +198,14 @@ export default function PierreFileTree(props: {
   let renderedKinds: ReadonlyMap<string, ChangeKind> | undefined
   let renderedIgnored: ReadonlySet<string> | undefined
   let renderedRoot = file.root
+  let widthHost: HTMLElement | undefined
+  let widest = 0
+
+  // A new row set measures from the pane's width again.
+  const resetWidth = () => {
+    widest = 0
+    widthHost?.style.removeProperty("--file-tree-min-width")
+  }
 
   const originalPath = (rawPath: string) => {
     const norm = normalizeFileTreeV2Path(rawPath)
@@ -307,6 +315,8 @@ export default function PierreFileTree(props: {
         return label ? { text: label } : null
       },
       onExpansionChange(change) {
+        resetWidth()
+
         if (syncingExpansion) return
         const original = originalPath(change.path)
 
@@ -319,6 +329,26 @@ export default function PierreFileTree(props: {
     if (!isLive && initialAllowed) applyAllowedCollapsed(initialAllowed)
     tree.render({ containerWrapper: wrapper })
     tree.getFileTreeContainer()?.classList.add("opencode-pierre-file-tree")
+    widthHost = tree.getFileTreeContainer()
+    const list = widthHost?.shadowRoot?.querySelector<HTMLElement>("[data-file-tree-virtualized-list]")
+    const scroller = list?.closest<HTMLElement>("[data-file-tree-virtualized-scroll]")
+
+    // Only some rows render, so the list's own width follows the rows on screen. Rows wider than the pane widen the
+    // tree, which keeps that width while they scroll out of view; otherwise the scroll position would snap back.
+    if (list && scroller) {
+      const widen = new ResizeObserver(() => {
+        if (scroller.scrollWidth <= scroller.clientWidth) return
+        const width = list.getBoundingClientRect().width
+
+        if (width <= widest) return
+        widest = width
+        widthHost?.style.setProperty("--file-tree-min-width", `${width}px`)
+      })
+
+      widen.observe(list)
+      onCleanup(() => widen.disconnect())
+    }
+
     setReady(true)
     onCleanup(() => {
       tree?.cleanUp()
@@ -344,6 +374,7 @@ export default function PierreFileTree(props: {
       if (!tree || model === renderedAllowed) return
       renderedAllowed = model
       syncSelection("")
+      resetWidth()
       tree.resetPaths(model.paths)
       applyAllowedCollapsed(model)
       syncSelection(active())
@@ -395,7 +426,11 @@ export default function PierreFileTree(props: {
         ops.push({ type: "add", path: item })
       }
 
-      if (ops.length > 0) tree.batch(ops)
+      if (ops.length > 0) {
+        resetWidth()
+        tree.batch(ops)
+      }
+
       syncingExpansion = true
 
       for (const dir of current.model.expandedDirs) {
