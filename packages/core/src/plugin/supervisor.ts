@@ -15,7 +15,6 @@ import { PluginModule } from "./module.js"
 import { SdkPlugins } from "./sdk.js"
 import { PluginUpdate } from "./update.js"
 import { Watcher } from "../filesystem/watcher.js"
-import { PluginScheduling } from "./scheduling.js"
 
 const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
   modules: Effect.Success<ReturnType<typeof PluginModule.make>>,
@@ -38,7 +37,6 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
   const plugins = () => [...definitions, ...packages.values()]
 
   for (const operation of operations) {
-    yield* PluginScheduling.checkpoint
     if (operation.type === "remove") {
       if (operation.target === "*") failures.clear()
       plugins()
