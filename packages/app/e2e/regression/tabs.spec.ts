@@ -1192,44 +1192,23 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
 })
 
 test("⌘W past the side panel's last tab keeps the session tab", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  const directory = "C:/OpenCode/SideCloseOvershoot"
-  const alpha = { id: "ses_side_close_alpha", title: "Side close alpha" }
-  const beta = { id: "ses_side_close_beta", title: "Side close beta" }
-  await openSession(page, {
-    name: "SideCloseOvershoot",
-    sessions: [alpha, beta],
-    fileList: (path) => (path ? [] : ["README.md"].map((file) => fileNode(directory, file))),
-    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
-    seed: {
-      panes: { [alpha.id]: { review: true }, [beta.id]: { review: true } },
-      storage: reviewTabs(directory, alpha.id),
-    },
-  })
-
-  const panel = page.locator("#review-panel")
-  const reviewTab = panel.getByRole("tab", { name: "Review", exact: true })
-  const fileTab = panel.getByRole("tab", { name: "README.md", exact: true })
-  const alphaTab = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(alpha.id)}"])`)
-
-  await openFileLauncher(panel)
-  await panel.getByRole("treeitem", { name: "README.md", exact: true }).click()
-  await expect(fileTab).toHaveAttribute("aria-selected", "true")
-  await panel.getByText("contents:README.md", { exact: true }).click()
-
-  // Closing the last side tab collapses the panel; one press too many must not close the session behind it.
-  await page.keyboard.press("ControlOrMeta+w")
-  await expect(fileTab).toHaveCount(0)
-  await expect(reviewTab).toHaveAttribute("aria-selected", "true")
-  await page.keyboard.press("ControlOrMeta+w")
-  await expect(panel).toHaveAttribute("aria-hidden", "true")
+  const sessions = await emptySidePanel(page)
   await page.keyboard.press("ControlOrMeta+w")
 
   // From the composer ⌘W closes the session tab, so only a swallowed press above leaves Beta to land on.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click()
   await page.keyboard.press("ControlOrMeta+w")
-  await expectPath(page, sessionHref(beta.id))
-  await expect(alphaTab).toHaveCount(0)
+  await expectPath(page, sessionHref(sessions.beta.id))
+  await expect(sessions.alphaTab).toHaveCount(0)
+})
+
+test("⌘W closes the session tab again once the window loses focus after the side panel empties", async ({ page }) => {
+  const sessions = await emptySidePanel(page)
+  // ⌘Tab away and back sends no click or key the page sees.
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")))
+  await page.keyboard.press("ControlOrMeta+w")
+  await expectPath(page, sessionHref(sessions.beta.id))
+  await expect(sessions.alphaTab).toHaveCount(0)
 })
 
 // Windows has no native menu bar: the titlebar menu owns Paste, which only the desktop edit action can perform.
@@ -1320,3 +1299,37 @@ test("loads a tab's transcript while the pointer rests on it, and not when it pa
   await expect(message(b.id)).toBeVisible()
   expect(requested.filter((id) => id === b.id)).toHaveLength(1)
 })
+
+// Closes Alpha's side tabs with ⌘W until the side panel empties and collapses, as an overshooting hand would.
+async function emptySidePanel(page: Page) {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const directory = "C:/OpenCode/SideCloseOvershoot"
+  const alpha = { id: "ses_side_close_alpha", title: "Side close alpha" }
+  const beta = { id: "ses_side_close_beta", title: "Side close beta" }
+  await openSession(page, {
+    name: "SideCloseOvershoot",
+    sessions: [alpha, beta],
+    fileList: (path) => (path ? [] : ["README.md"].map((file) => fileNode(directory, file))),
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+    seed: {
+      panes: { [alpha.id]: { review: true }, [beta.id]: { review: true } },
+      storage: reviewTabs(directory, alpha.id),
+    },
+  })
+
+  const panel = page.locator("#review-panel")
+  const reviewTab = panel.getByRole("tab", { name: "Review", exact: true })
+  const fileTab = panel.getByRole("tab", { name: "README.md", exact: true })
+
+  await openFileLauncher(panel)
+  await panel.getByRole("treeitem", { name: "README.md", exact: true }).click()
+  await expect(fileTab).toHaveAttribute("aria-selected", "true")
+  await panel.getByText("contents:README.md", { exact: true }).click()
+  await page.keyboard.press("ControlOrMeta+w")
+  await expect(fileTab).toHaveCount(0)
+  await expect(reviewTab).toHaveAttribute("aria-selected", "true")
+  await page.keyboard.press("ControlOrMeta+w")
+  await expect(panel).toHaveAttribute("aria-hidden", "true")
+
+  return { beta, alphaTab: page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(alpha.id)}"])`) }
+}
