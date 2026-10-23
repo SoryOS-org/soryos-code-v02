@@ -1,25 +1,23 @@
 import { expect } from "bun:test"
 import fs from "fs/promises"
 import path from "path"
-import { OpenAIChat } from "@opencode/ai/protocols"
 import { Database } from "@opencode/core/database/database"
 import { Location } from "@opencode/core/location"
 import { Permission } from "@opencode/core/permission"
 import { Plugin } from "@opencode/core/plugin"
+import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { PluginHost } from "@opencode/core/plugin/host"
 import { ProjectTable } from "@opencode/core/project/sql"
 import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
-import { SessionModelRequest } from "@opencode/core/session/model-request"
-import { SessionModelTransport } from "@opencode/core/session/model-transport"
-import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Tool } from "@opencode/core/tool"
 import { OpenCodeTools } from "@opencode/core/tool/plugin/opencode"
 import { WorktreeTable } from "@opencode/core/worktree/sql"
 import { WorktreeStrategies } from "@opencode/core/worktree/strategies"
 import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
+import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Effect } from "effect"
 import { initRepo } from "./fixture/git"
 import { tmpdirScoped } from "./fixture/tmpdir"
@@ -149,71 +147,22 @@ it.effect("groups available models by provider with paging", () =>
   }),
 )
 
-const moveHint = "tools.opencode.session_move"
-const requestModel = SessionRunnerModel.resolved(OpenAIChat.route.model({ id: "gpt-5.5", provider: "test" }), {
-  capabilities: { tools: true, input: ["text"], output: ["text"] },
-  cost: [],
-  limit: { context: 200_000, output: 32_000 },
-})
-const requestTransport = SessionModelTransport.Service.of({
-  bind: () => ({ execute: () => Effect.die("unused WebSocket execution") }),
-  close: () => Effect.void,
-  closeAll: Effect.void,
-})
-
-it.effect("skips the session_move hint when execute is wholly denied", () =>
+it.effect("skips the session_move hint when the context hook has no execute tool", () =>
   Effect.gen(function* () {
     const plugins = yield* Plugin.Service
-    const registry = yield* Tool.Service
-    const sessions = yield* Session.Service
-    const location = yield* Location.Service
+    const hooks = yield* PluginHooks.Service
     yield* OpenCodeTools.Plugin.effect(yield* PluginHost.make(plugins))
-    const session = yield* sessions.create({
-      location: Location.Ref.make({ directory: location.directory }),
-    })
-    const requests = yield* SessionModelRequest.Service.pipe(
-      Effect.provide(SessionModelRequest.layer),
-      Effect.provideService(SessionModelTransport.Service, requestTransport),
-    )
-    const hinted = (rules: Permission.Ruleset) =>
-      Effect.gen(function* () {
-        const tools = yield* registry.snapshot(rules)
-        const offered = tools.definitions.some((tool) => tool.name === "execute")
-        const hints = yield* Effect.forEach(["primary", "compaction", "generate"] as const, (kind) =>
-          requests[kind]({
-            session,
-            agent: Agent.ID.make("build"),
-            model: requestModel,
-            tools,
-            system: [],
-            messages: [],
-          }).pipe(Effect.map((prepared) => prepared.request.system.some((part) => part.text.includes(moveHint)))),
-        )
-        return { offered, hints }
-      })
-
-    expect(yield* hinted([{ action: "*", resource: "*", effect: "allow" }])).toEqual({
-      offered: true,
-      hints: [true, true, true],
-    })
-    expect(
-      yield* hinted([
-        { action: "*", resource: "*", effect: "allow" },
-        { action: "execute", resource: "*", effect: "deny" },
-      ]),
-    ).toEqual({
-      offered: false,
-      hints: [false, false, false],
-    })
-    expect(
-      yield* hinted([
-        { action: "*", resource: "*", effect: "allow" },
-        { action: "execute", resource: "secret", effect: "deny" },
-      ]),
-    ).toEqual({
-      offered: true,
-      hints: [true, true, true],
-    })
+    const event: SessionHooks["context"] = {
+      sessionID: Session.ID.make("ses_hint"),
+      agent: Agent.ID.make("build"),
+      model: Model.Ref.make({ providerID: Provider.ID.make("test"), id: Model.ID.make("alpha") }),
+      system: [],
+      messages: [],
+      tools: {},
+      options: {},
+    }
+    yield* hooks.trigger("session", "context", event)
+    expect(event.system.some((part) => part.text.includes("tools.opencode.session_move"))).toBe(false)
   }),
 )
 
