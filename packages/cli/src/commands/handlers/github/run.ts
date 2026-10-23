@@ -71,6 +71,13 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       } catch {}
     }
 
+    const eventName = (ctx as any)?.eventName || process.env["GITHUB_EVENT_NAME"] || ""
+    const isRepoEvent = eventName === "schedule" || eventName === "workflow_dispatch"
+    if (isRepoEvent && !process.env["PROMPT"]) {
+      console.error("PROMPT is required for schedule and workflow_dispatch events")
+      process.exitCode = 1
+      return
+    }
     const prompt = process.env["PROMPT"] || "Summarize this repository"
     yield* Effect.promise(() =>
       runNonInteractive({
@@ -89,6 +96,33 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       }),
     )
     yield* Effect.promise(postComment)
+    // Remove reaction
+    yield* Effect.promise(async () => {
+      if (!token) return
+      const commentId = (ctx as any)?.payload?.comment?.id
+      if (!commentId) return
+      const owner = (ctx as any)?.repo?.owner ?? (ctx as any)?.repository?.owner?.login
+      const repo = (ctx as any)?.repo?.repo ?? (ctx as any)?.repository?.name
+      if (!owner || !repo) return
+      const octokit = new Octokit({ auth: token })
+      try {
+        const reactions = await octokit.reactions.listForIssueComment({
+          owner,
+          repo,
+          comment_id: commentId,
+          content: "eyes",
+        })
+        const eyes = reactions.data.find((r: any) => r.user?.login === "opencode-agent[bot]")
+        if (eyes) {
+          await octokit.reactions.deleteForIssueComment({
+            owner,
+            repo,
+            comment_id: commentId,
+            reaction_id: eyes.id,
+          })
+        }
+      } catch {}
+    })
 
     yield* Effect.promise(async () => {
       const cwd = process.cwd()
@@ -107,12 +141,19 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       }
       const owner = match[1]
       const repo = match[2]
+      const isFork = (ctx as any)?.payload?.pull_request?.head?.repo?.full_name !== (ctx as any)?.payload?.pull_request?.base?.repo?.full_name && !!(ctx as any)?.payload?.pull_request
       const base = git("rev-parse --abbrev-ref HEAD", cwd)
       const branch = `opencode/run-${Date.now()}`
       git(`checkout -b ${branch}`, cwd)
       git("add -A", cwd)
       git('commit -m "opencode: automated changes"', cwd)
-      git(`push -u origin ${branch}`, cwd)
+      if (isFork) {
+        const forkRepo = (ctx as any).payload.pull_request.head.repo.full_name
+        git(`remote add fork https://github.com/${forkRepo}.git`, cwd)
+        git(`push fork HEAD:${(ctx as any).payload.pull_request.head.ref}`, cwd)
+      } else {
+        git(`push -u origin ${branch}`, cwd)
+      }
       const octokit = new Octokit({ auth: token })
       const pr = await octokit.pulls.create({
         owner,
