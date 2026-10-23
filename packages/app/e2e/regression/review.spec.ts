@@ -528,6 +528,7 @@ test("file tree expands Windows paths and scrolls long names in both directions"
   await expect(status).toHaveText("A")
   await expect.poll(() => statusInset(status, "right")).toBeLessThanOrEqual(24)
   const treeScroll = panel.locator(".opencode-pierre-file-tree")
+
   const scrollTree = (position: { left?: number; top?: number }) =>
     treeScroll.evaluate((element, position) => {
       const scroll = element.shadowRoot!.querySelector<HTMLElement>("[data-file-tree-virtualized-scroll]")!
@@ -538,6 +539,7 @@ test("file tree expands Windows paths and scrolls long names in both directions"
 
       return { left: scroll.scrollLeft, overflow: scroll.scrollWidth - scroll.clientWidth }
     }, position)
+
   await scrollTree({ left: 1_000_000 })
   await expect.poll(() => statusInset(status, "right")).toBeLessThanOrEqual(24)
   // The tree keeps the long row's width after it scrolls out of view, so the sideways position holds.
@@ -1287,16 +1289,58 @@ test("names a single change source and keeps the review header rows at 48px", as
   await expect(header).toHaveCSS("height", "48px")
   await expect(toolbar).toHaveCSS("height", "48px")
 
-  // Closing the last tab closes the side region; it opens empty, on its launchers, next time.
+  // Closing the last tab closes the side region; it reopens on a New tab view listing its launchers.
   const region = page.getByRole("button", { name: "Toggle review", exact: true })
   await panel.locator("#session-side-panel-review-tab").hover()
   await panel.getByRole("button", { name: "Close tab", exact: true }).click()
   await expect(region).toHaveAttribute("aria-expanded", "false")
   await region.click()
-  await expect(panel.getByRole("tab")).toHaveCount(0)
+  await expect(panel.getByRole("tab")).toHaveCount(1)
+  await expect(panel.getByRole("tab", { name: "New tab", exact: true })).toHaveAttribute("aria-selected", "true")
+  // "+" adds another New tab beside it instead of replacing it.
+  await panel.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(panel.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(2)
   // Only its launchers: "Recently closed" lists files, not the closed Review.
   await expect(panel.getByRole("button", { name: /^Review/ })).toBeVisible()
   await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toHaveCount(0)
+})
+
+test("Review from a new tab keeps the file browser and preview open", async ({ page }) => {
+  const directory = "C:/OpenCode/ReviewNewTabFile"
+  await openSession(page, {
+    name: "ReviewNewTabFile",
+    fileList: (path) => (path ? [] : [fileNode(directory, "README.md")]),
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+    seed: {
+      panes: { ses_reviewnewtabfile: { review: true } },
+      storage: { "opencode.global.dat:review-panel-v2": { sidebarOpened: false } },
+    },
+  })
+  const panel = page.locator("#review-panel")
+  const tab = (name: string) => panel.getByRole("tab", { name, exact: true })
+
+  await openFileLauncher(panel)
+  await expect(tab("Open file")).toHaveAttribute("aria-selected", "true")
+  await panel.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(tab("New tab")).toHaveAttribute("aria-selected", "true")
+  await panel.getByRole("button", { name: /^Review/ }).click()
+  await expect(tab("Review")).toHaveAttribute("aria-selected", "true")
+  await expect(tab("Open file")).toHaveAttribute("aria-selected", "false")
+  await tab("Review").hover()
+  await panel
+    .locator('div[data-value="review:changes"]')
+    .getByRole("button", { name: "Close tab", exact: true })
+    .click()
+  await tab("Open file").click()
+  await panel.getByRole("treeitem", { name: "README.md" }).click()
+  await expect(tab("README.md")).toHaveAttribute("aria-selected", "true")
+
+  // Choosing Review also leaves a single-click file preview open beside it.
+  await panel.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(tab("New tab")).toHaveAttribute("aria-selected", "true")
+  await panel.getByRole("button", { name: /^Review/ }).click()
+  await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
+  await expect(tab("README.md")).toHaveCount(1)
 })
 
 for (const direction of ["ltr", "rtl"] as const) {

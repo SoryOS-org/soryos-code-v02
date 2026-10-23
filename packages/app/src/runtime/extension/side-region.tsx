@@ -6,7 +6,6 @@ import {
   createSignal,
   on,
   onCleanup,
-  untrack,
   type Accessor,
   type JSX,
 } from "solid-js"
@@ -66,16 +65,13 @@ export function SideRegion(props: {
   const contentMounted = createMemo<boolean>((mounted) => mounted || tabsVisible(), false)
   const panelWidth = createMemo(() => (tabsVisible() ? "auto" : "0px"))
 
-  const menu = createSessionPanelMenu()
-  const primary = createMemo(() => menu().find((item) => item.primary))
-
-  // Opening the side region with no tabs starts a new tab, once per opening and session. Keyed by the session, not the
-  // item, whose object changes with every routed session.
+  // Opening the side region with no tabs shows a new tab view, once per opening and session. Keyed by the session, not
+  // the item, whose object changes with every routed session.
   const starting = createMemo(() =>
-    tabsOpen() && layout.ready() && props.region.empty() && primary() ? props.view.key : undefined,
+    tabsOpen() && layout.ready() && props.region.empty() ? props.view.key : undefined,
   )
 
-  createEffect(on(starting, (key) => key && untrack(primary)?.run()))
+  createEffect(on(starting, (key) => key && props.region.openNewTab("side")))
 
   // The split pane shows while it holds tabs; when the side pane has none, the split pane takes the whole height.
   const panes = createMemo(() => {
@@ -225,21 +221,18 @@ export function PaneTabs(props: {
   const modifier = closedTabsModifier()
 
   // Without a new tab item, "+" opens a host-owned new tab view listing the launchers, as ⌘T does inside the region.
-  const newTab = createMemo(() => props.region.newTab(props.pane.id))
+  const current = createMemo(() => props.region.shownNewTab(props.pane.id))
   const add = () => props.region.openNewTab(props.pane.id)
-  const dismiss = () => props.region.closeNewTab(props.pane.id)
-
-  // Once replaced, the view is gone: returning to the tab or session it opened over does not show it again.
-  createEffect(on(newTab, (shown) => !shown && dismiss(), { defer: true }))
 
   let selectionEvent: Event | undefined
 
   return (
     <Tabs
       data-pane-content={props.pane.id}
-      value={newTab() ? "new" : (props.pane.active() ?? "empty")}
+      value={current()?.id ?? props.pane.active() ?? "empty"}
       onChange={(value) => {
-        if (value === "new") return
+        if (props.region.newTabs(props.pane.id).some((entry) => entry.id === value))
+          return props.region.selectNewTab(value)
 
         // Kobalte selects the first tab while triggers register, including while the "+" menu's click is still
         // dispatching. Persist input events on a tab only; the region owns fallback selection.
@@ -249,7 +242,7 @@ export function PaneTabs(props: {
           selectionEvent.target instanceof Element &&
           selectionEvent.target.closest('[role="tab"]')
         ) {
-          dismiss()
+          props.region.newTabs(props.pane.id).forEach((entry) => props.region.dismissNewTab(entry.id))
           props.region.select(value)
         }
       }}
@@ -284,33 +277,35 @@ export function PaneTabs(props: {
               </Show>
             )}
           </For>
-          <Show when={newTab()}>
-            <Tabs.Trigger
-              value="new"
-              class="group"
-              onMiddleClick={dismiss}
-              closeButton={
-                <IconButton
-                  size="small"
-                  variant="ghost-muted"
-                  onPointerDown={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                  }}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    dismiss()
-                  }}
-                  icon={<Icon name="xmark-small" />}
-                  aria-label={language.t("common.closeTab")}
-                />
-              }
-              hideCloseButton
-            >
-              {language.t("session.tab.new")}
-            </Tabs.Trigger>
-          </Show>
+          <For each={props.region.newTabs(props.pane.id)}>
+            {(entry) => (
+              <Tabs.Trigger
+                value={entry.id}
+                class="group"
+                onMiddleClick={() => props.region.dismissNewTab(entry.id)}
+                closeButton={
+                  <IconButton
+                    size="small"
+                    variant="ghost-muted"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      props.region.dismissNewTab(entry.id)
+                    }}
+                    icon={<Icon name="xmark-small" />}
+                    aria-label={language.t("common.closeTab")}
+                  />
+                }
+                hideCloseButton
+              >
+                {language.t("session.tab.new")}
+              </Tabs.Trigger>
+            )}
+          </For>
           <div class="h-full shrink-0 sticky end-0 z-10 flex items-center justify-center bg-v2-background-bg-base">
             <Show
               when={primary() ?? (launchers().length === 0 && menu().length === 1 ? menu()[0] : undefined)}
@@ -379,12 +374,14 @@ export function PaneTabs(props: {
         </div>
       </div>
 
-      <Show when={newTab()}>
-        <Tabs.Content value="new" class="flex flex-col h-full overflow-hidden contain-strict">
-          <Launchers items={launchers()} onChoose={target} closed={closed} />
-        </Tabs.Content>
+      <Show when={current()}>
+        {(entry) => (
+          <Tabs.Content value={entry().id} class="flex flex-col h-full overflow-hidden contain-strict">
+            <Launchers items={launchers()} onChoose={target} closed={closed} />
+          </Tabs.Content>
+        )}
       </Show>
-      <Show when={props.placeholder && !newTab() && props.pane.active() === undefined}>
+      <Show when={props.placeholder && !current() && props.pane.active() === undefined}>
         <Tabs.Content value="empty" class="flex flex-col h-full overflow-hidden contain-strict">
           {/* With a new tab item, the new tab it opens is on its way. */}
           <Show when={!primary()}>
@@ -407,13 +404,13 @@ export function PaneTabs(props: {
         </Tabs.Content>
       </Show>
       {/* Kept mounted under the new tab view, so terminals and editors keep their state. */}
-      <div class="contents" classList={{ hidden: newTab() }} inert={newTab() || undefined}>
+      <div class="contents" classList={{ hidden: !!current() }} inert={!!current() || undefined}>
         <RegionContent
           pane={props.pane}
           view={props.view}
           screen={props.screen}
           frame={{
-            shown: () => props.shown() && !newTab(),
+            shown: () => props.shown() && !current(),
             present: props.present,
             placement: () => "side",
             reserve: () => false,

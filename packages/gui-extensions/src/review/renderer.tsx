@@ -210,7 +210,7 @@ const setup: Setup<typeof Review> = (ctx) => {
   const show = () => {
     const session = sessions.current()
 
-    if (session?.project && !layout.narrow()) layout.open(KEY, session)
+    if (session?.project && !layout.narrow()) layout.open(KEY, session, { tab: "select" })
   }
 
   const mac = /(Mac|iPhone|iPad)/.test(navigator.platform)

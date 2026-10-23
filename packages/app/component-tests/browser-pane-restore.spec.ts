@@ -521,7 +521,7 @@ story("reloads the browser tab with ⌘R inside the pane and leaves it to the wi
   await expect(reloads).toHaveText("1")
 })
 
-story("adds a second new tab with ⌘T on a new tab page", async ({ page }) => {
+story("keeps blank browser tabs when adding tabs and selecting another panel", async ({ page }) => {
   const root = page.getByTestId("browser-region-fixture")
   const mac = await page.evaluate(() => /Mac|iPhone|iPad|iPod/.test(navigator.platform))
   const address = root.getByRole("combobox", { name: "Browser address", exact: true })
@@ -535,6 +535,12 @@ story("adds a second new tab with ⌘T on a new tab page", async ({ page }) => {
   const tabs = root.getByRole("tab", { name: "New tab", exact: true })
   await expect(tabs).toHaveCount(2)
   await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true")
+  await expect(root.getByTestId("browser-closes")).toHaveText("[]")
+
+  // Selecting a different panel must not treat blank browser tabs as disposable placeholders.
+  await address.press(`${mac ? "Meta" : "Control"}+1`)
+  await expect(root.getByRole("tab", { name: "beta.ts", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(tabs).toHaveCount(2)
   await expect(root.getByTestId("browser-closes")).toHaveText("[]")
 })
 

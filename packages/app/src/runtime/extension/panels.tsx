@@ -309,15 +309,26 @@ export function createRegion(input: {
     return entry ? paneOf(entry) : "side"
   })
 
-  // The host's new tab view: the pane it shows in, and the session and selection it opened over, so a tab that opens
-  // and selects itself replaces it.
-  const [adding, setAdding] = createSignal<{ pane: SessionPane; session: string; over: string | undefined }>()
+  // The host's new tab views: each shows in a pane, over the session and selection it opened over, so a tab that opens
+  // and selects itself replaces it. A view stops being live once the selection moves off what it opened over.
+  type NewTab = { id: string; pane: SessionPane; session: string; over: string | undefined }
 
-  const newTab = (pane: SessionPane) => {
-    const value = adding()
+  const [adding, setAdding] = createSignal<NewTab[]>([])
+  const [chosen, setChosen] = createSignal<string>()
+  let serial = 0
 
-    return value?.pane === pane && value.session === input.view().key && value.over === panes[pane].active()
+  const live = (value: NewTab) => value.session === input.view().key && value.over === panes[value.pane].active()
+  const newTabs = (pane: SessionPane) => adding().filter((value) => value.pane === pane && live(value))
+
+  const shownNewTab = (pane: SessionPane) => {
+    const list = newTabs(pane)
+
+    return list.find((value) => value.id === chosen()) ?? list.at(-1)
   }
+
+  createEffect(() => {
+    if (adding().some((value) => !live(value))) setAdding((list) => list.filter(live))
+  })
 
   return {
     /** Whether a key event belongs to the side region rather than the session around it. */
@@ -347,20 +358,38 @@ export function createRegion(input: {
     select(key: string) {
       input.tabs().setActive(key)
     },
-    newTab,
-    /** Shows the new tab view in a pane, by default the one holding the selected tab. */
-    openNewTab(pane: SessionPane = activePane()) {
-      setAdding({ pane, session: input.view().key, over: panes[pane].active() })
+    /** The live new tab views of a pane, in strip order. */
+    newTabs,
+    /** The new tab view a pane shows: the selected one, else the newest. */
+    shownNewTab,
+    newTab: (pane: SessionPane) => shownNewTab(pane) !== undefined,
+    selectNewTab(id: string) {
+      setChosen(id)
     },
-    /** Closes the new tab view, in one pane or wherever it is; returns whether it was showing. */
+    /** Adds a new tab view in a pane, by default the one holding the selected tab, and shows it. */
+    openNewTab(pane: SessionPane = activePane()) {
+      const id = `new:${++serial}`
+
+      setAdding((list) => [...list, { id, pane, session: input.view().key, over: panes[pane].active() }])
+      setChosen(id)
+    },
+    dismissNewTab(id: string) {
+      setAdding((list) => list.filter((value) => value.id !== id))
+    },
+    /** Closes the shown new tab view, in one pane or wherever it is; returns whether one was showing. */
     closeNewTab(pane?: SessionPane) {
-      const value = adding()
+      const panesToCheck: SessionPane[] = pane ? [pane] : ["side", "split", "bottom"]
 
-      if (!value || (pane && value.pane !== pane)) return false
-      const shown = newTab(value.pane)
-      setAdding(undefined)
+      const value = panesToCheck.flatMap((id) => {
+        const shown = shownNewTab(id)
 
-      return shown
+        return shown ? [shown] : []
+      })[0]
+
+      if (!value) return false
+      setAdding((list) => list.filter((entry) => entry.id !== value.id))
+
+      return true
     },
     /** Opens or closes the side region for the user. Opening moves focus into it once it lands; closing gives focus back. */
     toggle() {
