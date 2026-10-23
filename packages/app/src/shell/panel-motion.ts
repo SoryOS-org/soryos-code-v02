@@ -37,21 +37,52 @@ const scaleByDistance = motionTuning.toggle("sidebars.scaleByDistance", {
   value: true,
 })
 
-const reference = 480
+const distanceKnob = (
+  id: string,
+  meta: { label: string; value: number; min: number; max: number; step: number; unit: string },
+) => motionTuning.number(`sidebars.scaleByDistance.${id}`, { ...meta, group: "Experiments", when: scaleByDistance })
 
-const bounds = { min: 0.15, max: 0.45 }
+const minDuration = distanceKnob("min", {
+  label: "Min duration",
+  value: 0.15,
+  min: 0.05,
+  max: 0.5,
+  step: 0.01,
+  unit: "s",
+})
+
+const maxDuration = distanceKnob("max", { label: "Max duration", value: 0.45, min: 0.2, max: 1, step: 0.01, unit: "s" })
+
+// The width whose flight takes the shared spring's own time.
+const referenceWidth = distanceKnob("reference", {
+  label: "Reference width",
+  value: 480,
+  min: 200,
+  max: 900,
+  step: 10,
+  unit: "px",
+})
+
+/** How flights scale by distance, or null while they don't. */
+export type DistanceScale = { min: number; max: number; reference: number }
+
+const distanceScale = (): DistanceScale | null =>
+  scaleByDistance() ? { min: minDuration(), max: maxDuration(), reference: referenceWidth() } : null
 
 /**
  * The shared spring for a panel that travels `distance` pixels, for motion that must read as the sidebar's own, like its
  * peek. Without a distance, or with scaling off, it is the shared spring as tuned.
  */
-export function panelSpring(distance?: number, base = spring(), scaled = scaleByDistance()): DurationOptions {
-  if (!scaled || !distance || distance <= 0) return base
-  // The bounds stretch with the global speed and slow motion, like the spring itself.
+export function panelSpring(distance?: number, base = spring(), scale = distanceScale()): DurationOptions {
+  if (!scale || !distance || distance <= 0) return base
+  // The bounds stretch with the global speed and slow motion, like the spring itself. A min dragged past the max stops
+  // at it.
   const time = (motionGlobals.slow.value ? 4 : 1) / motionGlobals.speed.value
-  const duration = base.duration * Math.sqrt(distance / reference)
+  const max = scale.max * time
+  const min = Math.min(scale.min * time, max)
+  const duration = base.duration * Math.sqrt(distance / scale.reference)
 
-  return { ...base, duration: Math.min(bounds.max * time, Math.max(bounds.min * time, duration)) }
+  return { ...base, duration: Math.min(max, Math.max(min, duration)) }
 }
 
 const style = motionTuning.choice("sidebars.style", {
