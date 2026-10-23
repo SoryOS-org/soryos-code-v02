@@ -1,6 +1,6 @@
 ---
 name: app-e2e-tests
-description: Use when writing, changing, reviewing, or debugging Playwright e2e tests in packages/app/e2e (regression keepers and user stories). Covers the mocked opencode server harness and the Bun static server, per-test isolation, page-load and route cost, the suite-wide service-worker block, races with first mount, hover, measurement, clock, dialogs and shortcuts, projects, shards and worker scheduling, rehearsing Windows timing locally, and diagnosing a CI flake from its artifacts. Not for Storybook component tests or e2e/performance benchmarks.
+description: Use when writing, changing, reviewing, or debugging Playwright e2e tests in packages/app/e2e (regression keepers and user stories). Covers the mocked opencode server harness and the Bun static server, per-test isolation, page-load and route cost, the suite-wide service-worker block, races with first mount, hover, measurement, clock, dialogs and shortcuts, projects, shards and worker scheduling, rehearsing Windows timing locally, and diagnosing a CI flake from its artifacts. Not for component tests (stories mounted on packages/stories) or e2e/performance benchmarks.
 ---
 
 # App e2e tests
@@ -122,9 +122,9 @@ Run from `packages/app`:
 
 ## When CI flakes
 
-- **Find it.** e2e runs on pull requests that affect `@opencode/app` or `@opencode/storybook`, including their workspace dependencies, and on every manual dispatch (`.github/workflows/test.yml:42-54`). It never runs on dev (`:28`).
+- **Find it.** e2e runs on pull requests that affect `@opencode/app` or `@opencode/stories`, including their workspace dependencies, and on every manual dispatch (`.github/workflows/test.yml:43-55`). It never runs on dev (`:28`).
   - Each OS has the legs `app-1` and `app-2` (the shards), `session-ui-components` and `app-components`.
-  - The required `e2e (linux)` and `e2e (windows)` checks only aggregate those legs (`:316-335`).
+  - The required `e2e (linux)` and `e2e (windows)` checks only aggregate those legs (`:319-334`).
   - A pass on retry leaves a leg green. Check each Windows shard report's Flaky list, and make sure your new tests are not on it.
 - **Download:** `gh run download <run-id> -n playwright-windows-app-2-1 -D <dir>`. Artifacts are named `playwright-<os>-<leg>-<run attempt>` (`test.yml:301-314`). App e2e results are in `<dir>/app/e2e/`.
 - **In CI, the failing first attempt has no trace and no video** (`playwright.config.ts:62-65`).

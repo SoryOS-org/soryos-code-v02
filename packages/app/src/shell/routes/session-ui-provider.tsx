@@ -1,9 +1,11 @@
 import { DataProvider } from "@opencode/session-ui/context"
 import { MarkdownProvider, type ReadMarkdownImage } from "@opencode/session-ui/context/markdown"
+import { MessageMenuProvider } from "@opencode/session-ui/context/message-menu"
+import { messageMenu } from "@/session/timeline/message-menu"
 import { useNavigate, useParams } from "@solidjs/router"
 import { createMemo, type ParentProps } from "solid-js"
 import { useProviders } from "@/providers/catalog/providers"
-import { LocalProvider } from "@/providers/models/selection"
+import { LocalProvider, useLocal } from "@/providers/models/selection"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { sessionHref } from "@/shell/routes/session"
 import { useData } from "@/runtime/server/current"
@@ -12,7 +14,9 @@ import { useTabs, type Tab } from "@/shell/tabs/tabs"
 import { readLocalImage } from "@/runtime/server/image"
 import { useLanguage } from "@/runtime/i18n/language"
 import { showToast } from "@/shell/notifications/toast"
+import { selectSessionUserMessages, selectVisibleSessionUserMessages } from "@/session/session-domain"
 import { createTurnDiffCache } from "@/session/timeline/turn-diffs"
+import { useSettings } from "@/settings/model"
 
 export function SessionUIProvider(
   props: ParentProps<{
@@ -26,6 +30,7 @@ export function SessionUIProvider(
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const language = useLanguage()
+  const settings = useSettings()
   const directory = () => props.directory
 
   const readImage = createMemo<ReadMarkdownImage>(() => {
@@ -64,6 +69,12 @@ export function SessionUIProvider(
     tabs.select(tabs.addSessionTab({ server: props.server, sessionId: session.id }))
   }
 
+  const sessionTitle = (id: string) => {
+    const session = data.session.get(id)
+
+    return session && !session.time.archived ? session.title || language.t("command.session.new") : undefined
+  }
+
   const providers = useProviders(directory)
 
   // Turn diffs live in the tab's in-memory state, so they outlast timeline remounts and go when the tab closes.
@@ -100,22 +111,40 @@ export function SessionUIProvider(
   }))
 
   return (
-    <DataProvider
-      data={sessionUIData()}
-      directory={directory()}
-      sessionID={params.id}
-      shellRunning={(id) => !!data.shell.get(id)}
-      shellOutput={(input) => serverSDK.api.shell.output(input)}
-      turnDiff={{
-        get: (input) => turnDiffs()?.get(input),
-        load: (input) => turnDiffs()?.load(input, () => serverSDK.api.session.diff(input)),
-      }}
-      onNavigateToSession={navigateToSession}
-      onSessionHref={href}
-    >
-      <MarkdownProvider readImage={readImage()} openSession={openReferencedSession}>
-        <LocalProvider>{props.children}</LocalProvider>
-      </MarkdownProvider>
-    </DataProvider>
+    <LocalProvider>
+      <DataProvider
+        data={sessionUIData()}
+        directory={directory()}
+        sessionID={params.id}
+        agents={useLocal().agent.visible()}
+        shellRunning={(id) => !!data.shell.get(id)}
+        shellOutput={(input) => serverSDK.api.shell.output(input)}
+        turnDiff={{
+          get: (input) => turnDiffs()?.get(input),
+          load: (input) => turnDiffs()?.load(input, () => serverSDK.api.session.diff(input)),
+        }}
+        onNavigateToSession={navigateToSession}
+        onSessionHref={href}
+        onPrompt={async (input) => {
+          // Like the composer, a staged revert commits first; its committed echo would otherwise drop this reply.
+          if (data.session.get(input.sessionID)?.revert)
+            await serverSDK.api.session.revert.commit({ sessionID: input.sessionID })
+          await data.session.prompt({
+            ...input,
+            metadata: { ...input.metadata, genui: settings.general.generatedUI() },
+          })
+        }}
+        promptMetadata={(sessionID) =>
+          selectVisibleSessionUserMessages(
+            selectSessionUserMessages(data.session.message.list(sessionID)),
+            data.session.get(sessionID)?.revert?.messageID,
+          ).map((message) => message.metadata)
+        }
+      >
+        <MarkdownProvider readImage={readImage()} openSession={openReferencedSession} sessionTitle={sessionTitle}>
+          <MessageMenuProvider enabled={messageMenu()}>{props.children}</MessageMenuProvider>
+        </MarkdownProvider>
+      </DataProvider>
+    </LocalProvider>
   )
 }

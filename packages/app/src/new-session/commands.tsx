@@ -19,7 +19,7 @@ export function useNewSessionCommands(input: {
   const language = useLanguage()
 
   useSettingsCommand()
-  command.register("new-session", () => [
+  command.register("palette", () => [
     {
       id: "command.palette",
       title: language.t("command.palette"),
@@ -29,6 +29,8 @@ export function useNewSessionCommands(input: {
         void dialog.show(() => <DialogCommandPalette />)
       },
     },
+  ])
+  command.register("new-session", () => [
     {
       id: "input.focus",
       title: language.t("command.input.focus"),

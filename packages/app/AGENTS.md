@@ -43,6 +43,22 @@ A flash, a blanked area, a dialog that resizes or a reset scroll on first open a
 - Do not use `leading-none`, `line-height: 1`, or a `13px` line height for normal text. Inter descenders clip inside truncation and overflow containers.
 - Keep control and row heights explicit. Fix font metrics directly rather than using transforms, negative margins, or clip-padding compensation.
 
+## Fonts
+
+Users choose three fonts in Settings > Appearance. Every surface uses one of these roles. This section is the single source for font rules across `app`, `ui`, `session-ui`, `gui-extensions` and `desktop`.
+
+| Role | Use for | Use |
+|---|---|---|
+| UI font | Prose, labels, titles, controls | Inherit, or `var(--font-family-sans)`, `var(--v2-font-family-sans)`, `font-sans` |
+| Code font | Shell commands, code, paths shown as code, diffs, logs, tool input | `var(--font-family-mono)`, `var(--v2-font-family-code)`, `font-mono`, or a `<code>` / `<pre>` element |
+| Terminal font | Terminal output only | `appearance.font("mono")` from the extension SDK |
+
+- Never write a literal family (`Inter`, `"IBM Plex Mono"`, `monospace`, `Menlo`, `system-ui`) in production CSS, classes, inline styles, canvas `font` strings or widget options. A literal ignores the user's setting.
+- Never add an `@font-face`, font file, or font package outside `packages/app/src/index.css`. That file is the only place the app ships faces: Inter (variable), IBM Plex Mono Text (weights below 600), Bold (600 and up) and Text Italic, and JetBrainsMono Nerd Font Mono Regular and Bold. If a design needs a face that is not shipped, add it there and say why in the PR.
+- Show shell commands with the timeline shell metrics: code font, `13px`, weight `440`, `-0.04px` letter spacing. Do not invent another size for the same content.
+- Prefer weight tokens (`font-medium`, `var(--font-weight-medium)`) over literal weights. Mono at `600` or more renders IBM Plex Mono Bold, so reserve it for real emphasis.
+- Do not read font settings directly. `src/settings/model.tsx` writes them to the CSS variables above, and the extension host passes the terminal font through `appearance.font`.
+
 ## Localization
 
 - NEVER hardcode user-visible English strings in production code. ALWAYS use an i18n key for visible copy, placeholders, accessible labels, tooltips, menus, dialogs, toasts, empty states, and displayed errors.

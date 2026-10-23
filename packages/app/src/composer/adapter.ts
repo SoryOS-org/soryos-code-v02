@@ -17,8 +17,11 @@ export type ComposerControls = {
   }
   model: {
     selection: ModelSelection
+    providerName?: string
     paid: boolean
     loading: boolean
+    /** While loading, the expected model's names from a catalog already loaded for another Location. */
+    preview?: { provider?: string; model: string; variant: string; variants: string[] }
   }
 }
 
@@ -91,6 +94,8 @@ export type ComposerSession = {
     | undefined
   >
   admitted: (messageID: string) => boolean
+  // Claims the run's blocking work for a steer; undefined when there is none or it was already moved.
+  background?: () => { move: () => Promise<void>; release: () => void } | undefined
 }
 
 type ComposerAdapterBase = {

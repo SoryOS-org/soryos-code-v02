@@ -474,7 +474,7 @@ function SettingsKeybindsView(props: {
                         const binding = () => props.keybind(id)
 
                         return (
-                          <div class="flex items-center justify-between gap-4 py-3 border-b border-border-weak-base last:border-none">
+                          <div class="flex items-center justify-between gap-4 py-3 border-b border-v2-border-border-base last:border-none">
                             <span>{props.title(id)}</span>
                             <Button
                               type="button"

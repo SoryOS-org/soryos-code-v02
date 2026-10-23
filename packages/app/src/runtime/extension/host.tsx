@@ -88,10 +88,10 @@ export type HostApiFactories = {
   readonly [K in Exclude<keyof HostApis, "links" | "dialogs">]: HostApiFactory<HostApis[K]>
 }
 
-export type ExtensionStatus = "loading" | "active" | "failed" | "disabled" | "blocked"
+type ExtensionStatus = "loading" | "active" | "failed" | "disabled" | "blocked"
 
 /** The last error an extension raised: in its setup or an effect, or while one of its contributions rendered. */
-export type ExtensionFailure = { readonly phase: "setup" | "render"; readonly error: string }
+type ExtensionFailure = { readonly phase: "setup" | "render"; readonly error: string }
 
 type Absent = Exclude<Live<never>, { readonly status: "active" }>
 

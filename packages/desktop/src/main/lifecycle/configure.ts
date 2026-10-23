@@ -26,6 +26,9 @@ export function configureApplication() {
   const features = app.commandLine.getSwitchValue("enable-features")
   app.commandLine.appendSwitch("enable-features", features ? `${jsCallStackFeature},${features}` : jsCallStackFeature)
 
+  // Chromium animates each mouse-wheel notch on Linux; native Linux apps scroll by the full delta immediately.
+  if (process.platform === "linux") app.commandLine.appendSwitch("disable-smooth-scrolling")
+
   if (!app.isPackaged)
     app.commandLine.appendSwitch("remote-debugging-port", process.env.OPENCODE_DESKTOP_REMOTE_DEBUGGING_PORT ?? "9222")
 

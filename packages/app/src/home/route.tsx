@@ -1,6 +1,7 @@
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Show } from "solid-js"
+import { useSettings } from "@/settings/model"
 import { createHomeController } from "./model"
 import { createHomeProjectsController } from "./projects/controller"
 import { HomeUtilityNav } from "./projects/view"
@@ -9,8 +10,19 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { StartHome } from "./start/start"
 
 export function Home() {
+  const settings = useSettings()
+
+  return (
+    <Show when={settings.appearance.tabLayout() === "inbox"} fallback={<SessionHome />}>
+      <StartHome />
+    </Show>
+  )
+}
+
+function SessionHome() {
   const mobile = createMediaQuery("(max-width: 767px)")
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
@@ -37,7 +49,6 @@ export function Home() {
         thumbHoverTarget={scroll.viewport.hoverTarget()}
         viewportRef={scroll.viewport.setViewport}
         onScroll={(event) => scroll.viewport.update(event.currentTarget.scrollTop)}
-        onWheel={scroll.viewport.containOuterWheel}
       >
         <div
           class={`

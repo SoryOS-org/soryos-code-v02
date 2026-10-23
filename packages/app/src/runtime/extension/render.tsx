@@ -30,7 +30,7 @@ export function Contribution(props: { extension: string; children: () => JSX.Ele
   )
 }
 
-export function ExtensionSlot<At extends keyof SlotMap>(props: { at: At; input: SlotMap[At] }) {
+export function ExtensionSlot<At extends keyof SlotMap>(props: { at: At; input: SlotMap[At]; fallback?: JSX.Element }) {
   const host = useExtensionHost()
 
   const items = createMemo(() =>
@@ -41,7 +41,7 @@ export function ExtensionSlot<At extends keyof SlotMap>(props: { at: At; input: 
   )
 
   return (
-    <For each={items()}>
+    <For each={items()} fallback={props.fallback}>
       {(item) => (
         <Contribution extension={item.extension}>
           {() =>

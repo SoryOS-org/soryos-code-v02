@@ -23,7 +23,7 @@ import { requireServerKey } from "@/shell/routes/session"
 import { useSessionModel } from "./model"
 import { SessionPanelFrame } from "./session-frame"
 import { SessionIdentityHeader } from "./session-identity-header"
-import { IncompatibleServerPanel } from "./incompatible-server-panel"
+import { ServerUnavailablePanel } from "./server-unavailable-panel"
 import { SessionErrorFallback } from "./route-error"
 import { createSessionResolution } from "./session-resolution"
 import { SessionScreenView } from "./screen"
@@ -66,7 +66,7 @@ function PreparingSession(props: { sessionID: string; pending: PendingSession })
           provider: { all: providers.all(), default: providers.default(), connected: [] },
         }}
       >
-        <div data-component="session-preparing" data-workspace-session class="min-h-0 flex-1 overflow-y-auto">
+        <div data-component="session-preparing" class="min-h-0 flex-1 overflow-y-auto">
           <SessionIdentityHeader sessionID={props.sessionID} />
           <div class="mx-auto w-full min-w-0 px-4 pb-5 md:max-w-session md:px-6">
             <SessionUserMessage
@@ -128,18 +128,39 @@ function ResolvedTargetSessionRoute() {
 
   const directory = createMemo(() => current()?.location.directory)
 
+  // Only a failed health check: a version mismatch has its own panel, and a rejected credential is not an outage.
+  const unreachable = () => {
+    const health = server.health
+
+    return !!health && !health.healthy && !health.checking && !health.unauthorized && !health.incompatible
+  }
+
   return (
     <Show
       when={!server.health?.incompatible}
       fallback={
         <SessionStatePanel>
-          <IncompatibleServerPanel
+          <ServerUnavailablePanel
+            reason="incompatible"
             onClose={() => tabs.removeSessionTab({ server: server.key, sessionId: params.id })}
           />
         </SessionStatePanel>
       }
     >
-      <Show when={directory()} fallback={<PendingSessionState sessionID={params.id} />}>
+      <Show
+        when={directory()}
+        fallback={
+          // Nothing is cached and an unreachable server never resolves the session, so explain instead of waiting blank.
+          <Show when={unreachable()} fallback={<PendingSessionState sessionID={params.id} />}>
+            <SessionStatePanel>
+              <ServerUnavailablePanel
+                reason="unreachable"
+                onClose={() => tabs.removeSessionTab({ server: server.key, sessionId: params.id })}
+              />
+            </SessionStatePanel>
+          </Show>
+        }
+      >
         {(value) => (
           <LocationProvider directory={value()}>
             <SessionUIProvider directory={value()} server={server.key}>

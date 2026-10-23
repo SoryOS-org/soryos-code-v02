@@ -163,7 +163,7 @@ export default function PairingPage(props: {
               </Button>
             </Row>
             <Show when={main()}>
-              <div data-action="settings-remote-access">
+              <div data-action="settings-remote-access" class="border-b-[0.5px] border-v2-border-border-base">
                 <Row title={ctx.t("remote.title")} description={ctx.t("remote.description")}>
                   <Switch
                     hideLabel

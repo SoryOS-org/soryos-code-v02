@@ -1,54 +1,101 @@
-import { ComponentProps, For } from "solid-js"
+import { createSignal, For, Show, splitProps, type ComponentProps } from "solid-js"
+import { syncSpinPhase } from "../hooks/spin-phase"
+import { motionTuning } from "../motion-tuning"
+import { spinnerDots, spinnerKeyframes, spinnerVariants, type SpinnerVariant } from "./spinner-variants"
 
-const outerIndices = new Set([1, 2, 4, 7, 8, 11, 13, 14])
+export type SpinnerVariantName = "today" | keyof typeof spinnerVariants
 
-const cornerIndices = new Set([0, 3, 12, 15])
+// Every activity spinner (tabs, loaders, the activity chip, subagents, the update button) shows Soft Radar; Knobs →
+// Experiments tries the other dot-matrix variations, and Today's PNG, in its place.
+const choice = motionTuning.choice("spinner.variant", {
+  label: "Activity spinner",
+  group: "Experiments",
+  order: 1,
+  value: "radar",
+  // SAFETY: built from spinnerVariants' own keys, plus "today".
+  labels: Object.fromEntries([
+    ["today", "Today"],
+    ...Object.entries(spinnerVariants).map(([name, variant]) => [name, variant.label]),
+  ]) as Record<SpinnerVariantName, string>,
+})
 
-const squares = Array.from({ length: 16 }, (_, i) => ({
-  id: i,
-  x: (i % 4) * 4,
-  y: Math.floor(i / 4) * 4,
-  delay: Math.random() * 1.5,
-  duration: 1 + Math.random() * 1,
-  outer: outerIndices.has(i),
-  corner: cornerIndices.has(i),
-}))
+const [chosen, setChosen] = createSignal(choice())
 
-export function Spinner(props: {
-  class?: string
-  classList?: ComponentProps<"div">["classList"]
-  style?: ComponentProps<"div">["style"]
-}) {
+motionTuning.subscribe(() => setChosen(choice()))
+
+// Each variation's keyframes are added to the document once, the first time one renders.
+const added = new Set<string>()
+
+export function Spinner(props: ComponentProps<"svg"> & { "data-component"?: string; variant?: SpinnerVariantName }) {
+  const [local, rest] = splitProps(props, ["variant", "class", "classList", "data-component"])
+  const name = () => local.variant ?? chosen()
+  // SAFETY: "today" is the only name that isn't a key of spinnerVariants, and it maps to undefined.
+  const variant = (): SpinnerVariant | undefined => spinnerVariants[name() as keyof typeof spinnerVariants]
+  const classList = () => ({ ...local.classList, [local.class ?? ""]: !!local.class })
+
   return (
-    <svg
-      {...props}
-      viewBox="0 0 15 15"
-      data-component="spinner"
-      classList={{
-        ...props.classList,
-        [props.class ?? ""]: !!props.class,
-      }}
-      fill="currentColor"
+    // Keyed, so switching variations builds a fresh SVG: its dots, keyframes and phase pin all come from the new one.
+    <Show
+      when={variant()}
+      keyed
+      fallback={
+        <svg
+          {...rest}
+          viewBox="0 0 16 16"
+          data-component={local["data-component"] ?? "spinner"}
+          data-slot="spinner-grid"
+          classList={classList()}
+          fill="currentColor"
+        >
+          <rect data-reduced-motion x={7} y={7} width={2} height={2} />
+        </svg>
+      }
     >
-      <For each={squares}>
-        {(square) => (
-          <rect
-            x={square.x}
-            y={square.y}
-            width="3"
-            height="3"
-            rx="1"
-            style={{
-              opacity: square.corner ? 0 : undefined,
-              animation: square.corner
-                ? undefined
-                : `${square.outer ? "pulse-opacity-dim" : "pulse-opacity"} ${square.duration}s ease-in-out infinite`,
-              "animation-fill-mode": square.corner ? undefined : "both",
-              "animation-delay": square.corner ? undefined : `${square.delay}s`,
-            }}
-          />
-        )}
-      </For>
-    </svg>
+      {(current) => {
+        const keyframes = `spinner-${name()}`
+
+        if (!added.has(keyframes)) {
+          added.add(keyframes)
+          const style = document.createElement("style")
+          style.textContent = spinnerKeyframes(keyframes, current)
+          document.head.append(style)
+        }
+
+        return (
+          <svg
+            {...rest}
+            ref={syncSpinPhase}
+            viewBox="0 0 16 16"
+            data-component={local["data-component"] ?? "spinner"}
+            data-slot="spinner-dots"
+            data-variant={name()}
+            classList={classList()}
+            fill="currentColor"
+          >
+            <For each={spinnerDots(current)}>
+              {(dot) => {
+                const loop = current.loop * dot.scale
+
+                return (
+                  <rect
+                    x={dot.x}
+                    y={dot.y}
+                    width={dot.size}
+                    height={dot.size}
+                    rx={dot.size * 0.24}
+                    style={{
+                      "--still": dot.still,
+                      animation: dot.hold
+                        ? undefined
+                        : `${keyframes}-${dot.shape} calc(${loop}s * var(--spinner-time, 1)) linear calc(${-loop * (1 - dot.at)}s * var(--spinner-time, 1)) infinite`,
+                    }}
+                  />
+                )
+              }}
+            </For>
+          </svg>
+        )
+      }}
+    </Show>
   )
 }

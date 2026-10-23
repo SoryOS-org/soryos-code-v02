@@ -11,6 +11,7 @@
     "./sdk": "./src/sdk/index.ts",
     "./sdk/main": "./src/sdk/main.ts",
     "./sdk/bridge": "./src/sdk/bridge.ts",
+    "./terminal": "./src/terminal/index.ts",
     "./updater": "./src/updater/contract.ts"
   },
   "scripts": {
@@ -34,7 +35,7 @@
     "@opencode/session-ui": "workspace:*",
     "@opencode/ui": "workspace:*",
     "@opencode/util": "workspace:*",
-    "@pierre/trees": "1.0.0-beta.4",
+    "@pierre/trees": "1.0.0-beta.6",
     "@solid-primitives/event-listener": "catalog:",
     "@solid-primitives/keyed": "1.5.3",
     "@solid-primitives/media": "catalog:",
@@ -44,7 +45,7 @@
     "@tanstack/solid-virtual": "catalog:",
     "effect": "catalog:",
     "fuzzysort": "catalog:",
-    "ghostty-web": "github:anomalyco/ghostty-web#83c0a07b8628b748aed073b232cb4b52a6ca11c1",
+    "ghostty-web": "github:anomalyco/ghostty-web#e91e38a9ceb13c566ddfa15185a9393849f712a9",
     "remeda": "catalog:",
     "solid-js": "catalog:",
     "solid-presence": "0.2.0",

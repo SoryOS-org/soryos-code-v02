@@ -3,6 +3,8 @@ export type JsonValue = null | boolean | number | string | Array<JsonValue> | { 
 export type ServerInfo = {
   version: string
   pid: number
+  hostname?: string | undefined
+  username?: string | undefined
   urls: Array<string>
   paths: { tmp: string }
   capabilities?: { persistentPty?: boolean | undefined } | undefined
@@ -65,6 +67,7 @@ export type FileDiffInfo = {
   additions: number
   deletions: number
   status: "added" | "deleted" | "modified"
+  more?: true
 }
 
 export type SessionsCursor = string
@@ -3290,6 +3293,7 @@ export type SessionImportInput = {
           readonly additions: number
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
+          readonly more?: true
         }>
       }
       readonly location: { readonly directory: string }
@@ -3343,6 +3347,7 @@ export type SessionImportInput = {
           readonly additions: number
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
+          readonly more?: true
         }>
       }
       readonly location: { readonly directory: string }
@@ -3396,6 +3401,7 @@ export type SessionImportInput = {
           readonly additions: number
           readonly deletions: number
           readonly status: "added" | "deleted" | "modified"
+          readonly more?: true
         }>
       }
       readonly location: { readonly directory: string }
@@ -5597,6 +5603,20 @@ export type FileWriteInput = {
 
 export type FileWriteOutput = { location: LocationPublicRef; data: FileSystemWrite }
 
+export type FileWatchInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly path: { readonly path: string }["path"]
+}
+
+export type FileWatchOutput = void
+
+export type FileUnwatchInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly path: { readonly path: string }["path"]
+}
+
+export type FileUnwatchOutput = void
+
 export type CommandListInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
 }
@@ -5996,25 +6016,36 @@ export type VcsDiffInput = {
     readonly mode: "working" | "branch" | "committed"
     readonly base?: string | undefined
     readonly context?: number | undefined
+    readonly untracked?: ("files" | "folders") | undefined
   }["location"]
   readonly mode: {
     readonly location?: { readonly directory?: string | undefined } | undefined
     readonly mode: "working" | "branch" | "committed"
     readonly base?: string | undefined
     readonly context?: number | undefined
+    readonly untracked?: ("files" | "folders") | undefined
   }["mode"]
   readonly base?: {
     readonly location?: { readonly directory?: string | undefined } | undefined
     readonly mode: "working" | "branch" | "committed"
     readonly base?: string | undefined
     readonly context?: number | undefined
+    readonly untracked?: ("files" | "folders") | undefined
   }["base"]
   readonly context?: {
     readonly location?: { readonly directory?: string | undefined } | undefined
     readonly mode: "working" | "branch" | "committed"
     readonly base?: string | undefined
     readonly context?: number | undefined
+    readonly untracked?: ("files" | "folders") | undefined
   }["context"]
+  readonly untracked?: {
+    readonly location?: { readonly directory?: string | undefined } | undefined
+    readonly mode: "working" | "branch" | "committed"
+    readonly base?: string | undefined
+    readonly context?: number | undefined
+    readonly untracked?: ("files" | "folders") | undefined
+  }["untracked"]
 }
 
 export type VcsDiffOutput = { location: LocationPublicRef; data: Array<FileDiffInfo> }
