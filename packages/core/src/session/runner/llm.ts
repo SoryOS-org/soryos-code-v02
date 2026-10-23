@@ -1,6 +1,6 @@
 export * as SessionRunnerLLM from "./llm.js"
 
-import { Message } from "@opencode/ai"
+import { applySecretShield, isSecretShieldMode, Message, type SecretShieldMode } from "@opencode/ai"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { Cause, Effect, Exit, FiberMap, Layer } from "effect"
 import { Database } from "../../database/database.js"
@@ -29,6 +29,7 @@ import { SessionRunnerRetry } from "./retry.js"
 import { SessionStep } from "./step.js"
 import { ToolOutput } from "../../tool-output.js"
 import { Plugin } from "../../plugin.js"
+import { Config } from "../../config.js"
 import { MAX_STEPS_PROMPT } from "./max-steps.js"
 
 const CONTINUE_AFTER_INCOMPLETE_STREAM =
@@ -49,7 +50,14 @@ const layer = Layer.effect(
     const compaction = yield* SessionCompaction.Service
     const plugins = yield* Plugin.Service
     const title = yield* SessionTitle.Service
+    const config = yield* Config.Service
     const steps = yield* SessionStep.make
+    const resolveShieldMode = Effect.fn("SessionRunner.resolveShieldMode")(function* () {
+      const fromConfig = Config.latest(yield* config.entries(), "secret_shield")
+      if (fromConfig) return fromConfig
+      const env = process.env.OPENCODE_SECRET_SHIELD?.trim().toLowerCase()
+      return env && isSecretShieldMode(env) ? env : ("off" as SecretShieldMode)
+    })
     // Title generation starts once input is visible and must not delay model execution.
     const titles = yield* FiberMap.make<SessionSchema.ID, void, never>()
 
@@ -240,13 +248,25 @@ const layer = Layer.effect(
           webSocket: "session",
           inputTokens: SessionCompaction.estimatePrompt(loaded),
         })
+        const shield = applySecretShield(prepared.request, yield* resolveShieldMode())
+        if (shield._tag === "blocked") {
+          const msg = shield.report.error ?? `detected ${shield.report.detected} credential(s), delivery blocked`
+          return yield* new StepFailedError({
+            error: { type: "secret-shield.blocked", message: `Secret Shield [block]: ${msg}` },
+          })
+        }
+        if (shield.report.detected > 0)
+          yield* Effect.logWarning(
+            `Secret Shield [${shield.report.mode}]: ${shield.report.detected} credential(s) detected`,
+          )
+        const shieldedPrepared = shield.request === prepared.request ? prepared : { ...prepared, request: shield.request }
         const outcome = yield* steps.attempt({
           isLocationClosed: lifecycle.isClosed,
           sessionID,
           assistantMessageID,
           agent: loaded.agent.id,
           model: loaded.model,
-          prepared,
+          prepared: shieldedPrepared,
           retry: (cause, error, proposed) =>
             retry.decide({
               cause,
@@ -406,5 +426,6 @@ export const node = makeLocationNode({
     Snapshot.node,
     ToolOutput.node,
     Database.node,
+    Config.node,
   ],
 })
