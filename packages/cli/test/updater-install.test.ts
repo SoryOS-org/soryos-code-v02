@@ -411,6 +411,35 @@ const links = (directory: string) =>
 const upgradeLinks = (directory: string) =>
   links(directory).filter((name) => name.startsWith(`opencode-upgrade-${process.pid}-`))
 
+windows("windows refuses an upgrade before package replacement when image retention fails", () =>
+  Effect.gen(function* () {
+    const test = yield* fixture()
+    // A file in place of the retention directory makes the real hard-link operation fail.
+    yield* test.fs.writeFileString(test.global.cache, "blocked")
+    const result = yield* test.updater.upgrade("npm", "2.3.4").pipe(Effect.flip, Effect.option)
+    expect(test.commands).toEqual([])
+    expect(yield* test.fs.readFileString(test.executable)).toBe("binary")
+    expect(result._tag).toBe("Some")
+    if (result._tag === "Some") {
+      expect(result.value).toBeInstanceOf(Updater.UpgradeError)
+      if (result.value instanceof Updater.UpgradeError) expect(result.value.retry).toContain("separate terminal")
+    }
+  }),
+)
+
+windows("windows refuses package removal when its temporary image retention fails", () =>
+  Effect.gen(function* () {
+    const test = yield* fixture()
+    yield* test.fs.writeFileString(test.global.tmp, "blocked")
+    const removal = test.updater.removal("npm")
+    if (!removal) return yield* Effect.die("Expected npm removal command")
+    const result = yield* removal.run.pipe(Effect.flip, Effect.option)
+    expect(test.commands).toEqual([])
+    expect(yield* test.fs.readFileString(test.executable)).toBe("binary")
+    expect(result._tag).toBe("Some")
+  }),
+)
+
 windows("windows keeps a second link to the running binary in the cache while the installer runs", () =>
   Effect.gen(function* () {
     const layout = { executable: "", cache: "" }

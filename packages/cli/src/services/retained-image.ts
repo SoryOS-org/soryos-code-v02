@@ -16,19 +16,37 @@ export const retain = Effect.fnUntraced(function* (directory: string, role: "ser
   const fs = yield* FileSystem.FileSystem
   return yield* Effect.acquireRelease(
     Effect.gen(function* () {
-      yield* fs.makeDirectory(directory, { recursive: true }).pipe(Effect.ignore)
-      const names = yield* fs.readDirectory(directory).pipe(Effect.orElseSucceed((): string[] => []))
-      yield* Effect.forEach(names, (name) =>
-        Effect.gen(function* () {
-          const pid = Number(pattern.exec(name)?.[1])
-          if (!pid || (yield* alive(pid))) return
-          yield* fs.remove(path.join(directory, name)).pipe(Effect.ignore)
-        }),
-      )
-      const target = path.join(directory, `opencode-${role}-${process.pid}-${randomBytes(4).toString("hex")}.exe`)
       const executable = yield* fs.realPath(process.execPath).pipe(Effect.orElseSucceed(() => process.execPath))
-      return yield* fs.link(executable, target).pipe(
-        Effect.as(target),
+      const link = (directory: string) =>
+        Effect.gen(function* () {
+          yield* fs.makeDirectory(directory, { recursive: true }).pipe(Effect.ignore)
+          const names = yield* fs.readDirectory(directory).pipe(Effect.orElseSucceed((): string[] => []))
+          yield* Effect.forEach(names, (name) =>
+            Effect.gen(function* () {
+              const pid = Number(pattern.exec(name)?.[1])
+              if (!pid || (yield* alive(pid))) return
+              yield* fs.remove(path.join(directory, name)).pipe(Effect.ignore)
+            }),
+          )
+          const target = path.join(directory, `opencode-${role}-${process.pid}-${randomBytes(4).toString("hex")}.exe`)
+          return yield* fs.link(executable, target).pipe(Effect.as(target))
+        })
+      return yield* link(directory).pipe(
+        Effect.catch((error) => {
+          const cause = error.reason.cause
+          const modules = executable.toLowerCase().indexOf(`${path.sep}node_modules${path.sep}`)
+          if (
+            process.platform !== "win32" ||
+            !(cause instanceof Error) ||
+            !("code" in cause) ||
+            cause.code !== "EXDEV" ||
+            modules === -1
+          )
+            return Effect.fail(error)
+          // The first node_modules contains the entire package tree, including native optional dependencies.
+          // Keep the image beside it so replacing that tree cannot remove the last running-image link.
+          return link(path.join(executable.slice(0, modules + 1), ".opencode", "retained-images"))
+        }),
         Effect.tapError((cause) => Effect.logWarning("could not link the running binary", { cause })),
         Effect.orElseSucceed(() => undefined),
       )
