@@ -730,7 +730,7 @@ export const dict = {
   "settings.notifications.push.enable": "Enable push",
   "settings.notifications.push.disable": "Disable push",
   "settings.notifications.push.enabled": "Push is enabled for this device.",
-  "settings.notifications.push.disabled": "Push is off for this device.",
+  "settings.notifications.push.disabled": "Push is off. Press Enable push to allow notifications.",
   "settings.notifications.push.updating": "Updating push subscription…",
   "settings.notifications.push.insecure": "Push needs HTTPS or localhost.",
   "settings.notifications.push.install": "On iPhone and iPad, add OpenCode to the Home Screen first.",
