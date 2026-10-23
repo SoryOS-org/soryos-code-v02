@@ -1,4 +1,5 @@
 import { useI18n } from "@opencode/ui/context/i18n"
+import { abort } from "@opencode/util/abort"
 import { checksum } from "@opencode/util/encode"
 import {
   type ComponentProps,
@@ -897,7 +898,7 @@ export function Markdown(
   })
 
   onCleanup(() => {
-    lifetime.abort()
+    abort(lifetime)
     images?.dispose()
 
     if (copyCleanup) copyCleanup()

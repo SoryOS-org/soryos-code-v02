@@ -2,6 +2,7 @@ import { Predicate } from "effect"
 import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useFilteredList } from "@opencode/ui/hooks"
+import { abort } from "@opencode/util/abort"
 import { createComposerAttachments, type ComposerAttachmentConfig } from "../attachments/attachments"
 import type { Upload } from "../attachments/uploads"
 import { resolveBlobUrl } from "@/runtime/persistence/drafts"
@@ -163,15 +164,15 @@ export function createComposerEditor(input: {
   const [found, setFound] = createStore<{ query: string; files: ComposerSuggestion[] }>({ query: "", files: [] })
   let fileQuery: string | undefined
   let fileAbort = new AbortController()
-  onCleanup(() => fileAbort.abort())
+  onCleanup(() => abort(fileAbort))
 
   // Debounced and abortable: each keystroke or close replaces the pending file search instead of queueing behind it.
   const findFiles = (query?: string) => {
     if (query === fileQuery) return
-    fileAbort.abort()
-    const abort = new AbortController()
+    abort(fileAbort)
+    const controller = new AbortController()
     fileQuery = query
-    fileAbort = abort
+    fileAbort = controller
 
     if (query === undefined) return
 
@@ -179,14 +180,14 @@ export function createComposerEditor(input: {
 
     const timer = setTimeout(
       () =>
-        void Promise.resolve(input.searchContextFiles(query, abort.signal)).then(
-          (files) => !abort.signal.aborted && setFound({ query, files }),
+        void Promise.resolve(input.searchContextFiles(query, controller.signal)).then(
+          (files) => !controller.signal.aborted && setFound({ query, files }),
           () => undefined,
         ),
       150,
     )
 
-    abort.signal.addEventListener("abort", () => clearTimeout(timer), { once: true })
+    controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true })
   }
 
   const contextList = useFilteredList<ComposerSuggestion>({

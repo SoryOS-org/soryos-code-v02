@@ -22,6 +22,7 @@ import { showToast } from "@/shell/notifications/toast"
 import { formatServerError } from "@/runtime/server/errors"
 import { Skill } from "@opencode/schema/skill"
 import { Session } from "@opencode/schema/session"
+import { abort } from "@opencode/util/abort"
 import { parseSessionMention } from "@opencode/util/session-mention"
 import { createKnownServerSessions, createServerSessionEntries } from "@/shell/commands/palette"
 import { matchesSessionTitle } from "./session-match"
@@ -68,7 +69,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const pathImages = new Map<string, Promise<string | undefined>>()
   const pathImageReads = new AbortController()
   onCleanup(() => {
-    pathImageReads.abort()
+    abort(pathImageReads)
     pathImages.forEach((url) => void url.then((value) => value && URL.revokeObjectURL(value)))
   })
 
