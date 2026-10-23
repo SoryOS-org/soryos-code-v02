@@ -36,6 +36,8 @@
     "@opencode/server": "workspace:*",
     "@opencode/tui": "workspace:*",
     "@opencode/util": "workspace:*",
+    "@actions/github": "6.0.1",
+    "@octokit/rest": "22.0.0",
     "@opentui/core": "catalog:",
     "@opentui/solid": "catalog:",
     "@opentunnel/client": "0.4.1",
