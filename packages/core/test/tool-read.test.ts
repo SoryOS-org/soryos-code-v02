@@ -467,6 +467,42 @@ describe("ReadTool", () => {
     }),
   )
 
+  it.effect("keeps fitting PNGs that are small, transparent, or smaller than their JPEG", () =>
+    Effect.gen(function* () {
+      const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
+      const png = (width: number, height: number, pixel: (x: number, y: number, channel: number) => number) => {
+        const pixels = new Uint8Array(width * height * 4)
+        for (let index = 0; index < pixels.length; index++) {
+          const offset = index >> 2
+          pixels[index] = pixel(offset % width, Math.floor(offset / width), index % 4)
+        }
+        const source = new photon.PhotonImage(pixels, width, height)
+        const content = Buffer.from(source.get_bytes()).toString("base64")
+        source.free()
+        return { uri: "file:///image.png", content, encoding: "base64" as const, mime: "image/png" }
+      }
+      let seed = 1
+      const blocks = Array.from({ length: 500 * 375 }, () => {
+        seed = (Math.imul(seed, 1103515245) + 12345) >>> 0
+        return (seed >>> 31) * 255
+      })
+      const cases = {
+        transparent: png(600, 600, (x, y, channel) =>
+          channel === 3 ? (y < 120 ? 0 : 255) : (((y * 600 + x) * 4 + channel) * 31 + x) % 256,
+        ),
+        small: png(1000, 1000, (_x, y, channel) => (channel === 3 ? 255 : y % 256)),
+        diagram: png(2000, 1500, (x, y, channel) =>
+          channel === 3 ? 255 : blocks[Math.floor(y / 4) * 500 + Math.floor(x / 4)]!,
+        ),
+      }
+      expect(cases.transparent.content.length).toBeGreaterThan(384 * 1024)
+      expect(cases.small.content.length).toBeLessThanOrEqual(384 * 1024)
+      expect(cases.diagram.content.length).toBeGreaterThan(384 * 1024)
+      const image = yield* Image.Service
+      for (const content of Object.values(cases)) expect(yield* image.normalize("image.png", content)).toEqual(content)
+    }),
+  )
+
   it.effect("accepts PNG candidates at the exact base64 limit and skips them one byte below", () =>
     Effect.gen(function* () {
       const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
