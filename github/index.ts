@@ -6,7 +6,7 @@ import * as core from "@actions/core"
 import * as github from "@actions/github"
 import type { Context as GitHubContext } from "@actions/github/lib/context"
 import type { IssueCommentEvent, PullRequestReviewCommentEvent } from "@octokit/webhooks-types"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { OpenCode } from "@opencode-ai/sdk"
 import { spawn } from "node:child_process"
 import { setTimeout as sleep } from "node:timers/promises"
 
@@ -228,15 +228,11 @@ try {
 }
 process.exit(exitCode)
 
-function createOpencode() {
-  const host = "127.0.0.1"
-  const port = 4096
-  const url = `http://${host}:${port}`
-  const proc = spawn(`opencode`, [`serve`, `--hostname=${host}`, `--port=${port}`])
-  const client = createOpencodeClient({ baseUrl: url })
-
+async function createOpencode() {
+  const host = await OpenCode.create()
+  const client = host
   return {
-    server: { url, close: () => proc.kill() },
+    server: { url: "http://opencode.local", close: () => void host.close() },
     client,
   }
 }
