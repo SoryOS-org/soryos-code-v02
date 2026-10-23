@@ -142,12 +142,6 @@
     }
   }
 
-  [data-component="search-list"]
-    [data-slot="search-list-section"]:first-child
-    > [data-slot="search-list-header"] {
-    padding-top: 20px;
-  }
-
   [data-component="search-list"] [data-slot="search-list-row"] {
     justify-content: flex-start;
     gap: 6px;
