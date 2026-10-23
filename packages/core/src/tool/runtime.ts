@@ -105,7 +105,11 @@ const jsonSchema = (schema: JsonSchema.JsonSchema) => {
     (typeof schema.$schema === "string" && schema.$schema.includes("draft-07")) || "definitions" in schema
       ? JsonSchema.fromSchemaDraft07(schema)
       : JsonSchema.fromSchemaDraft2020_12(schema)
-  return Schema.make<Schema.Codec<unknown>>(SchemaRepresentation.fromJsonSchemaDocument(draft).ast)
+  // Plugin and MCP tool schemas are untrusted: skip only `pattern` regexes (ReDoS)
+  // instead of failing the import, which silently disabled input validation (issue #58121).
+  return Schema.make<Schema.Codec<unknown>>(
+    SchemaRepresentation.fromJsonSchemaDocument(draft, { patterns: "ignore" }).ast,
+  )
 }
 
 const encodeOutput = (schema: Tool.ValueSchema<any>, value: unknown) => {

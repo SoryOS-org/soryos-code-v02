@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { Effect, Schema, SchemaGetter } from "effect"
+import { toJSONSchema } from "zod/v4/core"
 import { z } from "zod"
 import { emptyInputJsonSchema } from "@opencode/ai/tool"
 import { Agent } from "@opencode/schema/agent"
@@ -506,6 +507,72 @@ test("raw JSON schemas pass input through when they cannot be imported", async (
 
   expect(await Effect.runPromise(execute(tool, { value: 1, extra: true }, context))).toMatchObject({
     content: [{ type: "text", text: '{"value":1,"extra":true}' }],
+  })
+})
+
+test("raw JSON schema pattern keyword skips only the regex and keeps validating", async () => {
+  const tool: Info = {
+    name: "pattern",
+    description: "Pattern tool",
+    input: {
+      type: "object",
+      properties: {
+        session: { type: "string", pattern: "^ses_" },
+        gist: { type: "string", minLength: 1 },
+      },
+      required: ["session", "gist"],
+      additionalProperties: false,
+    },
+    execute: (input) => Effect.succeed({ content: JSON.stringify(input) }),
+  }
+
+  // Valid input decodes normally.
+  expect(await Effect.runPromise(execute(tool, { session: "ses_1", gist: "x" }, context))).toMatchObject({
+    content: [{ type: "text", text: '{"session":"ses_1","gist":"x"}' }],
+  })
+  // The regex itself is skipped (plugin and MCP schemas are untrusted).
+  expect(await Effect.runPromise(execute(tool, { session: "wrong", gist: "x" }, context))).toMatchObject({
+    content: [{ type: "text", text: '{"session":"wrong","gist":"x"}' }],
+  })
+  // Every other constraint still rejects.
+  expect(await Effect.runPromise(Effect.flip(execute(tool, { session: "ses_1", gist: 1 }, context)))).toEqual(
+    new Tool.Error({
+      message:
+        'Invalid arguments for tool "pattern":\n- gist: Expected string\n\nArguments provided:\n{\n  "session": "ses_1",\n  "gist": 1\n}\n\nUpdate the arguments and call the tool again.',
+    }),
+  )
+  expect(await Effect.runPromise(Effect.flip(execute(tool, { session: "ses_1" }, context)))).toEqual(
+    new Tool.Error({
+      message:
+        'Invalid arguments for tool "pattern":\n- gist: Missing key\n\nArguments provided:\n{\n  "session": "ses_1"\n}\n\nUpdate the arguments and call the tool again.',
+    }),
+  )
+})
+
+test("serialized Zod plugin schemas with regex keep validating missing keys", async () => {
+  // Plugin tools cross the supervisor boundary as JSON Schema documents, which is
+  // what reached runtime in issue #58121: the live Zod schema is serialized first.
+  const input = toJSONSchema(z.object({ session: z.string().regex(/^ses_/), gist: z.string().min(1) }), {
+    target: "draft-2020-12",
+    io: "input",
+  })
+  const tool: Info = {
+    name: "note",
+    description: "Note tool",
+    input: input as Info["input"],
+    execute: (value) => Effect.succeed({ content: JSON.stringify(value) }),
+  }
+
+  expect(
+    await Effect.runPromise(Effect.flip(execute(tool, { session: "ses_1", topic: "x" }, context))),
+  ).toEqual(
+    new Tool.Error({
+      message:
+        'Invalid arguments for tool "note":\n- gist: Missing key\n\nArguments provided:\n{\n  "session": "ses_1",\n  "topic": "x"\n}\n\nUpdate the arguments and call the tool again.',
+    }),
+  )
+  expect(await Effect.runPromise(execute(tool, { session: "ses_1", gist: "g" }, context))).toMatchObject({
+    content: [{ type: "text", text: '{"session":"ses_1","gist":"g"}' }],
   })
 })
 
