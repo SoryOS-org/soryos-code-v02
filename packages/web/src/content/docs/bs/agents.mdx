@@ -151,7 +151,7 @@ Konfigurirajte agente u svom konfiguracijskom fajlu `opencode.json`:
   "agent": {
     "build": {
       "mode": "primary",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "{file:./prompts/build.txt}",
       "tools": {
         "write": true,
@@ -171,7 +171,7 @@ Konfigurirajte agente u svom konfiguracijskom fajlu `opencode.json`:
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "You are a code reviewer. Focus on security, performance, and maintainability.",
       "tools": {
         "write": false,
@@ -195,7 +195,7 @@ Također možete definirati agente koristeći markdown datoteke. Stavite ih u:
 ---
 description: Reviews code for quality and best practices
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-5-5
 temperature: 0.1
 tools:
   write: false
@@ -366,7 +366,7 @@ Ako ne navedete model, primarni agenti koriste [model globalno konfiguriran](/do
 }
 ```
 
-ID modela u vašoj OpenCode konfiguraciji koristi format `provider/model-id`. Na primjer, ako koristite [OpenCode Zen](https://opencode.ai/v2/docs/console/), koristili biste `opencode/gpt-5.1-codex` za GPT 5.1 Codex.
+ID modela u vašoj OpenCode konfiguraciji koristi format `provider/model-id`. Na primjer, ako koristite [OpenCode Zen](https://opencode.ai/v2/docs/console/), koristili biste `opencode/gpt-6.1-sol` za GPT-6.1 Sol.
 
 ---
 
@@ -653,7 +653,7 @@ Na primjer, sa OpenAI-jevim modelima rezonovanja, možete kontrolisati napor ras
   "agent": {
     "deep-thinker": {
       "description": "Agent that uses high reasoning effort for complex problems",
-      "model": "openai/gpt-5",
+      "model": "openai/gpt-6.1-sol",
       "reasoningEffort": "high",
       "textVerbosity": "low"
     }
