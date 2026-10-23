@@ -1,6 +1,7 @@
 import { Effect } from "effect"
 import { execSync } from "node:child_process"
 import { Octokit } from "@octokit/rest"
+import * as github from "@actions/github"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { ServerConnection } from "../../../services/server-connection"
@@ -13,6 +14,43 @@ function git(cmd: string, cwd: string): string {
 export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
   Effect.gen(function* () {
     const server = yield* ServerConnection.resolve({ standalone: input.standalone })
+
+    // Permission check and reaction for GitHub Actions runs
+    const token = process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
+    const ctx = github.context
+    const issueNumber = (ctx.payload as any)?.issue?.number ?? (ctx.payload as any)?.pull_request?.number
+    const commentId = (ctx.payload as any)?.comment?.id
+    if (token && issueNumber) {
+      yield* Effect.promise(async () => {
+        const octokit = new Octokit({ auth: token })
+        const actor = ctx.actor
+        try {
+          const perm = await octokit.repos.getCollaboratorPermissionLevel({
+            owner: ctx.repo.owner,
+            repo: ctx.repo.repo,
+            username: actor,
+          })
+          if (!["admin", "write"].includes(perm.data.permission)) {
+            throw new Error(`User ${actor} does not have write permissions`)
+          }
+        } catch (e: any) {
+          console.error(e?.message || e)
+          process.exitCode = 1
+          throw e
+        }
+        if (commentId) {
+          try {
+            await octokit.reactions.createForIssueComment({
+              owner: ctx.repo.owner,
+              repo: ctx.repo.repo,
+              comment_id: commentId,
+              content: "eyes",
+            })
+          } catch {}
+        }
+      })
+    }
+
     const prompt = process.env["PROMPT"] || "Summarize this repository"
     yield* Effect.promise(() =>
       runNonInteractive({
