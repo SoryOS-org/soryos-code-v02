@@ -500,6 +500,7 @@ function MessageTimelineView(
         <Show when={!props.hideHeader}>
           <SessionTitleHeader>
             <SessionHeaderLayout
+              title={title.editing ? title.draft : childTitle()}
               location={
                 <>
                   <SessionLocation

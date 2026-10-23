@@ -209,42 +209,119 @@ test.describe("location", () => {
     sessions: [{ id: "ses_location", title: "Location session", directory: worktree }],
   }
 
-  test("only collapses location names when the timeline header is narrow", async ({ page }) => {
+  test("collapses the worktree name before the project and only then truncates the title", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
+    await page.clock.install()
     await openSession(page, {
       ...workspace,
       sessions: [{ id: "ses_location", title: "Investigate session header layout regression", directory: worktree }],
     })
     const header = page.locator("[data-session-title]")
-    const names = header.locator('[data-slot="session-location-project"], [data-slot="session-location-worktree"]')
+    const project = header.locator('[data-slot="session-location-project"]')
+    const worktreeName = header.locator('[data-slot="session-location-worktree"]')
+    const location = header.locator('[data-slot="session-location-trigger"]')
+    const row = header.locator(".session-header-layout")
     const review = page.getByRole("button", { name: "Toggle review", exact: true })
-    await expect(names).toHaveText(["Location", "quiet-falcon"])
+    const tooltip = page.getByRole("tooltip")
+    await expect(header.getByRole("button", { name: "More options", exact: true })).toBeVisible()
+    await expect(project).toHaveText("Location")
+    await expect(worktreeName).toHaveText("quiet-falcon")
 
-    for (const panel of [false, true, false]) {
-      if (panel || (await review.getAttribute("aria-expanded")) === "true") await review.click()
-      await expect(review).toHaveAttribute("aria-expanded", String(panel))
+    // Keep the viewport fixed: a pane can narrow a session independently of the window.
+    for (const state of [
+      { width: 1000, project: true, worktree: true, truncated: false },
+      { width: 680, project: true, worktree: false, truncated: false },
+      { width: 600, project: false, worktree: false, truncated: false },
+      { width: 490, project: false, worktree: false, truncated: true },
+      { width: 680, project: true, worktree: false, truncated: false },
+      { width: 1000, project: true, worktree: true, truncated: false },
+    ]) {
+      await row.evaluate((element, width) => (element.style.inlineSize = `${width}px`), state.width)
+      await expect(project).toBeVisible({ visible: state.project })
+      await expect(worktreeName).toBeVisible({ visible: state.worktree })
+      await expect(header.locator(".session-location-worktree-icon")).toBeVisible()
+      await expect
+        .poll(() => header.getByRole("heading").evaluate((element) => element.scrollWidth > element.clientWidth))
+        .toBe(state.truncated)
+      await expect(header.getByRole("button", { name: "More options", exact: true })).toBeInViewport()
+      await header.getByRole("heading").hover()
+      await location.hover()
+      if (state.project && state.worktree) {
+        // Advance past the shared tooltip delay, so absence is not just its initial waiting period.
+        await page.clock.fastForward(500)
+        await expect(tooltip).toBeHidden()
+      }
+      if (!state.project || !state.worktree) await expect(tooltip).toHaveText("Location / quiet-falcon")
       await expect
         .poll(() =>
-          names.evaluateAll((elements) => elements.every((element) => getComputedStyle(element).clipPath === "none")),
+          location.evaluate((element) => {
+            const icon = element.querySelector(".session-location-worktree-icon")?.getBoundingClientRect()
+            const bounds = element.getBoundingClientRect()
+
+            const separator = element
+              .closest(".session-header-location")
+              ?.querySelector(':scope > [data-slot="session-title-separator"]')
+              ?.getBoundingClientRect()
+
+            const label = element.querySelector('[data-slot="session-location-worktree"]')
+
+            const end = label?.checkVisibility({ checkVisibilityCSS: true })
+              ? label.getBoundingClientRect().right
+              : icon?.right
+
+            return !!end && !!separator && Math.abs(bounds.right - end - 6) <= 0.5 && bounds.right <= separator.left
+          }),
         )
-        .toBe(!panel)
-      await expect(header.getByRole("button", { name: "More options", exact: true })).toBeInViewport()
-      await expect
-        .poll(() => header.getByRole("heading").evaluate((element) => element.scrollWidth <= element.clientWidth))
         .toBe(true)
-      if (panel) {
-        const separator = header.locator('[data-slot="session-title-separator"]')
-        await expect(separator).toBeVisible()
-        await expect(separator).toHaveText("")
-        await expect(separator).toHaveAttribute("aria-hidden", "true")
-        await expect(header.locator(".session-location-worktree-icon")).toBeHidden()
-        const location = header.locator('[data-slot="session-location-trigger"]')
-        await location.hover()
-        await expect(location).toHaveCSS("padding-inline-start", "6px")
-        await expect(location).toHaveCSS("padding-inline-end", "6px")
-        expect(await location.boundingBox()).toMatchObject({ width: 28, height: 28 })
-      }
-      await header.screenshot({ path: test.info().outputPath(`location-${panel ? "compact" : "expanded"}.png`) })
+      await header.screenshot({ path: test.info().outputPath(`location-${state.width}.png`) })
+    }
+
+    await row.evaluate((element) => element.style.removeProperty("inline-size"))
+    await review.click()
+    await expect(review).toHaveAttribute("aria-expanded", "true")
+    await expect(worktreeName).toBeHidden()
+    await review.click()
+    await expect(worktreeName).toBeVisible()
+
+    // A title change must refit even when the session container itself never resizes.
+    await row.evaluate((element) => (element.style.inlineSize = "600px"))
+    await expect(project).toBeHidden()
+    await header.getByRole("heading").click()
+    await header.getByRole("textbox").fill("Short title")
+    await expect(project).toBeVisible()
+    await expect(worktreeName).toBeVisible()
+    await header.getByRole("textbox").press("Escape")
+    await expect(project).toBeHidden()
+    await expect(location).toHaveAccessibleName("Location / quiet-falcon")
+    await expect(location).not.toHaveAttribute("title")
+    await location.hover()
+    await expect(tooltip).toHaveText("Location / quiet-falcon")
+    await page.screenshot({ path: test.info().outputPath("location-tooltip.png") })
+    await location.click()
+    await expect(page.locator('[data-slot="session-location-card"]')).toBeVisible()
+    await expect(tooltip).toBeHidden()
+  })
+
+  test("collapses to the project avatar when there is no worktree", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openSession(page, {
+      ...workspace,
+      sessions: [{ id: "ses_location", title: "Investigate session header layout regression", directory: root }],
+    })
+    const header = page.locator("[data-session-title]")
+    const location = header.locator('[data-slot="session-location-trigger"]')
+    const project = location.locator('[data-slot="session-location-project"]')
+    const row = header.locator(".session-header-layout")
+    await expect(header.getByRole("button", { name: "More options", exact: true })).toBeVisible()
+    await expect(location.locator(".session-location-worktree-icon")).toHaveCount(0)
+
+    for (const width of [1000, 360, 1000]) {
+      await row.evaluate((element, width) => (element.style.inlineSize = `${width}px`), width)
+      await expect(project).toBeVisible({ visible: width === 1000 })
+      await location.hover()
+
+      if (width === 360) expect(await location.boundingBox()).toMatchObject({ width: 28, height: 28 })
+      await header.screenshot({ path: test.info().outputPath(`project-${width}.png`) })
     }
   })
 

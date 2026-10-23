@@ -2,6 +2,7 @@ import type { SessionInfo } from "@opencode/client/promise"
 import type { MountedSession, SessionScreen } from "@opencode/gui-extensions/sdk"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
+import { Tooltip } from "@opencode/ui/tooltip"
 import {
   displayName,
   getProjectAvatarGenerated,
@@ -10,7 +11,16 @@ import {
   ProjectAvatar,
 } from "@opencode/ui/project-avatar"
 import { useNavigate } from "@solidjs/router"
-import { createMemo, For, Show, type ComponentProps, type JSX, type ParentProps } from "solid-js"
+import {
+  createContext,
+  createMemo,
+  For,
+  Show,
+  useContext,
+  type ComponentProps,
+  type JSX,
+  type ParentProps,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { ExtensionSlot } from "@/runtime/extension/render"
 import { containsDirectory, getFilename } from "@opencode/util/path"
@@ -30,9 +40,12 @@ import { sessionHref } from "@/shell/routes/session"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTitle } from "./title"
 import { SessionHeaderSeparator } from "./header/separator"
+import { createSessionHeaderFit } from "./header/fit"
 import { SessionWorkingIndicator } from "./header/session-working-indicator"
 import { CollapsedSidebarToggleSpace } from "@/shell/sidebar-toggle"
 import "./session-identity-header.css"
+
+const SessionHeaderCollapse = createContext<() => number>(() => 0)
 
 export function SessionTitleHeader(props: ParentProps) {
   return (
@@ -53,15 +66,26 @@ export function SessionTitleHeader(props: ParentProps) {
   )
 }
 
-export function SessionHeaderLayout(props: ParentProps<{ location: JSX.Element; actions?: JSX.Element }>) {
+export function SessionHeaderLayout(
+  props: ParentProps<{ title: string | undefined; location: JSX.Element; actions?: JSX.Element }>,
+) {
+  const fit = createSessionHeaderFit()
+
   return (
-    <div class="session-header-layout">
-      <div class="session-header-location">{props.location}</div>
-      <div class="session-header-title">{props.children}</div>
-      <Show when={props.actions}>
-        <div class="session-header-actions">{props.actions}</div>
-      </Show>
-    </div>
+    <SessionHeaderCollapse.Provider value={() => fit.collapse}>
+      <div ref={fit.ref} class="session-header-layout" data-location-collapse={fit.collapse}>
+        <div class="session-header-location">{props.location}</div>
+        <div class="session-header-title">
+          <span class="session-header-title-measure" aria-hidden="true">
+            <span>{props.title}</span>
+          </span>
+          {props.children}
+        </div>
+        <Show when={props.actions}>
+          <div class="session-header-actions">{props.actions}</div>
+        </Show>
+      </div>
+    </SessionHeaderCollapse.Provider>
   )
 }
 
@@ -86,6 +110,7 @@ export function SessionLocation(props: {
   const layout = useLayout()
   const settingsSurface = useSettingsSurface()
   const navigate = useNavigate()
+  const collapse = useContext(SessionHeaderCollapse)
   const [store, setStore] = createStore({ open: false })
 
   const projectName = createMemo(() => displayName(props.project ?? { worktree: props.directory ?? "" }))
@@ -100,6 +125,8 @@ export function SessionLocation(props: {
   })
 
   const git = () => !!props.project?.vcs
+
+  const label = createMemo(() => [projectName(), worktree()].filter(Boolean).join(" / "))
 
   const branch = () =>
     props.directory ? server.ctx.data.location.vcs.info({ directory: props.directory })?.branch.current : undefined
@@ -180,33 +207,44 @@ export function SessionLocation(props: {
   return (
     <>
       <Menu placement="bottom-start" gutter={4} modal={false} onOpenChange={onOpenChange}>
-        <Menu.Trigger
-          data-slot="session-location-trigger"
-          title={[projectName(), worktree()].filter(Boolean).join(" / ")}
-          class="flex h-7 min-w-0 max-w-[60%] shrink items-center gap-1.5 rounded-[6px] px-1 text-start text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-text-text-base"
+        <Tooltip
+          placement="bottom"
+          value={<bdi dir="auto">{label()}</bdi>}
+          class="session-location-tooltip flex min-w-0 max-w-full"
+          forceOpen={collapse() === 0 ? false : undefined}
         >
-          <ProjectAvatar
-            class="shrink-0"
-            aria-hidden="true"
-            fallback={projectName()}
-            src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
-            variant={getProjectAvatarVariant(props.project?.icon?.color)}
-            generated={getProjectAvatarGenerated(props.project)}
-          />
-          <bdi dir="auto" data-slot="session-location-project" class="min-w-0 truncate">
-            {projectName()}
-          </bdi>
-          <Show when={!props.compact && worktree()}>
-            {(name) => (
-              <>
-                <Icon name="outline-worktree" class="session-location-worktree-icon shrink-0 text-v2-icon-icon-muted" />
-                <bdi dir="auto" data-slot="session-location-worktree" class="min-w-12 shrink-[1000] truncate">
-                  {name()}
-                </bdi>
-              </>
-            )}
-          </Show>
-        </Menu.Trigger>
+          <Menu.Trigger
+            data-slot="session-location-trigger"
+            aria-label={label()}
+            class="relative flex h-7 min-w-0 max-w-full shrink items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-start text-[13px] font-normal leading-[var(--line-height-compact)] tracking-[-0.04px] text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-text-text-base"
+          >
+            <ProjectAvatar
+              class="shrink-0"
+              aria-hidden="true"
+              fallback={projectName()}
+              src={getProjectAvatarSource(props.project?.id, props.project?.icon)}
+              variant={getProjectAvatarVariant(props.project?.icon?.color)}
+              generated={getProjectAvatarGenerated(props.project)}
+            />
+            <bdi dir="auto" data-slot="session-location-project" class="session-location-label min-w-0 truncate">
+              {projectName()}
+            </bdi>
+            <Show when={!props.compact && worktree()}>
+              {(name) => (
+                <>
+                  <SessionHeaderSeparator glyph="slash" gap={0} before={0} after={0} />
+                  <Icon
+                    name="outline-worktree"
+                    class="session-location-worktree-icon shrink-0 text-v2-icon-icon-muted"
+                  />
+                  <bdi dir="auto" data-slot="session-location-worktree" class="session-location-label min-w-0 truncate">
+                    {name()}
+                  </bdi>
+                </>
+              )}
+            </Show>
+          </Menu.Trigger>
+        </Tooltip>
         <Menu.Portal>
           <Menu.Content
             data-slot="session-location-card"
@@ -340,7 +378,7 @@ export function SessionLocation(props: {
         </Menu.Portal>
       </Menu>
       <Show when={props.trailing}>
-        <SessionHeaderSeparator />
+        <SessionHeaderSeparator glyph="slash" gap={8} before={6} after={4} />
       </Show>
     </>
   )
@@ -514,6 +552,7 @@ export function SessionIdentityHeader(props: { sessionID: string; session?: Sess
     <Show when={title() || parentTitle()}>
       <SessionTitleHeader>
         <SessionHeaderLayout
+          title={title()}
           location={
             <>
               <SessionLocation

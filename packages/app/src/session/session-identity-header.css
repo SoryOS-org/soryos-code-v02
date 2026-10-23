@@ -3,10 +3,9 @@
 }
 
 .session-header-layout {
-  container: session-header / inline-size;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   inline-size: 100%;
   block-size: 48px;
 }
@@ -14,51 +13,33 @@
 .session-header-location {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   min-inline-size: 0;
+  flex-shrink: 0;
+}
+
+.session-header-location > .session-location-tooltip,
+.session-header-location [data-slot="session-location-trigger"] {
+  max-inline-size: none;
+  flex-shrink: 0;
+}
+
+.session-header-location .session-location-label {
+  inline-size: max-content;
+  flex-shrink: 0;
+}
+
+/* The label leaves the hit area, but keeps its intrinsic width available to the fit observer. */
+.session-header-layout[data-location-collapse="1"] [data-slot="session-location-worktree"],
+.session-header-layout[data-location-collapse="2"] .session-location-label {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.session-header-location:has([data-slot="session-title-ancestors"]) {
   max-inline-size: 60%;
-}
-
-.session-header-location > [data-slot="session-location-trigger"] {
-  max-inline-size: 100%;
-}
-
-/* Use the header's available width, not the window: opening a side panel also narrows the timeline. */
-@container session-header (max-width: 640px) {
-  .session-header-location {
-    gap: 4px;
-  }
-
-  .session-header-location > [data-slot="session-location-trigger"] {
-    gap: 8px;
-    padding-inline: 6px;
-  }
-
-  /* The avatar-only trigger is square like the header's icon buttons, 6px from its avatar on every side, and the row
-     adds a 4px gap. */
-  .session-header-location > .session-header-separator {
-    --separator-before: 10px;
-  }
-
-  .session-header-location > .session-header-separator:dir(rtl) {
-    --separator-before: 9px;
-  }
-
-  /* The collapsed header reads avatar, separator, title; the names stay in the trigger's title and accessible name. */
-  .session-header-location .session-location-worktree-icon {
-    display: none;
-  }
-
-  /* Keep the names available to assistive tech while the icons leave room for the title. */
-  .session-header-location [data-slot="session-location-project"],
-  .session-header-location [data-slot="session-location-worktree"] {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+  flex-shrink: 1;
 }
 
 .session-header-title {
@@ -73,6 +54,26 @@
   min-inline-size: 0;
   max-inline-size: 100%;
   flex-shrink: 1;
+}
+
+.session-header-title-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  inline-size: 0;
+  block-size: 0;
+  overflow: hidden;
+}
+
+.session-header-title-measure > span {
+  display: block;
+  inline-size: max-content;
+  padding-inline: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 530;
+  line-height: var(--line-height-compact);
+  letter-spacing: -0.04px;
 }
 
 .session-header-actions {
@@ -99,9 +100,9 @@
 /* The original "/" text, as generated content so the separator itself stays empty for assistive tech. */
 .session-header-slash::before {
   content: "/";
-  font-size: 11px;
-  font-weight: 500;
-  line-height: var(--line-height-base);
+  font-size: 13px;
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-compact);
   /* Cancels the glyph's side bearings so the margins above measure to its ink. */
   margin-inline: -0.25px -0.34px;
 }

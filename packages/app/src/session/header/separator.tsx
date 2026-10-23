@@ -72,25 +72,32 @@ motionTuning.subscribe(() => setTuning(read()))
  * Sits between breadcrumb segments with `gap` of visible space on both sides. `before` and `after` are the space the
  * neighbouring segments already leave between their ink and this element, so the margins make up the rest.
  */
-export function SessionHeaderSeparator(props: { before?: number; after?: number }) {
+export function SessionHeaderSeparator(props: {
+  before?: number
+  after?: number
+  glyph?: typeof tuning.glyph
+  gap?: number
+}) {
+  const glyph = () => props.glyph ?? tuning.glyph
+
   // The ink of every glyph fills its box, so the gap is exact; the text beside it keeps ~0.5px of side bearing.
   const width = () => {
-    if (tuning.glyph === "divider") return tuning.weight
+    if (glyph() === "divider") return tuning.weight
 
-    if (tuning.glyph === "dot") return tuning.size / 4
+    if (glyph() === "dot") return tuning.size / 4
 
     return tuning.size * 0.45
   }
 
-  const stroke = () => tuning.weight * (tuning.glyph === "bold" ? 2 : 1)
+  const stroke = () => tuning.weight * (glyph() === "bold" ? 2 : 1)
 
   return (
     <span
       data-slot="session-title-separator"
-      data-glyph={tuning.glyph}
+      data-glyph={glyph()}
       class="session-header-separator text-v2-text-text-faint"
       style={{
-        "--separator-gap": `${tuning.gap}px`,
+        "--separator-gap": `${props.gap ?? tuning.gap}px`,
         "--separator-before": props.before === undefined ? undefined : `${props.before}px`,
         "--separator-after": props.after === undefined ? undefined : `${props.after}px`,
         opacity: tuning.opacity,
@@ -98,14 +105,14 @@ export function SessionHeaderSeparator(props: { before?: number; after?: number 
       aria-hidden="true"
     >
       <Switch>
-        <Match when={tuning.glyph === "divider"}>
+        <Match when={glyph() === "divider"}>
           <span class="block rounded-full bg-current" style={{ width: `${width()}px`, height: `${tuning.size}px` }} />
         </Match>
-        <Match when={tuning.glyph === "dot"}>
+        <Match when={glyph() === "dot"}>
           <span class="block rounded-full bg-current" style={{ width: `${width()}px`, height: `${width()}px` }} />
         </Match>
-        <Match when={tuning.glyph === "slash"}>
-          <span class="session-header-slash" />
+        <Match when={glyph() === "slash"}>
+          <span class="session-header-slash text-v2-icon-icon-faint" />
         </Match>
         <Match when={true}>
           <svg

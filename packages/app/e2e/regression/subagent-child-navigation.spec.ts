@@ -170,6 +170,36 @@ test("keeps the active nested session visible in a narrow desktop header", async
   await expect(page).toHaveURL(sessionHref(parentID))
 })
 
+test("restores the project name after closing review in a nested session", async ({ page }) => {
+  await page.setViewportSize({ width: 890, height: 900 })
+  await mockWorkspace(page, {
+    name: "Project with a moderately long display name",
+    directory,
+    sessions: [
+      { id: parentID, title: "Root session outlining repository-wide change analysis and implementation" },
+      { id: childID, parentID, title: "Intermediate agent examining architecture and regression coverage" },
+      { id: grandchildID, parentID: childID, title: "Review repository" },
+    ],
+  })
+  await page.goto(sessionHref(grandchildID))
+  await expect(page.locator("[data-timeline-virtual-content]")).toBeAttached()
+  const header = page.locator("[data-session-title]")
+  const row = header.locator(".session-header-layout")
+  const project = header.locator('[data-slot="session-location-project"]')
+  const review = page.getByRole("button", { name: "Toggle review", exact: true })
+  await expect(project).toBeVisible()
+  const width = await row.evaluate((element) => element.getBoundingClientRect().width)
+  await header.screenshot({ path: test.info().outputPath("nested-header-before-review.png") })
+
+  await review.click()
+  await expect(project).toBeHidden()
+  await review.click()
+  await expect.poll(() => row.evaluate((element) => element.getBoundingClientRect().width)).toBe(width)
+  await expect(project).toBeVisible()
+  await expect(header.getByRole("heading", { name: "Review repository", exact: true })).toBeVisible()
+  await header.screenshot({ path: test.info().outputPath("nested-header-restored.png") })
+})
+
 test("shows parent lineage while the child timeline loads", async ({ page }) => {
   await setup(page)
   const requested = Promise.withResolvers<void>()
