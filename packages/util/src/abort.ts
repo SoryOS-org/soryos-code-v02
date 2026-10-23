@@ -4,6 +4,6 @@
 // made once, so its stack holds only this module's load.
 const reason = new DOMException("signal is aborted without reason", "AbortError")
 
-export function abort(controller: AbortController) {
-  controller.abort(reason)
+export function abort(controller: AbortController | undefined) {
+  controller?.abort(reason)
 }

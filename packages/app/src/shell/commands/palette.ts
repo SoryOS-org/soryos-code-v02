@@ -1,3 +1,4 @@
+import { abort } from "@opencode/util/abort"
 import { getFilename } from "@opencode/util/path"
 import type { Project } from "@/runtime/server/types"
 import type { SessionInfo } from "@opencode/client/promise"
@@ -264,7 +265,7 @@ export function createServerSessionEntries(props: {
     ].toSorted((a, b) => b.time.updated - a.time.updated),
   )
 
-  onCleanup(() => state.abort?.abort())
+  onCleanup(() => abort(state.abort))
 
   const entries = (sessions: SessionInfo[], search: string): CommandPaletteEntry[] => {
     const projects = props.projects()
@@ -295,7 +296,7 @@ export function createServerSessionEntries(props: {
   const search = async (text: string): Promise<CommandPaletteEntry[]> => {
     const search = text.trim()
 
-    state.abort?.abort()
+    abort(state.abort)
     const current = new AbortController()
     state.abort = current
 

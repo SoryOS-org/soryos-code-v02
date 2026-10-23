@@ -1,6 +1,7 @@
 import type { FormInfo, FormOption, SessionFormReplyInput, FormStringField } from "@opencode/client/promise"
 import { createEffect, createMemo, createResource, on, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
+import { abort } from "@opencode/util/abort"
 import type { OpenCodeEventStream } from "@/runtime/server/client"
 
 function webSearchProviderField(form: FormInfo) {
@@ -49,7 +50,7 @@ export function createWebSearchRequest(input: {
 
   createEffect(
     on([input.owner, input.connected], () => {
-      store.sending?.abort.abort()
+      abort(store.sending?.abort)
       setStore({ sending: undefined, selected: "random", error: false })
     }),
   )
@@ -64,7 +65,7 @@ export function createWebSearchRequest(input: {
       },
     ),
   )
-  onCleanup(() => store.sending?.abort.abort())
+  onCleanup(() => abort(store.sending?.abort))
 
   const submit = async (selection: string | false) => {
     const form = input.request()

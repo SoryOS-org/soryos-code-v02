@@ -1,3 +1,4 @@
+import { abort } from "@opencode/util/abort"
 import { createMemo, createResource, onCleanup } from "solid-js"
 import { uniqueCommandPaletteEntries, type CommandPaletteEntry } from "./palette"
 
@@ -55,12 +56,12 @@ export function createCommandPaletteSearch(props: {
 
   const sources = props.sources.map((load) => {
     const state: SourceState = { seen: [] }
-    onCleanup(() => state.abort?.abort())
+    onCleanup(() => abort(state.abort))
 
     const [result] = createResource<SourceResult, string>(
       query,
       async (query, info) => {
-        state.abort?.abort()
+        abort(state.abort)
         const current = new AbortController()
         state.abort = current
         const previous = info.value ?? emptyResult

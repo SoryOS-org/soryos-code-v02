@@ -1,3 +1,4 @@
+import { abort } from "@opencode/util/abort"
 import {
   batch,
   catchError,
@@ -336,7 +337,7 @@ function createHost(input: HostInput) {
         // Each handle names its own dialog, so it never closes one another extension or instance opened. Closing a
         // dialog that still waits for the app interface, or for its deferred open, cancels it.
         const close = () => {
-          opening.abort()
+          abort(opening)
           waiting.cancel()
           dialog.close(id)
         }
@@ -750,7 +751,7 @@ function createHost(input: HostInput) {
       },
       preload: (session) => sessions.forEach((store) => store.get(session)),
       dispose() {
-        controller.abort()
+        abort(controller)
         // One batch: every contribution and contract of the extension disappears in the same frame.
         batch(() => {
           Array.from(cleanups).reverse().forEach(release)
