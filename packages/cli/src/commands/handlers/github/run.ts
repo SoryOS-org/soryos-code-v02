@@ -22,7 +22,17 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
   Effect.gen(function* () {
     const server = yield* ServerConnection.resolve({ standalone: input.standalone })
     const eventStr = Option.getOrUndefined(input.event)
-    const ctx: any = eventStr ? JSON.parse(eventStr) : github.context
+    let ctx: any
+    if (eventStr) {
+      ctx = JSON.parse(eventStr)
+    } else if (process.env.GITHUB_REPOSITORY) {
+      ctx = github.context
+    } else {
+      // Local run: build minimal context from git remote
+      const remote = git(["remote", "get-url", "origin"], process.cwd())
+      const m = remote.match(/github\.com[:/](.+?)\/(.+?)(?:\.git)?$/)
+      ctx = { eventName: process.env["GITHUB_EVENT_NAME"] || "", repo: { owner: m?.[1] || "", repo: m?.[2] || "" }, payload: {}, actor: process.env["GITHUB_ACTOR"] }
+    }
     const token = yield* Effect.promise(async () => {
       const t = Option.getOrUndefined(input.token) || process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
       if (t) return t
@@ -30,6 +40,10 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         const gt = process.env["GITHUB_TOKEN"]
         if (!gt) throw new Error("GITHUB_TOKEN required")
         return gt
+      }
+      if (!process.env["ACTIONS_ID_TOKEN_REQUEST_URL"]) {
+        // Not in GitHub Actions; no OIDC available
+        return undefined
       }
       try {
         const oidcBaseUrl = (process.env["OIDC_BASE_URL"] || "https://api.opencode.ai").replace(/\/+$/, "")
