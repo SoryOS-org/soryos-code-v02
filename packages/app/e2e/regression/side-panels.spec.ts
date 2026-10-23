@@ -127,6 +127,69 @@ test("review content stays aligned with the side region in both directions", asy
   await expectTreeSentinel(page)
 })
 
+test("new tab selection and closing stay in the focused pane", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const directory = "C:/OpenCode/PaneNewTabs"
+  const key = `local\u0000${base64Encode(directory)}/ses_panenewtabs`
+
+  await openSession(page, {
+    name: "PaneNewTabs",
+    fileList: () => [],
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+    seed: {
+      panes: { ses_panenewtabs: { review: true } },
+      storage: {
+        "opencode.global.dat:layout": {
+          sessionTabs: {
+            [key]: {
+              all: ["file://README.md", "file://notes.md"],
+              active: "file://README.md",
+              panes: { "file://notes.md": "split" },
+              selected: { side: "file://README.md", split: "file://notes.md" },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  const side = page.locator('[data-pane-content="side"]')
+  const split = page.locator('[data-pane-content="split"]')
+  const mod = (await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform))) ? "Meta" : "Control"
+  const sideTabs = side.getByRole("tab", { name: "New tab", exact: true })
+  const splitTabs = split.getByRole("tab", { name: "New tab", exact: true })
+  await expect(side.getByRole("tab", { name: "README.md", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(split.getByRole("tab", { name: "notes.md", exact: true })).toHaveAttribute("aria-selected", "true")
+
+  await side.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(sideTabs).toHaveCount(1)
+  await side.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(sideTabs).toHaveCount(2)
+  // Pick the older New tab, so a fallback to the newest one cannot pass unnoticed.
+  await sideTabs.nth(0).click()
+  await expect(sideTabs.nth(0)).toHaveAttribute("aria-selected", "true")
+
+  await split.getByRole("button", { name: "Add tab", exact: true }).click()
+  await expect(splitTabs).toHaveAttribute("aria-selected", "true")
+  await expect(sideTabs.nth(0)).toHaveAttribute("aria-selected", "true")
+  await expect(sideTabs.nth(1)).toHaveAttribute("aria-selected", "false")
+
+  await splitTabs.click()
+  await splitTabs.press(`${mod}+w`)
+  await expect(splitTabs).toHaveCount(0)
+  await expect(split.getByRole("tab", { name: "notes.md", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(sideTabs).toHaveCount(2)
+  await expect(sideTabs.nth(0)).toHaveAttribute("aria-selected", "true")
+
+  // With focus on the region itself, close falls back to the active pane, not another pane's New tab.
+  await split.getByRole("tab", { name: "notes.md", exact: true }).click()
+  await page.locator("#review-panel").focus()
+  await page.keyboard.press(`${mod}+w`)
+  await expect(split).toHaveCount(0)
+  await expect(sideTabs).toHaveCount(2)
+  await expect(sideTabs.nth(0)).toHaveAttribute("aria-selected", "true")
+})
+
 // A DOM mark survives only while the same node stays mounted.
 function mark(locator: Locator) {
   return locator.evaluate((element) => element.setAttribute("data-e2e-mounted", "original"))
@@ -202,7 +265,7 @@ test("the new tab view lists recently closed tabs, expands to the rest, and keep
   await readme.locator("..").getByRole("button", { name: "Close tab" }).click()
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
   await toggle.click()
-  await expect(panel.getByRole("tab")).toHaveCount(0)
+  await expect(panel.getByRole("tab", { name: "New tab", exact: true })).toHaveAttribute("aria-selected", "true")
   await expect(rows.first()).toContainText("README.md")
 
   // The list survives a reload, and reopening a row brings its tab back and takes it off the list.

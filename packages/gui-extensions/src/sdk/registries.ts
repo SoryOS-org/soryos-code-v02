@@ -91,9 +91,9 @@ export interface SessionPanelMenuItem extends MenuItemBase {
    */
   readonly opened?: boolean
   /**
-   * Marks the item that opens a new tab: + runs it directly instead of opening the menu, and the side region runs it
-   * when it opens with no tabs. The first primary item in `order` wins. Without one, + opens the menu and an empty side
-   * region lists the items. Omit it for an ordinary item.
+   * Makes + run this item directly instead of showing the host's launcher choices. The first primary item in `order`
+   * wins. Opening the side region with no tabs still shows the host's New tab view, which lists non-primary items
+   * that are not already open. Omit it for an ordinary launcher item.
    */
   readonly primary?: true
   /** Runs the item. */

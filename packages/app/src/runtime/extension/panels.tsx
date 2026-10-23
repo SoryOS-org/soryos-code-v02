@@ -2,7 +2,6 @@ import {
   batch,
   createEffect,
   createMemo,
-  createSignal,
   For,
   mergeProps,
   on,
@@ -11,6 +10,7 @@ import {
   type Accessor,
   type JSX,
 } from "solid-js"
+import { createStore } from "solid-js/store"
 import { Schema } from "effect"
 import { createMediaQuery } from "@solid-primitives/media"
 import {
@@ -313,21 +313,24 @@ export function createRegion(input: {
   // and selects itself replaces it. A view stops being live once the selection moves off what it opened over.
   type NewTab = { id: string; pane: SessionPane; session: string; over: string | undefined }
 
-  const [adding, setAdding] = createSignal<NewTab[]>([])
-  const [chosen, setChosen] = createSignal<string>()
+  const [state, setState] = createStore<{
+    adding: NewTab[]
+    chosen: Partial<Record<SessionPane, string>>
+  }>({ adding: [], chosen: {} })
+
   let serial = 0
 
   const live = (value: NewTab) => value.session === input.view().key && value.over === panes[value.pane].active()
-  const newTabs = (pane: SessionPane) => adding().filter((value) => value.pane === pane && live(value))
+  const newTabs = (pane: SessionPane) => state.adding.filter((value) => value.pane === pane && live(value))
 
   const shownNewTab = (pane: SessionPane) => {
     const list = newTabs(pane)
 
-    return list.find((value) => value.id === chosen()) ?? list.at(-1)
+    return list.find((value) => value.id === state.chosen[pane]) ?? list.at(-1)
   }
 
   createEffect(() => {
-    if (adding().some((value) => !live(value))) setAdding((list) => list.filter(live))
+    if (state.adding.some((value) => !live(value))) setState("adding", (list) => list.filter(live))
   })
 
   return {
@@ -363,31 +366,27 @@ export function createRegion(input: {
     /** The new tab view a pane shows: the selected one, else the newest. */
     shownNewTab,
     newTab: (pane: SessionPane) => shownNewTab(pane) !== undefined,
-    selectNewTab(id: string) {
-      setChosen(id)
+    selectNewTab(pane: SessionPane, id: string) {
+      setState("chosen", pane, id)
     },
     /** Adds a new tab view in a pane, by default the one holding the selected tab, and shows it. */
     openNewTab(pane: SessionPane = activePane()) {
       const id = `new:${++serial}`
 
-      setAdding((list) => [...list, { id, pane, session: input.view().key, over: panes[pane].active() }])
-      setChosen(id)
+      batch(() => {
+        setState("adding", (list) => [...list, { id, pane, session: input.view().key, over: panes[pane].active() }])
+        setState("chosen", pane, id)
+      })
     },
     dismissNewTab(id: string) {
-      setAdding((list) => list.filter((value) => value.id !== id))
+      setState("adding", (list) => list.filter((value) => value.id !== id))
     },
-    /** Closes the shown new tab view, in one pane or wherever it is; returns whether one was showing. */
-    closeNewTab(pane?: SessionPane) {
-      const panesToCheck: SessionPane[] = pane ? [pane] : ["side", "split", "bottom"]
-
-      const value = panesToCheck.flatMap((id) => {
-        const shown = shownNewTab(id)
-
-        return shown ? [shown] : []
-      })[0]
+    /** Closes the shown new tab view in the given or active pane; returns whether one was showing. */
+    closeNewTab(pane: SessionPane = activePane()) {
+      const value = shownNewTab(pane)
 
       if (!value) return false
-      setAdding((list) => list.filter((entry) => entry.id !== value.id))
+      setState("adding", (list) => list.filter((entry) => entry.id !== value.id))
 
       return true
     },

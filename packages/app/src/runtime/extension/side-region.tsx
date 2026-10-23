@@ -232,7 +232,7 @@ export function PaneTabs(props: {
       value={current()?.id ?? props.pane.active() ?? "empty"}
       onChange={(value) => {
         if (props.region.newTabs(props.pane.id).some((entry) => entry.id === value))
-          return props.region.selectNewTab(value)
+          return props.region.selectNewTab(props.pane.id, value)
 
         // Kobalte selects the first tab while triggers register, including while the "+" menu's click is still
         // dispatching. Persist input events on a tab only; the region owns fallback selection.
@@ -383,7 +383,7 @@ export function PaneTabs(props: {
       </Show>
       <Show when={props.placeholder && !current() && props.pane.active() === undefined}>
         <Tabs.Content value="empty" class="flex flex-col h-full overflow-hidden contain-strict">
-          {/* With a new tab item, the new tab it opens is on its way. */}
+          {/* After + runs a primary item, its tab owns the empty pane until it arrives. */}
           <Show when={!primary()}>
             <Show
               when={launchers().length > 0}

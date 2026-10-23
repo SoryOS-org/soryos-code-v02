@@ -204,19 +204,21 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     )
   }
 
+  // In the pane holding focus; the region itself, or a key a native page handed over, means the selected tab's pane.
+  const focusedPane = () => {
+    const pane = document.activeElement?.closest("[data-pane-content]")?.getAttribute("data-pane-content")
+
+    return pane === "side" || pane === "split" ? pane : undefined
+  }
+
   const closeTab = () => {
-    if (actions.region.closeNewTab()) return
+    if (actions.region.closeNewTab(focusedPane())) return
     const tab = closableTab()
 
     if (tab) actions.region.close(tab)
   }
 
-  // In the pane holding focus; the region itself, or a key a native page handed over, means the selected tab's pane.
-  const openSideTab = () => {
-    const pane = document.activeElement?.closest("[data-pane-content]")?.getAttribute("data-pane-content")
-
-    actions.region.openNewTab(pane === "side" || pane === "split" ? pane : undefined)
-  }
+  const openSideTab = () => actions.region.openNewTab(focusedPane())
 
   const selectAdjacentSideTab = (offset: -1 | 1) => {
     const key = adjacentTabKey(actions.region.keys(), actions.region.active(), offset)

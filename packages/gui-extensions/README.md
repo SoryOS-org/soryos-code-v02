@@ -136,6 +136,7 @@ flowchart LR
 - All panel callbacks take one named input: `list({ session, screen, open })`, `render({ tab, session, screen })`, `focus({ tab, session, screen, restored })`, `enter({ tab, session, screen })`, `close({ tab, session, screen })`, `reopen({ tab, session, screen })`, `normalize({ id, session, screen })`. Session fields are getters; the screen is the constant owning screen. Render tab fields are live getters too; lifecycle callbacks receive their event's tab. Stored ids and `restored` describe that call. Do not destructure live getters. Every `session.*` slot gets a non-null `screen`; `window.bottom` does not.
 - Render effects can run before public publication too: change-list views call `Changes.watch(input.screen, source)`, not `ctx.screen.current()`, so their first demand is never lost.
 - `fallback: true` opts a tab into selection when the stored selection is missing or cannot be selected; false or omission opts out. The host takes the first eligible regular tab, then a `first` tab, then a pinned tab, preserving order within each tier. Closing a tab still selects its neighbour.
+- A `session.panel` menu item's `primary: true` makes the strip's + run it directly; the first primary item in `order` wins. It does not run automatically when an empty side region opens: the host shows its New tab view with the non-primary items that are not already open. `opened: true` hides an ordinary item from that launcher list, but not from the + menu.
 
 ```ts
 ctx.add(Panel, {
