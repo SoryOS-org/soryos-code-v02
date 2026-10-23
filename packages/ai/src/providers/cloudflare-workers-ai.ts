@@ -1,10 +1,12 @@
 import type { ProviderPackage } from "../provider-package.js"
 import { CloudflareRunEvaluation } from "../experimental/cloudflare-run-evaluation.js"
 import { EvaluationRounding } from "../experimental/evaluation.js"
+import { CloudflareWorkersAIImages } from "../protocols/cloudflare-workers-ai-images.js"
 import { OpenAIChat } from "../protocols/openai-chat.js"
 import { AuthOptions, type AtLeastOne, type ProviderAuthOption } from "../route/auth-options.js"
 import { Route, type RouteDefaultsInput } from "../route/client.js"
 import { Endpoint } from "../route/endpoint.js"
+import { MediaRoute } from "../route/media.js"
 import { HttpOptions, ProviderConfigurationError, ProviderID, type ModelID } from "../schema/index.js"
 import type { OpenAIProviderOptionsInput } from "./openai-options.js"
 
@@ -27,6 +29,8 @@ export type Settings = ProviderPackage.Settings &
   WorkersAIURL & {
     readonly apiKey?: string
   }
+
+export type { CloudflareWorkersAIImageOptions } from "../protocols/cloudflare-workers-ai-images.js"
 
 export const baseURL = (input: WorkersAIURL) => {
   if (input.baseURL) return input.baseURL
@@ -80,6 +84,11 @@ export const configure = (input: LanguageModelOptions) => {
     id,
     model: (modelID: string | ModelID) => configured.model<OpenAIProviderOptionsInput>({ id: modelID }),
     experimental: { evaluation },
+    image: (modelID: string | ModelID) =>
+      CloudflareWorkersAIImages.model({
+        ...MediaRoute.deployment({ ...input, baseURL: runBaseURL(input) }, auth),
+        id: modelID,
+      }),
     configure,
   }
 }

@@ -581,10 +581,12 @@ call rather than being dropped, so check this table before swapping only the `mo
 | Stability `image`     | 1   | ✗         | ✓             | ✓      | ✓        | 1 (not on `core`)                | ✗                   |
 | Stability `upscale()` | ✗   | ✗         | ✗             | ✓      | ✓        | exactly 1 (required)             | ✗                   |
 | Vercel AI Gateway     | ✓   | per model | ✗             | ✗      | ignored  | per model                        | per model           |
+| Cloudflare Workers AI | 1   | ✓²        | ✗             | ✓²     | ✗        | ✗                                | ✗                   |
 
 ✓ lowers natively; ✗ fails whenever the field is set (including `n: 1`); `1` means `n > 1` fails. ¹ `Image.stream` on OpenAI generates one image. fal
 rejects `size` and `aspectRatio` together; which one a fal or BFL model takes depends on the model. Vercel AI Gateway
-forwards `format` but does not apply it, so the returned bytes keep the upstream model's own format.
+forwards `format` but does not apply it, so the returned bytes keep the upstream model's own format. ² Workers AI
+`@cf/black-forest-labs/flux-1-schnell` takes neither `size` nor `seed`, and the provider rejects them.
 
 `Media.Asset` is the one asset type shared by image requests, image responses, LLM messages, and tool results.
 `asset.source` is the serializable `Media.Source` (`bytes`, `base64`, `url`, or `ref`); `asset.bytes()`,
