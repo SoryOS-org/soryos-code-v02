@@ -6,21 +6,24 @@ import { getFilenameTruncated } from "@opencode/util/path"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { AttachmentCard } from "./attachment-card"
 
-/** What a comment is about: lines of a file, a labelled subject such as an element picked in a page, or quoted text. */
+/**
+ * What a comment is about: lines of a file, a labelled subject such as an element picked in a page, or quoted text.
+ * A quote from outside the timeline names its source, such as a terminal.
+ */
 export type CommentCardTarget =
   | { type: "file"; path: string; selection?: { startLine: number; endLine: number } }
   | { type: "note"; label: string; icon: string }
-  | { type: "quote"; text: string }
+  | { type: "quote"; text: string; source?: { label: string; icon: string } }
 
 export function commentCardTarget(
   comment:
     | { type?: "file"; path: string; selection?: { startLine: number; endLine: number } }
     | { type: "note"; label: string; icon: string }
-    | { type: "quote"; text: string },
+    | { type: "quote"; text: string; source?: { label: string; icon: string } },
 ): CommentCardTarget {
   if (comment.type === "note") return { type: "note", label: comment.label, icon: comment.icon }
 
-  if (comment.type === "quote") return { type: "quote", text: comment.text }
+  if (comment.type === "quote") return { type: "quote", text: comment.text, source: comment.source }
 
   return { type: "file", path: comment.path, selection: comment.selection }
 }
@@ -48,6 +51,7 @@ export function CommentCard(props: {
   let title: HTMLSpanElement | undefined
   const [truncated, setTruncated] = createSignal(false)
   const quote = () => (props.target.type === "quote" ? props.target.text.slice(0, QUOTE_PREVIEW_LENGTH) : undefined)
+  const source = () => (props.target.type === "quote" ? props.target.source : undefined)
   const heading = () => props.comment || (quote() ?? "")
   const tooltipDisabled = () => !props.tooltip || (!truncated() && !(props.target.type === "quote" && props.comment))
 
@@ -114,9 +118,9 @@ export function CommentCard(props: {
             {(text) => (
               <>
                 <span data-slot="comment-card-quote">
-                  <Icon name="outline-quote" data-slot="attachment-card-icon" />
+                  <Icon name={source()?.icon ?? "outline-quote"} data-slot="attachment-card-icon" />
                   <span data-slot="attachment-card-label" dir="auto">
-                    {props.comment ? text() : i18n.t("ui.commentCard.quote")}
+                    {props.comment ? text() : (source()?.label ?? i18n.t("ui.commentCard.quote"))}
                   </span>
                 </span>
                 <Show when={props.onClick}>

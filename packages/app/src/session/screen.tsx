@@ -66,6 +66,7 @@ export function SessionScreenView(props: { session: SessionModel }) {
         screen={mounted.screen}
         view={mounted.view}
         bindBackground={mounted.bindBackground}
+        bindPrompt={mounted.bindPrompt}
       />
     </ExtensionLinks>
   )
@@ -77,6 +78,7 @@ function SessionScreenContent(props: {
   view: Accessor<MountedSession>
   screen: SessionScreen
   bindBackground: (tasks: () => readonly BackgroundTask[]) => void
+  bindPrompt: (prompt: { quotable: () => boolean; focus: () => void }) => void
 }) {
   const session = props.session
   const language = useLanguage()
@@ -245,6 +247,7 @@ function SessionScreenContent(props: {
   })
 
   props.bindBackground(composer.requests.background.tasks)
+  props.bindPrompt({ quotable: composer.quote.available, focus: composer.quote.focus })
   useUsageExceededDialogs({
     selection: () => composer.active()?.composer.model.selection,
     onDone: () => composer.active()?.composer.restoreFocus(),

@@ -50,6 +50,8 @@ export function createMountedSession(session: SessionModel) {
   const attachment = useExtensionAttachment()
   // The composer region owns background tasks and is created after the view.
   const [background, setBackground] = createSignal<Accessor<readonly BackgroundTask[]>>()
+  // The screen's composer view, created after this object, says whether it takes quotes and focuses its prompt.
+  const [prompt, setPrompt] = createSignal<{ quotable: Accessor<boolean>; focus: () => void }>()
 
   const serverRef: ServerRef = {
     get id() {
@@ -95,6 +97,7 @@ export function createMountedSession(session: SessionModel) {
     missing: file.notFound,
     sync: (path, options) => {
       file.watch(path)
+
       return file.load(path, options)
     },
     unwatch: file.unwatch,
@@ -149,6 +152,14 @@ export function createMountedSession(session: SessionModel) {
 
   const composerRef: Composer = {
     attach: (part) => composer.context.add(part),
+    quotable: () => !!prompt()?.quotable(),
+    focus(commentID) {
+      if (commentID === undefined) return prompt()?.focus()
+
+      const item = composer.context.items().find((entry) => entry.type === "quote" && entry.commentID === commentID)
+
+      if (item) composer.capture().quoteComment.set(item.key)
+    },
     update: (id, patch) => composer.context.updateComment(id, patch),
     detach: (id) => composer.context.removeComment(id),
   }
@@ -259,5 +270,6 @@ export function createMountedSession(session: SessionModel) {
     screen,
     view: mounted,
     bindBackground: (tasks: Accessor<readonly BackgroundTask[]>) => setBackground(() => tasks),
+    bindPrompt: (value: { quotable: Accessor<boolean>; focus: () => void }) => setPrompt(() => value),
   }
 }

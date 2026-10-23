@@ -107,6 +107,8 @@ export function quoteComment(item: QuoteContextItem) {
 
   if (comment) quote.comment = comment
 
+  if (item.source) quote.source = { ...item.source }
+
   return quote
 }
 

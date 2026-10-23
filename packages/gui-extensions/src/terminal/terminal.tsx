@@ -7,7 +7,7 @@ import { showToast } from "@opencode/ui/toast"
 import { createPtyClient } from "@opencode/client/solid"
 import type { FitAddon, Terminal as Term } from "ghostty-web"
 import { Option, Predicate, Schema } from "effect"
-import { type ComponentProps, createMemo, onCleanup, onMount, splitProps } from "solid-js"
+import { type ComponentProps, createMemo, createSignal, onCleanup, onMount, Show, splitProps } from "solid-js"
 import { createKeyed, useExtension, type ServerRef } from "../sdk"
 import type { TerminalModel } from "./model"
 import type { LocalPTY } from "./state"
@@ -15,6 +15,7 @@ import { SerializeAddon } from "./serialize"
 import { disposeIfDisposable, getHoveredLinkText, setOptionIfSupported } from "./runtime-adapters"
 import { consumeTerminalMetaKey, terminalKeyInput } from "./terminal-key-event"
 import { terminalWriter } from "./writer"
+import { TerminalQuote, type TerminalQuoteTarget } from "./quote"
 
 // Serialization on unmount is a synchronous O(rows x cols) walk on the main thread and the
 // result is written to localStorage or desktop state for every terminal in the workspace.
@@ -28,6 +29,8 @@ export interface TerminalProps extends ComponentProps<"div"> {
   server: ServerRef
   directory: string
   ghostty: TerminalModel["ghostty"]
+  /** Where selected output can be quoted to. */
+  quote?: TerminalQuoteTarget
   autoFocus?: boolean
   onAutoFocus?: () => void
   onSubmit?: () => void
@@ -194,6 +197,7 @@ export const Terminal = (props: TerminalProps) => {
     "server",
     "directory",
     "ghostty",
+    "quote",
     "class",
     "classList",
     "autoFocus",
@@ -243,6 +247,8 @@ export const Terminal = (props: TerminalProps) => {
   let reconn: ReturnType<typeof setTimeout> | undefined
   let tries = 0
   let revealed = false
+  // The opened terminal, for the quote toolbar.
+  const [opened, setOpened] = createSignal<Term>()
 
   const reveal = () => {
     if (revealed) return
@@ -506,6 +512,7 @@ export const Terminal = (props: TerminalProps) => {
         handlePointerDown,
         handleLinkClick,
       })
+      setOpened(t)
 
       // onAutoFocus consumes the request, which flips autoFocus, so read it once.
       const autoFocus = local.autoFocus === true
@@ -798,25 +805,34 @@ export const Terminal = (props: TerminalProps) => {
   })
 
   return (
-    <div
-      ref={container}
-      data-component="terminal"
-      dir="ltr"
-      data-prevent-autofocus
-      tabIndex={-1}
-      style={{
-        "background-color": terminalColors().background,
-        "caret-color": "transparent",
-        "font-family": appearance.font("mono"),
-        opacity: 0,
-      }}
-      classList={{
-        ...local.classList,
-        "select-text": true,
-        "size-full px-6 py-3 relative overflow-hidden": true,
-        [local.class ?? ""]: !!local.class,
-      }}
-      {...others}
-    />
+    <>
+      <div
+        ref={container}
+        data-component="terminal"
+        dir="ltr"
+        data-prevent-autofocus
+        tabIndex={-1}
+        style={{
+          "background-color": terminalColors().background,
+          "caret-color": "transparent",
+          "font-family": appearance.font("mono"),
+          opacity: 0,
+        }}
+        classList={{
+          ...local.classList,
+          "select-text": true,
+          "size-full px-6 py-3 relative overflow-hidden": true,
+          [local.class ?? ""]: !!local.class,
+        }}
+        {...others}
+      />
+      <Show when={local.quote}>
+        {(target) => (
+          <Show when={opened()}>
+            {(term) => <TerminalQuote term={term()} container={container} target={target()} />}
+          </Show>
+        )}
+      </Show>
+    </>
   )
 }

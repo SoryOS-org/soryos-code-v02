@@ -501,16 +501,57 @@ export interface ComposerNote {
   }
 }
 
+/**
+ * Text the user quoted from something the extension shows, such as terminal output, with an optional comment. It
+ * renders like a quote from the session timeline, under the source's icon and label. The model reads "The user quoted
+ * the following from <subject>:" and the text, each line prefixed with `> `, then the comment when there is one.
+ */
+export interface ComposerQuote {
+  /** The part kind. */
+  type: "quote"
+  /** The id that `Composer.update`, `detach` and `focus` take. */
+  commentID: string
+  /** The quoted text, as plain text. */
+  text: string
+  /** The user's comment on the quote. Omit it to let the user add one from the chip. */
+  comment?: string
+  /** Where the text came from. It stays with the draft and the sent message. */
+  source: {
+    /** Chip text while the quote has no comment, e.g. `Terminal`. */
+    readonly label: string
+    /** Chip icon. */
+    readonly icon: IconName
+    /** Where the text came from, for the model, e.g. `the terminal`. Not localized. */
+    readonly subject: string
+  }
+}
+
 /** The session screen's composer: the parts attached to the routed session's next prompt. */
 export interface Composer {
   /**
-   * Attaches a file or a note to the next prompt.
+   * Attaches a file, a note or a quote to the next prompt. Focus stays where it is; call `focus` to move it.
    *
    * @param part - The part to attach.
    */
-  attach(part: ComposerFile | ComposerNote): void
+  attach(part: ComposerFile | ComposerNote | ComposerQuote): void
   /**
-   * Changes an attached part. Files and notes alike; a note takes only `comment`.
+   * Whether the composer takes quotes now. False in a subagent's session, which has no composer, and while the
+   * composer runs shell commands. Reactive.
+   *
+   * @example
+   * if (screen.composer.quotable()) screen.composer.attach(quote)
+   */
+  quotable(): boolean
+  /**
+   * Moves focus to the prompt, at its cursor. With the `commentID` of an attached quote, opens that quote's comment
+   * editor instead. While the composer is not shown, such as on a narrow screen showing a panel, the prompt keeps
+   * its focus and the comment editor opens once the composer shows.
+   *
+   * @param commentID - The attached quote whose comment editor to open. Omit it to focus the prompt.
+   */
+  focus(commentID?: string): void
+  /**
+   * Changes an attached part. Files, notes and quotes alike; a note or a quote takes only `comment`.
    *
    * @param id - The part's `commentID`.
    * @param patch - The fields to change.

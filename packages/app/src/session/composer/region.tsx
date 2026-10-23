@@ -311,6 +311,12 @@ export function createActiveSessionRegion(input: {
     ),
   )
 
+  const focusPrompt = () => {
+    if (!promptRef) return
+    promptRef.focus()
+    setCursorPosition(promptRef, prompt.cursor() ?? promptLength(prompt.current()))
+  }
+
   return {
     active,
     drop: {
@@ -325,11 +331,9 @@ export function createActiveSessionRegion(input: {
         prompt.context.add(item)
 
         if (comment) return prompt.capture().quoteComment.set(contextItemKey(item))
-
-        if (!promptRef) return
-        promptRef.focus()
-        setCursorPosition(promptRef, prompt.cursor() ?? promptLength(prompt.current()))
+        focusPrompt()
       },
+      focus: focusPrompt,
     },
     actions: {
       timeline: {

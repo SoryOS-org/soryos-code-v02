@@ -18,10 +18,11 @@ export type SessionUserComment =
       icon: string
     }
   | {
-      /** Plain text quoted from the session timeline, with an optional comment. */
+      /** Plain text quoted from the session timeline, or from the named source, with an optional comment. */
       type: "quote"
       text: string
       comment?: string
+      source?: { label: string; icon: string }
     }
 
 /** An attachment delivered to the model as a path on the server instead of inline bytes. */

@@ -11,13 +11,14 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { Keybind } from "@opencode/ui/keybind"
-import { createKeyed, useExtension, usePanel, type MountedSession } from "../sdk"
+import { createKeyed, useExtension, usePanel, type MountedSession, type SessionScreen } from "../sdk"
 import type { TerminalModel, TerminalWorkspace } from "./model"
 import { terminalTab, type LocalPTY } from "./state"
 import { SortableTerminalTab } from "./tab"
 import { Terminal } from "./terminal"
 import { terminalTabLabel } from "./title"
 import { focusTerminalById } from "./focus"
+import type { TerminalQuoteTarget } from "./quote"
 
 const MAX_CACHED_TERMINAL_WORKSPACES = 20
 
@@ -39,7 +40,12 @@ type TerminalPanelState = {
  * The terminals of the routed session's workspace. In the side region each terminal is its own strip tab and `tab`
  * names the one to show; the narrow-screen view has no strip, so it lists the terminals in its own tabs.
  */
-export default function TerminalPanel(props: { model: TerminalModel; session: MountedSession; tab: () => string }) {
+export default function TerminalPanel(props: {
+  model: TerminalModel
+  session: MountedSession
+  screen: SessionScreen
+  tab: () => string
+}) {
   const extension = useExtension()
   const keybinds = extension.keybinds
   const frame = usePanel()
@@ -50,6 +56,23 @@ export default function TerminalPanel(props: { model: TerminalModel; session: Mo
   const mobile = () => frame.placement() === "mobile"
   const active = () => (mobile() ? terminal().active() : terminal().byTab(props.tab())?.id)
   let tabList: HTMLDivElement | undefined
+
+  // Selected output quotes into the composer of the screen showing this panel.
+  const quote: TerminalQuoteTarget = {
+    available: () => props.screen.composer.quotable(),
+    add(text, comment) {
+      const composer = props.screen.composer
+      const commentID = crypto.randomUUID()
+
+      composer.attach({
+        type: "quote",
+        commentID,
+        text,
+        source: { label: extension.t("quote.label"), icon: "terminal", subject: "the terminal" },
+      })
+      composer.focus(comment ? commentID : undefined)
+    },
+  }
 
   onCleanup(() => terminal().cancelFocus())
 
@@ -243,6 +266,7 @@ export default function TerminalPanel(props: { model: TerminalModel; session: Mo
               server={surface.ops.server()}
               directory={surface.ops.directory}
               ghostty={props.model.ghostty}
+              quote={quote}
               autoFocus={terminal().focusRequested(surface.pty.id)}
               onAutoFocus={() => {
                 focusTerminalById(surface.pty.id)

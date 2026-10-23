@@ -62,7 +62,7 @@ export function formatNoteComment(input: NoteComment) {
 
 /** Each quoted line is prefixed, so quoted text cannot end the quote early and read as the user's own words. */
 export function formatQuoteComment(input: QuoteComment) {
-  const quote = `The user quoted the following from earlier in the conversation:\n${input.text
+  const quote = `The user quoted the following from ${input.source?.subject ?? "earlier in the conversation"}:\n${input.text
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n")}`

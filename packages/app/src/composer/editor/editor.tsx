@@ -887,6 +887,7 @@ function ComposerAttachments(props: {
                 <QuoteCommentEditor
                   anchor={anchor()}
                   text={current.text}
+                  icon={current.source?.icon}
                   comment={current.comment ?? ""}
                   mention={(query) => props.searchPaths?.(query) ?? Promise.resolve([])}
                   onSubmit={(comment) => {

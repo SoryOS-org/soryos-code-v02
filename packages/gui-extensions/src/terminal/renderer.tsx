@@ -1,11 +1,22 @@
 import { createMemo, lazy, on, onCleanup, Suspense } from "solid-js"
-import { Command, createKeyed, MenuItem, onIdle, Panel, type MountedSession, type PanelTab, type Setup } from "../sdk"
+import {
+  Command,
+  createKeyed,
+  MenuItem,
+  onIdle,
+  Panel,
+  Style,
+  type MountedSession,
+  type PanelTab,
+  type Setup,
+} from "../sdk"
 import type Terminal from "./index"
 import { terminalToggleCommand } from "./index"
 import { createTerminalModel, type TerminalWorkspace } from "./model"
 import { terminalTab, type LocalPTY } from "./state"
 import { terminalTabLabel } from "./title"
 import { TerminalTabLabel } from "./label"
+import quoteStyles from "./quote.css?inline"
 
 const setup: Setup<typeof Terminal> = (ctx) => {
   const sessions = ctx.sessions
@@ -14,6 +25,7 @@ const setup: Setup<typeof Terminal> = (ctx) => {
   const key = (id: string) => `${ctx.id}:${id}`
 
   onCleanup(model.dispose)
+  ctx.add(Style, quoteStyles)
   // The host withdraws the listener with the extension.
   ctx.workspaces.on("remove", model.remove)
 
@@ -260,7 +272,7 @@ const setup: Setup<typeof Terminal> = (ctx) => {
     },
     render: (props) => (
       <Suspense>
-        <TerminalPanel model={model} session={props.session} tab={() => props.tab.id} />
+        <TerminalPanel model={model} session={props.session} screen={props.screen} tab={() => props.tab.id} />
       </Suspense>
     ),
     close: (input) => {
