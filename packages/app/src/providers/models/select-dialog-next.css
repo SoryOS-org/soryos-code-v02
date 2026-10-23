@@ -198,7 +198,17 @@
 
 [data-component="menu-v2-content"][data-slot="model-dialog-flyout"] {
   position: fixed;
+  /* One width for every model, matching the 160px its placement assumes. */
+  width: 160px;
   max-height: 400px;
   overflow-y: auto;
   animation: none;
+
+  /* The model stats that close the flyout. */
+  > :last-child {
+    font-size: 11px;
+    line-height: 16px;
+    cursor: default;
+    user-select: none;
+  }
 }

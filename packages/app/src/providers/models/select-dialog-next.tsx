@@ -28,6 +28,7 @@ import { SearchHighlight, SearchList, type SearchListHandle, type SearchListRow 
 import { Tooltip } from "@opencode/ui/tooltip"
 import { TextInput } from "@opencode/ui/text-input"
 import { ModelTooltip } from "./tooltip"
+import { ModelDetails } from "./details"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { useData } from "@/runtime/server/current"
@@ -674,11 +675,16 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
       setStore("position", { left: left * 2 - placed.left, top: top * 2 - placed.top })
   }
 
+  // The row whose flyout is waiting on the open delay.
+  let pending = ""
+
   const hover = (id: string, row: HTMLElement) => {
-    if (list?.active()?.id === id && !store.keyboard) return
+    // A row highlighted by a scroll has no flyout yet, so moving on it still opens one.
+    if (list?.active()?.id === id && !store.keyboard && (store.flyout === id || pending === id)) return
     list?.setActive(id)
     setStore("keyboard", false)
     clearTimeout(timer)
+    pending = ""
     const item = rowItem(id)
 
     if (!item) return setStore("flyout", "")
@@ -686,7 +692,11 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
     if (store.warm) return openFlyout(id, row)
 
     setStore("flyout", "")
-    timer = setTimeout(() => openFlyout(id, row), 100)
+    pending = id
+    timer = setTimeout(() => {
+      pending = ""
+      openFlyout(id, row)
+    }, 100)
   }
 
   // Rows the pointer crosses on its way into the open flyout leave it alone.
@@ -702,6 +712,28 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
   }
 
   const close = () => setStore("flyout", "")
+
+  let pointer: { x: number; y: number } | undefined
+  createEventListener(document, "pointermove", (event: PointerEvent) => {
+    pointer = { x: event.clientX, y: event.clientY }
+  })
+
+  // Scrolling moves rows under a still cursor without a pointer event. A wheel scroll highlights the row that lands
+  // under the cursor and moves the flyout beside it; a keyboard scroll keeps its highlight and closes the flyout,
+  // which would otherwise be left beside a row that moved away.
+  const follow = () => {
+    clearTimeout(timer)
+    pending = ""
+
+    if (store.keyboard || !pointer) return close()
+    const row = document.elementFromPoint(pointer.x, pointer.y)?.closest<HTMLElement>('[data-slot="search-list-row"]')
+    const id = row?.dataset.optionKey
+
+    if (!row || !id || !scroller?.contains(row)) return close()
+    list?.setActive(id)
+    triangle.anchor(pointer)
+    openFlyout(id, row)
+  }
 
   let scroller: HTMLDivElement | undefined
 
@@ -841,6 +873,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
         onMouseMove={(event) => move(row.model.id, event)}
         onMouseLeave={(event) => {
           clearTimeout(timer)
+          pending = ""
           const target = event.relatedTarget
 
           if (target instanceof Element && target.closest('[data-slot="search-list-row"]')) return
@@ -896,11 +929,13 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
               element,
               "scroll",
               () => {
-                close()
+                follow()
                 fadeHeaders()
               },
               { capture: true },
             )
+            // A wheel scroll is the pointer's, so the highlight and flyout follow the row under it.
+            createEventListener(element, "wheel", () => setStore("keyboard", false), { passive: true })
           }}
         >
           <SearchList
@@ -985,6 +1020,8 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
               </span>
               <Keybind keys={formatKeybindParts("mod+f", language.t)} variant="neutral" class="shrink-0" />
             </div>
+            <div data-slot="menu-v2-separator" role="separator" />
+            <ModelDetails model={item()} provider={providerName(item().provider)} compact standalone />
           </div>
         )}
       </Show>
