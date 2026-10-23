@@ -7,7 +7,7 @@ import { SessionTable } from "@opencode-ai/core/session/sql"
 import { Project } from "@/project/project"
 import { InstanceRef } from "@/effect/instance-ref"
 
-interface SessionStats {
+export interface SessionStats {
   totalSessions: number
   totalMessages: number
   totalCost: number
@@ -46,6 +46,140 @@ interface SessionStats {
   medianTokensPerSession: number
 }
 
+export interface StatsJsonOptions {
+  days?: number
+  project?: string
+  currentProjectID?: string
+  now?: Date
+}
+
+export interface StatsJson {
+  schemaVersion: 1
+  generatedAt: string
+  filters: {
+    days: number | null
+    project: {
+      mode: "all" | "current" | "id"
+      id: string | null
+    }
+  }
+  range: {
+    days: number
+    earliest: string | null
+    latest: string | null
+  }
+  totals: {
+    sessions: number
+    messages: number
+    cost: number
+    tokens: {
+      input: number
+      output: number
+      reasoning: number
+      cache: {
+        read: number
+        write: number
+      }
+    }
+  }
+  averages: {
+    costPerDay: number
+    tokensPerSession: number
+    medianTokensPerSession: number
+  }
+  models: Array<{
+    id: string
+    messages: number
+    cost: number
+    tokens: {
+      input: number
+      output: number
+      cache: {
+        read: number
+        write: number
+      }
+    }
+  }>
+  tools: Array<{ name: string; count: number }>
+}
+
+function finite(value: number): number {
+  return Number.isFinite(value) ? value : 0
+}
+
+function isoOrNull(value: number): string | null {
+  if (!Number.isFinite(value)) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function projectFilter(project: string | undefined, currentProjectID: string | undefined) {
+  if (project === undefined) return { mode: "all" as const, id: null }
+  if (project === "") return { mode: "current" as const, id: currentProjectID ?? null }
+  return { mode: "id" as const, id: project }
+}
+
+export function toStatsJson(stats: SessionStats, options: StatsJsonOptions = {}): StatsJson {
+  const generatedAt = (options.now ?? new Date()).toISOString()
+  const range: Pick<StatsJson["range"], "earliest" | "latest"> =
+    stats.totalSessions > 0
+      ? {
+          earliest: isoOrNull(stats.dateRange.earliest),
+          latest: isoOrNull(stats.dateRange.latest),
+        }
+      : { earliest: null, latest: null }
+
+  return {
+    schemaVersion: 1,
+    generatedAt,
+    filters: {
+      days: typeof options.days === "number" && Number.isFinite(options.days) ? options.days : null,
+      project: projectFilter(options.project, options.currentProjectID),
+    },
+    range: {
+      days: finite(stats.days),
+      ...range,
+    },
+    totals: {
+      sessions: finite(stats.totalSessions),
+      messages: finite(stats.totalMessages),
+      cost: finite(stats.totalCost),
+      tokens: {
+        input: finite(stats.totalTokens.input),
+        output: finite(stats.totalTokens.output),
+        reasoning: finite(stats.totalTokens.reasoning),
+        cache: {
+          read: finite(stats.totalTokens.cache.read),
+          write: finite(stats.totalTokens.cache.write),
+        },
+      },
+    },
+    averages: {
+      costPerDay: finite(stats.costPerDay),
+      tokensPerSession: finite(stats.tokensPerSession),
+      medianTokensPerSession: finite(stats.medianTokensPerSession),
+    },
+    models: Object.entries(stats.modelUsage)
+      .map(([id, usage]) => ({
+        id,
+        messages: finite(usage.messages),
+        cost: finite(usage.cost),
+        tokens: {
+          input: finite(usage.tokens.input),
+          output: finite(usage.tokens.output),
+          cache: {
+            read: finite(usage.tokens.cache.read),
+            write: finite(usage.tokens.cache.write),
+          },
+        },
+      }))
+      .sort((a, b) => b.messages - a.messages || a.id.localeCompare(b.id)),
+    tools: Object.entries(stats.toolUsage)
+      .map(([name, count]) => ({ name, count: finite(count) }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+  }
+}
+
 export const StatsCommand = effectCmd({
   command: "stats",
   describe: "show token usage and cost statistics",
@@ -65,11 +199,31 @@ export const StatsCommand = effectCmd({
       .option("project", {
         describe: "filter by project (default: all projects, empty string: current project)",
         type: "string",
+      })
+      .option("json", {
+        describe: "emit machine-readable JSON (models and tools are not truncated)",
+        type: "boolean",
+        default: false,
       }),
   handler: Effect.fn("Cli.stats")(function* (args) {
     const ctx = yield* InstanceRef
     if (!ctx) return
-    const stats = yield* aggregateSessionStats(args.days, args.project, ctx.project)
+    const progress = args.json ? console.error : console.log
+    const stats = yield* aggregateSessionStats(args.days, args.project, ctx.project, progress)
+    if (args.json) {
+      process.stdout.write(
+        `${JSON.stringify(
+          toStatsJson(stats, {
+            days: args.days,
+            project: args.project,
+            currentProjectID: ctx.project?.id,
+          }),
+          null,
+          2,
+        )}\n`,
+      )
+      return
+    }
     let modelLimit: number | undefined
     if (args.models === true) {
       modelLimit = Infinity
@@ -89,6 +243,7 @@ const aggregateSessionStats = Effect.fn("Cli.stats.aggregate")(function* (
   days?: number,
   projectFilter?: string,
   currentProject?: Project.Info,
+  progress: (message: string) => void = console.log,
 ) {
   const svc = yield* Session.Service
   const sessions = yield* getAllSessions()
@@ -147,7 +302,7 @@ const aggregateSessionStats = Effect.fn("Cli.stats.aggregate")(function* (
   }
 
   if (filteredSessions.length > 1000) {
-    console.log(`Large dataset detected (${filteredSessions.length} sessions). This may take a while...`)
+    progress(`Large dataset detected (${filteredSessions.length} sessions). This may take a while...`)
   }
 
   if (filteredSessions.length === 0) {
