@@ -647,6 +647,8 @@ export function run(
                   set: { value: { phase: "sessions", cursor: nextID.id }, time_updated: Date.now() },
                 })
                 .run()
+              // Native V2 history (including 1.19 API sessions) is already authoritative.
+              if (nextID.imported) return
               if (projectID !== nextID.project_id)
                 yield* Effect.logWarning("Reassigned V1 session with missing project", {
                   sessionID: nextID.id,
