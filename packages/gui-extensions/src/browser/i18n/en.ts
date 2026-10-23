@@ -40,7 +40,7 @@ export default {
   "site.cookies.clear": "Clear",
   "site.permissions": "Permissions are blocked",
   "site.permissions.description": "Camera, microphone, location, and notifications don't work in this browser.",
-  "site.agent": "The agent can use this page",
+  "site.agent": "Agent can use this page",
   "site.agent.description": "It can read the page, run scripts, and fill in forms.",
   "page.add": "Add page to session",
   "page.placeholder": "Add context about this page",
