@@ -508,11 +508,31 @@ function createModelSelectorController(input: {
 function createProviderLabels(all: () => ModelItem[]) {
   const managed = createMemo(() => consoleModelGroup(all()))
   const managedIDs = createMemo(() => new Set(managed()?.providers.map((provider) => provider.id)))
+  const canonical = (provider: ModelItem["provider"]) => provider.canonical ?? provider.id.replace(/^console-/, "")
 
-  return (provider: ModelItem["provider"]) => {
-    const group = managed()
+  const direct = createMemo(
+    () =>
+      new Set(
+        all()
+          .filter((item) => !managedIDs().has(item.provider.id))
+          .map((item) => canonical(item.provider)),
+      ),
+  )
 
-    return group && managedIDs().has(provider.id) ? consoleProviderName(group, provider.name) : provider.name
+  return {
+    name: (provider: ModelItem["provider"]) => {
+      const group = managed()
+
+      return group && managedIDs().has(provider.id) ? consoleProviderName(group, provider.name) : provider.name
+    },
+    // The workspace badge only disambiguates a managed provider that is also connected directly.
+    workspace: (provider: ModelItem["provider"]) => {
+      const group = managed()
+
+      if (!group || !managedIDs().has(provider.id) || !direct().has(canonical(provider))) return
+
+      return group.workspace
+    },
   }
 }
 
@@ -596,7 +616,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
     onSelect: () => dialog.close(),
   })
 
-  const providerName = createProviderLabels(controller.all)
+  const labels = createProviderLabels(controller.all)
   const chatgptPlan = createChatgptPlan(controller.current)
 
   const [store, setStore] = createStore({
@@ -895,7 +915,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
           </span>
           {/* Favorites and Recent mix providers, so their rows name one. */}
           <Show when={row.model.group.title}>
-            <span class="min-w-0 shrink-[999] truncate text-v2-text-text-faint">{providerName(item().provider)}</span>
+            <span class="min-w-0 shrink-[999] truncate text-v2-text-text-faint">{labels.name(item().provider)}</span>
           </Show>
           <Show when={isFreeModel(item())}>
             <Badge class="shrink-0">{language.t("model.tag.free")}</Badge>
@@ -957,8 +977,11 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
             key={(row) => row.id}
             section={(row) => row.group.category}
             header={(row) => (
-              <span data-slot="model-dialog-header-label" class="min-w-0 truncate">
-                {row.group.title ?? providerName(row.item.provider)}
+              <span data-slot="model-dialog-header-label" class="flex min-w-0 items-center gap-1.5">
+                <span class="min-w-0 truncate">{row.group.title ?? labels.name(row.item.provider)}</span>
+                <Show when={!row.group.title && labels.workspace(row.item.provider)}>
+                  {(workspace) => <Badge class="shrink-0">{workspace()}</Badge>}
+                </Show>
               </span>
             )}
             empty={language.t("dialog.model.empty")}
@@ -1021,7 +1044,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
               <Keybind keys={formatKeybindParts("mod+f", language.t)} variant="neutral" class="shrink-0" />
             </div>
             <div data-slot="menu-v2-separator" role="separator" />
-            <ModelDetails model={item()} provider={providerName(item().provider)} compact standalone />
+            <ModelDetails model={item()} provider={labels.name(item().provider)} compact standalone />
           </div>
         )}
       </Show>
