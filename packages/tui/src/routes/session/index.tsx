@@ -3138,7 +3138,7 @@ function ShellDisplay(props: {
               </text>
             </box>
           </Show>
-          <Show when={limitedOutput()}>
+          <Show when={!isRunning() && limitedOutput()}>
             <text fg={theme.text.muted}>{limitedOutput()}</text>
           </Show>
         </Show>
