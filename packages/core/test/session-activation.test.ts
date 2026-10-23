@@ -33,47 +33,44 @@ const it = testEffect(
   ),
 )
 
-// Pause an old prompt's execution-ownership check while a newer prompt arrives.
-let idleCheck: Deferred.Deferred<void>
-let idleRelease: Deferred.Deferred<void>
-let pauseIdle = false
-const itRace = testEffect(AppNodeBuilder.build(
-  LayerNode.group([Database.node, Bus.node, SessionProjector.node, Session.node, LocationServiceMap.node]),
-  [Global.node.replace(tempGlobalLayer), offlineModels,
-    Watcher.node.replace(Watcher.configured({ enabled: false })),
-    SessionExecution.node.replace(Layer.succeed(SessionExecution.Service, {
-      active: Effect.succeed(new Set<Session.ID>()),
-      isActive: () => Effect.gen(function* () {
-        if (!pauseIdle) return false
-        pauseIdle = false
-        yield* Deferred.succeed(idleCheck, undefined)
-        yield* Deferred.await(idleRelease)
-        return false
-      }),
-      resume: () => Effect.void, wake: () => Effect.void,
-      interrupt: () => Effect.succeed(false), awaitIdle: () => Effect.void,
-    })),
-  ],
-))
+// Execution stub for tests that gate settlement themselves; every gate lives in the test that owns it.
+const idleExecution: SessionExecution.Interface = {
+  active: Effect.succeed(new Set<Session.ID>()),
+  isActive: () => Effect.succeed(false),
+  resume: () => Effect.void,
+  wake: () => Effect.void,
+  interrupt: () => Effect.succeed(false),
+  awaitIdle: () => Effect.void,
+}
 
-// Execution stub whose wake marks the session active synchronously, as RunCoordinator.wake does.
-const stubActive = new Set<Session.ID>()
-let stubSettled: Deferred.Deferred<void>
-const itActive = testEffect(AppNodeBuilder.build(
-  LayerNode.group([Database.node, Bus.node, SessionProjector.node, Session.node, LocationServiceMap.node]),
-  [Global.node.replace(tempGlobalLayer), offlineModels,
-    Watcher.node.replace(Watcher.configured({ enabled: false })),
-    SessionExecution.node.replace(Layer.succeed(SessionExecution.Service, {
-      active: Effect.sync(() => new Set(stubActive)),
-      isActive: (sessionID: Session.ID) => Effect.sync(() => stubActive.has(sessionID)),
-      resume: () => Effect.void,
-      wake: (sessionID: Session.ID) => Effect.sync(() => { stubActive.add(sessionID) }),
-      interrupt: () => Effect.succeed(false),
-      awaitIdle: (sessionID: Session.ID) =>
-        Effect.suspend(() => (stubActive.has(sessionID) ? Deferred.await(stubSettled) : Effect.void)),
-    })),
-  ],
-))
+const sessionStack = (execution: Partial<SessionExecution.Interface>) =>
+  AppNodeBuilder.build(
+    LayerNode.group([Database.node, Bus.node, SessionProjector.node, Session.node, LocationServiceMap.node]),
+    [
+      Global.node.replace(tempGlobalLayer),
+      offlineModels,
+      Watcher.node.replace(Watcher.configured({ enabled: false })),
+      SessionExecution.node.replace(Layer.succeed(SessionExecution.Service, { ...idleExecution, ...execution })),
+    ],
+  )
+
+// Records the session's published status types and signals the first idle.
+const recordStatus = (sessionID: Session.ID) =>
+  Effect.gen(function* () {
+    const bus = yield* Bus.Service
+    const states: string[] = []
+    const idle = yield* Deferred.make<void>()
+    const unsubscribe = yield* bus.listen((event) => Effect.gen(function* () {
+      if (event.type !== SessionStatusEvent.Status.type) return
+      const data = Schema.decodeUnknownSync(SessionStatusEvent.Status.data)(event.data)
+      if (data.sessionID !== sessionID) return
+      states.push(data.status.type)
+      if (data.status.type === "idle") yield* Deferred.succeed(idle, undefined)
+    }))
+    yield* Effect.addFinalizer(() => unsubscribe)
+    return { states, idle }
+  })
+
 
 const project = Effect.gen(function* () {
   const tmp = yield* tmpdirScoped()
@@ -101,124 +98,103 @@ describe("Session waits for plugin activation", () => {
     Effect.gen(function* () {
       const active = new Set<Session.ID>()
       const firstSettled = yield* Deferred.make<void>()
-      const idleObserved = yield* Deferred.make<void>()
-      const recheck = yield* Deferred.make<void>()
-      const activeChecked = yield* Deferred.make<void>()
+      const restarted = yield* Deferred.make<void>()
       const secondSettled = yield* Deferred.make<void>()
-      const waiter = yield* Deferred.make<Fiber.Fiber<unknown, unknown>>()
       let waits = 0
-      const layer = AppNodeBuilder.build(
-        LayerNode.group([Database.node, Bus.node, SessionProjector.node, Session.node, LocationServiceMap.node]),
-        [
-          Global.node.replace(tempGlobalLayer),
-          offlineModels,
-          Watcher.node.replace(Watcher.configured({ enabled: false })),
-          SessionExecution.node.replace(Layer.succeed(SessionExecution.Service, {
-            active: Effect.sync(() => new Set(active)),
-            isActive: (sessionID) => Effect.gen(function* () {
-              const running = active.has(sessionID)
-              if (waits > 0 && running) yield* Deferred.succeed(activeChecked, undefined)
-              return running
-            }),
-            wake: (sessionID) => Effect.sync(() => { active.add(sessionID) }),
-            resume: (sessionID) => Effect.sync(() => { active.add(sessionID) }),
-            interrupt: () => Effect.succeed(false),
-            awaitIdle: () => Effect.withFiber((fiber) => Effect.gen(function* () {
-              yield* Deferred.succeed(waiter, fiber)
-              waits++
-              if (waits > 1) return yield* Deferred.await(secondSettled)
-              yield* Deferred.await(firstSettled)
-              yield* Deferred.succeed(idleObserved, undefined)
-              // The first execution settled; hold its waiter until a non-prompt resume races the recheck.
-              yield* Deferred.await(recheck)
-            })),
-          })),
-        ],
-      )
+      const layer = sessionStack({
+        active: Effect.sync(() => new Set(active)),
+        isActive: (sessionID) => Effect.sync(() => active.has(sessionID)),
+        wake: (sessionID) => Effect.sync(() => { active.add(sessionID) }),
+        resume: (sessionID) => Effect.sync(() => { active.add(sessionID) }),
+        awaitIdle: () => Effect.gen(function* () {
+          if (++waits === 1) return yield* Deferred.await(firstSettled)
+          yield* Deferred.succeed(restarted, undefined)
+          yield* Deferred.await(secondSettled)
+        }),
+      })
       yield* Effect.gen(function* () {
         const tmp = yield* tmpdirScoped()
         const sessions = yield* Session.Service
-        const bus = yield* Bus.Service
         const session = yield* sessions.create({ location: { directory: AbsolutePath.make(tmp.path) } })
-        const states: string[] = []
-        const unsubscribe = yield* bus.listen((event) => Effect.sync(() => {
-          if (event.type !== SessionStatusEvent.Status.type) return
-          const data = Schema.decodeUnknownSync(SessionStatusEvent.Status.data)(event.data)
-          if (data.sessionID === session.id) states.push(data.status.type)
-        }))
-        yield* Effect.addFinalizer(() => unsubscribe)
+        const { states, idle } = yield* recordStatus(session.id)
         yield* sessions.prompt({ sessionID: session.id, text: "Run" })
+        // The first execution settles and a non-prompt resume restarts it before the waiter's ownership check.
         active.delete(session.id)
-        yield* Deferred.succeed(firstSettled, undefined)
-        yield* Deferred.await(idleObserved)
         yield* sessions.resume(session.id)
-        yield* Deferred.succeed(recheck, undefined)
-        yield* Deferred.await(activeChecked)
+        yield* Deferred.succeed(firstSettled, undefined)
+        yield* Deferred.await(restarted).pipe(Effect.timeout("2 seconds"))
         expect(states).toEqual(["busy"])
         active.delete(session.id)
         yield* Deferred.succeed(secondSettled, undefined)
-        // Observe the actual waiter finishing, not an elapsed-time guess about whether it ran.
-        yield* Fiber.join(yield* Deferred.await(waiter))
+        yield* Deferred.await(idle)
         expect(states).toEqual(["busy", "idle"])
         expect(waits).toBe(2)
       }).pipe(Effect.provide(layer))
     }),
   )
 
-  itRace.live("does not let old preparation cleanup overwrite a newer prompt's busy status", () =>
+  testEffect(Layer.empty).live("does not let old preparation cleanup overwrite a newer prompt's busy status", () =>
     Effect.gen(function* () {
-      idleCheck = yield* Deferred.make<void>()
-      idleRelease = yield* Deferred.make<void>()
-      pauseIdle = true
-      const tmp = yield* project
-      const sessions = yield* Session.Service
-      const bus = yield* Bus.Service
-      const session = yield* sessions.create({ location: { directory: AbsolutePath.make(tmp.path) } })
-      const states: string[] = []
-      const unsubscribe = yield* bus.listen((event) => Effect.sync(() => {
-        if (event.type !== SessionStatusEvent.Status.type) return
-        const data = Schema.decodeUnknownSync(SessionStatusEvent.Status.data)(event.data)
-        if (data.sessionID === session.id) states.push(data.status.type)
-      }))
-      yield* Effect.addFinalizer(() => unsubscribe)
-      const first = yield* sessions.prompt({ sessionID: session.id, text: "First", resume: false }).pipe(Effect.forkScoped({ startImmediately: true }))
-      yield* Deferred.await(idleCheck)
-      const second = yield* sessions.prompt({ sessionID: session.id, text: "Second", resume: false }).pipe(Effect.forkScoped({ startImmediately: true }))
-      yield* Effect.addFinalizer(() => Deferred.succeed(idleRelease, undefined))
-      yield* Effect.sleep("20 millis")
-      yield* Deferred.succeed(idleRelease, undefined)
-      yield* Fiber.join(first)
-      yield* Fiber.join(second)
-      expect(states).toEqual(["busy", "idle", "busy", "idle"])
+      const checking = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      let paused = true
+      const layer = sessionStack({
+        // Hold the old prompt's execution-ownership check while a newer prompt arrives.
+        isActive: () => Effect.gen(function* () {
+          if (!paused) return false
+          paused = false
+          yield* Deferred.succeed(checking, undefined)
+          yield* Deferred.await(release)
+          return false
+        }),
+      })
+      yield* Effect.gen(function* () {
+        const tmp = yield* project
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({ location: { directory: AbsolutePath.make(tmp.path) } })
+        const { states } = yield* recordStatus(session.id)
+        const first = yield* sessions.prompt({ sessionID: session.id, text: "First", resume: false }).pipe(Effect.forkScoped({ startImmediately: true }))
+        yield* Deferred.await(checking)
+        const second = yield* sessions.prompt({ sessionID: session.id, text: "Second", resume: false }).pipe(Effect.forkScoped({ startImmediately: true }))
+        // Registered last so teardown releases the held cleanup before interrupting either uninterruptible prompt.
+        yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
+        // The newer prompt's busy waits behind the old cleanup instead of being overwritten by it.
+        expect(states).toEqual(["busy"])
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(first)
+        yield* Fiber.join(second)
+        expect(states).toEqual(["busy", "idle", "busy", "idle"])
+      }).pipe(Effect.scoped, Effect.provide(layer))
     }),
   )
-  itActive.live("publishes idle once the woken execution settles", () =>
+
+  testEffect(Layer.empty).live("publishes idle once the woken execution settles", () =>
     Effect.gen(function* () {
-      stubActive.clear()
-      stubSettled = yield* Deferred.make<void>()
-      const tmp = yield* tmpdirScoped()
-      const sessions = yield* Session.Service
-      const bus = yield* Bus.Service
-      const session = yield* sessions.create({ location: { directory: AbsolutePath.make(tmp.path) } })
-      const states: string[] = []
-      const idle = yield* Deferred.make<void>()
-      const unsubscribe = yield* bus.listen((event) => Effect.gen(function* () {
-        if (event.type !== SessionStatusEvent.Status.type) return
-        const data = Schema.decodeUnknownSync(SessionStatusEvent.Status.data)(event.data)
-        if (data.sessionID !== session.id) return
-        states.push(data.status.type)
-        if (data.status.type === "idle") yield* Deferred.succeed(idle, undefined)
-      }))
-      yield* Effect.addFinalizer(() => unsubscribe)
-      yield* sessions.prompt({ sessionID: session.id, text: "Run" })
-      // Preparation handed off to the woken execution: busy stands until settlement.
-      expect(states).toEqual(["busy"])
-      yield* Effect.sync(() => stubActive.clear())
-      yield* Deferred.succeed(stubSettled, undefined)
-      yield* Deferred.await(idle)
-      expect(states).toEqual(["busy", "idle"])
+      // wake marks the session active synchronously, as RunCoordinator.wake does.
+      const active = new Set<Session.ID>()
+      const settled = yield* Deferred.make<void>()
+      const layer = sessionStack({
+        active: Effect.sync(() => new Set(active)),
+        isActive: (sessionID) => Effect.sync(() => active.has(sessionID)),
+        wake: (sessionID) => Effect.sync(() => { active.add(sessionID) }),
+        awaitIdle: (sessionID) => Effect.suspend(() => (active.has(sessionID) ? Deferred.await(settled) : Effect.void)),
+      })
+      yield* Effect.gen(function* () {
+        const tmp = yield* tmpdirScoped()
+        const sessions = yield* Session.Service
+        const session = yield* sessions.create({ location: { directory: AbsolutePath.make(tmp.path) } })
+        const { states, idle } = yield* recordStatus(session.id)
+        yield* sessions.prompt({ sessionID: session.id, text: "Run" })
+        // Preparation handed off to the woken execution: busy stands until settlement.
+        expect(states).toEqual(["busy"])
+        active.clear()
+        yield* Deferred.succeed(settled, undefined)
+        yield* Deferred.await(idle)
+        expect(states).toEqual(["busy", "idle"])
+      }).pipe(Effect.provide(layer))
     }),
   )
+
   it.live("publishes busy before cold plugin setup, then clears preparation-only status", () =>
     Effect.gen(function* () {
       const tmp = yield* tmpdirScoped()
