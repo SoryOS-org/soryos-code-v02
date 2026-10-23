@@ -1,4 +1,6 @@
-import { useCommand, type CommandOption } from "@/shell/commands/command"
+import { createSignal } from "solid-js"
+import { createEventListener } from "@solid-primitives/event-listener"
+import { matchKeybind, parseKeybind, useCommand, type CommandOption } from "@/shell/commands/command"
 import { adjacentTabKey } from "@/shell/titlebar/tab-order"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { previewSelectedLines } from "@opencode/session-ui/pierre/selection-bridge"
@@ -81,6 +83,20 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const inSide = actions.region.focus
   // ⌘T and ⌘W inside the side region open and close its tabs, unless the focused panel binds the key itself there.
   const sideKey = (event: KeyboardEvent) => inSide(event) && !extensionClaims(event)
+  const closeKeybind = () => settings.keybinds.get("tab.close") ?? "mod+w"
+  // ⌘W on the side panel's last tab closes the panel and moves focus out of it, where one press too many would close
+  // the session tab. Until the user clicks or presses another key, ⌘W closes nothing.
+  const [emptied, setEmptied] = createSignal(false)
+  createEventListener(document, "pointerdown", () => setEmptied(false), { capture: true })
+  createEventListener(
+    document,
+    "keydown",
+    (event) => {
+      if (["Meta", "Control", "Shift", "Alt"].includes(event.key)) return
+      if (!matchKeybind(parseKeybind(closeKeybind()), event)) setEmptied(false)
+    },
+    { capture: true },
+  )
   const cycleSideTabs = () => actions.session.layout.view().side.opened() && actions.region.keys().length > 1
 
   const sideFocused = (target: EventTarget | null) => {
@@ -404,15 +420,26 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
         slash: "open",
         onSelect: openFile,
       }),
-      side &&
-        fileCommand({
-          id: "file.close",
-          title: language.t("command.tab.close"),
-          keybind: settings.keybinds.get("tab.close") ?? "mod+w",
-          hidden: !tab,
-          when: sideKey,
-          onSelect: closeTab,
-        }),
+      side
+        ? fileCommand({
+            id: "file.close",
+            title: language.t("command.tab.close"),
+            keybind: closeKeybind(),
+            hidden: !tab,
+            when: sideKey,
+            onSelect: (source) => {
+              closeTab()
+              setEmptied(source === "keybind" && !actions.session.layout.view().side.opened())
+            },
+          })
+        : fileCommand({
+            id: "file.close",
+            title: language.t("command.tab.close"),
+            keybind: closeKeybind(),
+            hidden: true,
+            when: emptied,
+            onSelect: () => {},
+          }),
       side &&
         fileCommand({
           id: "file.tab.new",

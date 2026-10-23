@@ -1191,6 +1191,47 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
   await expectPath(page, sessionHref(beta.id))
 })
 
+test("⌘W past the side panel's last tab keeps the session tab", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const directory = "C:/OpenCode/SideCloseOvershoot"
+  const alpha = { id: "ses_side_close_alpha", title: "Side close alpha" }
+  const beta = { id: "ses_side_close_beta", title: "Side close beta" }
+  await openSession(page, {
+    name: "SideCloseOvershoot",
+    sessions: [alpha, beta],
+    fileList: (path) => (path ? [] : ["README.md"].map((file) => fileNode(directory, file))),
+    fileContent: (path) => ({ type: "text", content: `contents:${path}` }),
+    seed: {
+      panes: { [alpha.id]: { review: true }, [beta.id]: { review: true } },
+      storage: reviewTabs(directory, alpha.id),
+    },
+  })
+
+  const panel = page.locator("#review-panel")
+  const reviewTab = panel.getByRole("tab", { name: "Review", exact: true })
+  const fileTab = panel.getByRole("tab", { name: "README.md", exact: true })
+  const alphaTab = page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(alpha.id)}"])`)
+
+  await openFileLauncher(panel)
+  await panel.getByRole("treeitem", { name: "README.md", exact: true }).click()
+  await expect(fileTab).toHaveAttribute("aria-selected", "true")
+  await panel.getByText("contents:README.md", { exact: true }).click()
+
+  // Closing the last side tab collapses the panel; one press too many must not close the session behind it.
+  await page.keyboard.press("ControlOrMeta+w")
+  await expect(fileTab).toHaveCount(0)
+  await expect(reviewTab).toHaveAttribute("aria-selected", "true")
+  await page.keyboard.press("ControlOrMeta+w")
+  await expect(panel).toHaveAttribute("aria-hidden", "true")
+  await page.keyboard.press("ControlOrMeta+w")
+
+  // From the composer ⌘W closes the session tab, so only a swallowed press above leaves Beta to land on.
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click()
+  await page.keyboard.press("ControlOrMeta+w")
+  await expectPath(page, sessionHref(beta.id))
+  await expect(alphaTab).toHaveCount(0)
+})
+
 // Windows has no native menu bar: the titlebar menu owns Paste, which only the desktop edit action can perform.
 test("the Windows titlebar menu pastes through the desktop edit action", async ({ page }) => {
   await mockWorkspace(page, { name: "WindowsMenu", sessions: [] })
