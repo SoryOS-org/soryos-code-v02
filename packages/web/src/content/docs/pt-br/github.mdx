@@ -68,7 +68,7 @@ Ou você pode configurá-lo manualmente.
            env:
              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
            with:
-             model: anthropic/claude-sonnet-4-20250514
+             model: anthropic/claude-sonnet-5-5
              # github_token: xxxx
    ```
 
@@ -142,7 +142,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-5-5
           prompt: |
             Revise a base de código para quaisquer comentários TODO e crie um resumo.
             Se encontrar problemas que valham a pena resolver, abra um issue para rastreá-los.
@@ -180,7 +180,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-5-5
           use_github_token: true
           prompt: |
             Revise este pull request:
@@ -236,7 +236,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: anthropic/claude-sonnet-5-5
           prompt: |
             Revise este issue. Se houver uma correção clara ou docs relevantes:
             - Forneça links de documentação
@@ -255,7 +255,7 @@ Substitua o prompt padrão para personalizar o comportamento do opencode para se
 ```yaml title=".github/workflows/opencode.yml"
 - uses: anomalyco/opencode/github@latest
   with:
-    model: anthropic/claude-sonnet-4-5
+    model: anthropic/claude-sonnet-5-5
     prompt: |
       Revise este pull request:
       - Verifique problemas de qualidade de código

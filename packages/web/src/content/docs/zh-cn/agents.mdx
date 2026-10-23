@@ -151,7 +151,7 @@ _模式_：`primary`
   "agent": {
     "build": {
       "mode": "primary",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "{file:./prompts/build.txt}",
       "tools": {
         "write": true,
@@ -171,7 +171,7 @@ _模式_：`primary`
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-20250514",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "You are a code reviewer. Focus on security, performance, and maintainability.",
       "tools": {
         "write": false,
@@ -195,7 +195,7 @@ _模式_：`primary`
 ---
 description: Reviews code for quality and best practices
 mode: subagent
-model: anthropic/claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-5-5
 temperature: 0.1
 tools:
   write: false
@@ -366,7 +366,7 @@ Markdown 文件名即为代理名称。例如，`review.md` 会创建一个名�
 }
 ```
 
-OpenCode 配置中的模型 ID 使用 `provider/model-id` 格式。例如，如果您使用 [OpenCode Zen](https://opencode.ai/v2/docs/console/)，则可以使用 `opencode/gpt-5.1-codex` 来表示 GPT 5.1 Codex。
+OpenCode 配置中的模型 ID 使用 `provider/model-id` 格式。例如，如果您使用 [OpenCode Zen](https://opencode.ai/v2/docs/console/)，则可以使用 `opencode/gpt-6.1-sol` 来表示 GPT-6.1 Sol。
 
 ---
 
@@ -653,7 +653,7 @@ Only analyze code and suggest changes.
   "agent": {
     "deep-thinker": {
       "description": "Agent that uses high reasoning effort for complex problems",
-      "model": "openai/gpt-5",
+      "model": "openai/gpt-6.1-sol",
       "reasoningEffort": "high",
       "textVerbosity": "low"
     }

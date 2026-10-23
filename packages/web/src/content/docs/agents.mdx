@@ -168,7 +168,7 @@ Configure agents in your `opencode.json` config file:
   "agent": {
     "build": {
       "mode": "primary",
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "{file:./prompts/build.txt}",
       "permission": {
         "edit": "allow",
@@ -177,7 +177,7 @@ Configure agents in your `opencode.json` config file:
     },
     "plan": {
       "mode": "primary",
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "anthropic/claude-haiku-5-5",
       "permission": {
         "edit": "deny",
         "bash": "deny"
@@ -186,7 +186,7 @@ Configure agents in your `opencode.json` config file:
     "code-reviewer": {
       "description": "Reviews code for best practices and potential issues",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-6",
+      "model": "anthropic/claude-sonnet-5-5",
       "prompt": "You are a code reviewer. Focus on security, performance, and maintainability.",
       "permission": {
         "edit": "deny"
@@ -209,7 +209,7 @@ You can also define agents using markdown files. Place them in:
 ---
 description: Reviews code for quality and best practices
 mode: subagent
-model: anthropic/claude-sonnet-4-6
+model: anthropic/claude-sonnet-5-5
 temperature: 0.1
 permission:
   edit: deny
@@ -373,13 +373,13 @@ If you don’t specify a model, primary agents use the [model globally configure
 {
   "agent": {
     "plan": {
-      "model": "anthropic/claude-haiku-4-5"
+      "model": "anthropic/claude-haiku-5-5"
     }
   }
 }
 ```
 
-The model ID in your OpenCode config uses the format `provider/model-id`. For example, if you're using [OpenCode Zen](https://opencode.ai/v2/docs/console/), you would use `opencode/gpt-5.1-codex` for GPT 5.1 Codex.
+The model ID in your OpenCode config uses the format `provider/model-id`. For example, if you're using [OpenCode Zen](https://opencode.ai/v2/docs/console/), you would use `opencode/gpt-6.1-sol` for GPT-6.1 Sol.
 
 ---
 
@@ -694,7 +694,7 @@ For example, with OpenAI's reasoning models, you can control the reasoning effor
   "agent": {
     "deep-thinker": {
       "description": "Agent that uses high reasoning effort for complex problems",
-      "model": "openai/gpt-5",
+      "model": "openai/gpt-6.1-sol",
       "reasoningEffort": "high",
       "textVerbosity": "low"
     }
