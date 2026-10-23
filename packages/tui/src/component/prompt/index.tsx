@@ -1118,7 +1118,10 @@ export function Prompt(props: PromptProps) {
     const pending = pendingSubmit()
     if (!pending) return
     const location = currentLocation.ref ?? data.location.default()
+    // Dialog handlers can clear the modal before navigating. Cancel on open so
+    // closing a workspace picker cannot retry against the previous location.
     if (
+      dialog.stack.length > 0 ||
       disabled() ||
       props.sessionID !== pending.sessionID ||
       store.mode !== pending.mode ||
@@ -1128,7 +1131,6 @@ export function Prompt(props: PromptProps) {
       setPendingSubmit(undefined)
       return
     }
-    if (dialog.stack.length > 0) return
     if (
       [data.location.agent, data.location.model, data.location.config].some(
         (catalog) => catalog.list(location) === undefined,

@@ -71,6 +71,57 @@ test("switching away while the worktree loads cancels the pending submit", async
   expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
 })
 
+test("switching worktrees after catalogs load inside the picker does not submit in the new location", async () => {
+  await using fixture = await workspace("agent")
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  await fixture.openWorkspace(process.cwd())
+  fixture.release()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 3 })
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.sent).toHaveLength(0)
+
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 3 })
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.sent).toHaveLength(0)
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  expect(fixture.created[0]).toMatchObject({
+    location: { directory: process.cwd() },
+    agent: "build",
+    model: { providerID: "provider", id: "source-model" },
+  })
+  expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
+})
+
+test("opening and dismissing a dialog cancels the deferred submit without losing the draft", async () => {
+  await using fixture = await workspace("agent")
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  fixture.setup.mockInput.pressKey("p", { ctrl: true })
+  await fixture.setup.waitFor(() => fixture.setup.renderer.currentFocusedEditor instanceof InputRenderable)
+  fixture.release()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 3 })
+  fixture.setup.mockInput.pressEscape()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 3 })
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.sent).toHaveLength(0)
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  expect(fixture.created[0]).toMatchObject({
+    location: { directory: fixture.target },
+    agent: "review",
+    model: { providerID: "provider", id: "target-model" },
+  })
+})
+
 test("an edited prompt can be submitted again before the worktree finishes loading", async () => {
   await using fixture = await workspace("agent")
   await fixture.switchWorkspace()
@@ -181,7 +232,7 @@ async function workspace(catalog: string) {
     },
   })
 
-  async function selectWorkspace(directory: string) {
+  async function openWorkspace(directory: string) {
     setup.mockInput.pressKey("p", { ctrl: true })
     await setup.waitFor(() => setup.renderer.currentFocusedEditor instanceof InputRenderable)
     await setup.mockInput.typeText("move")
@@ -191,6 +242,10 @@ async function workspace(catalog: string) {
     await setup.waitFor(() => setup.renderer.currentFocusedEditor instanceof InputRenderable)
     await setup.mockInput.typeText(directory)
     await setup.waitForFrame((frame) => frame.includes(path.basename(directory)) && frame.includes("new ctrl+a"))
+  }
+
+  async function selectWorkspace(directory: string) {
+    await openWorkspace(directory)
     setup.mockInput.pressEnter()
     await setup.waitForFrame((frame) => !frame.includes("Worktrees") && frame.includes(path.basename(directory)))
   }
@@ -205,6 +260,7 @@ async function workspace(catalog: string) {
       failures = 1
       gate.resolve()
     },
+    openWorkspace,
     selectWorkspace,
     async switchWorkspace() {
       await setup.ready
