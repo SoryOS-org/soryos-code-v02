@@ -5,7 +5,9 @@ import { pathKey } from "@/workspaces/path-key"
 import { useServerHealth } from "@/runtime/server/health"
 import { createServerSdkContext } from "./client"
 import { createServerSyncContext } from "./sync"
-import { createData } from "@opencode/client/solid"
+import { createData, createSessionRetention } from "@opencode/client/solid"
+import { useTabs } from "@/shell/tabs/tabs"
+import { useCurrentRoute } from "@/shell/state/layout"
 import type { ServerScope } from "@/runtime/server/scope"
 import { createPermissionAutoApprover } from "@/session/requests/auto-approve"
 import { createServerNotificationState } from "@/shell/notifications/notification"
@@ -212,6 +214,28 @@ function createServerController(
   const data = createDesktopData({
     data: source,
     remove: (sessionID) => sdk.api.session.remove({ sessionID }),
+  })
+
+  // Transcripts otherwise stay loaded for every session this window ever opened. Open tabs and the three most
+  // recently viewed sessions keep theirs; any other session reloads its transcript when it is opened again.
+  const tabs = useTabs()
+  const route = useCurrentRoute()
+  createSessionRetention({
+    session: source.session,
+    current: () => {
+      const value = route()
+
+      return value.type === "session" && value.server === connKey ? value.sessionId : undefined
+    },
+    keep: () =>
+      tabs.ready()
+        ? tabs.store.flatMap((tab) =>
+            tab.type === "session" && tab.server === connKey
+              ? [tab.sessionId, tab.routeSessionId ?? tab.sessionId]
+              : [],
+          )
+        : source.session.list().map((session) => session.id),
+    limit: 3,
   })
 
   const sync = createServerSyncContext(sdk, data)

@@ -324,6 +324,7 @@ function SessionScreenContent(props: {
       )
     },
     () => conversationVisible() && messagesReady(),
+    (sessionID) => server.ctx.data.session.message.list(sessionID),
   )
 
   const mobileTabs = () => (
