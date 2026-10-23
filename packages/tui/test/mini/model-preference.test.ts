@@ -4,7 +4,11 @@ import { resolveMiniModelPreference } from "../../src/mini/model-preference"
 const recent = { providerID: "connected", modelID: "recent" }
 const configured = { providerID: "connected", modelID: "configured" }
 const providers = [
-  { id: "connected", name: "Connected", models: { recent: { name: "Recent" }, configured: { name: "Configured" } } },
+  {
+    id: "connected",
+    name: "Connected",
+    models: { agent: { name: "Agent" }, recent: { name: "Recent" }, configured: { name: "Configured" } },
+  },
 ]
 
 describe("Mini model preference", () => {
@@ -24,6 +28,32 @@ describe("Mini model preference", () => {
     expect(result.model).toEqual(configured)
     expect(result.variant).toBe("high")
     expect(result.warning).toBeUndefined()
+  })
+  test("prefers the agent model and variant over configured and recent models", () => {
+    expect(
+      resolveMiniModelPreference({
+        agent: { providerID: "connected", modelID: "agent", variant: "high" },
+        configured: [{ type: "document", info: { model: "connected/configured#low" } }],
+        recent: [recent],
+        providers,
+      }),
+    ).toEqual({
+      model: { providerID: "connected", modelID: "agent" },
+      variant: "high",
+      warning: undefined,
+    })
+  })
+  test.each([false, true])("explains an unavailable agent model before falling back (configured=%s)", (hasConfig) => {
+    const result = resolveMiniModelPreference({
+      agent: { providerID: "disconnected", modelID: "agent", variant: "low" },
+      configured: hasConfig ? [{ type: "document", info: { model: "connected/configured#high" } }] : [],
+      recent: [recent],
+      providers,
+    })
+    expect(result.model).toEqual(hasConfig ? configured : recent)
+    expect(result.variant).toBe(hasConfig ? "high" : undefined)
+    expect(result.warning).toContain("Agent model disconnected/agent")
+    expect(result.warning).toContain(`Falling back to connected/${hasConfig ? "configured" : "recent"}`)
   })
   test("accepts the explicit configured model form", () => {
     expect(

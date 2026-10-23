@@ -103,6 +103,7 @@ export type QueuedPromptAction = "steer" | "queue" | "cancel"
 export type RunAgent = {
   id: string
   name: string
+  model?: ModelPreferenceModel & { variant?: string }
   description?: string
   mode: "subagent" | "primary" | "all"
   hidden: boolean

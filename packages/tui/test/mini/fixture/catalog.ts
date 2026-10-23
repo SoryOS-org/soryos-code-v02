@@ -1,5 +1,6 @@
 import { spyOn } from "bun:test"
 import type {
+  AgentListOutput,
   ConfigGetOutput,
   LocationRef,
   ModelListOutput,
@@ -49,6 +50,7 @@ export function stubCatalogLists(
     location?: LocationRef
     providers?: ProviderListOutput["data"]
     models?: ModelListOutput["data"]
+    agents?: AgentListOutput["data"]
     config?: ConfigGetOutput
   } = {},
 ) {
@@ -63,7 +65,7 @@ export function stubCatalogLists(
   return {
     provider: spyOn(sdk.provider, "list").mockResolvedValue({ location, data: input.providers ?? [] } as never),
     model: spyOn(sdk.model, "list").mockResolvedValue({ location, data: input.models ?? [] } as never),
-    agent: spyOn(sdk.agent, "list").mockResolvedValue(empty as never),
+    agent: spyOn(sdk.agent, "list").mockResolvedValue({ location, data: input.agents ?? [] } as never),
     reference: spyOn(sdk.reference, "list").mockResolvedValue(empty as never),
     command: spyOn(sdk.command, "list").mockResolvedValue(empty as never),
     skill: spyOn(sdk.skill, "list").mockResolvedValue(empty as never),
