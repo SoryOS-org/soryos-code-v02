@@ -626,6 +626,7 @@ All experimental settings live under the `experimental` key:
     "todo": true,
     "subagent_depth": 2,
     "portable_shell_scanner": true,
+    "background_compaction": true,
     "location_idle_timeout": "4 hours",
   },
 }
@@ -644,6 +645,20 @@ start another subagent.
 
 Set `portable_shell_scanner` to `true` to replace the default tree-sitter shell scanner used by permission checks.
 Defaults to `false`. See [Permissions](/permissions#scanner) for how it behaves.
+
+### Background compaction
+
+Set `background_compaction` to `true` to write the compaction summary in the background before it is needed, so
+automatic compaction doesn't pause the session. Defaults to `false`. See
+[Compaction](/compaction#background-compaction) for how it works.
+
+```jsonc
+{
+  "experimental": {
+    "background_compaction": true,
+  },
+}
+```
 
 ### Location idle timeout
 

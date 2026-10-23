@@ -14783,7 +14783,7 @@
               "todo": {
                 "type": "boolean"
               },
-              "precompute_compaction": {
+              "background_compaction": {
                 "type": "boolean"
               },
               "subagent_depth": {

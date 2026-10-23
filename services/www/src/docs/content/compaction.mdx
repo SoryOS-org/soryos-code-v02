@@ -104,6 +104,37 @@ By default OpenCode writes the summary itself, using the session's model. Set
 
 If that model cannot be resolved, OpenCode falls back to the session's model.
 
+## Background compaction
+
+<Callout type="warning">
+  Experimental. This may change, break, or be removed in any release without notice.
+</Callout>
+
+Automatic compaction normally pauses the session while the summary is written. With background compaction, OpenCode
+writes the summary ahead of time and swaps it in when compaction is due:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "experimental": {
+    "background_compaction": true,
+  },
+}
+```
+
+```text
+85% of the threshold   summary of the conversation so far starts in the background
+                       the session keeps going; the summary is held, not applied
+threshold              the held summary is swapped in; everything since it is kept as is
+```
+
+| Rule | Behavior |
+| --- | --- |
+| Cost | The summary request reuses the prompt cache. A summary that is never used still costs tokens. |
+| Falls back | Compaction summarizes as usual if too much conversation arrived since the held summary, or if the model, instructions, or start of the conversation changed. |
+| Skipped | Not used for native compaction, in sessions under about 64k tokens, right after a model switch, or when a provider rejects a request as too long. |
+| Storage | Held summaries live in memory and are lost on restart. |
+
 ## Providers
 
 Some providers can compact the conversation on their side instead. Enable it per
