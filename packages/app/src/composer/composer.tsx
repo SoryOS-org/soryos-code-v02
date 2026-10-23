@@ -129,7 +129,18 @@ function ComposerModelControl(props: {
           {(name) => (
             <>
               <span class="shrink-0 text-v2-text-text-faint">{name()}</span>
-              <span class="shrink-0 whitespace-pre text-v2-text-text-faint">{" / "}</span>
+              <svg
+                class="mx-1.5 shrink-0 self-center fill-none stroke-current text-v2-text-text-faint opacity-60"
+                width="3"
+                height="8"
+                viewBox="0 0 3 8"
+                stroke-width="1"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path d="M2.5 0.5L0.5 7.5" />
+              </svg>
+              <span class="sr-only">{" / "}</span>
             </>
           )}
         </Show>
