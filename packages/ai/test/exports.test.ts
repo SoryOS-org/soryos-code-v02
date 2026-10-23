@@ -188,6 +188,11 @@ describe("public exports", () => {
     )
     expect(VercelAIGateway.configure({ apiKey: "fixture" }).image("meta/muse-image-1.0").route.id).toBe("openai-images")
     expect(VercelAIGateway.provider.image).toBe(VercelAIGateway.image)
+    expect(
+      CloudflareWorkersAI.configure({ accountId: "fixture", apiKey: "fixture" }).image(
+        "@cf/black-forest-labs/flux-1-schnell",
+      ).route.id,
+    ).toBe("cloudflare-workers-ai-images")
     expect(XAI.configure({ apiKey: "fixture" }).video("grok-imagine-video-1.5").route.id).toBe("xai-video")
     expect(XAI.provider.video).toBe(XAI.video)
     expect(Google.configure({ apiKey: "fixture" }).video("veo-3.1-generate-preview").route.id).toBe("google-video")
