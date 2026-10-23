@@ -30,6 +30,7 @@ import {
   CloudflareWorkersAI,
   Deepgram,
   DeepSeek,
+  DigitalOcean,
   ElevenLabs,
   Fal,
   Fireworks,
@@ -152,6 +153,8 @@ describe("public exports", () => {
     expect(TypeSafeAI.experimental.evaluation).toBeFunction()
     expect(OpenCode.experimental.evaluation).toBeFunction()
     expect(VercelAIGateway.experimental.evaluation).toBeFunction()
+    expect(Baseten.experimental.evaluation).toBeFunction()
+    expect(DigitalOcean.experimental.evaluation).toBeFunction()
     expect(OpenAI.experimental.evaluation("gpt-6-luna").route.id).toBe("openai-decisions")
     expect(XAI.model).toBeFunction()
     expect(XAI.provider.responses).toBe(XAI.responses)

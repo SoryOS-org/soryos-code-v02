@@ -2,8 +2,10 @@ import { describe, expect } from "bun:test"
 import { Effect } from "effect"
 import { Evaluation, EvaluationModel, type EvaluationOptions } from "../../src/experimental.js"
 import {
+  Baseten,
   CloudflareAIGateway,
   CloudflareWorkersAI,
+  DigitalOcean,
   OpenAI,
   OpenCode,
   OpenRouter,
@@ -85,6 +87,22 @@ const cloudflareAIGateway = recordedTests({
   options: cloudflareOptions,
 })
 
+const baseten = recordedTests({
+  prefix: "baseten-evaluation",
+  provider: "baseten",
+  protocol: "system-one",
+  requires: ["BASETEN_API_KEY"],
+  metadata: { model: "decision-models/baseten-elephant-9b-latest" },
+})
+
+const digitalocean = recordedTests({
+  prefix: "digitalocean-evaluation",
+  provider: "digitalocean",
+  protocol: "system-one",
+  requires: ["DIGITALOCEAN_API_KEY"],
+  metadata: { model: "typesafe-jev-1.13.0" },
+})
+
 describe("experimental Evaluation recorded", () => {
   typesafe.effect("evaluates choice score and boolean questions", () =>
     assertEvaluation(
@@ -146,6 +164,23 @@ describe("experimental Evaluation recorded", () => {
         accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "fixture-account",
         gatewayApiKey: process.env.CLOUDFLARE_API_TOKEN ?? "fixture",
       }).experimental.evaluation("typesafe/jev"),
+    ),
+  )
+
+  baseten.effect("evaluates choice score and boolean questions", () =>
+    assertEvaluation(
+      Baseten.configure({ apiKey: process.env.BASETEN_API_KEY ?? "fixture" }).experimental.evaluation(
+        "decision-models/baseten-elephant-9b-latest",
+      ),
+      "baseten-",
+    ),
+  )
+
+  digitalocean.effect("evaluates choice score and boolean questions", () =>
+    assertEvaluation(
+      DigitalOcean.configure({ apiKey: process.env.DIGITALOCEAN_API_KEY ?? "fixture" }).experimental.evaluation(
+        "typesafe-jev-1.13.0",
+      ),
     ),
   )
 })
