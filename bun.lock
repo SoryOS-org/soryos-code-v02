@@ -642,6 +642,9 @@
       "name": "@opencode/server",
       "version": "2.1.4",
       "dependencies": {
+        "@babel/core": "7.29.7",
+        "@babel/preset-typescript": "7.27.1",
+        "babel-preset-solid": "1.9.15",
         "@effect/platform-node": "catalog:",
         "@effect/platform-node-shared": "catalog:",
         "@opencode/core": "workspace:*",
