@@ -198,6 +198,15 @@ OpenAI reads `OPENAI_API_KEY` and calls `/v1/decisions`.
 The common API uses `boolean`; System One routes lower it to native `noul`, and OpenAI lowers it to
 `predicate`. OpenAI predicates take no criteria, so boolean criteria fail before the request, and a
 refused question fails the call with a `ContentPolicy` error.
+Cloudflare serves its Clef models through Workers AI and TypeSafe Jev through AI Gateway, both on `/ai/run`:
+
+```ts
+import { CloudflareAIGateway, CloudflareWorkersAI } from "@opencode/ai/providers"
+
+CloudflareWorkersAI.configure({ accountId }).experimental.evaluation("@cf/cloudflare/clef")
+CloudflareAIGateway.configure({ accountId }).experimental.evaluation("typesafe/jev")
+```
+
 Choice and score answers include `confidence` when the provider returns it, such as
 `response.answers.department.confidence`. Score legends remain available in provider metadata, and
 the provider's rounded probabilities are returned unchanged.
