@@ -2,6 +2,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createEffect, createMemo, For, type JSX, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Icon } from "@opencode/ui/icon"
+import { abort } from "@opencode/util/abort"
 import { useI18n } from "../../context/i18n"
 import { Loader } from "../../feedback/loader/loader"
 import { createTypeahead } from "./controller"
@@ -32,18 +33,18 @@ export function Typeahead<T>(props: {
 
   const cache = new Map<string, T[]>()
   let seen: T[] = []
-  let abort: AbortController | undefined
+  let request: AbortController | undefined
   let input: HTMLInputElement | undefined
-  onCleanup(() => abort?.abort())
+  onCleanup(() => abort(request))
 
   const query = () => store.query.trim()
   const pending = () => store.loading || store.answered !== query()
 
   const search = (query: string) => {
-    abort?.abort()
+    abort(request)
 
     if (cache.has(query)) return setStore({ answered: query, failed: false, loading: false })
-    const current = (abort = new AbortController())
+    const current = (request = new AbortController())
     setStore("loading", true)
     props.source(query, current.signal).then(
       (items) => {
@@ -62,7 +63,7 @@ export function Typeahead<T>(props: {
     const next = query()
 
     if (!next || cache.has(next)) return search(next)
-    abort?.abort()
+    abort(request)
     const timer = setTimeout(() => search(next), props.delay)
     onCleanup(() => clearTimeout(timer))
   })
