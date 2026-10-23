@@ -1,3 +1,4 @@
+import { ScrollView } from "@opencode/ui/scroll-view"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
@@ -18,6 +19,7 @@ const chip = motionTuning.choice("activity.chip", {
   value: "today",
   labels: { today: en["experiment.activityChip.today"], orb: en["experiment.activityChip.orb"] },
 })
+
 const corners = motionTuning.choice("activity.chip.corners", {
   label: en["experiment.chipCorners"],
   group: "Experiments",
@@ -25,7 +27,9 @@ const corners = motionTuning.choice("activity.chip.corners", {
   value: "capsule",
   labels: { capsule: en["experiment.chipCorners.capsule"], composer: en["experiment.chipCorners.composer"] },
 })
+
 const [experiment, setExperiment] = createStore({ chip: chip(), corners: corners() })
+
 motionTuning.subscribe(() => setExperiment({ chip: chip(), corners: corners() }))
 
 export type SessionActivityItem = {
@@ -73,16 +77,20 @@ export function SessionActivityChips(props: {
 }) {
   const language = useLanguage()
   const settings = useSettings()
+
   const active = () =>
     settings.general.backgroundActivity() !== "off" && (props.subagents.length > 0 || props.shells.length > 0)
+
   const alignment = createMemo(() => {
     const value = settings.general.backgroundActivity()
+
     if (value === "center") return "center"
 
     // Left/right are physical positions; Kobalte and flex alignment use logical start/end.
     return (value === "left") !== (language.direction() === "rtl") ? "start" : "end"
   })
-  const placement = () => (alignment() === "center" ? "top" : alignment() === "end" ? "top-end" : "top-start")
+
+  const placement = () => (({ center: "top", start: "top-start", end: "top-end" }) as const)[alignment()]
 
   // A subagent can only be interrupted once its child session exists.
   const stoppable = (item: SessionActivityItem) => item.type === "shell" || !!item.sessionID
@@ -199,44 +207,49 @@ export function SessionActivityChips(props: {
               aria-label={label()}
               onFocusIn={(event: FocusEvent) => {
                 if (!(event.target instanceof HTMLElement)) return
+
                 const row = event.target.closest<HTMLElement>('[data-component="menu-v2-item"]')
+
                 if (!row) return
+
                 // Kobalte's scroll adjustment ignores scroll-padding; native scrolling keeps the ring clear of the edge.
                 queueMicrotask(() => row.scrollIntoView({ block: "nearest", inline: "nearest" }))
               }}
             >
-              <For each={props.subagents}>
-                {(item) => (
-                  <Menu.Item {...row(item)}>
-                    <ActivityGlyph muted />
-                    <span class="shrink-0 font-[530]">
-                      <bdi>
-                        {item.agent
-                          ? `${item.agent[0].toUpperCase()}${item.agent.slice(1)}`
-                          : language.t("ui.tool.agent.default")}
-                      </bdi>
-                    </span>
-                    <span dir="auto" class="min-w-0 flex-1 truncate text-v2-text-text-muted">
-                      {item.label}
-                    </span>
-                    {end(item)}
-                  </Menu.Item>
-                )}
-              </For>
-              <For each={props.shells}>
-                {(item) => (
-                  <Menu.Item {...row(item)}>
-                    <Icon name="console" class="shrink-0 text-v2-icon-icon-muted" />
-                    <span
-                      dir="ltr"
-                      class="min-w-0 flex-1 truncate font-mono text-[13px] tracking-[-0.04px] text-v2-text-text-base"
-                    >
-                      {item.label}
-                    </span>
-                    {end(item)}
-                  </Menu.Item>
-                )}
-              </For>
+              <ScrollView focusable={false}>
+                <For each={props.subagents}>
+                  {(item) => (
+                    <Menu.Item {...row(item)}>
+                      <ActivityGlyph muted />
+                      <span class="shrink-0 font-[530]">
+                        <bdi>
+                          {item.agent
+                            ? `${item.agent[0].toUpperCase()}${item.agent.slice(1)}`
+                            : language.t("ui.tool.agent.default")}
+                        </bdi>
+                      </span>
+                      <span dir="auto" class="min-w-0 flex-1 truncate text-v2-text-text-muted">
+                        {item.label}
+                      </span>
+                      {end(item)}
+                    </Menu.Item>
+                  )}
+                </For>
+                <For each={props.shells}>
+                  {(item) => (
+                    <Menu.Item {...row(item)}>
+                      <Icon name="console" class="shrink-0 text-v2-icon-icon-muted" />
+                      <span
+                        dir="ltr"
+                        class="min-w-0 flex-1 truncate font-mono text-[13px] tracking-[-0.04px] text-v2-text-text-base"
+                      >
+                        {item.label}
+                      </span>
+                      {end(item)}
+                    </Menu.Item>
+                  )}
+                </For>
+              </ScrollView>
             </Menu.Content>
           </Menu.Portal>
         </Menu>
@@ -248,12 +261,16 @@ export function SessionActivityChips(props: {
 // Load on first opt-in, then retain both identities for an interruptible crossfade.
 function ActivityGlyph(props: { muted?: boolean }) {
   const enabled = createMemo((previous) => previous || experiment.chip === "orb", false)
+
   const [orb] = createResource(enabled, async () => {
     const { CssAgentOrb } = await import("@/session/agent-glyph/css-agent-orb")
+
     return CssAgentOrb
   })
+
   // Guard the first read so loading this experiment never suspends the composer or hides today's glyph.
   const loaded = () => orb.state === "ready"
+
   return (
     <span data-slot="activity-glyph" data-orb={experiment.chip === "orb" && loaded()} aria-hidden="true">
       <span data-slot="activity-glyph-today">
