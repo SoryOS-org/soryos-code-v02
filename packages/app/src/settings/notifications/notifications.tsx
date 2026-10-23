@@ -1,10 +1,16 @@
-import { Component } from "solid-js"
+import { Component, Show, createMemo } from "solid-js"
+import { createStore } from "solid-js/store"
+import { Button } from "@opencode/ui/button"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
+import { useGlobal } from "@/runtime/server/runtime"
+import { usePlatform } from "@/runtime/platform/platform"
+import { useSettingsServers } from "@/settings/servers/inventory"
+import type { PushIssue } from "@/shell/notifications/push"
 import {
   createSoundSettingsController,
   soundOptions,
@@ -58,6 +64,31 @@ export const SettingsNotifications: Component = () => {
   const language = useLanguage()
   const settings = useSettings()
   const sounds = createSoundSettingsController()
+  const platform = usePlatform()
+  const global = useGlobal()
+  const servers = useSettingsServers()
+  const [pushState, setPushState] = createStore<{ key?: string }>({ key: undefined })
+
+  const connected = createMemo(() => servers().filter((server) => server.connection))
+  const selected = createMemo(() => connected().find((server) => server.key === pushState.key) ?? connected()[0])
+
+  const push = createMemo(() => {
+    const server = selected()
+
+    if (!server) return
+
+    return global.serverCtx(server.key)?.notification.push
+  })
+
+  const issueKey = {
+    insecure: "settings.notifications.push.insecure",
+    install: "settings.notifications.push.install",
+    unsupported: "settings.notifications.push.unsupported",
+    denied: "settings.notifications.push.denied",
+    serverUnsupported: "settings.notifications.push.serverUnsupported",
+    subscription: "settings.notifications.push.subscription",
+    failed: "settings.notifications.push.failed",
+  } as const satisfies Record<PushIssue, string>
 
   return (
     <>
@@ -73,6 +104,62 @@ export const SettingsNotifications: Component = () => {
       </div>
 
       <div class="settings-tab-body settings-tab-body--sectioned">
+        <Show when={platform.platform === "web" && connected().length > 0}>
+          <div class="settings-section">
+            <h3 class="settings-section-title">{language.t("settings.notifications.push.title")}</h3>
+            <SettingsList>
+              <SettingsRow
+                title={language.t("settings.notifications.push.server")}
+                description={language.t("settings.notifications.push.description")}
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <Select
+                    data-action="settings-notifications-push-server"
+                    options={connected()}
+                    current={selected()}
+                    value={(server) => server.key}
+                    label={(server) => server.name}
+                    onSelect={(server) => server && setPushState("key", server.key)}
+                    placement="bottom-end"
+                    gutter={6}
+                  />
+                  <Show when={push()} keyed>
+                    {(controller) => (
+                      <Button
+                        data-action="settings-notifications-push-toggle"
+                        variant="outline"
+                        disabled={controller.state.busy || !controller.ready()}
+                        onClick={() => void (controller.state.enabled ? controller.disable() : controller.enable())}
+                      >
+                        {language.t(
+                          controller.state.enabled
+                            ? "settings.notifications.push.disable"
+                            : "settings.notifications.push.enable",
+                        )}
+                      </Button>
+                    )}
+                  </Show>
+                </div>
+              </SettingsRow>
+            </SettingsList>
+            <Show when={push()} keyed>
+              {(controller) => (
+                <div role="status" class="text-12-regular text-v2-text-text-muted break-words">
+                  {controller.state.busy
+                    ? language.t("settings.notifications.push.updating")
+                    : controller.state.issue
+                      ? language.t(issueKey[controller.state.issue])
+                      : language.t(
+                          controller.state.enabled
+                            ? "settings.notifications.push.enabled"
+                            : "settings.notifications.push.disabled",
+                        )}
+                </div>
+              )}
+            </Show>
+          </div>
+        </Show>
+
         <div class="settings-section">
           <h3 class="settings-section-title">{language.t("settings.general.section.notifications")}</h3>
           <SettingsList>
@@ -96,6 +183,18 @@ export const SettingsNotifications: Component = () => {
                 <Switch
                   checked={settings.notifications.permissions()}
                   onChange={(checked) => settings.notifications.setPermissions(checked)}
+                />
+              </div>
+            </SettingsRow>
+
+            <SettingsRow
+              title={language.t("settings.general.notifications.questions.title")}
+              description={language.t("settings.general.notifications.questions.description")}
+            >
+              <div data-action="settings-notifications-questions">
+                <Switch
+                  checked={settings.notifications.questions()}
+                  onChange={(checked) => settings.notifications.setQuestions(checked)}
                 />
               </div>
             </SettingsRow>
