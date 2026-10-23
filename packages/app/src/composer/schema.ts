@@ -184,13 +184,26 @@ export const NoteContextItem = Persistence.struct({ ...NoteFields, commentID: Sc
 
 export type NoteContextItem = typeof NoteContextItem.Type
 
+/** Where text quoted from outside the timeline came from, such as an extension's terminal. */
+export const QuoteSource = Persistence.struct({
+  label: Schema.String,
+  icon: Schema.String,
+  subject: Schema.String,
+})
+
+export type QuoteSource = typeof QuoteSource.Type
+
 const QuoteFields = {
   type: Schema.Literal("quote"),
   text: Schema.String,
   comment: Persistence.optional(Schema.String),
+  source: Persistence.optional(QuoteSource),
 }
 
-/** Plain text the user quoted from the session timeline, with an optional comment, as sent in message metadata. */
+/**
+ * Plain text the user quoted, with an optional comment, as sent in message metadata. Without a source it was quoted
+ * from the session timeline.
+ */
 export const QuoteComment = Persistence.struct(QuoteFields)
 
 export type QuoteComment = typeof QuoteComment.Type

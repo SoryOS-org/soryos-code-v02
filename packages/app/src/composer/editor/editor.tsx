@@ -311,7 +311,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               spellcheck={state.mode === "normal"}
               // @ts-expect-error
               autocomplete="off"
-              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent px-3 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
+              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-3 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
               classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell", "opacity-50": props.disabled }}
               style={{
                 "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined,
@@ -383,7 +383,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={!props.controller.value()}>
               <div
                 dir={state.mode === "normal" ? "auto" : "ltr"}
-                class="pointer-events-none absolute inset-x-0 top-0 px-3 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                class="pointer-events-none absolute inset-x-0 top-0 ps-4 pe-3 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
                 classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell" }}
                 style={{ "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined, "text-align": "start" }}
               >
@@ -887,6 +887,7 @@ function ComposerAttachments(props: {
                 <QuoteCommentEditor
                   anchor={anchor()}
                   text={current.text}
+                  icon={current.source?.icon}
                   comment={current.comment ?? ""}
                   mention={(query) => props.searchPaths?.(query) ?? Promise.resolve([])}
                   onSubmit={(comment) => {
@@ -1231,7 +1232,7 @@ function ComposerEditorPopover(props: {
     <div
       ref={container}
       data-component="composer-suggestions"
-      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-2 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-1.5 shadow-[var(--v2-elevation-raised)] no-scrollbar"
       classList={{ "overflow-auto": !props.history, "overflow-hidden": !!props.history }}
       style={{ "max-height": `${store.maxHeight}px` }}
       onMouseDown={(event) => event.preventDefault()}

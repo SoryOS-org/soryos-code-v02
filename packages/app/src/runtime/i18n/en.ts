@@ -156,6 +156,8 @@ export const dict = {
   "dialog.model.hint.variant": "Variant",
   "dialog.model.hint.select": "Select",
   "dialog.model.hint.favorite": "Favorite",
+  "dialog.model.favorite": "Favorite",
+  "dialog.model.unfavorite": "Unfavorite",
 
   "dialog.model.unpaid.freeModels.title": "Free models provided by OpenCode",
   "dialog.model.unpaid.addMore.title": "Add more models from popular providers",
@@ -787,6 +789,8 @@ export const dict = {
   "settings.experimental.row.generatedUI.description": "Let agents show dashboards, charts and forms in the timeline",
   "settings.experimental.row.newIcons.title": "New icons",
   "settings.experimental.row.newIcons.description": "Preview the updated icon set",
+  "settings.experimental.row.newModelPicker.title": "New model picker",
+  "settings.experimental.row.newModelPicker.description": "Preview the redesigned model picker",
   "settings.guiExtensions.title": "Extensions",
   "settings.guiExtensions.description": "Built-in GUI extensions in this window. Development builds only.",
   "settings.guiExtensions.reload": "Reload",

@@ -1,6 +1,8 @@
 import { useCommand, type CommandOption } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { DialogSelectModel } from "@/providers/models/select-dialog"
+import { DialogSelectModelNext } from "@/providers/models/select-dialog-next"
+import { useSettings } from "@/settings/model"
 import { useLocal, type ModelSelection } from "@/providers/models/selection"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useSessionLayout } from "@/session/session-layout"
@@ -19,6 +21,7 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
   const dialog = useDialog()
   const language = useLanguage()
   const local = useLocal()
+  const settings = useSettings()
   const workspace = useWorkspaceLocation()
   const { sessionKey } = useSessionLayout()
   const sessionOwnership = createSessionOwnership(sessionKey)
@@ -35,8 +38,9 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
   }
 
   const chooseModel = () => {
+    const Picker = settings.general.newModelPicker() ? DialogSelectModelNext : DialogSelectModel
     sessionOwnership.capture().run(() => {
-      void dialog.show(() => <DialogSelectModel model={model} />)
+      void dialog.show(() => <Picker model={model} />)
     })
   }
 

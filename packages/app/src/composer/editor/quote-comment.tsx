@@ -12,6 +12,7 @@ const WIDTH = 380
 export function QuoteCommentEditor(props: {
   anchor: HTMLElement
   text: string
+  icon?: string
   comment: string
   mention: (query: string) => Promise<string[]>
   onSubmit: (comment: string) => void
@@ -73,7 +74,7 @@ export function QuoteCommentEditor(props: {
           mention={{ items: props.mention }}
           selection={
             <span class="flex min-w-0 items-center gap-1" dir="auto">
-              <Icon name="outline-quote" size="small" class="shrink-0" />
+              <Icon name={props.icon ?? "outline-quote"} size="small" class="shrink-0" />
               <span class="min-w-0 truncate leading-[var(--line-height-tight)]">{props.text.slice(0, 200)}</span>
             </span>
           }

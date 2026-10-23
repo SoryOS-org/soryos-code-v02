@@ -104,7 +104,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
       context: input.adapter.state.context.items().map((item) => {
         if (item.type === "note") return { ...item, live: item.live ? { ...item.live } : undefined }
 
-        if (item.type === "quote") return { ...item }
+        if (item.type === "quote") return { ...item, source: item.source ? { ...item.source } : undefined }
 
         return { ...item, selection: item.selection ? { ...item.selection } : undefined }
       }),
@@ -428,7 +428,13 @@ function restoreSubmission(
   restored.target.context.replaceComments(
     restored.context.filter(isCommentItem).map((item): ContextItem => {
       if (item.type === "quote")
-        return { type: "quote", text: item.text, comment: item.comment, commentID: item.commentID }
+        return {
+          type: "quote",
+          text: item.text,
+          comment: item.comment,
+          source: item.source ? { ...item.source } : undefined,
+          commentID: item.commentID,
+        }
 
       if (item.type === "note")
         return {

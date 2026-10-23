@@ -472,6 +472,12 @@ test("file tree expands Windows paths and scrolls long names in both directions"
         return [
           { ...fileNode(directory, "frontend/app.ts"), path: "frontend\\app.ts" },
           { ...fileNode(directory, longPath), path: `frontend\\${longFilename}` },
+          // Short rows below the long one, so it can scroll out of view.
+          ...Array.from({ length: 80 }, (_, index) => {
+            const name = `file-${String(index).padStart(2, "0")}.ts`
+
+            return { ...fileNode(directory, `frontend/${name}`), path: `frontend\\${name}` }
+          }),
         ]
       }
 
@@ -506,13 +512,40 @@ test("file tree expands Windows paths and scrolls long names in both directions"
   const status = longRow.locator('[data-item-section="git"]')
   await expect(longRow).toBeVisible()
   await expect(content).toHaveAttribute("title", longFilename)
-  await expect.poll(() => content.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0)
+  // The name is never clipped: the tree scrolls sideways and the change letter sticks to the pane's edge.
   await expect
-    .poll(() => longRow.evaluate((element) => element.scrollWidth - element.clientWidth))
+    .poll(() => content.evaluate((element) => element.scrollWidth - element.clientWidth))
     .toBeLessThanOrEqual(0)
-  await expect(content).toHaveCSS("text-overflow", "clip")
+  await expect
+    .poll(() =>
+      longRow.evaluate((element) => {
+        const scroll = element.closest("[data-file-tree-virtualized-scroll]")!
+
+        return scroll.scrollWidth - scroll.clientWidth
+      }),
+    )
+    .toBeGreaterThan(0)
   await expect(status).toHaveText("A")
   await expect.poll(() => statusInset(status, "right")).toBeLessThanOrEqual(24)
+  const treeScroll = panel.locator(".opencode-pierre-file-tree")
+  const scrollTree = (position: { left?: number; top?: number }) =>
+    treeScroll.evaluate((element, position) => {
+      const scroll = element.shadowRoot!.querySelector<HTMLElement>("[data-file-tree-virtualized-scroll]")!
+
+      if (position.left !== undefined) scroll.scrollLeft = position.left
+
+      if (position.top !== undefined) scroll.scrollTop = position.top
+
+      return { left: scroll.scrollLeft, overflow: scroll.scrollWidth - scroll.clientWidth }
+    }, position)
+  await scrollTree({ left: 1_000_000 })
+  await expect.poll(() => statusInset(status, "right")).toBeLessThanOrEqual(24)
+  // The tree keeps the long row's width after it scrolls out of view, so the sideways position holds.
+  await scrollTree({ top: 1_000_000 })
+  await expect(longRow).toHaveCount(0)
+  await expect.poll(async () => (await scrollTree({})).overflow).toBeGreaterThan(0)
+  await expect.poll(async () => (await scrollTree({})).left).toBeGreaterThan(0)
+  await scrollTree({ left: 0, top: 0 })
   await viewport.evaluate((element) => element.setAttribute("dir", "rtl"))
   await expect.poll(() => statusInset(status, "left")).toBeLessThanOrEqual(24)
   await frontend.focus()

@@ -621,6 +621,15 @@ test("the location dialog lists every ready server's projects in one list and ta
   await expect(chip.locator('[data-component="tag"]')).toHaveText("apollo")
   await expect(options.locator(".command-palette-title")).toHaveText(["opencode", "New worktree", "opencode-beta"])
   await expect(options.nth(0)).toHaveAttribute("aria-selected", "true")
+  // The chip's avatar sits on the same column as the row icons below it.
+  await expect
+    .poll(async () => {
+      const avatar = await chip.locator('[data-component="project-avatar-v2"]').boundingBox()
+      const icon = await options.nth(0).locator(".command-palette-row-icon").boundingBox()
+
+      return avatar && icon ? Math.abs(avatar.x - icon.x) : Infinity
+    })
+    .toBeLessThanOrEqual(0.5)
   await page.keyboard.press("Backspace")
   await expect(search).toHaveValue("opencode")
   await expect(options.nth(0)).toHaveAttribute("aria-selected", "true")
