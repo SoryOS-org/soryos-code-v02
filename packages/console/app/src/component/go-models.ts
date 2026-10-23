@@ -1,6 +1,6 @@
 // Requests are per 5 hours; allowances are monthly usage at official API prices.
 export const goModels = [
-  { id: "kimi-k3", name: "Kimi K3", requests: 110, allowance: 15, featured: true },
+  { id: "kimi-k3", name: "Kimi K3", requests: 110, allowance: 15 },
   {
     id: "kimi-k3.1-pro",
     name: "Kimi K3.1 Pro",
