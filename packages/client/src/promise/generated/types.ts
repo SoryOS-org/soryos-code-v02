@@ -361,7 +361,13 @@ export type ConfigModelSettings = { compaction?: ProviderCompaction; encoding?: 
 
 export type PermissionRule = { action: string; resource: string; effect: PermissionEffect }
 
-export type PluginInfo = { id?: string; source: PluginSource; features: PluginFeatures; state: PluginState }
+export type PluginInfo = {
+  id?: string
+  source: PluginSource
+  features: PluginFeatures
+  revision?: string
+  state: PluginState
+}
 
 export type SessionForkBoundary =
   | { type: "before"; messageID: SessionMessageID }
@@ -2967,6 +2973,16 @@ export type PluginListInput = {
 }
 
 export type PluginListOutput = { location: LocationPublicRef; data: Array<PluginInfo> }
+
+export type PluginGuiInput = {
+  readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
+  readonly id: { readonly id: string }["id"]
+}
+
+export type PluginGuiOutput = {
+  location: LocationPublicRef
+  data: { source: string; options: { [x: string]: JsonValue } }
+}
 
 export type PluginCheckInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]

@@ -21,6 +21,27 @@ export const PluginGroup = HttpApiGroup.make("server.plugin")
       ),
   )
   .add(
+    HttpApiEndpoint.post("plugin.gui", "/api/plugin/gui", {
+      query: LocationQuery,
+      payload: Schema.Struct({ id: Schema.String }),
+      success: Location.response(
+        Schema.Struct({
+          source: Schema.String,
+          options: Schema.Record(Schema.String, Schema.Json),
+        }),
+      ),
+      error: [InvalidRequestError, ServiceUnavailableError],
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "plugin.gui",
+          summary: "Load a configured GUI plugin",
+          description: "Return the browser bundle and configured options for an active GUI plugin.",
+        }),
+      ),
+  )
+  .add(
     HttpApiEndpoint.post("plugin.check", "/api/plugin/check", {
       query: LocationQuery,
       payload: Schema.Struct({ target: Schema.String.pipe(Schema.optional) }),

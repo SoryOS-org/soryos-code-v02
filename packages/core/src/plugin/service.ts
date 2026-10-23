@@ -9,11 +9,20 @@ import { Context, type Effect, type Exit } from "effect"
 export interface Interface {
   readonly activate: (plugins: readonly Generation[], failures?: readonly Failure[]) => Effect.Effect<void>
   readonly list: () => Effect.Effect<Plugin.Info[]>
+  /** Resolves one active plugin's configured GUI entry without exposing its server setup implementation. */
+  readonly gui: (id: string) => Effect.Effect<GuiEntry | undefined>
   readonly close: (exit: Exit.Exit<unknown, unknown>) => Effect.Effect<void>
   /** Wait for announced updates and activation to settle; failures remain in the inventory. */
   readonly awaitActivation: Effect.Effect<void>
   /** Keep readiness pending while preparing an update. Run the returned Effect to release it. */
   readonly hold: () => Effect.Effect<Effect.Effect<void>>
+}
+
+export interface GuiEntry {
+  /** Resolved `./gui` file used to build a browser bundle for Desktop. */
+  readonly entrypoint: string
+  /** JSON options configured for this plugin at the current location. */
+  readonly options: Readonly<Record<string, unknown>>
 }
 
 export type Failure = Plugin.Info & { readonly state: Extract<Plugin.State, { readonly status: "failed" }> }
@@ -22,6 +31,9 @@ export type Generation = PluginDefinition & {
   readonly revision: string
   readonly source?: Plugin.Source
   readonly features?: Plugin.Features
+  readonly gui?: GuiEntry
+  /** The package provides a GUI entry but no server plugin entry. */
+  readonly serverless?: true
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Plugin") {}

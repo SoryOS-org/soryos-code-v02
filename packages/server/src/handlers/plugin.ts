@@ -1,13 +1,54 @@
 import { Plugin } from "@opencode/core/plugin"
 import { PluginUpdate } from "@opencode/core/plugin/update"
 import { InvalidRequestError, ServiceUnavailableError } from "@opencode/protocol/errors"
-import { Cause, Effect, Exit } from "effect"
+import { Cause, Effect, Exit, Schema } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
 import { Api } from "../api"
 import { response } from "../location"
 
 export const PluginHandler = HttpApiBuilder.group(Api, "server.plugin", (handlers) =>
   handlers
+    .handle("plugin.gui", (ctx) =>
+      Effect.gen(function* () {
+        const plugins = yield* Plugin.Service
+        const gui = yield* plugins.gui(ctx.payload.id)
+        if (!gui)
+          return yield* new InvalidRequestError({
+            message: `Plugin does not have an active GUI entry: ${ctx.payload.id}`,
+            field: "id",
+          })
+
+        const options = yield* Schema.decodeUnknownEffect(Schema.Record(Schema.String, Schema.Json))(gui.options).pipe(
+          Effect.mapError(
+            () =>
+              new ServiceUnavailableError({
+                message: `GUI plugin options are not JSON serializable: ${ctx.payload.id}`,
+                service: "plugin",
+              }),
+          ),
+        )
+        const built = yield* Effect.tryPromise({
+          try: async () => {
+            const { buildGuiBundle } = await import("../gui-bundle")
+
+            return buildGuiBundle(gui.entrypoint)
+          },
+          catch: (cause) =>
+            new ServiceUnavailableError({
+              message: `Failed to build GUI plugin: ${ctx.payload.id}: ${String(cause)}`,
+              service: "plugin",
+            }),
+        })
+        if (!built.success || !built.outputs[0])
+          return yield* new ServiceUnavailableError({
+            message: `Failed to build GUI plugin: ${ctx.payload.id}`,
+            service: "plugin",
+          })
+
+        const source = yield* Effect.promise(() => built.outputs[0].text())
+        return yield* response(Effect.succeed({ source, options }))
+      }),
+    )
     .handle("plugin.list", () =>
       Effect.gen(function* () {
         return yield* response(Plugin.Service.use((plugin) => plugin.list()))

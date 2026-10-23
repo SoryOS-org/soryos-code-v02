@@ -43,6 +43,12 @@ const layer = Layer.effect(
     const list = Effect.fn("Plugin.list")(function* () {
       return inventory
     })
+    const gui = Effect.fn("Plugin.gui")(function* (id: string) {
+      const slot = active.get(Plugin.ID.make(id))
+
+      if (!slot) return undefined
+      return slot.plugin.gui
+    })
     const host = yield* PluginHost.make({ list })
     const load = Effect.fnUntraced(function* (plugin: Generation) {
       const activation: Activation = { plugin, scope: yield* Scope.fork(scope) }
@@ -253,6 +259,7 @@ const layer = Layer.effect(
       awaitActivation: ready.await,
       hold,
       list,
+      gui,
     })
   }),
 )
@@ -288,7 +295,8 @@ function slotInfo(slot: Slot): Plugin.Info {
     id: slot.plugin.id,
     source: slot.plugin.source ?? { type: "builtin" },
     state: failure === undefined ? { status: "active" } : { status: "failed", ...failure },
-    features: { server: true, ...slot.plugin.features },
+    features: { ...(slot.plugin.serverless ? {} : { server: true }), ...slot.plugin.features },
+    ...(slot.plugin.gui ? { revision: slot.plugin.revision } : {}),
   }
 }
 

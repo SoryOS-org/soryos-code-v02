@@ -5,8 +5,9 @@ import { Host } from "@opencode/plugin/host"
 import { createPluginSources } from "@opencode/plugin/source"
 import { Npm } from "@opencode/util/npm"
 import { Deferred, Effect, FiberSet, PubSub, Schema, Stream } from "effect"
+import { createHash } from "node:crypto"
 import path from "path"
-import { stat } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 import { fileURLToPath, pathToFileURL } from "url"
 import type { ConfigPluginSource } from "../config/plugin/source.js"
 import type { Generation } from "../plugin.js"
@@ -57,7 +58,7 @@ export const make = Effect.fn("PluginModule.make")(function* () {
           ) === "deny"
         )
           return { blocked: true as const }
-        return yield* load(operation, sources, options)
+        return yield* load(operation, sources, watch, options)
       }),
     changes: () => Stream.fromPubSub(changes),
   }
@@ -98,6 +99,7 @@ export class LoadError extends Schema.TaggedError<LoadError>()("PluginModule.Loa
 const load = Effect.fn("PluginModule.load")(function* (
   operation: Extract<ConfigPluginSource.Operation, { type: "add" }>,
   sources: ReturnType<typeof createPluginSources>,
+  watchGui: (file: string) => Effect.Effect<void>,
   options?: { readonly install?: boolean },
 ) {
   const local = path.isAbsolute(operation.target)
@@ -113,8 +115,34 @@ const load = Effect.fn("PluginModule.load")(function* (
     local && (yield* Effect.promise(() => stat(operation.target))).isFile()
       ? { server: pathToFileURL(operation.target).href }
       : yield* Effect.sync(() => Host.resolve(installed ?? { directory: operation.target }))
+  const gui = operation.global && entrypoints.gui ? fileURLToPath(entrypoints.gui) : undefined
+  if (local && gui) yield* watchGui(gui)
+  const guiRevision = gui
+    ? local
+      ? createHash("sha256")
+          .update(yield* Effect.promise(() => readFile(gui)))
+          .digest("hex")
+      : installed?.revision
+    : undefined
   const entrypoint = entrypoints.server
-  if (!local && options?.install === false && !entrypoint) return { pending: true as const }
+  if (!local && options?.install === false && !entrypoint && !entrypoints.gui) return { pending: true as const }
+  if (!entrypoint && entrypoints.gui) {
+    return {
+      id: `gui:${operation.target}`,
+      ...(gui ? { features: { gui: true as const } } : {}),
+      revision: JSON.stringify([operation, installed?.revision, guiRevision]),
+      source: local
+        ? { type: "local" as const, path: fileURLToPath(entrypoints.gui) }
+        : {
+            type: "package" as const,
+            target: operation.target,
+            ...(installed?.version ? { version: installed.version } : {}),
+          },
+      ...(gui ? { gui: { entrypoint: gui, options: operation.options } } : {}),
+      serverless: true as const,
+      effect: () => Effect.void,
+    } satisfies Generation
+  }
   if (!entrypoint) return yield* new LoadError({ message: `Plugin entrypoint not found: ${operation.target}` })
   yield* Effect.log({ msg: "loading plugin", id: operation.target, entrypoint })
   const loaded = yield* Effect.promise(() =>
@@ -136,10 +164,11 @@ const load = Effect.fn("PluginModule.load")(function* (
     id: plugin.id,
     features: {
       ...(entrypoints.tui ? { tui: true as const } : {}),
-      ...(entrypoints.gui ? { gui: true as const } : {}),
+      ...(gui ? { gui: true as const } : {}),
       ...(entrypoints.rpc ? { rpc: true as const } : {}),
     },
-    revision: JSON.stringify([operation, loaded.version]),
+    ...(gui ? { gui: { entrypoint: gui, options: operation.options } } : {}),
+    revision: JSON.stringify([operation, loaded.version, guiRevision]),
     source: path.isAbsolute(operation.target)
       ? { type: "local" as const, path: fileURLToPath(entrypoint) }
       : {

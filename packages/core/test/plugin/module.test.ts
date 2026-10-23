@@ -43,9 +43,57 @@ it.live("reports a configured GUI entrypoint as a plugin feature", () =>
     )
 
     const modules = yield* PluginModule.make()
-    const plugin = yield* modules.load({ type: "add", target: directory.path, options: {} })
+    const plugin = yield* modules.load({ type: "add", target: directory.path, options: {}, global: true })
 
     expect(plugin).toMatchObject({ id: "gui-fixture", features: { gui: true } })
+  }),
+)
+
+it.live("admits a GUI-only package only from global plugin configuration", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    yield* Effect.promise(() => writeFiles(directory.path, { "gui.tsx": "throw new Error('loaded on server')" }))
+
+    const modules = yield* PluginModule.make()
+    const projectPlugin = yield* modules.load({ type: "add", target: directory.path, options: {} })
+    if ("pending" in projectPlugin || "blocked" in projectPlugin || "error" in projectPlugin)
+      return yield* Effect.die(new Error("Project GUI-only plugin was not loaded"))
+    expect(projectPlugin.features).toBeUndefined()
+    expect(projectPlugin.gui).toBeUndefined()
+
+    const operation = { type: "add" as const, target: directory.path, options: { groupLimit: 40 }, global: true as const }
+    const plugin = yield* modules.load(operation)
+    if ("pending" in plugin || "blocked" in plugin || "error" in plugin)
+      return yield* Effect.die(new Error("GUI-only plugin was not loaded"))
+    const registry = yield* Plugin.Service
+    yield* registry.activate([plugin])
+    yield* registry.awaitActivation
+
+    expect(plugin).toMatchObject({
+      id: `gui:${directory.path}`,
+      features: { gui: true },
+      serverless: true,
+      gui: { entrypoint: expect.stringContaining("gui.tsx") },
+    })
+    expect((yield* registry.list()).find((item) => item.id === plugin.id)?.features).toEqual({ gui: true })
+    expect(yield* registry.gui(plugin.id)).toEqual({
+      entrypoint: path.join(directory.path, "gui.tsx"),
+      options: { groupLimit: 40 },
+    })
+
+    const changed = yield* modules
+      .changes()
+      .pipe(Stream.runHead, Effect.timeout("5 seconds"), Effect.forkScoped({ startImmediately: true }))
+    yield* Effect.promise(() => Bun.write(path.join(directory.path, "gui.tsx"), "export default { setup() {} }"))
+    yield* Fiber.join(changed)
+
+    const updated = yield* modules.load(operation)
+    if ("pending" in updated || "blocked" in updated || "error" in updated)
+      return yield* Effect.die(new Error("Updated GUI-only plugin was not loaded"))
+    yield* registry.activate([updated])
+    yield* registry.awaitActivation
+    expect(updated.revision).not.toBe(plugin.revision)
+    expect((yield* registry.list()).find((item) => item.id === updated.id)?.revision).toBe(updated.revision)
   }),
 )
 

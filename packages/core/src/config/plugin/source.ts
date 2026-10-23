@@ -12,12 +12,14 @@ import { Config } from "../../config.js"
 import { Watcher } from "../../filesystem/watcher.js"
 import { Location } from "../../location.js"
 import { PluginSourceDirectory } from "../../plugin/source-directory.js"
+import { Global } from "@opencode/util/global"
 
 export type Operation =
   | {
       readonly type: "add"
       readonly target: string
       readonly options: Record<string, unknown>
+      readonly global?: true
       readonly mtime?: number
     }
   | {
@@ -39,6 +41,7 @@ export const layer = Layer.effect(
     const watcher = yield* Watcher.Service
     const fs = yield* FSUtil.Service
     const location = yield* Location.Service
+    const global = yield* Global.Service
     const configuredChanges = yield* PubSub.unbounded<void>()
     const watched = new Set<string>()
 
@@ -74,7 +77,7 @@ export const layer = Layer.effect(
     return Service.of({
       operations: Effect.fn("ConfigPluginSource.operations")(function* () {
         const entries = yield* config.entries()
-        const operations = yield* scan(fs, location, entries)
+        const operations = yield* scan(fs, location, entries, global.config)
         yield* watchConfiguredSources(entries, operations)
         return operations
       }),
@@ -95,7 +98,7 @@ export const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Config.node, FSUtil.node, Watcher.node, Location.node],
+  deps: [Config.node, FSUtil.node, Watcher.node, Location.node, Global.node],
 })
 
 export const empty = makeLocationNode({
@@ -123,12 +126,21 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
   fs: FSUtil.Interface,
   location: Location.Interface,
   entries: readonly Entry[],
+  globalConfig: string,
 ) {
   const discovered = yield* Effect.forEach(
     entries.filter((entry): entry is Directory => entry.type === "directory"),
     (entry) =>
       PluginSourceDirectory.discover(fs, entry.path).pipe(
-        Effect.map((targets) => targets.map((target): Operation => ({ type: "add", target, options: {} }))),
+        Effect.map((targets) =>
+          targets.map(
+            (target): Operation => ({
+              type: "add",
+              target,
+              options: {},
+            }),
+          ),
+        ),
       ),
   ).pipe(Effect.map((items) => items.flat()))
   const configured = entries
@@ -142,7 +154,11 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
           : operation.target.startsWith("./") || operation.target.startsWith("../")
             ? path.resolve(directory, operation.target)
             : operation.target
-        return { ...operation, target }
+        return {
+          ...operation,
+          target,
+          ...(entry.path && FSUtil.contains(globalConfig, entry.path) ? { global: true as const } : {}),
+        }
       }),
     )
   const resolved = yield* Effect.forEach(configured, (operation) =>
@@ -164,11 +180,12 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
       const entrypoints: Host.Entrypoints = directory
         ? yield* Effect.sync(() => Host.resolve({ directory: operation.target }))
         : { server: pathToFileURL(operation.target).href }
-      if (!entrypoints.server) return []
+      const entrypoint = entrypoints.server ?? entrypoints.gui
+      if (!entrypoint) return []
       if (directory) {
         const root = yield* fs.resolve(operation.target)
-        const server = yield* fs.resolve(fileURLToPath(entrypoints.server))
-        if (!FSUtil.contains(root, server)) return []
+        const resolved = yield* fs.resolve(fileURLToPath(entrypoint))
+        if (!FSUtil.contains(root, resolved)) return []
       }
       const times = yield* Effect.forEach(
         [

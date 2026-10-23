@@ -40,6 +40,7 @@ export const Info = Schema.Struct({
   id: ID.pipe(optional),
   source: Source,
   features: Features,
+  revision: Schema.String.pipe(optional),
   state: State,
 }).annotate({ identifier: "Plugin.Info" })
 

@@ -3,6 +3,7 @@ import type { Effect, Stream } from "effect"
 import type { Location } from "@opencode/schema/location"
 import type { Agent } from "@opencode/schema/agent"
 import type { Plugin } from "@opencode/schema/plugin"
+import type { Schema } from "effect"
 import type { Session } from "@opencode/schema/session"
 import type { AbsolutePath } from "@opencode/schema/schema"
 import type { Project } from "@opencode/schema/project"
@@ -18,7 +19,6 @@ import type { AgentAttachment } from "@opencode/schema/prompt"
 import type { Skill } from "@opencode/schema/skill"
 import type { FileDiff } from "@opencode/schema/file-diff"
 import type { InstructionEntry } from "@opencode/schema/instruction-entry"
-import type { Schema } from "effect"
 import type { Event } from "@opencode/schema/event"
 import type { EventLog } from "@opencode/schema/event-log"
 import type { Workspace } from "@opencode/schema/workspace"
@@ -96,6 +96,16 @@ export type PluginListInput = { readonly location?: { readonly directory?: strin
 export type PluginListOutput = { readonly location: Location.PublicRef; readonly data: ReadonlyArray<Plugin.Info> }
 export type PluginListOperation<E = never> = (input?: PluginListInput) => Effect.Effect<PluginListOutput, E>
 
+export type PluginGuiInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly id: string
+}
+export type PluginGuiOutput = {
+  readonly location: Location.PublicRef
+  readonly data: { readonly source: string; readonly options: { readonly [x: string]: Schema.Json } }
+}
+export type PluginGuiOperation<E = never> = (input: PluginGuiInput) => Effect.Effect<PluginGuiOutput, E>
+
 export type PluginCheckInput = {
   readonly location?: { readonly directory?: string | undefined } | undefined
   readonly target?: string | undefined
@@ -112,6 +122,7 @@ export type PluginUpdateOperation<E = never> = (input: PluginUpdateInput) => Eff
 
 export interface PluginApi<E = never> {
   readonly list: PluginListOperation<E>
+  readonly gui: PluginGuiOperation<E>
   readonly check: PluginCheckOperation<E>
   readonly update: PluginUpdateOperation<E>
 }
