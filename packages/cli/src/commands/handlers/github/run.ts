@@ -6,7 +6,7 @@ import { runNonInteractive } from "../../../run/run"
 
 export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
   Effect.gen(function* () {
-    const server = yield* ServerConnection.resolve({ standalone: true })
+    const server = yield* ServerConnection.resolve({ standalone: input.standalone })
     const prompt = process.env["PROMPT"] || "Summarize this repository"
     yield* Effect.promise(() =>
       runNonInteractive({

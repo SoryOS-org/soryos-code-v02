@@ -534,6 +534,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           params: {
             event: Flag.String("event").pipe(Flag.withDescription("GitHub mock event to run the agent for"), Flag.optional),
             token: Flag.String("token").pipe(Flag.withDescription("GitHub personal access token"), Flag.optional),
+            standalone: Flag.Boolean("standalone").pipe(Flag.withDescription("Run with a private server"), Flag.withDefault(false)),
           },
         }),
       ],
