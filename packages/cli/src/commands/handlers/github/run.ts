@@ -1,6 +1,7 @@
 import { Effect, Option } from "effect"
 import { execFileSync } from "node:child_process"
 import { Octokit } from "@octokit/rest"
+import * as core from "@actions/core"
 import * as github from "@actions/github"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
@@ -16,11 +17,35 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
     const server = yield* ServerConnection.resolve({ standalone: input.standalone })
     const eventStr = Option.getOrUndefined(input.event)
     const ctx: any = eventStr ? JSON.parse(eventStr) : github.context
-    const token = Option.getOrUndefined(input.token) || process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
+    const token = yield* Effect.promise(async () => {
+      const t = Option.getOrUndefined(input.token) || process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
+      if (t) return t
+      if (process.env["USE_GITHUB_TOKEN"] === "true") {
+        const gt = process.env["GITHUB_TOKEN"]
+        if (!gt) throw new Error("GITHUB_TOKEN required")
+        return gt
+      }
+      try {
+        const oidcBaseUrl = (process.env["OIDC_BASE_URL"] || "https://api.opencode.ai").replace(/\/+$/, "")
+        const oidcToken = await core.getIDToken("opencode-github-action")
+        const res = await fetch(`${oidcBaseUrl}/exchange_github_app_token`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${oidcToken}` },
+        })
+        if (!res.ok) throw new Error(`token exchange failed: ${res.status}`)
+        const data = (await res.json()) as { token: string }
+        return data.token
+      } catch (e) {
+        console.error("OIDC token exchange failed:", e)
+        return undefined
+      }
+    })
 
     const eventName = ctx?.eventName || process.env["GITHUB_EVENT_NAME"] || ""
     const isRepoEvent = eventName === "schedule" || eventName === "workflow_dispatch"
     const issueNumber = ctx?.payload?.issue?.number ?? ctx?.payload?.pull_request?.number ?? ctx?.issue?.number
+    const prPayload = ctx?.payload?.pull_request ?? (ctx?.payload?.issue?.pull_request ? ctx?.payload?.issue : null)
+    const isFork = !!prPayload?.head?.repo && (prPayload.head.repo.full_name !== (prPayload.base?.repo?.full_name ?? prPayload.base?.repo?.full_name))
     const commentId = ctx?.payload?.comment?.id
     const owner = ctx?.repo?.owner ?? ctx?.repository?.owner?.login
     const repo = ctx?.repo?.repo ?? ctx?.repository?.name
@@ -77,7 +102,29 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
 
     const cwd = process.cwd()
 
-    // Run the prompt
+    // Checkout PR branch if applicable
+    if (prPayload?.head?.ref) {
+      yield* Effect.promise(async () => {
+        try {
+          if (isFork && prPayload.head.repo?.full_name) {
+            git(["remote", "add", "fork", `https://github.com/${prPayload.head.repo.full_name}.git`], cwd)
+            git(["fetch", "fork", prPayload.head.ref], cwd)
+            git(["checkout", "-B", `pr-${issueNumber}`, `fork/${prPayload.head.ref}`], cwd)
+          } else {
+            git(["fetch", "origin", prPayload.head.ref], cwd)
+            git(["checkout", prPayload.head.ref], cwd)
+          }
+        } catch {}
+      })
+    }
+
+    // Run the prompt (capture stdout for the reply)
+    const captured: string[] = []
+    const origWrite = process.stdout.write.bind(process.stdout)
+    process.stdout.write = ((chunk: any, ...args: any[]) => {
+      captured.push(String(chunk))
+      return origWrite(chunk, ...args)
+    }) as any
     yield* Effect.promise(async () => {
       await runNonInteractive({
         server,
@@ -94,13 +141,15 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         auto: true,
       })
     })
+    process.stdout.write = origWrite
+    const responseText = captured.join("").trim()
 
-    // Post-completion comment
+    // Post the model's answer as a comment
     yield* Effect.promise(async () => {
       if (!token || !issueNumber) return
       const octokit = new Octokit({ auth: token })
       try {
-        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: "opencode run completed." })
+        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: responseText || "opencode run completed." })
       } catch {}
     })
 
@@ -126,20 +175,23 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         console.log("Working tree changed but no token provided; skipping PR creation")
         return
       }
-      const isFork = !!(ctx?.payload?.pull_request) && (ctx?.payload?.pull_request?.head?.repo?.full_name !== ctx?.payload?.pull_request?.base?.repo?.full_name)
       const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
       const branch = `opencode/run-${Date.now()}`
       git(["checkout", "-b", branch], cwd)
       git(["add", "-A"], cwd)
       git(["commit", "-m", "opencode: automated changes"], cwd)
       const octokit = new Octokit({ auth: pushToken })
-      if (isFork) {
-        const forkRepo = ctx.payload.pull_request.head.repo.full_name
+      if (isFork && prPayload) {
+        const forkRepo = prPayload.head.repo.full_name
+        const headRef = prPayload.head.ref
         git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd)
-        git(["push", "fork", `HEAD:${ctx.payload.pull_request.head.ref}`], cwd)
+        git(["push", "fork", `HEAD:${headRef}`], cwd)
         try {
           await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: "opencode pushed changes to the PR branch." })
         } catch {}
+      } else if (prPayload) {
+        // Existing PR: push to its branch (already checked out), no new PR
+        git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
       } else {
         git(["push", "-u", "origin", branch], cwd)
         try {
