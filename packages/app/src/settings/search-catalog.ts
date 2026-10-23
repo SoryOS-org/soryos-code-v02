@@ -112,6 +112,13 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     keywords: "icons iconography glyphs redesign",
   },
   {
+    tab: "experimental",
+    label: "settings.experimental.row.newModelPicker.title",
+    target: "settings-new-model-picker",
+    description: "settings.experimental.row.newModelPicker.description",
+    keywords: "model picker selector switcher redesign",
+  },
+  {
     tab: "appearance",
     label: "settings.general.row.colorScheme.title",
     target: "settings-color-scheme",
