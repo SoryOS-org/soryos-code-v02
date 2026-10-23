@@ -47,6 +47,7 @@ import {
   Layer,
   Option,
   PubSub,
+  Queue,
   Ref,
   Schedule,
   Schema,
@@ -1340,9 +1341,7 @@ test("acknowledges completed MCP URL elicitations without returning internal con
           const result = yield* Fiber.join(call)
           expect(yield* forms.state(form.id)).toEqual({ status: "answered", answer: { elicitation: true } })
           return result
-        }).pipe(
-          Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))),
-        )
+        }).pipe(Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))))
 
         expect(result.structured).toEqual({ action: "accept" })
       }),
@@ -1363,10 +1362,12 @@ test("cancels MCP elicitation forms when the server gives up on them", async () 
           const { form } = yield* Deferred.await(created)
           yield* Fiber.await(call)
           // The server's cancellation and its tool error race; the form settles shortly after either.
-          const state = yield* forms.state(form.id).pipe(
-            Effect.repeat({ until: (state) => state.status !== "pending", schedule: Schedule.spaced("10 millis") }),
-            Effect.timeout("2 seconds"),
-          )
+          const state = yield* forms
+            .state(form.id)
+            .pipe(
+              Effect.repeat({ until: (state) => state.status !== "pending", schedule: Schedule.spaced("10 millis") }),
+              Effect.timeout("2 seconds"),
+            )
           expect(state.status).toBe("cancelled")
         }).pipe(Effect.provide(resourceMcpLayer(server.url, (form) => recordForm(created, form))))
       }),
@@ -2096,6 +2097,98 @@ shutdownIt.effect("discards in-flight and queued MCP notifications after its lay
     yield* Fiber.join(second)
     expect(observed).toEqual([])
     expect((yield* service.servers()).map((server) => server.name)).toEqual([Mcp.ServerName.make("fixture")])
+  }),
+)
+
+shutdownIt.live("stops MCP servers concurrently when its layer closes", () =>
+  Effect.gen(function* () {
+    const names = ["first", "second"]
+    const events: string[] = []
+    const everyClosed = yield* Deferred.make<void>()
+    // Each fake stdio server exits only once every server has seen stdin close. Stopping always signals
+    // the process group afterwards, so a sequential shutdown signals the first before the second closes.
+    const spawner = ChildProcessSpawner.make((command) =>
+      Effect.gen(function* () {
+        if (!ChildProcess.isStandardCommand(command)) return yield* Effect.die("Expected a standard process command")
+        const name = command.command
+        const stdin = command.options.stdin
+        const output = yield* Queue.unbounded<Uint8Array>()
+        const killed = yield* Deferred.make<ExitCode>()
+        const reply = (message: { id?: number; method: string; params?: { protocolVersion?: string } }) => {
+          if (message.id === undefined) return
+          const response =
+            message.method === "initialize"
+              ? {
+                  result: {
+                    protocolVersion: message.params?.protocolVersion,
+                    capabilities: { tools: {} },
+                    serverInfo: { name, version: "1.0.0" },
+                  },
+                }
+              : message.method === "tools/list"
+                ? { result: { tools: [] } }
+                : { error: { code: -32601, message: "Method not found" } }
+          Queue.offerUnsafe(
+            output,
+            new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", id: message.id, ...response }) + "\n"),
+          )
+        }
+        if (typeof stdin !== "object" || !("stream" in stdin) || typeof stdin.stream === "string")
+          return yield* Effect.die("Expected piped stdin")
+        yield* Effect.forkScoped(
+          stdin.stream.pipe(
+            Stream.decodeText(),
+            Stream.splitLines,
+            Stream.runForEach((line) => Effect.sync(() => reply(JSON.parse(line)))),
+            Effect.andThen(
+              Effect.suspend(() => {
+                events.push(`closed ${name}`)
+                return events.filter((event) => event.startsWith("closed")).length === names.length
+                  ? Deferred.succeed(everyClosed, undefined)
+                  : Effect.void
+              }),
+            ),
+          ),
+        )
+        return makeHandle({
+          pid: ProcessId(1),
+          exitCode: Effect.raceFirst(Deferred.await(everyClosed).pipe(Effect.as(ExitCode(0))), Deferred.await(killed)),
+          isRunning: Effect.succeed(true),
+          kill: (options) =>
+            Effect.sync(() => events.push(`${options?.killSignal ?? "SIGTERM"} ${name}`)).pipe(
+              Effect.andThen(Deferred.succeed(killed, ExitCode(143))),
+            ),
+          stdin: Sink.drain,
+          stdout: Stream.fromQueue(output),
+          stderr: Stream.never,
+          all: Stream.never,
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.empty,
+          unref: Effect.succeed(Effect.void),
+        })
+      }),
+    )
+    const environment = Layer.succeed(
+      Environment.Service,
+      Environment.Service.of({ files: Environment.makeFiles(Environment.makeMemoryDriver()), spawner }),
+    )
+    const root = yield* Scope.make()
+    yield* Effect.addFinalizer(() => Scope.close(root, Exit.void))
+    const context = yield* Layer.buildWithScope(Mcp.layer().pipe(Layer.provide(environment)), root)
+    const service = Context.get(context, Mcp.Service)
+    yield* Effect.forEach(names, (name) => service.add(name, new ConfigMCP.Local({ type: "local", command: [name] })), {
+      discard: true,
+    })
+    yield* Effect.forEach(names, (name) => settled(service, name), { discard: true })
+    expect((yield* service.servers()).map((server) => server.status)).toEqual([
+      { status: "connected" },
+      { status: "connected" },
+    ])
+
+    yield* State.shutdown(Scope.close(root, Exit.void))
+
+    expect(events.slice(0, 2).toSorted()).toEqual(["closed first", "closed second"])
+    expect(events.slice(2).toSorted()).toEqual(["SIGTERM first", "SIGTERM second"])
   }),
 )
 
