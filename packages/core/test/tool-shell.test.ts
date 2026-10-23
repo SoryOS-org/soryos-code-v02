@@ -34,7 +34,7 @@ import { Plugin } from "@opencode/core/plugin"
 import { PluginSupervisor } from "@opencode/core/plugin/supervisor"
 import { Shell } from "@opencode/core/shell"
 import { ShellSelect } from "@opencode/core/shell/select"
-import { ID } from "@opencode/schema/shell"
+import { Event, ID } from "@opencode/schema/shell"
 import { ShellTool } from "@opencode/core/tool/plugin/shell"
 import { ToolOutput } from "@opencode/core/tool-output"
 import { Tool } from "@opencode/core/tool"
@@ -1552,6 +1552,31 @@ describe("ShellTool", () => {
         (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]().then(() => undefined)),
       ),
     { timeout: 15_000 },
+  )
+
+  it.live("publishes shell deletion when its location is torn down", () =>
+    Effect.acquireUseRelease(
+      Effect.promise(() => tmpdir()),
+      (tmp) =>
+        Effect.gen(function* () {
+          reset()
+          const bus = yield* Bus.Service
+          const deleted = yield* bus.subscribe(Event.Deleted).pipe(
+            Stream.filter((event) => event.location?.directory === tmp.path),
+            Stream.runHead,
+            Effect.forkScoped({ startImmediately: true }),
+          )
+          const info = yield* withSession(tmp.path, () =>
+            Effect.gen(function* () {
+              const shell = yield* Shell.Service
+              return yield* shell.create({ command: idleCommand, timeout: 0 })
+            }),
+          )
+
+          expect((yield* Fiber.join(deleted).pipe(Effect.timeout("2 seconds"))).valueOrUndefined?.data.id).toBe(info.id)
+        }),
+      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]().then(() => undefined)),
+    ),
   )
 
   it.live("returns the shell id for a background command", () =>
