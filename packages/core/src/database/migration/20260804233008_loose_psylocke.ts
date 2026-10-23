@@ -136,26 +136,15 @@ const migration: DatabaseMigration.Migration = {
           CONSTRAINT \`fk_session_message_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );
       `)
-      // 1.19's /api/session already writes V2 messages in this database.
-      // Preserve their sessions before moving the projection's foreign key.
+      // Preserve 1.19 API history until the data importer can resolve its owners.
+      // This durable staging table survives interruption between schema and data migration.
       yield* tx.run(`
-        INSERT OR IGNORE INTO \`session_v2\` (
-          id, project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
-          summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost,
-          tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
-          revert, permission, agent, model, time_created, time_updated, time_compacting, time_archived
-        )
-        SELECT
-          id, project_id, workspace_id, parent_id, slug, directory, path, title, version, share_url,
-          summary_additions, summary_deletions, summary_files, summary_diffs, metadata, cost,
-          tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
-          revert, NULL, agent, model, time_created, time_updated, time_compacting, time_archived
-        FROM \`session\`
-        WHERE EXISTS (SELECT 1 FROM \`session_message\` WHERE session_id = session.id);
+        CREATE TABLE \`migration_v1_session_message\` AS
+        SELECT id, session_id, type, seq, time_created, time_updated, data FROM \`session_message\`;
       `)
       yield* tx.run(`
-        INSERT INTO \`__new_session_message\` (id, session_id, type, seq, time_created, time_updated, data)
-        SELECT id, session_id, type, seq, time_created, time_updated, data FROM \`session_message\`;
+        CREATE INDEX \`migration_v1_session_message_session_idx\`
+        ON \`migration_v1_session_message\` (session_id, seq);
       `)
       yield* tx.run(`DROP TABLE \`session_message\`;`)
       yield* tx.run(`ALTER TABLE \`__new_session_message\` RENAME TO \`session_message\`;`)
