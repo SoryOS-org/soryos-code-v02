@@ -24,7 +24,7 @@ const style = motionTuning.choice("sidebars.preview.style", {
   label: "Style",
   group: "Experiments",
   card: "Sidebar hover",
-  value: "glide",
+  value: "cursor",
   labels: { today: "Today", glide: "Glide", cursor: "Follow cursor" },
 })
 
@@ -32,7 +32,7 @@ const spring = motionTuning.spring("sidebars.preview", {
   label: "Glide",
   group: "Experiments",
   card: "Sidebar hover",
-  when: () => style() !== "today",
+  when: () => style() === "glide",
   presets: {
     snappy: { duration: 0.2, bounce: 0 },
     smooth: { duration: 0.28, bounce: 0 },
@@ -43,7 +43,7 @@ const spring = motionTuning.spring("sidebars.preview", {
 const glides = () => style() !== "today"
 
 // In the vertical strip, the next tab's preview starts where the last one was and glides to its own row, so moving
-// down the tabs reads as one card following the cursor. "Follow cursor" glides to the pointer's height instead.
+// down the tabs reads as one card following the cursor. "Follow cursor" pins the card to the pointer's height instead.
 const glide: Glide = {
   closedAt: Number.NEGATIVE_INFINITY,
   offset: Spring.fromDuration(0, spring()),
@@ -147,7 +147,7 @@ export function TabPreviewPopover(props: {
         tabIndex={-1}
         onPointerMove={(event: PointerEvent) => {
           glide.pointerY = event.clientY
-          if (props.orientation === "vertical" && style() === "cursor" && triggerEl === glide.trigger) follow()
+          if (props.orientation === "vertical" && style() === "cursor" && triggerEl === glide.trigger) place()
         }}
       >
         {props.trigger}
@@ -204,24 +204,33 @@ function show(card: HTMLElement, trigger: HTMLElement) {
   unwatch()
 
   if (prefersReducedMotion()) return glide.offset.snap(0)
-  const cursor = style() === "cursor"
 
-  if (cursor) watch(trigger)
+  if (style() === "cursor") {
+    watch(trigger)
+    place()
+    // The card has no height while it mounts, so clamp again once it's laid out.
+    if (!glide.rects) requestAnimationFrame(place)
 
-  if (!handover && !cursor) return glide.offset.snap(0)
+    return
+  }
+
+  if (!handover) return glide.offset.snap(0)
   // Starts from where the last card is, keeping the velocity of a glide already under way.
-  if (handover) glide.offset.value += previous.getBoundingClientRect().top - trigger.getBoundingClientRect().top
-  glide.offset.target = cursor ? cursorOffset() : 0
-
-  if (!handover) glide.offset.snap(glide.offset.target)
+  glide.offset.value += previous.getBoundingClientRect().top - trigger.getBoundingClientRect().top
+  glide.offset.target = 0
   card.style.transform = `translateY(${glide.offset.value}px)`
   glide.stop ??= frameLoop.add(step)
 }
 
-function follow() {
-  if (!glide.card?.isConnected || prefersReducedMotion()) return
-  glide.offset.target = cursorOffset()
-  glide.stop ??= frameLoop.add(step)
+// "Follow cursor" moves the card straight to the pointer, with no spring.
+function place() {
+  const card = glide.card
+
+  if (!card?.isConnected || prefersReducedMotion()) return
+  glide.stop?.()
+  glide.stop = undefined
+  glide.offset.snap(cursorOffset())
+  card.style.transform = `translateY(${glide.offset.value}px)`
 }
 
 // Keeps the pointer level with the middle of the row-sized slot the card would sit in by default, so the offset is 0
@@ -250,7 +259,7 @@ function measure() {
 function watch(trigger: HTMLElement) {
   const refresh = () => {
     glide.rects = undefined
-    follow()
+    place()
   }
   const observer = new ResizeObserver(refresh)
   observer.observe(trigger.closest('[data-slot="vertical-tabs"]') ?? trigger)
@@ -287,8 +296,6 @@ function step(dt: number) {
 
   glide.offset.omega = (2 * Math.PI) / spring().duration
   glide.offset.zeta = 1 - spring().bounce
-
-  if (style() === "cursor" && !glide.rects) glide.offset.target = cursorOffset()
 
   if (prefersReducedMotion()) glide.offset.snap(0)
   const offset = glide.offset.step(dt)
