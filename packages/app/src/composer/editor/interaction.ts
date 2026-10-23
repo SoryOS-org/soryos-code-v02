@@ -233,7 +233,7 @@ export function createComposerEditor(input: {
       return "file"
     },
     sortGroupsBy: (a, b) => {
-      const order = ["reference", "agent", "session", "skill", "resource", "recent", "file"]
+      const order = ["skill", "agent", "session", "reference", "resource", "recent", "file"]
 
       return order.indexOf(a.category) - order.indexOf(b.category)
     },
