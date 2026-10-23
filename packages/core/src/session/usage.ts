@@ -18,7 +18,6 @@ export const tokens = (usage: Usage | undefined): TokenUsage.Info => ({
   },
 })
 
-// TODO(#35765): Use Copilot's reported billed amount once billing has a dedicated typed runtime contract.
 export function calculateCost(costs: Model.Info["cost"], usage: TokenUsage.Info) {
   const context = usage.input + usage.cache.read + usage.cache.write
   const tier = costs
@@ -35,12 +34,22 @@ export function calculateCost(costs: Model.Info["cost"], usage: TokenUsage.Info)
   )
 }
 
-export type Recorded = { readonly tokens: TokenUsage.Info; readonly cost: Money.USD }
+export type Recorded = {
+  readonly tokens: TokenUsage.Info
+  readonly cost: Money.USD
+  readonly reportedCostUSD?: Money.USD
+}
 
 export const record = (usage: Usage | undefined, costs: Model.Info["cost"]): Recorded => {
   const normalized = tokens(usage)
-  return { tokens: normalized, cost: calculateCost(costs, normalized) }
+  const reportedCostUSD = reportedCost(usage)
+  return { tokens: normalized, cost: reportedCostUSD ?? calculateCost(costs, normalized), reportedCostUSD }
 }
+
+export const reportedCost = (usage: Usage | undefined) =>
+  usage?.reportedCostUSD !== undefined && Number.isFinite(usage.reportedCostUSD) && usage.reportedCostUSD >= 0
+    ? Money.USD.make(usage.reportedCostUSD)
+    : undefined
 
 export const add = (a: Recorded, b: Recorded): Recorded => ({
   cost: Money.USD.make(a.cost + b.cost),

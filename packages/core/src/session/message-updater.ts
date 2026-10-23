@@ -269,6 +269,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           draft.rawFinish = event.data.rawFinish
           draft.native = castDraft(event.data.native)
           draft.cost = event.data.cost
+          draft.reportedCostUSD = event.data.reportedCostUSD
           draft.tokens = event.data.tokens
           projectTerminalSnapshot(draft, event)
         })

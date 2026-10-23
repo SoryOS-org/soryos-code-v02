@@ -1262,6 +1262,7 @@ export type SessionStepEnded = {
     rawFinish?: string
     native?: SessionMessageNative1
     cost: MoneyUSD
+    reportedCostUSD?: MoneyUSD
     tokens: TokenUsageInfo
     snapshot?: SnapshotID
     files?: Array<RelativePath>
@@ -2437,6 +2438,7 @@ export type SessionMessageAssistant = {
   rawFinish?: string
   native?: SessionMessageNative
   cost?: MoneyUSD
+  reportedCostUSD?: MoneyUSD
   tokens?: TokenUsageInfo
   error?: SessionStructuredError
   retry?: SessionMessageAssistantRetry

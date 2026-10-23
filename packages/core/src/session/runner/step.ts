@@ -244,7 +244,12 @@ export const make = Effect.gen(function* () {
                     .pipe(Effect.orElseSucceed(() => undefined))
               : undefined
           const usage = record.finish
-            ? { cost: SessionUsage.calculateCost(input.model.cost, record.finish.tokens), tokens: record.finish.tokens }
+            ? {
+                cost:
+                  record.finish.reportedCostUSD ?? SessionUsage.calculateCost(input.model.cost, record.finish.tokens),
+                reportedCostUSD: record.finish.reportedCostUSD,
+                tokens: record.finish.tokens,
+              }
             : undefined
           if (record.failure) yield* publisher.publishStepFailure({ ...usage, snapshot, files })
           if (record.finish && usage && !record.failure)

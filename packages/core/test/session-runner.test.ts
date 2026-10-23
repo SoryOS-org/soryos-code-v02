@@ -15,6 +15,7 @@ import {
   InvalidRequestError,
   RateLimitError,
   UnknownProviderError,
+  Usage,
 } from "@opencode/ai"
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
 import { AnthropicMessages, OpenAIResponses } from "@opencode/ai/protocols"
@@ -155,6 +156,22 @@ test("calculates step cost using the matching context tier", () => {
       { input: 80, output: 10, reasoning: 2, cache: { read: 20, write: 1 } },
     ),
   ).toBeCloseTo(0.0002926)
+})
+
+test("prefers provider-reported USD cost over model price estimates", () => {
+  const costs = [
+    {
+      input: Money.USDPerMillionTokens.make(1),
+      output: Money.USDPerMillionTokens.make(2),
+      cache: { read: Money.USDPerMillionTokens.make(0), write: Money.USDPerMillionTokens.make(0) },
+    },
+  ]
+  const usage = new Usage({ inputTokens: 1000, outputTokens: 100, nonCachedInputTokens: 1000, reportedCostUSD: 0.0123 })
+  expect(SessionUsage.record(usage, costs).cost).toBe(Money.USD.make(0.0123))
+  expect(SessionUsage.record(usage, costs).reportedCostUSD).toBe(Money.USD.make(0.0123))
+  expect(
+    SessionUsage.record(new Usage({ ...usage, reportedCostUSD: Number.NaN }), costs).reportedCostUSD,
+  ).toBeUndefined()
 })
 
 test("ignores malformed model cost fields", () => {

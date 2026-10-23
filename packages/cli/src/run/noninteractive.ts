@@ -85,6 +85,7 @@ export async function runNonInteractivePrompt(input: Input) {
   const renderedText = new Map<string, string>()
   const renderedReasoning = new Map<string, string>()
   const renderedTools = new Set<string>()
+  const renderedSteps = new Set<string>()
   let submitted = false
   let promoted = false
   let emittedError = false
@@ -493,6 +494,7 @@ export async function runNonInteractivePrompt(input: Input) {
 
       if (event.type === "session.step.ended") {
         flushStep()
+        renderedSteps.add(event.data.assistantMessageID)
         const part = {
           id: partID(event.id),
           sessionID: input.sessionID,
@@ -501,6 +503,7 @@ export async function runNonInteractivePrompt(input: Input) {
           reason: event.data.finish,
           snapshot: event.data.snapshot,
           cost: event.data.cost,
+          reportedCostUSD: event.data.reportedCostUSD,
           tokens: event.data.tokens,
         }
         emit("step_finish", time, { part })
@@ -658,6 +661,22 @@ export async function runNonInteractivePrompt(input: Input) {
         }
         await input.renderToolError(item)
         UI.error(item.state.error.message)
+      }
+
+      if (message.finish && message.tokens && !renderedSteps.has(message.id)) {
+        renderedSteps.add(message.id)
+        emit("step_finish", timestamp, {
+          part: {
+            id: projectedPartID(message.id, "step-finish"),
+            sessionID: input.sessionID,
+            messageID: message.id,
+            type: "step-finish",
+            reason: message.finish,
+            cost: message.cost,
+            reportedCostUSD: message.reportedCostUSD,
+            tokens: message.tokens,
+          },
+        })
       }
 
       // A declined tool call ends its step with an interrupted-step error that is

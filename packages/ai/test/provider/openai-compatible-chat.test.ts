@@ -381,7 +381,7 @@ describe("OpenAI-compatible Chat route", () => {
                   deltaChunk({ role: "assistant", content: "Hello" }),
                   deltaChunk({ content: "!" }),
                   deltaChunk({}, "stop"),
-                  usageChunk({ prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 }),
+                  usageChunk({ prompt_tokens: 5, completion_tokens: 2, total_tokens: 7, cost: 0.0123 }),
                 ),
                 { headers: { "content-type": "text/event-stream" } },
               )
@@ -392,6 +392,7 @@ describe("OpenAI-compatible Chat route", () => {
 
       expect(response.text).toBe("Hello!")
       expect(response.usage).toMatchObject({ inputTokens: 5, outputTokens: 2, totalTokens: 7 })
+      expect(response.usage?.reportedCostUSD).toBe(0.0123)
       expect(response.events.at(-1)).toMatchObject({
         type: "finish",
         reason: { normalized: "stop", raw: "stop" },
@@ -462,6 +463,7 @@ describe("OpenAI-compatible Chat route", () => {
         inputTokens: undefined,
         outputTokens: undefined,
         totalTokens: undefined,
+        reportedCostUSD: undefined,
         providerMetadata: {
           deepseek: {
             prompt_tokens: null,

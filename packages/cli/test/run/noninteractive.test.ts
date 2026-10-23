@@ -354,6 +354,9 @@ describe("runNonInteractivePrompt", () => {
           model: { providerID: "test", id: "test-model" },
           content: [{ type: "text", text: "projected answer" }],
           finish: "stop",
+          cost: 0.0007,
+          reportedCostUSD: 0.0012,
+          tokens: { input: 100, output: 2, reasoning: 0, cache: { read: 0, write: 0 } },
           time: { created: 2, completed: 3 },
         },
         { id: messageID, type: "user", text: "hello", time: { created: 1 } },
@@ -373,7 +376,13 @@ describe("runNonInteractivePrompt", () => {
         .split("\n")
         .filter(Boolean)
         .map((line) => JSON.parse(line)),
-    ).toEqual([expect.objectContaining({ type: "text", part: expect.objectContaining({ text: "projected answer" }) })])
+    ).toEqual([
+      expect.objectContaining({ type: "text", part: expect.objectContaining({ text: "projected answer" }) }),
+      expect.objectContaining({
+        type: "step_finish",
+        part: expect.objectContaining({ reportedCostUSD: 0.0012, cost: 0.0007 }),
+      }),
+    ])
   })
 
   test("reports an observed execution failure before prompt promotion", async () => {

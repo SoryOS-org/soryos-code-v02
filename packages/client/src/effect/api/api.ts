@@ -826,6 +826,7 @@ export type SessionLogOutput =
             readonly rawFinish?: string | undefined
             readonly native?: SessionMessage.Native | undefined
             readonly cost: Money.USD
+            readonly reportedCostUSD?: Money.USD | undefined
             readonly tokens: {
               readonly input: number
               readonly output: number
