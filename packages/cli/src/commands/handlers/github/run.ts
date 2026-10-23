@@ -97,7 +97,11 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       yield* Effect.promise(async () => {
         const octokit = new Octokit({ auth: token })
         try {
-          await octokit.reactions.createForIssueComment({ owner, repo, comment_id: commentId, content: "eyes" })
+          if (eventName === "pull_request_review_comment") {
+            await octokit.reactions.createForPullRequestReviewComment({ owner, repo, comment_id: commentId, content: "eyes" })
+          } else {
+            await octokit.reactions.createForIssueComment({ owner, repo, comment_id: commentId, content: "eyes" })
+          }
         } catch {}
       })
     }
@@ -198,10 +202,19 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       if (!token || !commentId || isRepoEvent) return
       const octokit = new Octokit({ auth: token })
       try {
-        const reactions = await octokit.reactions.listForIssueComment({ owner, repo, comment_id: commentId, content: "eyes" })
+        let reactions: any
+        if (eventName === "pull_request_review_comment") {
+          reactions = await octokit.reactions.listForPullRequestReviewComment({ owner, repo, comment_id: commentId, content: "eyes" })
+        } else {
+          reactions = await octokit.reactions.listForIssueComment({ owner, repo, comment_id: commentId, content: "eyes" })
+        }
         const eyes = reactions.data.find((r: any) => r.user?.login === "opencode-agent[bot]")
         if (eyes) {
-          await octokit.reactions.deleteForIssueComment({ owner, repo, comment_id: commentId, reaction_id: eyes.id })
+          if (eventName === "pull_request_review_comment") {
+            await octokit.reactions.deleteForPullRequestComment({ owner, repo, comment_id: commentId, reaction_id: eyes.id })
+          } else {
+            await octokit.reactions.deleteForIssueComment({ owner, repo, comment_id: commentId, reaction_id: eyes.id })
+          }
         }
       } catch {}
     })
@@ -227,12 +240,20 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       try { git(["config", "--local", "user.email"], cwd) } catch { gitSafe(["config", "--local", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd) }
 
       try {
-        const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+        const octokit = new Octokit({ auth: pushToken })
+        let base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+        if (base === "HEAD") {
+          try {
+            const repoInfo = await octokit.repos.get({ owner, repo })
+            base = repoInfo.data.default_branch
+          } catch {
+            base = "main"
+          }
+        }
         const branch = `opencode/run-${Date.now()}`
         git(["checkout", "-b", branch], cwd)
         git(["add", "-A"], cwd)
         git(["commit", "-m", "opencode: automated changes"], cwd)
-        const octokit = new Octokit({ auth: pushToken })
         if (isFork && prPayload) {
           const forkRepo = prPayload.head.repo.full_name
           const headRef = prPayload.head.ref
