@@ -580,10 +580,8 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, options:
     providerMetadataKey: request.model.route.providerMetadataKey ?? request.model.provider,
     toolCallID: (id: string) => {
       if (mistral)
-        return id
-          .replace(/[^a-zA-Z0-9]/g, "")
-          .slice(0, 9)
-          .padEnd(9, "0")
+        // hash avoids collisions when IDs share a long common prefix (e.g. GLM chatcmpl-tool-*)
+        return Bun.hash(id).toString(36).padStart(9, "0").slice(-9)
       if (modelID.includes("claude")) return id.replace(/[^a-zA-Z0-9_-]/g, "_")
       if (request.model.provider === "openai" || request.model.provider === "azure" || modelID.startsWith("openai/"))
         return id.slice(0, 40)
