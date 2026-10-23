@@ -277,7 +277,7 @@ describe("current session timeline rows", () => {
     })
   })
 
-  test("omits a grouped reasoning-only row while busy until other content or completion", () => {
+  test("keeps a grouped reasoning-only row while busy", () => {
     const thought = { type: "reasoning", text: "Thinking", time: { created: 1, completed: 2 } } as const
 
     const rows = (content: SessionMessageAssistant["content"], busy: boolean) =>
@@ -288,9 +288,15 @@ describe("current session timeline rows", () => {
         timelineDetail: timelinePresets[2].value,
       }).rows
 
-    expect(rows([{ ...thought, time: { created: 1 } }], true).map((row) => row._tag)).toEqual(["UserMessage"])
-    expect(rows([thought], true).map((row) => row._tag)).toEqual(["UserMessage"])
-    expect(rows([thought, { type: "text", text: "" }], true).map((row) => row._tag)).toEqual(["UserMessage"])
+    expect(rows([{ ...thought, time: { created: 1 } }], true).map((row) => row._tag)).toEqual([
+      "UserMessage",
+      "AssistantPart",
+    ])
+    expect(rows([thought], true).map((row) => row._tag)).toEqual(["UserMessage", "AssistantPart"])
+    expect(rows([thought, { type: "text", text: "" }], true).map((row) => row._tag)).toEqual([
+      "UserMessage",
+      "AssistantPart",
+    ])
     expect(rows([thought, { type: "text", text: "Answer" }], true).map((row) => row._tag)).toEqual([
       "UserMessage",
       "AssistantPart",

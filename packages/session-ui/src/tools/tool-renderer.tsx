@@ -429,8 +429,48 @@ export function CurrentContextToolGroup(props: {
     ]),
   )
 
+  const reasoning = createMemo(() => props.parts.flatMap((part) => (part.type === "reasoning" ? [part] : [])))
+  // Thoughts alone are not finished work yet, so the live group reads as Thinking, in place of Working, rather than
+  // "Used 1 Thought".
+  const thinking = createMemo(() => props.busy && reasoning().length > 0 && reasoning().length === props.parts.length)
+  const [now, setNow] = createSignal(Date.now())
+
+  createEffect(() => {
+    if (!thinking()) return
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    onCleanup(() => clearInterval(timer))
+  })
+
+  const elapsed = createMemo(() => {
+    const started = reasoning()[0]?.time?.created
+
+    if (!thinking() || started === undefined) return ""
+    const total = Math.max(0, Math.floor((now() - started) / 1000))
+    const numfmt = new Intl.NumberFormat(i18n.locale())
+
+    if (total < 60) return i18n.t("ui.message.duration.seconds", { count: numfmt.format(total) })
+
+    if (total < 3600)
+      return i18n.t("ui.message.duration.minutesSeconds", {
+        minutes: numfmt.format(Math.floor(total / 60)),
+        seconds: numfmt.format(total % 60),
+      })
+
+    return i18n.t("ui.message.duration.hoursMinutes", {
+      hours: numfmt.format(Math.floor(total / 3600)),
+      minutes: numfmt.format(Math.floor(total / 60) % 60),
+    })
+  })
+
   const label = createMemo(() => {
-    const thoughts = props.parts.filter((part) => part.type === "reasoning").length
+    const thoughts = reasoning().length
+
+    if (thinking()) {
+      const text = i18n.t("ui.sessionTurn.status.thinking")
+
+      return { text, title: text, before: "", count: undefined, between: "", after: "" }
+    }
 
     if (!names() && !thoughts) {
       const text = i18n.t("ui.messagePart.context.updates")
@@ -566,7 +606,16 @@ export function CurrentContextToolGroup(props: {
                   </Show>
                 </span>
               </Show>
-              <Show when={label().title}>{(title) => <span data-slot="basic-tool-tool-title">{title()}</span>}</Show>
+              <Show when={label().title}>
+                {(title) => (
+                  <span data-slot="basic-tool-tool-title">
+                    <Show when={thinking()} fallback={title()}>
+                      <TextShimmer text={title()} active />
+                    </Show>
+                  </span>
+                )}
+              </Show>
+              <Show when={elapsed()}>{(value) => <span data-slot="basic-tool-tool-subtitle">{value()}</span>}</Show>
               <Show when={label().after}>
                 {(after) => <span data-slot="context-tool-group-prefix">{after()}</span>}
               </Show>
@@ -616,7 +665,8 @@ export function CurrentContextToolGroup(props: {
                             id={part().id}
                             content={part()}
                             streaming={part().streaming ?? false}
-                            defaultOpen={props.reasoningDefaultOpen}
+                            // The group already reads as Thinking, so opening it shows the thoughts themselves.
+                            defaultOpen={thinking() || props.reasoningDefaultOpen}
                             open={props.reasoningOpen?.(part().id)}
                             onOpenChange={(open) => props.onReasoningOpenChange?.(part().id, open)}
                             onContentRendered={props.onSizeChange}

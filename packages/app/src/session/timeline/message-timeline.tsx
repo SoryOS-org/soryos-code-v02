@@ -419,9 +419,16 @@ function MessageTimelineView(
         return message?.type === "compaction" && message.status === "running"
       }
 
+      if (!Predicate.isTagged(row, "AssistantPart")) return false
+
+      // A live group of only thoughts reads as Thinking and stands in for Working.
+      if (row.group.type === "context" && projection.lastAssistantGroupKey().get(active) === row.group.key)
+        return row.group.refs.every(
+          (ref) => Timeline.resolveContent(messageByID().get(ref.messageID), ref.partID)?.type === "reasoning",
+        )
+
       // Used and read groups keep the fallback, so each new read does not swap Working out for its short call.
-      if (!Predicate.isTagged(row, "AssistantPart") || row.group.type === "context" || row.group.type === "read")
-        return false
+      if (row.group.type === "context" || row.group.type === "read") return false
 
       return (row.group.type === "part" ? [row.group.ref] : row.group.refs).some((ref) => {
         const content = Timeline.resolveContent(messageByID().get(ref.messageID), ref.partID)

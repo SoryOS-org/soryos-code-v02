@@ -681,7 +681,9 @@ test.describe("Working", () => {
     await expect(working).toHaveCount(0)
   })
 
-  test("keeps Working instead of Used 1 Thought while reasoning is the only activity", async ({ page }) => {
+  test("shows an expandable live Thinking in place of Working while reasoning is the only activity", async ({
+    page,
+  }) => {
     const timeline = await setupTimeline(page, {
       messages: [
         userMessage(),
@@ -690,15 +692,36 @@ test.describe("Working", () => {
       settings: { timelineDetail: detailed },
     })
 
+    // reasoningPart starts at 1700000001000, so the pause lands 8m 12s into the thought.
+    await page.clock.install({ time: 1700000001000 })
+    await page.reload()
+    await timeline.transport.waitForConnection()
+    await page.clock.pauseAt(1700000001000 + 492_000)
+
     const working = page.locator('[data-component="session-working"]')
     const group = page.locator('[data-component="collapsed-tool-group"]')
-    await expect(working).toBeVisible()
-    await expect(group).toHaveCount(0)
+    const trigger = group.locator('[data-component="context-tool-group-trigger"]')
+    const elapsed = trigger.locator('[data-slot="basic-tool-tool-subtitle"]')
+    await expect(group).toHaveAttribute("data-timeline-part-ids", `${assistantID}:reasoning:0`)
+    await expect(trigger).toHaveAttribute("aria-label", "Thinking")
+    await expect(trigger.locator('[data-component="text-shimmer"]')).toHaveAttribute("data-active", "true")
+    await expect(elapsed).toHaveText("8m 12s")
+    await expect(working).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Used 1 Thought" })).toHaveCount(0)
 
+    await page.clock.fastForward(1_000)
+    await expect(elapsed).toHaveText("8m 13s")
+
+    await trigger.click()
+    await expect(group.getByText("Still considering the answer.", { exact: true })).toBeVisible()
+
+    // Event delivery schedules timers, so let time run again before streaming the next part.
+    await page.clock.resume()
+
     await timeline.send(partUpdated(toolPart("prt_after_thought", "read", "running", { filePath: "package.json" })))
-    await expect(group).toBeVisible()
     await expect(group).toHaveAttribute("data-timeline-part-ids", `${assistantID}:reasoning:0,prt_after_thought`)
+    await expect(trigger).toHaveAttribute("aria-label", "Used 1 Read")
+    await expect(elapsed).toHaveCount(0)
     await expect(working).toBeVisible()
   })
 
