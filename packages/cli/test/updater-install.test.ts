@@ -4,7 +4,7 @@ import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
 import { expect, spyOn, test } from "bun:test"
-import { Effect, FileSystem, Layer, Logger, PlatformError, Stream } from "effect"
+import { Effect, FileSystem, Layer, PlatformError, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
@@ -486,10 +486,7 @@ windows("windows refuses package removal when its temporary image retention fail
   { fallback: true, exitCode: 1 },
 ].forEach(({ fallback, exitCode }) => {
   windows(
-    "windows reports possible retained-image leftovers only after fallback uninstall: fallback=" +
-      fallback +
-      ", exit=" +
-      exitCode,
+    "windows returns retained-image cleanup information after uninstall: fallback=" + fallback + ", exit=" + exitCode,
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
@@ -514,16 +511,11 @@ windows("windows refuses package removal when its temporary image retention fail
         )
         const removal = test.updater.removal("npm")
         if (!removal) return yield* Effect.die("Expected npm removal command")
-        const logs: string[] = []
-        const result = yield* removal.run.pipe(
-          Effect.exit,
-          Effect.provide(Logger.layer([Logger.make((log) => logs.push(String(log.message)))])),
-        )
+        const result = yield* removal.run.pipe(Effect.exit)
         expect(result._tag).toBe(exitCode === 0 ? "Success" : "Failure")
         const directory = path.join(path.dirname(test.global.home), ".opencode", "retained-images")
-        // Once uninstalled, another OpenCode run cannot be relied on to sweep this directory.
-        expect(logs.some((message) => message.includes(directory))).toBe(fallback && exitCode === 0)
-        if (fallback && exitCode === 0) expect(logs.join("\n")).toContain("after all OpenCode processes exit")
+        // The caller owns user-visible cleanup instructions; diagnostic logs cannot carry this contract.
+        if (result._tag === "Success") expect(result.value.retainedDirectory).toBe(fallback ? directory : undefined)
         expect(test.commands).toEqual([["npm", "uninstall", "--global", "@opencode/cli"]])
       }),
   )

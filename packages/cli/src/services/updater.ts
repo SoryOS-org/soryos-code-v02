@@ -112,9 +112,12 @@ export interface Interface {
   readonly method: () => Effect.Effect<Method | undefined>
   readonly latest: (method?: Method) => Effect.Effect<string, Error>
   readonly upgrade: (method: Method, version: string) => Effect.Effect<void, Error>
-  readonly removal: (
-    method: Method,
-  ) => { readonly command: ReadonlyArray<string>; readonly run: Effect.Effect<void, Error> } | undefined
+  readonly removal: (method: Method) =>
+    | {
+        readonly command: ReadonlyArray<string>
+        readonly run: Effect.Effect<{ readonly retainedDirectory?: string }, Error>
+      }
+    | undefined
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/cli/Updater") {}
@@ -267,7 +270,7 @@ const make = Effect.gen(function* () {
         exec(command, "5 minutes").pipe(
           Effect.flatMap((result) => (result.code === 0 ? Effect.void : Effect.fail(new Error(resultDetail(result))))),
         ),
-        { directory: global.tmp, uninstall: true },
+        global.tmp,
       ),
     }
   }
@@ -374,12 +377,9 @@ const make = Effect.gen(function* () {
   // while another link to it exists (see RetainedImage). Upgrades keep that link in the
   // cache, with a same-volume fallback for package installs. Uninstall has already
   // removed the cache, so it uses the temporary directory.
-  const retaining = <A, E, R>(
-    method: Method,
-    effect: Effect.Effect<A, E, R>,
-    options: { directory?: string; uninstall?: boolean } = {},
-  ) => {
-    if (process.platform !== "win32" || method === "brew") return effect
+  const retaining = <E, R>(method: Method, effect: Effect.Effect<void, E, R>, directory = global.cache) => {
+    if (process.platform !== "win32" || method === "brew")
+      return effect.pipe(Effect.as({ retainedDirectory: undefined }))
     // Only the installed binary is at stake; source checkouts run inside bun or node.
     const owned =
       method === "curl"
@@ -387,8 +387,7 @@ const make = Effect.gen(function* () {
         : method === "winget"
           ? installedWinget
           : installedPackage !== undefined
-    if (!owned) return effect
-    const directory = options.directory ?? global.cache
+    if (!owned) return effect.pipe(Effect.as({ retainedDirectory: undefined }))
     return Effect.scoped(
       Effect.gen(function* () {
         const link = yield* RetainedImage.retain(directory, "upgrade")
@@ -404,12 +403,8 @@ const make = Effect.gen(function* () {
                   : "Close all OpenCode processes, then run the package-manager command from a separate terminal.",
             }),
           )
-        const result = yield* effect
-        if (options.uninstall && path.dirname(link) !== directory)
-          yield* Effect.logWarning(
-            `Uninstall may leave retained executables in ${path.dirname(link)}; remove them after all OpenCode processes exit.`,
-          )
-        return result
+        yield* effect
+        return { retainedDirectory: path.dirname(link) === directory ? undefined : path.dirname(link) }
       }),
     ).pipe(Effect.provideService(FileSystem.FileSystem, fs))
   }
