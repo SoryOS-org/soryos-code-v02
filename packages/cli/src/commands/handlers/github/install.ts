@@ -44,7 +44,14 @@ export default Runtime.handler(Commands.commands.github.commands.install, () =>
     }
 
     const provider = (model as string).split("/")[0]
-    const envVar = provider === "anthropic" ? "ANTHROPIC_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "MODEL_API_KEY"
+    const envVarMap: Record<string, string> = {
+      anthropic: "ANTHROPIC_API_KEY",
+      openai: "OPENAI_API_KEY",
+      google: "GOOGLE_API_KEY",
+      opencode: "OPENCODE_API_KEY",
+      "github-copilot": "GITHUB_TOKEN",
+    }
+    const envVar = envVarMap[provider] ?? `${provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`
 
     const workflowDir = join(cwd, ".github", "workflows")
     if (!existsSync(workflowDir)) mkdirSync(workflowDir, { recursive: true })
