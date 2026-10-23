@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { bashUsesFifoProcessSubstitution, zshUsesFifoProcessSubstitution } from "../fixture/bash"
 import { ShellScan } from "../../src/shell/scan.js"
 
 const executions = [
@@ -187,12 +188,13 @@ describe("Bash real-shell differential grammar", () => {
     "scan_first `scan_second`",
     'scan_first "$(printf "\'"; scan_second)"',
   ]
-  // Read process substitution arguments so the real shell does not block on
-  // FIFO-based implementations (FreeBSD's default bash build uses FIFOs).
-  const functions = probes
+  const functions = probes.map((name) => `${name}() { printf '${name}\\n' >&2; }; `).join("")
+  // Read process substitution arguments so FIFO-based shells do not block on
+  // the FIFO open. Keep the original probes for bash where /dev/fd is available.
+  const portableFunctions = probes
     .map(
       (name) =>
-        `${name}() { printf '${name}\\n' >&2; for arg; do case "$arg" in /dev/fd/*|*/sh-np.*) read -r _ < "$arg" 2>/dev/null || true;; esac; done; }; `,
+        `${name}() { printf '${name}\\n' >&2; for arg; do case "$arg" in /dev/fd/*|*/sh-np.*|/tmp/zsh*) read -r _ < "$arg" 2>/dev/null || true;; esac; done; }; `,
     )
     .join("")
 
@@ -212,6 +214,11 @@ describe("Bash real-shell differential grammar", () => {
 
   for (const shell of ["bash", "zsh", Bun.which("dash") ? "dash" : "sh"]) {
     const executable = Bun.which(shell)
+    const executableFunctions =
+      (shell === "bash" && bashUsesFifoProcessSubstitution()) ||
+      (shell === "zsh" && zshUsesFifoProcessSubstitution())
+        ? portableFunctions
+        : functions
     const sources = (
       shell === "bash" || shell === "zsh"
         ? [...words, "scan_first <(scan_second)", 'values=(value "$(scan_second)"); scan_first']
@@ -224,7 +231,7 @@ describe("Bash real-shell differential grammar", () => {
           executable!,
           ...(shell === "bash" ? ["--noprofile", "--norc"] : shell === "zsh" ? ["-f"] : []),
           "-c",
-          functions + source,
+          executableFunctions + source,
         ],
         { env: { PATH: "/usr/bin:/bin", LC_ALL: "C" } },
       )
