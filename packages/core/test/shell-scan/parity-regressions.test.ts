@@ -4,6 +4,9 @@ import { ShellParse } from "../../src/shell/parse.js"
 import { ShellScan } from "../../src/shell/scan.js"
 
 const conditions = ["[[ -n <(scan_probe) ]]", "[[ -n >(scan_probe) ]]"]
+// Real-shell variants that open the process substitution path. Bash built
+// without /dev/fd support uses FIFOs, which block until the path is read.
+const executableConditions = ['[[ -n "$(cat <(scan_probe))x" ]]', ': > >(scan_probe)']
 const contexts = [
   (source: string) => source,
   (source: string) => `( ${source} )`,
@@ -88,7 +91,7 @@ describe("legacy-accepted shell syntax regressions", () => {
         "probe()# ignored ) }\n{ scan_probe; }; probe",
         "probe \\\n() \\\n{ scan_probe; }; probe",
         "function \\\nprobe() # ignored \\\n{ scan_probe; }; probe",
-        ...(shell === "bash" ? conditions : ["() { scan_probe; }"]),
+        ...(shell === "bash" ? executableConditions : ["() { scan_probe; }"]),
       ])(`${shell} really executes the extracted command: %s`, (source) => {
       if (!executable) throw new Error(`${shell} is unavailable`)
       const execution = Bun.spawnSync(

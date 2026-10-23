@@ -1,5 +1,5 @@
 import fs from "fs/promises"
-import { realpathSync, watch } from "node:fs"
+import { realpathSync } from "node:fs"
 import os from "os"
 import path from "path"
 import { describe, expect } from "bun:test"
@@ -547,7 +547,7 @@ describe("ShellTool conditional process substitution", () => {
             const marker = path.join(directory.active, "marker")
             const result = yield* runPermissionCommand(
               registry,
-              '[[ -n <(printf reached > marker) ]]; wait "$!"',
+              'path=<(printf reached > marker); [[ -n "$path" ]] < "$path"; wait "$!"',
               marker,
               [],
             )
@@ -570,7 +570,7 @@ describe("ShellTool conditional process substitution", () => {
               const location = yield* Location.Service
               yield* saved.add({ projectID: location.project.id, action: "shell", resources: ["wait *"] })
               const marker = path.join(directory.active, "marker")
-              const command = '[[ -n <(printf reached > marker) ]]; wait "$!"'
+              const command = 'path=<(printf reached > marker); [[ -n "$path" ]] < "$path"; wait "$!"'
               const result = yield* runPermissionCommand(registry, command, marker, [reply])
               expect(result.requests).toMatchObject([
                 { action: "shell", resources: ["printf reached > marker", 'wait "$!"'], save: ["printf *", "wait *"] },
@@ -1733,15 +1733,7 @@ describe("ShellTool", () => {
     () =>
       Effect.gen(function* () {
         const tmp = yield* tmpdirScoped()
-        const ready = yield* Deferred.make<void>()
-        yield* Effect.acquireRelease(
-          Effect.sync(() =>
-            watch(tmp.path, (_event, filename) => {
-              if (filename === "ready") Deferred.doneUnsafe(ready, Exit.void)
-            }),
-          ),
-          (watcher) => Effect.sync(() => watcher.close()),
-        )
+        const ready = path.join(tmp.path, "ready")
         yield* withSession(tmp.path, () =>
           Effect.gen(function* () {
             const shell = yield* Shell.Service
@@ -1754,7 +1746,13 @@ describe("ShellTool", () => {
               }),
               (info) =>
                 Effect.gen(function* () {
-                  yield* Deferred.await(ready).pipe(Effect.timeout("5 seconds"))
+                  // FreeBSD's fs.watch does not report the changed filename, so
+                  // poll for the readiness file instead of watching for it.
+                  yield* Effect.gen(function* () {
+                    while (!(yield* Effect.promise(() => Bun.file(ready).exists()))) {
+                      yield* Effect.sleep(Duration.millis(10))
+                    }
+                  }).pipe(Effect.timeout("5 seconds"))
                   yield* shell.timeout(info.id, 1)
                   // Completion must reap the process, not only mark the command as timed out.
                   expect((yield* shell.wait(info.id).pipe(Effect.timeout("10 seconds"))).status).toBe("timeout")

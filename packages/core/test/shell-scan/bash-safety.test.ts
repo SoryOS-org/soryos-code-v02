@@ -187,6 +187,15 @@ describe("Bash real-shell differential grammar", () => {
     "scan_first `scan_second`",
     'scan_first "$(printf "\'"; scan_second)"',
   ]
+  // Read process substitution arguments so the real shell does not block on
+  // FIFO-based implementations (FreeBSD's default bash build uses FIFOs).
+  const functions = probes
+    .map(
+      (name) =>
+        `${name}() { printf '${name}\\n' >&2; for arg; do case "$arg" in /dev/fd/*|*/sh-np.*) read -r _ < "$arg" 2>/dev/null || true;; esac; done; }; `,
+    )
+    .join("")
+
   const contexts = [
     (source: string) => source,
     (source: string) => `\n\n${source}\n\n`,
@@ -215,7 +224,7 @@ describe("Bash real-shell differential grammar", () => {
           executable!,
           ...(shell === "bash" ? ["--noprofile", "--norc"] : shell === "zsh" ? ["-f"] : []),
           "-c",
-          probes.map((name) => `${name}() { printf '${name}\\n' >&2; }; `).join("") + source,
+          functions + source,
         ],
         { env: { PATH: "/usr/bin:/bin", LC_ALL: "C" } },
       )
