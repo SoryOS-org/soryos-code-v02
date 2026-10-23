@@ -565,6 +565,7 @@ export function Prompt(props: PromptProps) {
         name: "prompt.editor",
         slash: { name: "editor" },
         run: async () => {
+          setPendingSubmit(undefined)
           dialog.clear()
 
           const editorPrompt = expandPromptInputPastedText(store.prompt, store.prompt.pasted, renderer.widthMethod)
@@ -1113,6 +1114,7 @@ export function Prompt(props: PromptProps) {
     mode: "normal" | "shell"
     prompt: PromptInfo
     delivery: SessionInbox.Delivery
+    slash: boolean
   }>()
   createEffect(() => {
     const pending = pendingSubmit()
@@ -1132,9 +1134,12 @@ export function Prompt(props: PromptProps) {
       return
     }
     if (
-      [data.location.agent, data.location.model, data.location.config].some(
-        (catalog) => catalog.list(location) === undefined,
-      )
+      [
+        data.location.agent,
+        data.location.model,
+        data.location.config,
+        ...(pending.slash ? [data.location.command] : []),
+      ].some((catalog) => catalog.list(location) === undefined)
     )
       return
     setPendingSubmit(undefined)
@@ -1200,9 +1205,14 @@ export function Prompt(props: PromptProps) {
     // A worktree switch updates the active location before its catalogs arrive.
     // Join their in-flight loads instead of silently dropping this submission.
     const location = currentLocation.ref ?? data.location.default()
-    const catalogs = [data.location.agent, data.location.model, data.location.config].filter(
-      (catalog) => catalog.list(location) === undefined,
-    )
+    const slashHead = parseSlashHead(inputText, /\s/)
+    const slashInput = store.mode === "normal" && slashHead !== undefined
+    const catalogs = [
+      data.location.agent,
+      data.location.model,
+      data.location.config,
+      ...(slashInput ? [data.location.command] : []),
+    ].filter((catalog) => catalog.list(location) === undefined)
     if (catalogs.length > 0) {
       const pending = {
         location: locationKey(location),
@@ -1210,6 +1220,7 @@ export function Prompt(props: PromptProps) {
         mode: store.mode,
         prompt: structuredClone(unwrap(store.prompt)),
         delivery,
+        slash: slashInput,
       }
       setPendingSubmit(pending)
       void Promise.all(catalogs.map((catalog) => catalog.sync(location))).catch((error: unknown) => {
@@ -1219,7 +1230,6 @@ export function Prompt(props: PromptProps) {
       })
       return false
     }
-    const slashHead = parseSlashHead(inputText, /\s/)
     const isCommand =
       slashHead !== undefined &&
       (data.location.command.list(currentLocation.ref) ?? []).some((command) => command.name === slashHead.name)

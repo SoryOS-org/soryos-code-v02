@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { InputRenderable, TextareaRenderable } from "@opentui/core"
 import path from "node:path"
 import { createAppFixture } from "./fixture/app"
@@ -166,17 +166,105 @@ test("a failed catalog load preserves the prompt and reports the error", async (
   expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
 })
 
-async function workspace(catalog: string) {
+test.each(["agent-first", "command-first", "command-only"])(
+  "slash submission waits for the destination command catalog (%s)",
+  async (order) => {
+    await using fixture = await workspace(order === "command-only" ? "command" : "agent", {
+      text: "/review changed files",
+      command: order !== "command-only",
+    })
+    await fixture.switchWorkspace()
+    fixture.setup.mockInput.pressEnter()
+    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    expect(fixture.created).toHaveLength(0)
+    expect(fixture.sent).toHaveLength(0)
+    expect(fixture.commands).toHaveLength(0)
+
+    if (order !== "command-only") {
+      if (order === "agent-first") fixture.release()
+      else fixture.releaseCommand()
+      await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+      expect(fixture.created).toHaveLength(0)
+      expect(fixture.sent).toHaveLength(0)
+      expect(fixture.commands).toHaveLength(0)
+    }
+    fixture.release()
+    fixture.releaseCommand()
+    await fixture.setup.waitFor(() => fixture.commands.length === 1)
+    expect(fixture.sent).toHaveLength(0)
+    expect(fixture.commands[0]).toMatchObject({ name: "review", text: "changed files" })
+    expect(fixture.created[0]).toMatchObject({ location: { directory: fixture.target }, agent: "review" })
+  },
+)
+
+test("ordinary prompts do not wait for the destination command catalog", async () => {
+  await using fixture = await workspace("command")
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  expect(fixture.commands).toHaveLength(0)
+  expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
+})
+
+test("an unknown slash remains prompt text after the destination commands load", async () => {
+  await using fixture = await workspace("command", { text: "/unknown changed files" })
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  expect(fixture.created).toHaveLength(0)
+  fixture.release()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  expect(fixture.commands).toHaveLength(0)
+  expect(fixture.sent[0]).toMatchObject({ text: "/unknown changed files" })
+})
+
+test("the external-editor shortcut cancels a deferred submit and preserves the edited draft", async () => {
+  const editor = await import("../src/editor")
+  const opened = Promise.withResolvers<void>()
+  const content = Promise.withResolvers<string>()
+  using open = spyOn(editor, "openEditor").mockImplementation(() => {
+    opened.resolve()
+    return content.promise
+  })
+  await using fixture = await workspace("agent")
+  try {
+    await fixture.switchWorkspace()
+    fixture.setup.mockInput.pressEnter()
+    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    fixture.setup.mockInput.pressKey("F9")
+    await opened.promise
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ value: "Review the changes" }))
+    fixture.release()
+    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    expect(fixture.created).toHaveLength(0)
+    expect(fixture.sent).toHaveLength(0)
+
+    content.resolve("Edited changes")
+    await fixture.setup.waitForFrame((frame) => frame.includes("Edited changes"))
+    expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Edited changes")
+    fixture.setup.mockInput.pressEnter()
+    await fixture.setup.waitFor(() => fixture.sent.length === 1)
+    expect(fixture.sent[0]).toMatchObject({ text: "Edited changes" })
+  } finally {
+    content.resolve("Edited changes")
+    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  }
+})
+
+async function workspace(catalog: string, options: { text?: string; command?: boolean } = {}) {
   const source = process.cwd()
   const target = path.join(path.parse(source).root, "opencode-worktree")
   const gate = Promise.withResolvers<void>()
   const requested = Promise.withResolvers<void>()
+  const command = Promise.withResolvers<void>()
+  if (!options.command) command.resolve()
   const created: unknown[] = []
   const sent: unknown[] = []
+  const commands: unknown[] = []
   let session: unknown
   let failures = 0
   const setup = await createAppFixture({
-    config: { animations: false, tabs: { enabled: false } },
+    config: { animations: false, tabs: { enabled: false }, keybinds: { "prompt.editor": "f9" } },
     fetch: async (url, request) => {
       const directory = url.searchParams.get("location[directory]") ?? source
       const destination = directory === target
@@ -189,6 +277,7 @@ async function workspace(catalog: string) {
           return json({ message: "Catalog unavailable" }, { status: 503 })
         }
       }
+      if (destination && url.pathname === "/api/command") await command.promise
       if (url.pathname === "/api/location") return json(location)
       if (url.pathname === "/api/fs/list") return json({ location, data: [] })
       if (url.pathname === "/api/agent")
@@ -207,7 +296,8 @@ async function workspace(catalog: string) {
       if (url.pathname === "/api/config")
         return json(destination ? [{ type: "document", info: { model: "provider/target-model" } }] : [])
       if (url.pathname === "/api/provider") return json({ location, data: [{ id: "provider", name: "Provider" }] })
-      if (url.pathname === "/api/command") return json({ location, data: [] })
+      if (url.pathname === "/api/command")
+        return json({ location, data: [{ name: "review", description: "Review the changes" }] })
       if (url.pathname === "/api/worktree") return json([{ directory: source }, { directory: target, strategy: "git" }])
       if (url.pathname === "/api/session" && request.method === "POST") {
         const body = await request.json()
@@ -227,6 +317,10 @@ async function workspace(catalog: string) {
       if (/^\/api\/session\/[^/]+\/prompt$/.test(url.pathname)) {
         sent.push(await request.json())
         return json({ data: {} })
+      }
+      if (/^\/api\/session\/[^/]+\/command$/.test(url.pathname)) {
+        commands.push(await request.json())
+        return new Response(null, { status: 204 })
       }
       return undefined
     },
@@ -255,7 +349,9 @@ async function workspace(catalog: string) {
     target,
     created,
     sent,
+    commands,
     release: gate.resolve,
+    releaseCommand: command.resolve,
     fail() {
       failures = 1
       gate.resolve()
@@ -267,12 +363,15 @@ async function workspace(catalog: string) {
       await setup.waitForFrame((frame) => frame.includes("Build · Source Model Provider"))
       await setup.waitFor(() => setup.renderer.currentFocusedEditor instanceof TextareaRenderable)
       setup.renderer.currentFocusedEditor?.setText("")
-      await setup.mockInput.typeText("Review the changes")
+      setup.renderer.currentFocusedEditor?.setText(options.text ?? "Review the changes")
+      setup.renderer.currentFocusedEditor?.gotoBufferEnd()
+      setup.mockInput.pressEscape()
       await selectWorkspace(target)
       await requested.promise
     },
     async [Symbol.asyncDispose]() {
       gate.resolve()
+      command.resolve()
       await setup[Symbol.asyncDispose]()
     },
   }
