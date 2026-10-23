@@ -3127,6 +3127,7 @@ function ShellDisplay(props: {
           >
             <box flexDirection="row" gap={1}>
               <Spinner color={color()} />
+              <text fg={color()}>Working…</text>
               <text
                 fg={color()}
                 wrapMode={expanded() ? "word" : "char"}
