@@ -64,10 +64,13 @@ runs:
       shell: bash
       run: echo "$HOME/.opencode/bin" >> $GITHUB_PATH
 
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
     - name: Run opencode
       shell: bash
       id: run_opencode
-      run: opencode github run
+      run: bun run index.ts
       env:
         MODEL: ${{ inputs.model }}
         AGENT: ${{ inputs.agent }}
