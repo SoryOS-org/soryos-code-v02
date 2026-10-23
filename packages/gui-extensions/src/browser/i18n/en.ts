@@ -45,6 +45,7 @@ export default {
   "page.add": "Add page to session",
   "page.placeholder": "Add context about this page",
   "external.open": "Open in system browser",
+  "external.menu": "Open in browser",
   "external.unavailable": "This address only works on the server's machine.",
   options: "Browser options",
   "zoom.in": "Zoom in",
@@ -52,5 +53,5 @@ export default {
   "zoom.reset": "Reset zoom",
   "zoom.percent": "{{percent}}%",
   "link.copy": "Copy link",
-  "history.clear": "Clear browsing history",
+  "history.clear": "Clear history",
 }

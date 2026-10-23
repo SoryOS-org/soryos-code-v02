@@ -821,29 +821,25 @@ export default function SessionBrowserPane(props: {
               />
             </Tooltip>
             <Menu.Portal>
-              <Menu.Content class="min-w-56">
+              <Menu.Content class="w-[172px]">
                 {/* Zooming closes the menu: the page stays a still while the menu covers it, so a zoom would show
                     only once it closed. The address field shows any zoom but 100% afterwards. */}
                 <Menu.Group>
                   <Menu.Item
                     disabled={!address()}
                     onSelect={() => zoomPage("in")}
-                    shortcut={<Keybind keys={[...keybinds.keys("mod+plus")]} variant="neutral" />}
+                    shortcut={<Keybind keys={keybinds.keys("mod+plus").map(fullWidth)} variant="neutral" />}
                   >
                     {extension.t("zoom.in")}
                   </Menu.Item>
                   <Menu.Item
                     disabled={!address()}
                     onSelect={() => zoomPage("out")}
-                    shortcut={<Keybind keys={[...keybinds.keys("mod+-")]} variant="neutral" />}
+                    shortcut={<Keybind keys={keybinds.keys("mod+-").map(fullWidth)} variant="neutral" />}
                   >
                     {extension.t("zoom.out")}
                   </Menu.Item>
-                  <Menu.Item
-                    disabled={!zoomed()}
-                    onSelect={() => zoomPage("reset")}
-                    badge={extension.t("zoom.percent", { percent: Math.round((page()?.zoom ?? 1) * 100) })}
-                  >
+                  <Menu.Item disabled={!zoomed()} onSelect={() => zoomPage("reset")}>
                     {extension.t("zoom.reset")}
                   </Menu.Item>
                 </Menu.Group>
@@ -852,7 +848,7 @@ export default function SessionBrowserPane(props: {
                   {extension.t("link.copy")}
                 </Menu.Item>
                 <Menu.Item disabled={!reachable()} onSelect={() => system.openExternal(address())}>
-                  {extension.t("external.open")}
+                  {extension.t("external.menu")}
                 </Menu.Item>
                 <Menu.Separator />
                 <Menu.Item disabled={props.model.visits().length === 0} onSelect={() => props.model.clearHistory()}>
@@ -1128,11 +1124,20 @@ function SiteInformation(props: {
   const extension = useExtension()
 
   // `load` counts openings and clears, so a count for an earlier one never replaces a later one.
-  const [state, setState] = createStore<{ open: boolean; cookies?: number; clearing: boolean; load: number }>({
+  const [state, setState] = createStore<{
+    open: boolean
+    pointer: boolean
+    cookies?: number
+    clearing: boolean
+    load: number
+  }>({
     open: false,
+    pointer: false,
     clearing: false,
     load: 0,
   })
+
+  let trigger: HTMLButtonElement | undefined
 
   const kind = () => {
     const value = connection(props.url)
@@ -1173,6 +1178,7 @@ function SiteInformation(props: {
       open={state.open}
       placement="bottom-start"
       gutter={8}
+      shift={-10}
       modal={false}
       onOpenChange={(open) => {
         setState("open", open)
@@ -1182,8 +1188,11 @@ function SiteInformation(props: {
     >
       <Tooltip placement="top" value={extension.t("site.info")}>
         <Popover.Trigger
+          ref={trigger}
           as={IconButton}
           type="button"
+          onPointerDown={() => setState("pointer", true)}
+          onKeyDown={() => setState("pointer", false)}
           variant="ghost-muted"
           size="small"
           aria-label={extension.t("site.info")}
@@ -1199,21 +1208,26 @@ function SiteInformation(props: {
 
             if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
           }}
+          // Focus returns to the trigger on close, which Chromium rings after Escape; a pointer opening keeps it unringed.
+          onCloseAutoFocus={(event: Event) => {
+            if (!state.pointer) return
+            event.preventDefault()
+            const active = document.activeElement
+
+            // An outside press already moved focus where it belongs.
+            if (active && active !== document.body && !active.closest('[data-component="browser-site"]')) return
+            trigger?.focus({ preventScroll: true, focusVisible: false })
+          }}
         >
-          <div class="flex items-center justify-between gap-2">
+          <div data-slot="browser-site-row">
+            <span data-slot="browser-site-icon">
+              <Icon name="outline-globe" />
+            </span>
             <Popover.Title data-slot="browser-site-host" dir="ltr">
               {addressParts(props.url).host || props.url}
             </Popover.Title>
-            {/* A plain button: Kobalte's close button carries the open popover's data-expanded, which icon buttons
-                draw as pressed. */}
-            <IconButton
-              variant="ghost-muted"
-              size="small"
-              aria-label={extension.t("common.close")}
-              icon={<Icon name="outline-xmark" />}
-              onClick={() => setState("open", false)}
-            />
           </div>
+          <div data-slot="browser-site-separator" aria-hidden="true" />
           <Show when={kind()}>
             {(value) => (
               <SiteRow
@@ -1258,12 +1272,23 @@ function SiteInformation(props: {
   )
 }
 
+// The zoom shortcuts draw their plus and minus at the width of a letter key.
+function fullWidth(key: string) {
+  if (key === "+") return "＋"
+
+  if (key === "-") return "－"
+
+  return key
+}
+
 function SiteRow(props: { icon: IconName; title: string; detail?: string; children?: JSX.Element }) {
   return (
     <div data-slot="browser-site-row">
-      <Icon name={props.icon} class="shrink-0" />
+      <span data-slot="browser-site-icon">
+        <Icon name={props.icon} />
+      </span>
       <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span class="text-v2-text-text-base">{props.title}</span>
+        <span>{props.title}</span>
         <Show when={props.detail}>{(detail) => <span data-slot="browser-site-detail">{detail()}</span>}</Show>
       </div>
       {props.children}

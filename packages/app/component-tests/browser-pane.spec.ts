@@ -618,9 +618,6 @@ story("zooms the page from the browser options in view and keeps its zoom in the
 
   const zoom = root.getByRole("button", { name: "110%", exact: true })
   await expect(zoom).toBeVisible()
-  await options.click()
-  await expect(page.getByRole("menuitem", { name: /^Reset zoom/ })).toContainText("110%")
-  await page.keyboard.press("Escape")
   await zoom.click()
   await expect(root.getByText("Zoom: 100", { exact: true })).toBeVisible()
   await expect(zoom).toBeHidden()
