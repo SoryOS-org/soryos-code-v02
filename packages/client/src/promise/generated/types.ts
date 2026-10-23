@@ -2361,6 +2361,7 @@ export type ConfigEntry =
       }
     }
   | { type: "directory"; path: AbsolutePath }
+  | { type: "rejected"; path: AbsolutePath; reason: string }
 
 export type SessionInboxUser = {
   id: SessionMessageID
