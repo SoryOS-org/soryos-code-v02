@@ -1,14 +1,26 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { Effect, Layer } from "effect"
 import { HttpClientRequest } from "effect/http"
 import { Image, ImageClient, Media } from "../../src/index.js"
 import { CloudflareWorkersAI } from "../../src/providers.js"
+import { ProviderConfigurationError } from "../../src/schema/index.js"
 import { it } from "../lib/effect.js"
 import { dynamicResponse, fixedResponse } from "../lib/http.js"
 
 const workers = CloudflareWorkersAI.configure({ accountId: "test-account", apiKey: "test" })
 
 describe("Cloudflare Workers AI Images", () => {
+  test("derives the Run API base only from an /ai/v1 base", () => {
+    expect(CloudflareWorkersAI.runBaseURL({ baseURL: "https://proxy.test/client/v4/accounts/a/ai/v1" })).toBe(
+      "https://proxy.test/client/v4/accounts/a/ai/run",
+    )
+    const gateway = CloudflareWorkersAI.configure({
+      baseURL: "https://gateway.ai.cloudflare.com/v1/a/g/workers-ai/v1",
+      apiKey: "test",
+    })
+    expect(() => gateway.image("@cf/black-forest-labs/flux-1-schnell")).toThrow(ProviderConfigurationError)
+  })
+
   it.effect("posts JSON inputs to the Run API and decodes the base64 envelope", () =>
     Effect.gen(function* () {
       const response = yield* Image.generate({
