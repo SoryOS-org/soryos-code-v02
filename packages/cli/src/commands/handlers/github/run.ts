@@ -257,7 +257,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         if (isFork && prPayload) {
           const forkRepo = prPayload.head.repo.full_name
           const headRef = prPayload.head.ref
-          try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://${pushToken}@github.com/${forkRepo}.git`], cwd) }
+          try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd) }
           git(["push", "fork", `HEAD:${headRef}`], cwd)
         } else if (prPayload) {
           git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
