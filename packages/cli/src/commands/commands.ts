@@ -525,6 +525,19 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         ...ServerParams,
       },
     }),
+    Spec.make("github", {
+      description: "Manage the GitHub agent",
+      commands: [
+        Spec.make("install", { description: "Install the GitHub agent" }),
+        Spec.make("run", {
+          description: "Run the GitHub agent",
+          params: {
+            event: Flag.String("event").pipe(Flag.withDescription("GitHub mock event to run the agent for"), Flag.optional),
+            token: Flag.String("token").pipe(Flag.withDescription("GitHub personal access token"), Flag.optional),
+          },
+        }),
+      ],
+    }),
     Spec.make("pair", {
       description: "Print one-time links to connect a browser or app",
       params: {
