@@ -501,11 +501,13 @@ function DrillButton(props: { label: string; onDrill: () => void }) {
   )
 }
 
+// The negative start margin cancels the chip's padding, so its icon sits where the search icon would and lines up with
+// the row icons, leaving the chip the same 6px inset from the field on every side.
 function BackChip(props: { label: string; onBack: () => void; children: JSX.Element }) {
   return (
     <button
       type="button"
-      class="flex h-6 max-w-[280px] items-center gap-1.5 rounded-sm bg-v2-background-bg-base px-1.5 text-13-medium text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
+      class="-ms-1.5 flex h-6 max-w-[280px] items-center gap-1.5 rounded-sm bg-v2-background-bg-base px-1.5 text-13-medium text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
       aria-label={props.label}
       onMouseDown={(event) => event.preventDefault()}
       onClick={props.onBack}
