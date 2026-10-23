@@ -1,9 +1,14 @@
-import { Extension } from "../sdk"
+import { Schema } from "effect"
+import { Extension, Store } from "../sdk"
 import en from "./i18n/en"
 
 export default Extension.define({
   id: "context",
   legacy: ["usage"],
+  stores: {
+    // The tab's expanded sections, kept across sessions and restarts.
+    sections: Store.global(Schema.Struct({ open: Schema.Array(Schema.String) }), { open: ["context"] }),
+  },
   i18n: {
     en,
     am: () => import("./i18n/am"),
