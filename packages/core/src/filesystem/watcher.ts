@@ -237,7 +237,7 @@ export async function pollWith(
   }
 }
 
-function scanEntries(directory: string, names: ReadonlySet<string>): Scan {
+export function scanEntries(directory: string, names: ReadonlySet<string>): Scan {
   return async () => {
     const next = new Map<string, string>()
     let entries
@@ -264,7 +264,7 @@ function scanEntries(directory: string, names: ReadonlySet<string>): Scan {
   }
 }
 
-function scanDirectory(directory: string, ignore: readonly string[]): Scan {
+export function scanDirectory(directory: string, ignore: readonly string[]): Scan {
   const ignored = (file: string) => {
     const relative = path.relative(directory, file)
     return ignore.some((entry) => {
