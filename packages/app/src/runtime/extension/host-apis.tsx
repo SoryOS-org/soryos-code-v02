@@ -53,6 +53,7 @@ import { deferredHandle, globalStoreTarget, persistedHandle, storeImports, store
 
 type Attached = {
   sessions: Accessor<readonly SessionRef[]>
+  openSession: (serverID: string, sessionID: string) => void
   current: Accessor<MountedSession | undefined>
   screen: Accessor<SessionScreen | undefined>
   scope: (server: string) => ServerScope
@@ -286,6 +287,7 @@ export function createHostApis() {
     sessions: () => ({
       list: () => current()?.sessions() ?? [],
       current: () => current()?.current(),
+      open: (serverID, sessionID) => write((value) => value.openSession(serverID, sessionID)),
     }),
     screen: () => ({
       current: () => {
@@ -789,6 +791,14 @@ export function createExtensionAttachment(apis: HostApis) {
 
   const mounted: Attached = {
     sessions,
+    openSession(serverID, sessionID) {
+      const conn = connection(serverID)
+
+      if (!conn) return
+
+      const tab = tabs.addSessionTab({ server: ServerConnection.key(conn), sessionId: sessionID })
+      tabs.select(tab)
+    },
     current,
     screen,
     scope,

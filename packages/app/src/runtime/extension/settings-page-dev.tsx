@@ -1,4 +1,4 @@
-import { For, onCleanup, Show } from "solid-js"
+import { createMemo, For, onCleanup, Show } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { Button } from "@opencode/ui/button"
 import { Switch } from "@opencode/ui/switch"
@@ -15,6 +15,12 @@ export function GuiExtensionsSettings() {
   const host = useExtensionHost()
   const bridge = usePlatform().extensions
   const [installed, setInstalled] = createStore<{ list: Installed[] }>({ list: [] })
+
+  const definitions = createMemo(() => {
+    const ids = new Set(installed.list.map((item) => item.id))
+
+    return host.definitions().filter((definition) => ids.has(definition.id))
+  })
 
   if (bridge) {
     void bridge.manager.list().then((list) => setInstalled("list", reconcile([...list])))
@@ -64,7 +70,7 @@ export function GuiExtensionsSettings() {
       <div class="settings-tab-body settings-tab-body--sectioned">
         <section class="settings-section" aria-label={language.t("settings.guiExtensions.title")}>
           <SettingsList>
-            <For each={host.definitions()}>
+            <For each={definitions()}>
               {(definition) => (
                 <SettingsRow
                   title={<bdi dir="ltr">{definition.id}</bdi>}

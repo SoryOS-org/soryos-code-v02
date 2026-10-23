@@ -617,6 +617,18 @@ export interface Sessions {
    * Reactive.
    */
   current(): MountedSession | undefined
+  /**
+   * Opens or focuses a session tab and routes to that session. Does nothing while the server is not listed.
+   *
+   * @param serverID - The server's `ServerRef.id`.
+   * @param sessionID - The session id on that server.
+   *
+   * @example
+   * ```ts
+   * ctx.sessions.open(server.id, session.id)
+   * ```
+   */
+  open(serverID: string, sessionID: string): void
 }
 
 /**

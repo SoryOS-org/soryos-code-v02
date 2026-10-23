@@ -2,6 +2,7 @@ import {
   batch,
   catchError,
   createContext,
+  createComputed,
   createMemo,
   createRenderEffect,
   createResource,
@@ -778,6 +779,17 @@ function createHost(input: HostInput) {
     instance.dispose()
   }
 
+  createComputed(() => {
+    const available = new Set(input.definitions.map((definition) => definition.id))
+
+    Array.from(instances.keys()).forEach((id) => {
+      if (available.has(id)) return
+      deactivate(id)
+      setState("status", id, undefined)
+      setState("failures", id, undefined)
+    })
+  })
+
   const fail = (id: string, cause: unknown, phase: ExtensionFailure["phase"] = "setup") => {
     console.error(`[extension] ${id}`, cause)
     batch(() => {
@@ -871,7 +883,11 @@ function createHost(input: HostInput) {
         input.definitions
           .filter((definition) => !disabled.has(definition.id))
           .forEach((definition) => {
-            if (instances.has(definition.id) || state.status[definition.id] === "loading") return
+            const current = instances.get(definition.id)
+
+            if (current?.definition === definition || state.status[definition.id] === "loading") return
+
+            if (current) deactivate(definition.id)
 
             void activate(latest(definition))
           })

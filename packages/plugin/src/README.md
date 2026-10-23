@@ -46,6 +46,69 @@ const registration = await ctx.model.transform(applyModelPolicy)
 await registration.dispose()
 ```
 
+## GUI Plugins
+
+A Desktop GUI plugin is a package with a `./gui` export. Add the package to the user's global `plugins` config to authorize
+it and make it available across Desktop projects:
+
+```jsonc title="~/.config/opencode/opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["@acme/opencode-project-sessions"],
+}
+```
+
+Export a synchronous setup from `gui.tsx` using `@opencode/plugin/gui`. GUI-only packages do not need a server entry point.
+The server reports their GUI capability and serves a browser bundle to Desktop; the app never runs the plugin's server
+entry to render its UI. Keep the GUI entry browser-compatible: OpenCode bundles its dependencies and shares only the GUI
+SDK and Solid runtime with the app.
+
+```json title="package.json"
+{
+  "name": "@acme/opencode-project-sessions",
+  "type": "module",
+  "exports": { "./gui": "./gui.tsx" },
+  "peerDependencies": {
+    "@opencode/plugin": "^2.0.28",
+    "@opencode/client": "^2.0.28",
+    "solid-js": ">=1.9.0"
+  }
+}
+```
+
+```tsx title="gui.tsx"
+import { define } from "@opencode/plugin/gui"
+import { For } from "solid-js"
+
+export default define({
+  id: "project-sessions",
+  i18n: { en: { "command.open": "Sessions by project" } },
+  setup(ctx) {
+    ctx.ui.command({
+      id: "open",
+      get title() {
+        return ctx.t("command.open")
+      },
+      run() {
+        ctx.ui.dialog((dialog) => (
+          <For each={ctx.servers.list()}>
+            {(server) => <button onClick={() => ctx.sessions.open(server.id, "session-id")}>{server.name}</button>}
+          </For>
+        ))
+      },
+    })
+  },
+})
+```
+
+`ctx.servers` returns live, authenticated clients for the servers Desktop lists. Use `server.client.project.list()` and
+`server.client.session.list({ project: project.id, parentID: null })` to build a session view; call
+`ctx.sessions.open(server.id, session.id)` to navigate to a selected session. The dialog and command registrations are
+owned by the GUI plugin and are removed when it is disabled or unloaded. Desktop reads one GUI plugin inventory from
+the built-in local server's default location; it does not switch plugin sets as sessions move between projects or load
+GUI code from remote servers. Put GUI plugin entries in global config for consistent availability. Persist a GUI plugin's
+own state with `ctx.storage.global(key)` or `ctx.storage.globalString(key, initial)`; it is namespaced by the plugin id.
+
 ## Transform Hooks
 
 Transform hooks contribute to stateful domains. The editor is synchronous,

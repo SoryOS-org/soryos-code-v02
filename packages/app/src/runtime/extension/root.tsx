@@ -1,4 +1,14 @@
-import { createMemo, lazy, onCleanup, Show, Suspense, type ParentProps } from "solid-js"
+import {
+  createContext,
+  createMemo,
+  createSignal,
+  lazy,
+  onCleanup,
+  Show,
+  Suspense,
+  useContext,
+  type ParentProps,
+} from "solid-js"
 import { extensionEnabled } from "@opencode/gui-extensions/sdk/bridge"
 import type { Definition } from "@opencode/gui-extensions/sdk"
 import { builtins } from "./builtins"
@@ -12,9 +22,11 @@ import { ExtensionCommands } from "./commands"
 import { ExtensionStyles } from "./render"
 import { ExtensionServersProvider } from "./servers"
 import { ExtensionServerEndpoints } from "./server-shell"
-import { createContext, useContext } from "solid-js"
+import { GuiPluginLoader } from "./gui-plugins"
 
 const HostApisContext = createContext<HostApis>()
+
+const GuiDefinitionRegistry = createContext<(definition: Definition) => () => void>()
 
 const ExtensionHotReload = import.meta.env.DEV ? lazy(() => import("./hmr")) : undefined
 
@@ -24,6 +36,14 @@ export function useHostApis() {
   if (!value) throw new Error("Host APIs are unavailable")
 
   return value
+}
+
+function useGuiDefinitionRegistry() {
+  const register = useContext(GuiDefinitionRegistry)
+
+  if (!register) throw new Error("GUI plugin registry is unavailable")
+
+  return register
 }
 
 /** Mounts the extension host for the window. Lives above the app interface so extensions can contribute servers. */
@@ -38,10 +58,25 @@ export function ExtensionRoot(props: ParentProps) {
 
   const os = platform.platform === "desktop" ? platform.os : undefined
 
-  // Built-ins only: installed `.ocdx` archives run their main entry until that format ships renderer bundles.
-  const definitions = builtins.filter(
+  // Built-ins are ready before configured server GUI plugins load, so external code never blocks the app's first mount.
+  const builtinsForPlatform = builtins.filter(
     (definition: Definition) => !definition.os || (!!os && definition.os.includes(os)),
   )
+
+  const [external, setExternal] = createSignal<readonly Definition[]>([])
+  const definitions = createMemo(() => [...builtinsForPlatform, ...external()])
+
+  const register = (definition: Definition) => {
+    if (builtinsForPlatform.some((item) => item.id === definition.id))
+      throw new Error(`GUI plugin id is reserved by a built-in: ${definition.id}`)
+
+    if (external().some((item) => item.id === definition.id))
+      throw new Error(`GUI plugin id is already registered: ${definition.id}`)
+
+    setExternal((items) => [...items, definition])
+
+    return () => setExternal((items) => items.filter((item) => item !== definition))
+  }
 
   // Only enable preferences cross this boundary; the host derives blocked status from live hard dependencies.
   const disabled = createMemo(() => {
@@ -49,32 +84,34 @@ export function ExtensionRoot(props: ParentProps) {
 
     if (!state) return undefined
 
-    return new Set(definitions.flatMap((definition) => (extensionEnabled(definition, state) ? [] : [definition.id])))
+    return new Set(definitions().flatMap((definition) => (extensionEnabled(definition, state) ? [] : [definition.id])))
   })
 
   const failed = (id: string) => installed.list().some((item) => item.id === id && item.error !== undefined)
 
   return (
     <HostApisContext.Provider value={apis}>
-      <ExtensionHostProvider
-        definitions={definitions}
-        disabled={disabled}
-        apis={apis.apis}
-        whenMounted={apis.whenMounted}
-        ipc={bridge ? (token) => ipcs.client(token) : undefined}
-        generation={ipcs.generation}
-        failed={failed}
-      >
-        <ExtensionStyles />
-        {ExtensionHotReload && (
-          <Suspense>
-            <ExtensionHotReload />
-          </Suspense>
-        )}
-        <MenubarItemsProvider value={menubar}>
-          <ExtensionServersProvider failed={failed}>{props.children}</ExtensionServersProvider>
-        </MenubarItemsProvider>
-      </ExtensionHostProvider>
+      <GuiDefinitionRegistry.Provider value={register}>
+        <ExtensionHostProvider
+          definitions={definitions()}
+          disabled={disabled}
+          apis={apis.apis}
+          whenMounted={apis.whenMounted}
+          ipc={bridge ? (token) => ipcs.client(token) : undefined}
+          generation={ipcs.generation}
+          failed={failed}
+        >
+          <ExtensionStyles />
+          {ExtensionHotReload && (
+            <Suspense>
+              <ExtensionHotReload />
+            </Suspense>
+          )}
+          <MenubarItemsProvider value={menubar}>
+            <ExtensionServersProvider failed={failed}>{props.children}</ExtensionServersProvider>
+          </MenubarItemsProvider>
+        </ExtensionHostProvider>
+      </GuiDefinitionRegistry.Provider>
     </HostApisContext.Provider>
   )
 }
@@ -83,6 +120,7 @@ export function ExtensionRoot(props: ParentProps) {
 export function ExtensionAttachment(props: ParentProps) {
   const host = useExtensionHost()
   const attachment = createExtensionAttachment(useHostApis())
+  const registerGuiDefinition = useGuiDefinitionRegistry()
 
   return (
     <ExtensionAttachmentProvider value={attachment}>
@@ -90,6 +128,7 @@ export function ExtensionAttachment(props: ParentProps) {
       <ExtensionServerEndpoints />
       <Show when={host.ready()}>
         <MountedInterface attach={attachment.attach} />
+        <GuiPluginLoader register={registerGuiDefinition} />
         {props.children}
       </Show>
     </ExtensionAttachmentProvider>

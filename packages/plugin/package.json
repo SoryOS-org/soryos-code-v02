@@ -15,6 +15,7 @@
     "./effect": "./src/effect/index.ts",
     "./host": "./src/host.ts",
     "./runtime": "./src/runtime.ts",
+    "./gui": "./src/gui/index.ts",
     "./tui": "./src/tui/index.ts",
     "./*": "./src/*.ts"
   },

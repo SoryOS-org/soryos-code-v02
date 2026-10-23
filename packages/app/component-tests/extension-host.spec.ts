@@ -43,6 +43,71 @@ story("an extension that finishes loading after the host unmounts is never set u
   expect(setups).toBe(0)
 })
 
+story(
+  "a GUI plugin registered after startup activates and disposes its contributions when removed",
+  async ({ page }) => {
+    const result = await page.evaluate(async (fixture) => {
+      const { mountExtensionHost, onCleanup } = await import(fixture)
+      const host = mountExtensionHost()
+      const registry = { kind: "registry" as const, id: "fixture.gui-plugin" }
+      const cleaned = Promise.withResolvers<void>()
+      let setups = 0
+      let cleanups = 0
+
+      host.register({
+        id: "gui-plugin",
+        renderer: async () => ({
+          default: (ctx: Context) => {
+            setups++
+            ctx.add(registry, "session browser")
+            onCleanup(() => {
+              cleanups++
+              cleaned.resolve()
+            })
+          },
+        }),
+      })
+      await host.waitForStatus("gui-plugin", "active")
+      const before = host.entries(registry.id)
+      host.remove("gui-plugin")
+      await cleaned.promise
+      const after = host.entries(registry.id)
+      host.unmount()
+
+      return { setups, cleanups, before, after }
+    }, fixture)
+
+    expect(result).toEqual({ setups: 1, cleanups: 1, before: 1, after: 0 })
+  },
+)
+
+story("a GUI plugin can open a session through the host navigation API", async ({ page }) => {
+  const writes = await page.evaluate(async (fixture) => {
+    const { mountHostApis } = await import(fixture)
+
+    const host = mountHostApis({
+      definitions: [
+        {
+          id: "session-browser",
+          renderer: async () => ({
+            default: (context: Context) => context.sessions.open("sidecar", "ses-existing"),
+          }),
+        },
+      ],
+    })
+
+    const opened = host.waitForSessionOpen()
+    host.attach()
+    await opened
+    const result = [...host.writes]
+    host.unmount()
+
+    return result
+  }, fixture)
+
+  expect(writes).toContain("open session sidecar ses-existing")
+})
+
 story("async work from synchronous setup cannot register after the host unmounts", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountExtensionHost, onCleanup } = await import(fixture)
@@ -1003,7 +1068,9 @@ story("startup enable state does not wait for the manager, and live updates beat
 
       const failed = mountExtensions({
         bridge: { ...bridge, manager: { ...bridge.manager, initial, list: () => reply.promise } },
-        definitions: [{ id: "disabled", renderer: async () => ({ default: () => void setups.push("wrongly enabled") }) }],
+        definitions: [
+          { id: "disabled", renderer: async () => ({ default: () => void setups.push("wrongly enabled") }) },
+        ],
       })
 
       await new Promise((resolve) => setTimeout(resolve, 50))

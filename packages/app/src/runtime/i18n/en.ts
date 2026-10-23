@@ -679,6 +679,8 @@ export const dict = {
   "settings.guiExtensions.description": "Built-in GUI extensions in this window. Development builds only.",
   "settings.guiExtensions.reload": "Reload",
   "settings.guiExtensions.status.loading": "Loading",
+  "toast.guiPlugin.failed.title": "GUI plugin failed to load",
+  "toast.guiPlugin.failed.description": "{plugin}: {message}",
   "settings.guiExtensions.status.active": "Active",
   "settings.guiExtensions.status.failed": "Failed",
   "settings.guiExtensions.status.disabled": "Disabled",

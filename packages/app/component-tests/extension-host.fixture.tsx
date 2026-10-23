@@ -18,7 +18,9 @@ import {
 } from "@opencode/gui-extensions/sdk"
 import {
   createComponent,
+  createEffect,
   createMemo,
+  createRoot,
   createSignal,
   getOwner,
   onCleanup,
@@ -57,7 +59,7 @@ type Captured = { apis?: ReturnType<typeof createHostApis> }
 /** A value the fixture's storage holds as JSON. */
 type Json = string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json }
 
-export { createComponent, createMemo, createSignal, getOwner, onCleanup, runWithOwner }
+export { createComponent, createEffect, createMemo, createRoot, createSignal, getOwner, onCleanup, runWithOwner }
 
 const layout: Layout = {
   narrow: () => false,
@@ -100,7 +102,7 @@ function fakeApis(storage: (extension: string) => Storage): HostApiFactories {
     servers: () => servers,
     workspaces: () => workspaces,
     desktop: () => undefined,
-    sessions: () => ({ list: () => [], current: () => undefined }),
+    sessions: () => ({ list: () => [], current: () => undefined, open() {} }),
     screen: () => ({ current: () => undefined }),
     layout: () => layout,
     storage,
@@ -135,6 +137,21 @@ export async function until(check: () => boolean) {
 export function mountExtensionHost() {
   const loads: PromiseWithResolvers<{ default: Setup<Definition> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
+  const [external, setExternal] = createSignal<readonly Definition[]>([])
+
+  const definitions = createMemo(() => [
+    {
+      id: "fixture",
+      renderer: () => {
+        const load = Promise.withResolvers<{ default: Setup<Definition> }>()
+        loads.push(load)
+
+        return load.promise
+      },
+    },
+    ...external(),
+  ])
+
   const hosts: ExtensionHost[] = []
   const container = document.createElement("div")
   document.body.appendChild(container)
@@ -150,17 +167,7 @@ export function mountExtensionHost() {
       <LanguageProvider locale="en">
         <DialogProvider>
           <ExtensionHostProvider
-            definitions={[
-              {
-                id: "fixture",
-                renderer: () => {
-                  const load = Promise.withResolvers<{ default: Setup<Definition> }>()
-                  loads.push(load)
-
-                  return load.promise
-                },
-              },
-            ]}
+            definitions={definitions()}
             disabled={disabled}
             apis={fakeApis(unused)}
             whenMounted={mounted}
@@ -185,9 +192,24 @@ export function mountExtensionHost() {
     /** Renderer loads requested so far. */
     count: () => loads.length,
     reload: () => hosts[0]?.reload("fixture"),
+    register: (definition: Definition) => setExternal((items) => [...items, definition]),
+    remove: (id: string) => setExternal((items) => items.filter((item) => item.id !== id)),
     disable: () => setDisabled(new Set(["fixture"])),
     enable: () => setDisabled(new Set<string>()),
-    status: () => hosts[0]?.state.status.fixture,
+    status: (id = "fixture") => hosts[0]?.state.status[id],
+    waitForStatus: async (id: string, expected: string) => {
+      if (hosts[0]?.state.status[id] === expected) return
+
+      await new Promise<void>((resolve) => {
+        createRoot((dispose) => {
+          createEffect(() => {
+            if (hosts[0]?.state.status[id] !== expected) return
+            dispose()
+            resolve()
+          })
+        })
+      })
+    },
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
   }
@@ -324,6 +346,7 @@ const web: Platform = {
 function standIn(overrides: Partial<Interface>): Interface {
   return {
     sessions: () => [],
+    openSession: () => undefined,
     current: () => undefined,
     screen: () => undefined,
     scope: () => ServerScope.local,
@@ -499,12 +522,17 @@ export function mountHostApis(input: { definitions: readonly Definition[] }) {
   const container = document.createElement("div")
   document.body.appendChild(container)
   const writes: string[] = []
+  const sessionOpen = Promise.withResolvers<void>()
   const [opened, setOpened] = createSignal<readonly string[]>([])
   const hosts: ExtensionHost[] = []
   const captured: Captured = {}
   const layout = standIn({}).layout
 
   const mounted = standIn({
+    openSession(serverID, sessionID) {
+      writes.push(`open session ${serverID} ${sessionID}`)
+      sessionOpen.resolve()
+    },
     layout: {
       ...layout,
       open(key) {
@@ -545,6 +573,7 @@ export function mountHostApis(input: { definitions: readonly Definition[] }) {
     writes,
     /** Mounts the interface. */
     attach: () => void captured.apis?.attach(mounted),
+    waitForSessionOpen: () => sessionOpen.promise,
     status: (id: string) => hosts[0]?.state.status[id],
     unmount: () => {
       dispose()
