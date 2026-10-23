@@ -121,12 +121,12 @@ const nativeOptions = (options: OpenAIImageOptions | undefined) => {
   return { output_compression: outputCompression, output_format: outputFormat, ...native }
 }
 
-/** `gpt-image-2` and later take any size within limits; older models take a fixed list. */
+/**
+ * `gpt-image-1`, `chatgpt-image` and DALL·E take a fixed list, `gpt-image-2` and later any size within limits. Other
+ * models are gateway-hosted (`bfl/flux-2-pro`); the gateway passes `size` through to them as is.
+ */
 const sizes = (model: string): ImageSizing.Limits | ReadonlyArray<ImageSizing.Size> => {
-  // Gateways prefix the upstream provider (`openai/gpt-image-2`).
   const id = model.slice(model.lastIndexOf("/") + 1)
-  if (/^gpt-image-[2-9]/.test(id))
-    return { multiple: 16, maxEdge: 3840, minPixels: 655_360, maxPixels: 8_294_400, maxRatio: 3 }
   if (id.startsWith("dall-e-2")) return [256, 512, 1024].map((edge) => ({ width: edge, height: edge }))
   if (id.startsWith("dall-e-3"))
     return [
@@ -134,11 +134,15 @@ const sizes = (model: string): ImageSizing.Limits | ReadonlyArray<ImageSizing.Si
       { width: 1792, height: 1024 },
       { width: 1024, height: 1792 },
     ]
-  return [
-    { width: 1024, height: 1024 },
-    { width: 1536, height: 1024 },
-    { width: 1024, height: 1536 },
-  ]
+  if (/^(gpt-image-1|chatgpt-image)/.test(id))
+    return [
+      { width: 1024, height: 1024 },
+      { width: 1536, height: 1024 },
+      { width: 1024, height: 1536 },
+    ]
+  if (id.startsWith("gpt-image-"))
+    return { multiple: 16, maxEdge: 3840, minPixels: 655_360, maxPixels: 8_294_400, maxRatio: 3 }
+  return { multiple: 16 }
 }
 
 const size = (request: Request) => {

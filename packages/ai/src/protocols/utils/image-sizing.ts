@@ -39,16 +39,19 @@ export const fit = (shape: Shape, limits: Limits): Size => {
   const area = targetPixels(shape)
   const width = Math.sqrt(area * ratio)
   const height = Math.sqrt(area / ratio)
-  const up = Math.max(1, (limits.minEdge ?? 0) / Math.min(width, height), Math.sqrt((limits.minPixels ?? 0) / area))
+  const up = Math.max((limits.minEdge ?? 0) / Math.min(width, height), Math.sqrt((limits.minPixels ?? 0) / area))
+  const scaled = Math.max(1, up)
   const down = Math.min(
-    1,
-    (limits.maxEdge ?? Infinity) / (Math.max(width, height) * up),
-    Math.sqrt((limits.maxPixels ?? Infinity) / area) / up,
+    (limits.maxEdge ?? Infinity) / (Math.max(width, height) * scaled),
+    Math.sqrt((limits.maxPixels ?? Infinity) / area) / scaled,
   )
-  // Round toward the limit that applied so the result never crosses it.
-  const round = down < 1 ? Math.floor : up > 1 ? Math.ceil : Math.round
+  // Round away from a limit the size reached, including one it lands on exactly, so it never crosses it.
+  const round = down <= 1 ? Math.floor : up >= 1 ? Math.ceil : Math.round
   const snap = (edge: number) =>
-    Math.max(limits.multiple, round(Number(((edge * up * down) / limits.multiple).toFixed(6))) * limits.multiple)
+    Math.max(
+      limits.multiple,
+      round(Number(((edge * scaled * Math.min(1, down)) / limits.multiple).toFixed(6))) * limits.multiple,
+    )
   return { width: snap(width), height: snap(height) }
 }
 
@@ -70,6 +73,26 @@ export const nearest = (shape: Shape, sizes: ReadonlyArray<Size>): Size => {
 
 /** Reports a size more than 2% off the requested aspect or more than √2 per edge off the requested tier. */
 export const notice = (name: string, shape: Shape, size: Size): Media.Notice | undefined => {
+  const requested = missed(shape, size)
+  if (requested === undefined) return undefined
+  return { type: "other", message: `${name} doesn't offer ${requested}; used ${describe(size)}` }
+}
+
+/** Free width and height that must honor the shape; a size that misses it fails instead of returning a notice. */
+export const exact = (route: MediaProtocol.Identity, shape: Shape, limits: Limits) => {
+  if (!isRequested(shape)) return Effect.succeed(undefined)
+  const size = fit(shape, limits)
+  const requested = missed(shape, size)
+  if (requested === undefined) return Effect.succeed(size)
+  return Effect.fail(
+    route.unsupported(
+      shape.resolution === undefined ? "media.aspect" : "media.resolution",
+      `${route.name} can't render ${requested}; the closest size it takes is ${describe(size)}. Change aspect or resolution, or set the size in providerOptions`,
+    ),
+  )
+}
+
+const missed = (shape: Shape, size: Size) => {
   const aspectMissed =
     shape.aspect !== undefined && Math.abs(Math.log(size.width / size.height / aspectRatio(shape))) > 0.02
   const requestedTier = shape.resolution === undefined ? undefined : tier(shape.resolution)
@@ -78,23 +101,7 @@ export const notice = (name: string, shape: Shape, size: Size): Media.Notice | u
     (requestedTier === undefined ||
       Math.abs(Math.log2(Math.sqrt(size.width * size.height) / (requestedTier * 1024))) > 0.5)
   if (!aspectMissed && !resolutionMissed) return undefined
-  const requested = [shape.aspect, shape.resolution].filter((value) => value !== undefined).join(" at ")
-  return {
-    type: "other",
-    message: `${name} doesn't offer ${requested}; used ${size.width}x${size.height} (${label(size)})`,
-  }
-}
-
-/** Free width and height that must honor the shape; a size that misses it fails instead of returning a notice. */
-export const exact = (route: MediaProtocol.Identity, shape: Shape, limits: Limits) => {
-  if (!isRequested(shape)) return Effect.succeed(undefined)
-  const size = fit(shape, limits)
-  const missed = notice(route.name, shape, size)
-  if (missed !== undefined)
-    return Effect.fail(
-      route.unsupported(shape.resolution === undefined ? "media.aspect" : "media.resolution", missed.message),
-    )
-  return Effect.succeed(size)
+  return [shape.aspect, shape.resolution].filter((value) => value !== undefined).join(" at ")
 }
 
 const aspectRatio = (shape: Shape) => {
@@ -104,11 +111,12 @@ const aspectRatio = (shape: Shape) => {
 
 const targetPixels = (shape: Shape) => ((tier(shape.resolution ?? "1K") ?? 1) * 1024) ** 2
 
-const label = (size: Size) => {
+const describe = (size: Size) => {
   const divisor = gcd(size.width, size.height)
   const width = size.width / divisor
   const height = size.height / divisor
-  return width <= 32 && height <= 32 ? `${width}:${height}` : `${(size.width / size.height).toFixed(2)}:1`
+  const ratio = width <= 32 && height <= 32 ? `${width}:${height}` : `${(size.width / size.height).toFixed(2)}:1`
+  return `${size.width}x${size.height} (${ratio})`
 }
 
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))

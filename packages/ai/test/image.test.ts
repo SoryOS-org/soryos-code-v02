@@ -2,7 +2,17 @@ import { describe, expect } from "bun:test"
 import { Effect, Layer, Stream } from "effect"
 import { HttpClientRequest } from "effect/http"
 import { Image, ImageClient, Media } from "../src/index.js"
-import { BlackForestLabs, Fal, Google, OpenAI, Replicate, Stability, XAI, ZAI } from "../src/providers.js"
+import {
+  BlackForestLabs,
+  Fal,
+  Google,
+  OpenAI,
+  Replicate,
+  Stability,
+  VercelAIGateway,
+  XAI,
+  ZAI,
+} from "../src/providers.js"
 import { it } from "./lib/effect.js"
 import { dynamicResponse, json } from "./lib/http.js"
 
@@ -181,6 +191,30 @@ describe("Image", () => {
       Effect.provide(
         layer((input) => {
           expect(JSON.parse(input.text)).toEqual({ model: "gpt-image-1.5", prompt: "A lighthouse", size: "1536x1024" })
+          return Effect.succeed(json(input, { data: [{ b64_json: "AQID" }] }))
+        }),
+      ),
+    ),
+  )
+
+  it.effect("computes a free size for gateway-hosted models", () =>
+    Effect.gen(function* () {
+      const response = yield* Image.generate({
+        model: VercelAIGateway.configure({ apiKey: "test", baseURL: "https://gateway.test/v1" }).image(
+          "bfl/flux-2-klein-4b",
+        ),
+        prompt: "A lighthouse",
+        aspect: "16:9",
+      })
+      expect(response.notices).toBeUndefined()
+    }).pipe(
+      Effect.provide(
+        layer((input) => {
+          expect(JSON.parse(input.text)).toEqual({
+            model: "bfl/flux-2-klein-4b",
+            prompt: "A lighthouse",
+            size: "1360x768",
+          })
           return Effect.succeed(json(input, { data: [{ b64_json: "AQID" }] }))
         }),
       ),

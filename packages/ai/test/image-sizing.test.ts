@@ -24,6 +24,10 @@ describe("ImageSizing", () => {
     expect(ImageSizing.fit({ aspect: "1:1", resolution: "4K" }, GPT_IMAGE_2)).toEqual({ width: 2880, height: 2880 })
     expect(ImageSizing.fit({ aspect: "1:1", resolution: "0.5K" }, GPT_IMAGE_2)).toEqual({ width: 816, height: 816 })
     expect(ImageSizing.fit({ aspect: "4:1" }, GPT_IMAGE_2)).toEqual({ width: 1776, height: 592 })
+    expect(ImageSizing.fit({ aspect: "16:9", resolution: "2K" }, { multiple: 16, maxPixels: 2048 * 2048 })).toEqual({
+      width: 2720,
+      height: 1536,
+    })
     expect(ImageSizing.fit({ aspect: "16:9" }, { multiple: 32, minEdge: 1024, maxEdge: 2048 })).toEqual({
       width: 1824,
       height: 1024,

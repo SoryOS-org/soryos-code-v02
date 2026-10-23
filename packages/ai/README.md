@@ -583,7 +583,7 @@ call rather than dropping them, so check this table before swapping only the `mo
 | Replicate             | ✗   | ✗                    | ✗                     | ✗ (use `providerOptions`)        | everything                                         |
 | Stability `image`     | 1   | ✓                    | ✗                     | 1 (not on `core`)                | `seed`, `output_format`                            |
 | Stability `upscale()` | ✗   | ✗                    | ✗                     | exactly 1 (required)             | `seed`, `output_format`                            |
-| Vercel AI Gateway     | ✓   | as OpenAI            | as OpenAI             | per model                        | as OpenAI                                          |
+| Vercel AI Gateway     | ✓   | as OpenAI³           | as OpenAI³            | per model                        | as OpenAI                                          |
 | Cloudflare Workers AI | 1   | width × height²      | width × height²       | ✗                                | `width`, `height`, `seed`                          |
 
 ✓ lowers natively; ✗ fails whenever the field is set (including `n: 1`); `1` means `n > 1` fails. "width × height"
@@ -591,7 +591,9 @@ computes a size the provider accepts and fails when the request falls outside it
 generates one image. On OpenAI, `gpt-image-2` and later get a computed size; older models get the nearest of their
 fixed sizes. `providerOptions.size` replaces `aspect` and `resolution`, so setting both fails. Vercel AI Gateway
 forwards `outputFormat` but does not apply it, so the returned bytes keep the upstream model's own format. ² Workers AI
-`@cf/black-forest-labs/flux-1-schnell` takes no size, and the provider rejects it.
+`@cf/black-forest-labs/flux-1-schnell` takes no size, and the provider rejects it. ³ Non-OpenAI gateway models
+(`bfl/flux-2-pro`) get a computed width × height, which the gateway passes through; models with a fixed list, such as
+Recraft, reject sizes outside it.
 
 `Media.Asset` is the one asset type shared by image requests, image responses, LLM messages, and tool results.
 `asset.source` is the serializable `Media.Source` (`bytes`, `base64`, `url`, or `ref`); `asset.bytes()`,

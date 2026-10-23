@@ -148,7 +148,8 @@ describe("Alibaba Images", () => {
       expect(tooLarge.reason).toMatchObject({
         _tag: "UnsupportedOperation",
         operation: "media.resolution",
-        message: "Alibaba Images doesn't offer 1:1 at 4K; used 2048x2048 (1:1)",
+        message:
+          "Alibaba Images can't render 1:1 at 4K; the closest size it takes is 2048x2048 (1:1). Change aspect or resolution, or set the size in providerOptions",
       })
     }),
   )
