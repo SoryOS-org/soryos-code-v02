@@ -12,7 +12,7 @@ import { ToolMode } from "@opencode/schema/session-stats"
 import { TokenUsage } from "@opencode/schema/token-usage"
 import { Database } from "../database/database.js"
 import { EventTable } from "../event/sql.js"
-import { SessionMessageTable, SessionTable } from "./sql.js"
+import { SessionMessageTable, SessionRevertUsageTable, SessionTable } from "./sql.js"
 
 type Input = {
   readonly from?: number
@@ -87,13 +87,22 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
     (yield* db
       .get<{ time: number | null }>(
         sql`
-        SELECT min(message.time_created) AS time
-        FROM ${SessionMessageTable} AS message
-        JOIN ${SessionTable} AS session ON session.id = message.session_id
-        WHERE message.type IN ('user', 'assistant')
-          AND message.time_created < ${to}
-          AND (session.fork_session_id IS NULL OR message.time_created >= session.time_created)
-          ${project}
+        SELECT min(time_created) AS time
+        FROM (
+          SELECT message.time_created AS time_created
+          FROM ${SessionMessageTable} AS message
+          JOIN ${SessionTable} AS session ON session.id = message.session_id
+          WHERE message.type IN ('user', 'assistant')
+            AND message.time_created < ${to}
+            AND (session.fork_session_id IS NULL OR message.time_created >= session.time_created)
+            ${project}
+          UNION ALL
+          SELECT message.time_created AS time_created
+          FROM ${SessionRevertUsageTable} AS message
+          JOIN ${SessionTable} AS session ON session.id = message.session_id
+          WHERE message.time_created < ${to}
+            ${project}
+        )
       `,
       )
       .pipe(Effect.orDie))?.time ??
@@ -140,6 +149,26 @@ export const get = Effect.fn("SessionStats.get")(function* (input: Input = {}) {
             AND message.time_created >= ${range.from}
             AND message.time_created < ${range.to}
             AND (session.fork_session_id IS NULL OR message.time_created >= session.time_created)
+            ${project}
+          UNION ALL
+          SELECT
+            message.session_id AS sessionID,
+            session.parent_id AS parentID,
+            message.type AS type,
+            message.time_created AS timeCreated,
+            message.model_provider_id AS providerID,
+            message.model_id AS modelID,
+            message.model_variant AS variant,
+            message.tokens_input AS input,
+            message.tokens_output AS output,
+            message.tokens_reasoning AS reasoning,
+            message.tokens_cache_read AS cacheRead,
+            message.tokens_cache_write AS cacheWrite,
+            message.cost AS cost
+          FROM ${SessionRevertUsageTable} AS message
+          JOIN ${SessionTable} AS session ON session.id = message.session_id
+          WHERE message.time_created >= ${range.from}
+            AND message.time_created < ${range.to}
             ${project}
         `,
         )

@@ -789,6 +789,36 @@ const layer = Layer.effectDiscard(
           .get()
           .pipe(Effect.orDie)
         if (!boundary) return yield* Effect.die(new Error(`Revert boundary message not found: ${event.data.to}`))
+        // Preserve the reverted rows' prompts, steps and usage for SessionStats before
+        // deleting them. The fork filter matches SessionStats: rows a fork copied from its
+        // parent belong to the parent's stats, not this session's.
+        yield* db
+          .run(
+            sql`
+              INSERT OR IGNORE INTO session_revert_usage (id, session_id, type, time_created, model_provider_id, model_id, model_variant, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write)
+              SELECT
+                message.id,
+                message.session_id,
+                message.type,
+                message.time_created,
+                json_extract(message.data, '$.model.providerID'),
+                json_extract(message.data, '$.model.id'),
+                json_extract(message.data, '$.model.variant'),
+                coalesce(json_extract(message.data, '$.cost'), 0),
+                coalesce(json_extract(message.data, '$.tokens.input'), 0),
+                coalesce(json_extract(message.data, '$.tokens.output'), 0),
+                coalesce(json_extract(message.data, '$.tokens.reasoning'), 0),
+                coalesce(json_extract(message.data, '$.tokens.cache.read'), 0),
+                coalesce(json_extract(message.data, '$.tokens.cache.write'), 0)
+              FROM ${SessionMessageTable} AS message
+              JOIN ${SessionTable} AS session ON session.id = message.session_id
+              WHERE message.type IN ('user', 'assistant')
+                AND message.session_id = ${event.data.sessionID}
+                AND message.seq >= ${boundary.seq}
+                AND (session.fork_session_id IS NULL OR message.time_created >= session.time_created)
+            `,
+          )
+          .pipe(Effect.orDie)
         yield* db
           .delete(SessionMessageTable)
           .where(
