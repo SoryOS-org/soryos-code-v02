@@ -30,7 +30,6 @@ import { SessionShell } from "./shell.js"
 import { SessionSkill } from "./skill.js"
 import { SessionSchema } from "./schema.js"
 import { SessionStore } from "./store.js"
-import { readiness } from "../readiness.js"
 
 type PromptRequest = SessionPrompt.Input & {
   id?: SessionMessage.ID
@@ -177,11 +176,10 @@ export const make = Effect.fn("Session.make")(function* () {
           yield* statusLock.withPermit(Effect.gen(function* () {
             preparing.set(sessionID, (preparing.get(sessionID) ?? 0) + 1)
             accepted = session
-            yield* Effect.logInfo("runtime prompt accepted before activation", { sessionID, messageID, statusSerialized: true })
             yield* bus.publish(SessionStatusEvent.Status, { sessionID, status: { type: "busy" } }, { location: session.location })
           }))
           const item = yield* restore(
-            readiness("prompt.prepare", { sessionID, messageID, directory: session.location.directory }, SessionPrompt.prepare({ session, messageID, input })).pipe(
+            SessionPrompt.prepare({ session, messageID, input }).pipe(
               Effect.provideService(Instance.Service, instances),
               Effect.provideService(FSUtil.Service, fs),
             ),
