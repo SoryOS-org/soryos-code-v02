@@ -37,6 +37,7 @@ test("uses service worker notifications when the Notification constructor is una
     "Response ready",
     {
       body: "Session",
+      tag: "https://opencode.test/server/a2V5/session/ses_test",
       data: { url: "https://opencode.test/server/a2V5/session/ses_test" },
     },
   ])
