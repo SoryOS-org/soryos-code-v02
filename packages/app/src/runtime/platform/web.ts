@@ -1,5 +1,6 @@
 import { createBrowserDraftStore } from "@/runtime/persistence/drafts"
 import type { Platform } from "./platform"
+import { isIOS } from "./pwa"
 
 export function createWebPlatform(version: string) {
   const platform: Platform = {
@@ -33,7 +34,9 @@ export async function notify(
 
   const permission =
     Notification.permission === "default"
-      ? await Notification.requestPermission().catch(() => "denied")
+      ? isIOS()
+        ? "default"
+        : await Notification.requestPermission().catch(() => "denied")
       : Notification.permission
 
   if (permission !== "granted") return

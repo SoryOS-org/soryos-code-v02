@@ -61,3 +61,23 @@ test("stays quiet while the app is focused", async () => {
 
   expect(showNotification).not.toHaveBeenCalled()
 })
+
+test("does not request notification permission outside a user gesture on iOS", async () => {
+  const requestPermission = mock(async () => "granted" as const)
+  Object.defineProperty(navigator, "userAgent", {
+    configurable: true,
+    value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+  })
+  Object.defineProperty(globalThis, "Notification", {
+    configurable: true,
+    value: class {
+      static permission = "default"
+      static requestPermission = requestPermission
+    },
+  })
+  document.hasFocus = () => false
+
+  await notify("Response ready")
+
+  expect(requestPermission).not.toHaveBeenCalled()
+})

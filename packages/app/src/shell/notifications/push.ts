@@ -1,6 +1,6 @@
 import { createStore } from "solid-js/store"
 import type { ServerApi } from "@/runtime/server/api"
-import { isStandalone } from "@/runtime/platform/pwa"
+import { isIOS, isStandalone } from "@/runtime/platform/pwa"
 
 export type PushIssue =
   | "insecure"
@@ -38,13 +38,6 @@ export function pushSupport(input: { secure: boolean; supported: boolean; ios: b
   if (input.ios && !input.installed) return "install" satisfies PushIssue
 
   if (!input.supported) return "unsupported" satisfies PushIssue
-}
-
-function isIOS() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  )
 }
 
 export function browserPush(): PushBrowser {
