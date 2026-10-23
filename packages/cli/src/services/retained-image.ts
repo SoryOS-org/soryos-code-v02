@@ -34,18 +34,16 @@ export const retain = Effect.fnUntraced(function* (directory: string, role: "ser
       return yield* link(directory).pipe(
         Effect.catch((error) => {
           const cause = error.reason.cause
-          const modules = executable.toLowerCase().indexOf(`${path.sep}node_modules${path.sep}`)
+          const fallback = fallbackDirectory(executable)
           if (
             process.platform !== "win32" ||
             !(cause instanceof Error) ||
             !("code" in cause) ||
             cause.code !== "EXDEV" ||
-            modules === -1
+            !fallback
           )
             return Effect.fail(error)
-          // The first node_modules contains the entire package tree, including native optional dependencies.
-          // Keep the image beside it so replacing that tree cannot remove the last running-image link.
-          return link(path.join(executable.slice(0, modules + 1), ".opencode", "retained-images"))
+          return link(fallback)
         }),
         Effect.tapError((cause) => Effect.logWarning("could not link the running binary", { cause })),
         Effect.orElseSucceed(() => undefined),
@@ -53,6 +51,21 @@ export const retain = Effect.fnUntraced(function* (directory: string, role: "ser
     }),
     // The last link of a still-running image refuses deletion; a later sweep removes it.
     (target) => (target === undefined ? Effect.void : fs.remove(target).pipe(Effect.ignore)),
+  )
+})
+
+/** Find package fallback images, including those retained before this operation chose ordinary tmp. */
+export const remaining = Effect.fnUntraced(function* (executable: string) {
+  const directory = fallbackDirectory(executable)
+  if (!directory) return undefined
+  const fs = yield* FileSystem.FileSystem
+  return yield* fs.readDirectory(directory).pipe(
+    Effect.map((names) => (names.some((name) => pattern.test(name)) ? directory : undefined)),
+    Effect.catch((error) =>
+      error.reason._tag === "NotFound"
+        ? Effect.succeed(undefined)
+        : Effect.logWarning("could not inspect retained images", { cause: error }).pipe(Effect.as(directory)),
+    ),
   )
 })
 
@@ -89,3 +102,10 @@ const alive = (pid: number) =>
     Effect.as(true),
     Effect.catch((cause) => Effect.succeed(!(cause instanceof Error && "code" in cause && cause.code === "ESRCH"))),
   )
+
+function fallbackDirectory(executable: string) {
+  const modules = executable.toLowerCase().indexOf(`${path.sep}node_modules${path.sep}`)
+  if (modules === -1) return undefined
+  // Keep links outside the first node_modules, including all native optional dependencies.
+  return path.join(executable.slice(0, modules + 1), ".opencode", "retained-images")
+}

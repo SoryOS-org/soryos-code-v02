@@ -404,7 +404,7 @@ const make = Effect.gen(function* () {
             }),
           )
         yield* effect
-        return { retainedDirectory: path.dirname(link) === directory ? undefined : path.dirname(link) }
+        return { retainedDirectory: yield* RetainedImage.remaining(executable) }
       }),
     ).pipe(Effect.provideService(FileSystem.FileSystem, fs))
   }

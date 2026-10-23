@@ -481,12 +481,18 @@ windows("windows refuses package removal when its temporary image retention fail
   })
 })
 ;[
-  { fallback: true, exitCode: 0 },
-  { fallback: false, exitCode: 0 },
-  { fallback: true, exitCode: 1 },
-].forEach(({ fallback, exitCode }) => {
+  { fallback: true, previous: false, exitCode: 0 },
+  { fallback: false, previous: false, exitCode: 0 },
+  { fallback: false, previous: true, exitCode: 0 },
+  { fallback: true, previous: false, exitCode: 1 },
+].forEach(({ fallback, previous, exitCode }) => {
   windows(
-    "windows returns retained-image cleanup information after uninstall: fallback=" + fallback + ", exit=" + exitCode,
+    "windows returns retained-image cleanup information after uninstall: fallback=" +
+      fallback +
+      ", previous=" +
+      previous +
+      ", exit=" +
+      exitCode,
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
@@ -509,18 +515,22 @@ windows("windows refuses package removal when its temporary image retention fail
                 )
               : fs.link(source, target),
         )
+        const directory = path.join(path.dirname(test.global.home), ".opencode", "retained-images")
+        yield* fs.makeDirectory(directory, { recursive: true })
+        yield* fs.writeFileString(path.join(directory, "unrelated.txt"), "keep")
+        // A service may have used fallback storage even when uninstall can use the ordinary tmp directory.
+        if (previous) yield* fs.writeFileString(path.join(directory, "opencode-service-4-aa.exe"), "service image")
         const removal = test.updater.removal("npm")
         if (!removal) return yield* Effect.die("Expected npm removal command")
         const result = yield* removal.run.pipe(Effect.exit)
         expect(result._tag).toBe(exitCode === 0 ? "Success" : "Failure")
-        const directory = path.join(path.dirname(test.global.home), ".opencode", "retained-images")
         // The caller owns user-visible cleanup instructions; diagnostic logs cannot carry this contract.
-        if (result._tag === "Success") expect(result.value.retainedDirectory).toBe(fallback ? directory : undefined)
+        if (result._tag === "Success")
+          expect(result.value.retainedDirectory).toBe(fallback || previous ? directory : undefined)
         expect(test.commands).toEqual([["npm", "uninstall", "--global", "@opencode/cli"]])
       }),
   )
 })
-
 
 windows("windows keeps a second link to the running binary in the cache while the installer runs", () =>
   Effect.gen(function* () {
