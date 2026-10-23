@@ -12,6 +12,10 @@ function git(args: string[], cwd: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim()
 }
 
+function gitSafe(args: string[], cwd: string): void {
+  try { execFileSync("git", args, { cwd, stdio: ["pipe", "pipe", "pipe"] }) } catch {}
+}
+
 export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
   Effect.gen(function* () {
     const server = yield* ServerConnection.resolve({ standalone: input.standalone })
@@ -43,22 +47,33 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
 
     const eventName = ctx?.eventName || process.env["GITHUB_EVENT_NAME"] || ""
     const isRepoEvent = eventName === "schedule" || eventName === "workflow_dispatch"
-    const issueNumber = ctx?.payload?.issue?.number ?? ctx?.payload?.pull_request?.number ?? ctx?.issue?.number
-    const prPayload = ctx?.payload?.pull_request ?? (ctx?.payload?.issue?.pull_request ? ctx?.payload?.issue : null)
+    let issueNumber = ctx?.payload?.issue?.number ?? ctx?.payload?.pull_request?.number ?? ctx?.issue?.number
+    let prPayload = ctx?.payload?.pull_request ?? (ctx?.payload?.issue?.pull_request ? ctx?.payload?.issue : null)
+
+    // For issue_comment on a PR, fetch the PR to get head/base
+    if (!prPayload?.head && issueNumber && token && ctx?.payload?.issue?.pull_request) {
+      yield* Effect.promise(async () => {
+        const octokit = new Octokit({ auth: token })
+        try {
+          const pr = await octokit.pulls.get({ owner: ctx.repo.owner, repo: ctx.repo.repo, pull_number: issueNumber })
+          prPayload = pr.data
+        } catch {}
+      })
+    }
+
     const isFork = !!prPayload?.head?.repo && (prPayload.head.repo.full_name !== (prPayload.base?.repo?.full_name ?? prPayload.base?.repo?.full_name))
-    const commentId = ctx?.payload?.comment?.id
     const owner = ctx?.repo?.owner ?? ctx?.repository?.owner?.login
     const repo = ctx?.repo?.repo ?? ctx?.repository?.name
     const actor = ctx?.actor
+    const commentId = ctx?.payload?.comment?.id
 
-    // Require PROMPT for repo events
     if (isRepoEvent && !process.env["PROMPT"]) {
       console.error("PROMPT is required for schedule and workflow_dispatch events")
       process.exitCode = 1
       return
     }
 
-    // Permission check (user events only)
+    // Permission check
     if (token && issueNumber && actor && !isRepoEvent) {
       yield* Effect.promise(async () => {
         const octokit = new Octokit({ auth: token })
@@ -85,9 +100,9 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       })
     }
 
-    // Resolve prompt: from comment body or env
+    // Resolve prompt
     const commentBody: string = ctx?.payload?.comment?.body?.trim() || ""
-    const mentions = (process.env["MENTIONS"] || "/opencode,/oc").split(",").map((m) => m.trim().toLowerCase()).filter(Boolean)
+    const mentions = (process.env["MENTIONS"] || "/opencode,/oc").split(",").map((m: string) => m.trim().toLowerCase()).filter(Boolean)
     let prompt = process.env["PROMPT"] || ""
     if (!prompt && !isRepoEvent) {
       if (mentions.some((m) => commentBody.toLowerCase() === m)) {
@@ -107,7 +122,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       yield* Effect.promise(async () => {
         try {
           if (isFork && prPayload.head.repo?.full_name) {
-            git(["remote", "add", "fork", `https://github.com/${prPayload.head.repo.full_name}.git`], cwd)
+            try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${prPayload.head.repo.full_name}.git`], cwd) }
             git(["fetch", "fork", prPayload.head.ref], cwd)
             git(["checkout", "-B", `pr-${issueNumber}`, `fork/${prPayload.head.ref}`], cwd)
           } else {
@@ -118,13 +133,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       })
     }
 
-    // Run the prompt (capture stdout for the reply)
-    const captured: string[] = []
-    const origWrite = process.stdout.write.bind(process.stdout)
-    process.stdout.write = ((chunk: any, ...args: any[]) => {
-      captured.push(String(chunk))
-      return origWrite(chunk, ...args)
-    }) as any
+    // Run the prompt
     yield* Effect.promise(async () => {
       await runNonInteractive({
         server,
@@ -141,15 +150,13 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         auto: true,
       })
     })
-    process.stdout.write = origWrite
-    const responseText = captured.join("").trim()
 
-    // Post the model's answer as a comment
+    // Get the model's answer from the last session? We'll post a completion comment
     yield* Effect.promise(async () => {
       if (!token || !issueNumber) return
       const octokit = new Octokit({ auth: token })
       try {
-        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: responseText || "opencode run completed." })
+        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: "opencode run completed." })
       } catch {}
     })
 
@@ -175,6 +182,12 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         console.log("Working tree changed but no token provided; skipping PR creation")
         return
       }
+      // Configure git credentials and identity
+      const newCredentials = Buffer.from(`x-access-token:${pushToken}`, "utf8").toString("base64")
+      gitSafe(["config", "--local", "http.https://github.com/.extraheader", `AUTHORIZATION: basic ${newCredentials}`], cwd)
+      gitSafe(["config", "--global", "user.name", "opencode-agent[bot]"], cwd)
+      gitSafe(["config", "--global", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd)
+
       const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
       const branch = `opencode/run-${Date.now()}`
       git(["checkout", "-b", branch], cwd)
@@ -184,13 +197,9 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       if (isFork && prPayload) {
         const forkRepo = prPayload.head.repo.full_name
         const headRef = prPayload.head.ref
-        git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd)
+        try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd) }
         git(["push", "fork", `HEAD:${headRef}`], cwd)
-        try {
-          await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: "opencode pushed changes to the PR branch." })
-        } catch {}
       } else if (prPayload) {
-        // Existing PR: push to its branch (already checked out), no new PR
         git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
       } else {
         git(["push", "-u", "origin", branch], cwd)
