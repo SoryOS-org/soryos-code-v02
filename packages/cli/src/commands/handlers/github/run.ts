@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process"
 import { Octokit } from "@octokit/rest"
 import * as core from "@actions/core"
 import * as github from "@actions/github"
+import { OpenCode } from "@opencode/client/promise"
+import { Service } from "@opencode/client/effect/service"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 import { ServerConnection } from "../../../services/server-connection"
@@ -133,13 +135,22 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       })
     }
 
+    const client = OpenCode.make({ baseUrl: server.endpoint.url, headers: Service.headers(server.endpoint) })
+
+    // Create session with model
+    const session = yield* Effect.promise(async () => {
+      const modelStr = process.env["MODEL"]
+      const created = await client.session.create({ location: { directory: cwd }, model: modelStr ? { providerID: modelStr.split("/")[0], id: modelStr.split("/").slice(1).join("/") } : undefined, agent: process.env["AGENT"] || undefined, title: "github run" })
+      return created
+    })
+
     // Run the prompt
     yield* Effect.promise(async () => {
       await runNonInteractive({
         server,
         message: [prompt],
         continue: false,
-        session: undefined,
+        session: session.id,
         fork: false,
         model: process.env["MODEL"],
         agent: process.env["AGENT"] || undefined,
@@ -151,12 +162,26 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       })
     })
 
-    // Get the model's answer from the last session? We'll post a completion comment
+    // Read the model's answer from the session
+    const answer = yield* Effect.promise(async () => {
+      try {
+        const msgs = await client.message.list({ sessionID: session.id, limit: 50 })
+        const list = (msgs.data ?? msgs) as any[]
+        const assistant = [...list].reverse().find((m: any) => m.type === "assistant")
+        if (!assistant) return ""
+        const parts = assistant.content ?? []
+        return parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n\n").trim()
+      } catch {
+        return ""
+      }
+    })
+
+    // Post the model's answer as a comment
     yield* Effect.promise(async () => {
       if (!token || !issueNumber) return
       const octokit = new Octokit({ auth: token })
       try {
-        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: "opencode run completed." })
+        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body: answer || "opencode run completed." })
       } catch {}
     })
 
@@ -182,14 +207,15 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         console.log("Working tree changed but no token provided; skipping PR creation")
         return
       }
-      // Save original extraheader
-      let originalExtra: string | undefined
-      try { originalExtra = git(["config", "--local", "--get", "http.https://github.com/.extraheader"], cwd) } catch {}
-      // Configure git credentials and identity
+      // Configure git credentials (local only)
       const newCredentials = Buffer.from(`x-access-token:${pushToken}`, "utf8").toString("base64")
       gitSafe(["config", "--local", "http.https://github.com/.extraheader", `AUTHORIZATION: basic ${newCredentials}`], cwd)
-      gitSafe(["config", "--global", "user.name", "opencode-agent[bot]"], cwd)
-      gitSafe(["config", "--global", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd)
+      // Set identity only if missing
+      try { git(["config", "--local", "user.name"], cwd) } catch { gitSafe(["config", "--local", "user.name", "opencode-agent[bot]"], cwd) }
+      try { git(["config", "--local", "user.email"], cwd) } catch { gitSafe(["config", "--local", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd) }
+
+      let originalExtra: string | undefined
+      try { originalExtra = git(["config", "--local", "--get", "http.https://github.com/.extraheader"], cwd) } catch {}
 
       try {
         const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
@@ -215,7 +241,6 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
           }
         }
       } finally {
-        // Restore original extraheader
         if (originalExtra) {
           gitSafe(["config", "--local", "http.https://github.com/.extraheader", originalExtra], cwd)
         } else {
