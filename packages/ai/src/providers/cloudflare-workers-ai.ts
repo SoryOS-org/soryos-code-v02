@@ -1,5 +1,6 @@
 import type { ProviderPackage } from "../provider-package.js"
 import { CloudflareRunEvaluation } from "../experimental/cloudflare-run-evaluation.js"
+import { EvaluationRounding } from "../experimental/evaluation.js"
 import { OpenAIChat } from "../protocols/openai-chat.js"
 import { AuthOptions, type AtLeastOne, type ProviderAuthOption } from "../route/auth-options.js"
 import { Route, type RouteDefaultsInput } from "../route/client.js"
@@ -59,6 +60,8 @@ export const route = Route.make({
 
 export const routes = [route]
 
+const clefRounding = new EvaluationRounding({ probabilityDecimals: 4, scoreDecimals: 4 })
+
 export const configure = (input: LanguageModelOptions) => {
   const { accountId: _accountId, apiKey: _apiKey, auth: _auth, baseURL: _baseURL, ...defaults } = input
   const auth = AuthOptions.bearer(input, authEnvVars)
@@ -71,6 +74,7 @@ export const configure = (input: LanguageModelOptions) => {
       baseURL: runBaseURL(input),
       headers: input.headers,
       http: HttpOptions.make(input.http),
+      rounding: clefRounding,
     })
   return {
     id,

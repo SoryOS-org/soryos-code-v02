@@ -1,5 +1,10 @@
 import { Effect, Schema } from "effect"
-import { EvaluationModel, type EvaluationRequestFor, type EvaluationResponse } from "./evaluation.js"
+import {
+  EvaluationModel,
+  type EvaluationRequestFor,
+  type EvaluationResponse,
+  type EvaluationRounding,
+} from "./evaluation.js"
 import { SystemOne } from "./system-one.js"
 import { Endpoint } from "../route/endpoint.js"
 import { MediaProtocol } from "../route/media-protocol.js"
@@ -20,6 +25,7 @@ export interface ModelInput extends MediaRoute.ModelInput {
   readonly provider: ProviderID
   /** The Run API base, `.../client/v4/accounts/{account}/ai/run`. */
   readonly baseURL: string
+  readonly rounding?: EvaluationRounding
 }
 
 /** Posts `{ model, input }` to Cloudflare's `/ai/run` with the System One request body as `input`. */
@@ -45,7 +51,7 @@ export const model = (input: ModelInput) => {
               SystemOne.toResponse(
                 "answers" in output.value.result ? output.value.result : output.value.result.result,
                 input.provider,
-                SystemOne.jevRounding,
+                input.rounding,
               ),
             ),
           ),

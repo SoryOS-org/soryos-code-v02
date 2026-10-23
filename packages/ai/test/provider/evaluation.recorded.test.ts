@@ -155,6 +155,8 @@ describe("experimental Evaluation recorded", () => {
         apiKey: process.env.CLOUDFLARE_API_KEY ?? "fixture",
       }).experimental.evaluation("@cf/cloudflare/clef"),
       "clef",
+    ).pipe(
+      Effect.map((response) => expect(response.rounding).toMatchObject({ probabilityDecimals: 4, scoreDecimals: 4 })),
     ),
   )
 
@@ -164,6 +166,8 @@ describe("experimental Evaluation recorded", () => {
         accountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "fixture-account",
         gatewayApiKey: process.env.CLOUDFLARE_API_TOKEN ?? "fixture",
       }).experimental.evaluation("typesafe/jev"),
+    ).pipe(
+      Effect.map((response) => expect(response.rounding).toMatchObject({ probabilityDecimals: 2, scoreDecimals: 2 })),
     ),
   )
 
