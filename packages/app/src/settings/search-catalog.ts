@@ -78,6 +78,14 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
+    label: "settings.timeline.row.width.title",
+    description: "settings.timeline.row.width.description",
+    target: "settings-timeline-width",
+    section: "settings.timeline.title",
+    keywords: "column line length measure narrow focused comfortable wide readability",
+  },
+  {
+    tab: "general",
     label: "settings.timeline.row.turnDiffs.title",
     description: "settings.timeline.row.turnDiffs.description",
     target: "settings-show-turn-diffs",

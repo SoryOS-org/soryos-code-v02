@@ -19,6 +19,8 @@ export type FollowUpBehavior = Settings["general"]["followUpBehavior"]
 
 export type BackgroundActivity = Settings["general"]["backgroundActivity"]
 
+export type TimelineWidth = Settings["general"]["timelineWidth"]
+
 export type TabLayout = Settings["appearance"]["tabLayout"]
 
 export type ReduceMotion = Settings["appearance"]["reduceMotion"]
@@ -124,6 +126,7 @@ const generalSchema = Persistence.struct({
   showCustomAgents: Schema.Boolean,
   showTurnDiffs: Schema.Boolean,
   backgroundActivity: Schema.Literals(["off", "left", "center", "right"]),
+  timelineWidth: Schema.Literals(["focused", "comfortable", "wide"]),
   // Lets agents render generated UI in the timeline; an experiment users can turn off.
   generatedUI: Schema.Boolean,
   // The "New icons" design experiment, off until it ships.
@@ -294,6 +297,7 @@ export const defaultSettings: Settings = {
     showCustomAgents: false,
     showTurnDiffs: false,
     backgroundActivity: "left",
+    timelineWidth: "comfortable",
     generatedUI: true,
     newIcons: false,
     mobileTitlebarPosition: "top",
@@ -354,6 +358,14 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
       document.documentElement.dataset.motion = reduce ? "reduce" : "full"
     })
 
+    const timelineWidth = withFallback(() => store.general?.timelineWidth, defaultSettings.general.timelineWidth)
+
+    // The session column's width token keys off this attribute, so every surface sharing it follows the setting.
+    createEffect(() => {
+      if (typeof document === "undefined") return
+      document.documentElement.dataset.timelineWidth = timelineWidth()
+    })
+
     const autoApproveDefault = withFallback(
       () => store.permissions?.autoApprove,
       defaultSettings.permissions.autoApprove,
@@ -387,6 +399,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setBackgroundActivity(value: BackgroundActivity) {
           setStore("general", "backgroundActivity", value)
+        },
+        timelineWidth,
+        setTimelineWidth(value: TimelineWidth) {
+          setStore("general", "timelineWidth", value)
         },
         generatedUI: withFallback(() => store.general?.generatedUI, defaultSettings.general.generatedUI),
         setGeneratedUI(value: boolean) {

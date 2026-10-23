@@ -94,6 +94,7 @@ describe("settings schema", () => {
         showCustomAgents: false,
         showTurnDiffs: false,
         backgroundActivity: "left",
+        timelineWidth: "comfortable",
         generatedUI: true,
         newIcons: false,
         mobileTitlebarPosition: "top",
@@ -132,6 +133,7 @@ describe("settings schema", () => {
         reasoningMode: 3,
         followUpBehavior: "invalid",
         backgroundActivity: "invalid",
+        timelineWidth: "invalid",
       },
       appearance: { fontSize: "large", mono: "Custom Mono", tabLayout: "vertical", showProjectName: true },
       permissions: { autoApprove: true, autoApproveProjects: { on: true, off: false, bad: "yes" } },
@@ -147,6 +149,7 @@ describe("settings schema", () => {
       timelineDetail: timelinePresets[2].value,
       followUpBehavior: "steer",
       backgroundActivity: "left",
+      timelineWidth: "comfortable",
     })
     expect(settings.appearance).toEqual({
       fontSize: 14,

@@ -9,6 +9,7 @@ import { ExtensionSettingsSections } from "@/runtime/extension/settings-page-vie
 import {
   type BackgroundActivity,
   type FollowUpBehavior,
+  type TimelineWidth,
   type WorkspaceDefaultDestination,
   useSettings,
 } from "@/settings/model"
@@ -167,6 +168,35 @@ const BackgroundActivitySetting = () => {
   )
 }
 
+const TimelineWidthSetting = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+  const options = createMemo((): { value: TimelineWidth; label: string }[] => [
+    { value: "focused", label: language.t("settings.timeline.row.width.focused") },
+    { value: "comfortable", label: language.t("settings.timeline.row.width.comfortable") },
+    { value: "wide", label: language.t("settings.timeline.row.width.wide") },
+  ])
+
+  return (
+    <SettingsRow
+      title={language.t("settings.timeline.row.width.title")}
+      description={language.t("settings.timeline.row.width.description")}
+    >
+      <Select
+        data-action="settings-timeline-width"
+        aria-label={language.t("settings.timeline.row.width.title")}
+        options={options()}
+        current={options().find((option) => option.value === settings.general.timelineWidth())}
+        value={(option) => option.value}
+        label={(option) => option.label}
+        placement="bottom-end"
+        gutter={6}
+        onSelect={(option) => option && settings.general.setTimelineWidth(option.value)}
+      />
+    </SettingsRow>
+  )
+}
+
 const LanguageSetting = () => {
   const language = useLanguage()
 
@@ -295,6 +325,7 @@ export const SettingsGeneral: Component = () => {
                 onChange={settings.general.setTimelineDetail}
               />
             </div>
+            <TimelineWidthSetting />
             <BackgroundActivitySetting />
             <SettingsRow
               title={language.t("settings.timeline.row.turnDiffs.title")}
