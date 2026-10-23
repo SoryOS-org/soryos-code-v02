@@ -167,7 +167,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       try {
         const msgs = await client.message.list({ sessionID: session.id, limit: 50 })
         const list = (msgs.data ?? msgs) as any[]
-        const assistant = [...list].reverse().find((m: any) => m.type === "assistant")
+        const assistant = list.find((m: any) => m.type === "assistant")
         if (!assistant) return ""
         const parts = assistant.content ?? []
         return parts.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n\n").trim()
@@ -207,15 +207,16 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         console.log("Working tree changed but no token provided; skipping PR creation")
         return
       }
+      // Save original extraheader BEFORE setting token
+      let originalExtra: string | undefined
+      try { originalExtra = git(["config", "--local", "--get", "http.https://github.com/.extraheader"], cwd) } catch {}
+
       // Configure git credentials (local only)
       const newCredentials = Buffer.from(`x-access-token:${pushToken}`, "utf8").toString("base64")
       gitSafe(["config", "--local", "http.https://github.com/.extraheader", `AUTHORIZATION: basic ${newCredentials}`], cwd)
       // Set identity only if missing
       try { git(["config", "--local", "user.name"], cwd) } catch { gitSafe(["config", "--local", "user.name", "opencode-agent[bot]"], cwd) }
       try { git(["config", "--local", "user.email"], cwd) } catch { gitSafe(["config", "--local", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd) }
-
-      let originalExtra: string | undefined
-      try { originalExtra = git(["config", "--local", "--get", "http.https://github.com/.extraheader"], cwd) } catch {}
 
       try {
         const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
