@@ -13,7 +13,7 @@ const route = MediaProtocol.identity({
   provider: "cloudflare-workers-ai",
 })
 /** FLUX.2 models only accept multipart form fields, even for a prompt alone. */
-const MULTIPART_MODEL = /^@cf\/black-forest-labs\/flux-2-/
+const MULTIPART_MODEL_PREFIX = "@cf/black-forest-labs/flux-2-"
 const RESERVED_FORM_FIELDS = new Set(["prompt"])
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,8 @@ const fromRequest = Effect.fn("CloudflareWorkersAIImages.fromRequest")(function*
     seed: request.seed,
   }
   const native = mergeJsonRecords(request.providerOptions, request.http?.body)
-  if (!MULTIPART_MODEL.test(request.model.id)) return MediaProtocol.json(mergeJsonRecords(fields, native) ?? {})
+  if (!request.model.id.startsWith(MULTIPART_MODEL_PREFIX))
+    return MediaProtocol.json(mergeJsonRecords(fields, native) ?? {})
   const body = new FormData()
   MediaInput.appendFields(body, fields, { overlay: native, reserved: RESERVED_FORM_FIELDS })
   return MediaProtocol.multipart(body)
