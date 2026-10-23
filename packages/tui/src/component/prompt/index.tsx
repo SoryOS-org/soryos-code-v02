@@ -9,7 +9,19 @@ import {
   stripAnsiSequences,
   type KeyEvent,
 } from "@opentui/core"
-import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match, For } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  onMount,
+  createSignal,
+  onCleanup,
+  on,
+  Show,
+  Switch,
+  Match,
+  For,
+  untrack,
+} from "solid-js"
 import path from "path"
 import { useLocal } from "../../context/local"
 import { useTheme, useThemes } from "../../context/theme"
@@ -70,6 +82,7 @@ import { directoryRecentValue } from "../../prompt/directory-completion"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
+import { isDeepEqual } from "remeda"
 
 export type PromptProps = {
   sessionID?: string
@@ -1094,6 +1107,38 @@ export function Prompt(props: PromptProps) {
   })
 
   let submitting = false
+  const [pendingSubmit, setPendingSubmit] = createSignal<{
+    location: string
+    sessionID?: string
+    mode: "normal" | "shell"
+    prompt: PromptInfo
+    delivery: SessionInbox.Delivery
+  }>()
+  createEffect(() => {
+    const pending = pendingSubmit()
+    if (!pending) return
+    const location = currentLocation.ref ?? data.location.default()
+    if (
+      disabled() ||
+      props.sessionID !== pending.sessionID ||
+      store.mode !== pending.mode ||
+      !isDeepEqual(store.prompt, pending.prompt) ||
+      locationKey(location) !== pending.location
+    ) {
+      setPendingSubmit(undefined)
+      return
+    }
+    if (dialog.stack.length > 0) return
+    if (
+      [data.location.agent, data.location.model, data.location.config].some(
+        (catalog) => catalog.list(location) === undefined,
+      )
+    )
+      return
+    setPendingSubmit(undefined)
+    untrack(() => void submit(pending.delivery))
+  })
+
   async function submit(delivery: SessionInbox.Delivery = "steer") {
     if (disabled()) return false
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
@@ -1149,6 +1194,28 @@ export function Prompt(props: PromptProps) {
       clearPrompt()
       await slash.command.run(slash.input)
       return true
+    }
+    // A worktree switch updates the active location before its catalogs arrive.
+    // Join their in-flight loads instead of silently dropping this submission.
+    const location = currentLocation.ref ?? data.location.default()
+    const catalogs = [data.location.agent, data.location.model, data.location.config].filter(
+      (catalog) => catalog.list(location) === undefined,
+    )
+    if (catalogs.length > 0) {
+      const pending = {
+        location: locationKey(location),
+        sessionID: props.sessionID,
+        mode: store.mode,
+        prompt: structuredClone(unwrap(store.prompt)),
+        delivery,
+      }
+      setPendingSubmit(pending)
+      void Promise.all(catalogs.map((catalog) => catalog.sync(location))).catch((error: unknown) => {
+        if (disposed || pendingSubmit() !== pending) return
+        setPendingSubmit(undefined)
+        toast.show({ title: "Failed to prepare prompt", message: errorMessage(error), variant: "error" })
+      })
+      return false
     }
     const slashHead = parseSlashHead(inputText, /\s/)
     const isCommand =
