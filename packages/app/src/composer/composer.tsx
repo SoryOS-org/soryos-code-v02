@@ -3,7 +3,6 @@ import { Dynamic } from "solid-js/web"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
-import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
 import { consoleModelGroup } from "@/providers/models/provider-group"
 import { consoleProviderName } from "@/providers/catalog/console"
@@ -145,9 +144,6 @@ function ComposerModelControl(props: {
           )}
         </Show>
         <span class="truncate">{props.modelName}</span>
-      </span>
-      <span class="-ml-0.5 -mr-1 flex shrink-0">
-        <Icon name="chevron-down" />
       </span>
     </>
   )
