@@ -196,7 +196,7 @@
   background: var(--v2-overlay-simple-overlay-hover);
 }
 
-[data-component="menu-v2-content"][data-slot="model-dialog-flyout"] {
+[data-component="menu-v2-content"][data-slot="model-dialog-next-flyout"] {
   position: fixed;
   /* One width for every model, matching the 160px its placement assumes. */
   width: 160px;

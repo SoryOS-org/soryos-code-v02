@@ -978,7 +978,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
           <div
             ref={(element) => (flyoutRef = element)}
             data-component="menu-v2-content"
-            data-slot="model-dialog-flyout"
+            data-slot="model-dialog-next-flyout"
             style={{ left: `${store.position.left}px`, top: `${store.position.top}px` }}
             onMouseEnter={() => triangle.cancel()}
           >
