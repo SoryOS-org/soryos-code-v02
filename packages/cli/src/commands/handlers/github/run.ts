@@ -29,7 +29,8 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       ctx = github.context
     } else {
       // Local run: build minimal context from git remote
-      const remote = git(["remote", "get-url", "origin"], process.cwd())
+      let remote = ""
+      try { remote = git(["remote", "get-url", "origin"], process.cwd()) } catch {}
       const m = remote.match(/github\.com[:/](.+?)\/(.+?)(?:\.git)?$/)
       ctx = { eventName: process.env["GITHUB_EVENT_NAME"] || "", repo: { owner: m?.[1] || "", repo: m?.[2] || "" }, payload: {}, actor: process.env["GITHUB_ACTOR"] }
     }
