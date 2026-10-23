@@ -7,7 +7,8 @@ import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Cause, Context, Effect, Layer, PubSub, RcMap, Stream } from "effect"
 import { lazy } from "../util/lazy.js"
-import { readdirSync, statSync, watch } from "node:fs"
+import { watch } from "node:fs"
+import { readdir, stat } from "node:fs/promises"
 import path from "path"
 import loadBinding from "./watcher-binding.js"
 
@@ -198,12 +199,50 @@ export const testLayer = Layer.effectContext(
   }),
 )
 
-function poll(directory: string, names: ReadonlySet<string>, publish: (update: Update) => void): Subscription {
-  const scan = () => {
+type Scan = () => Promise<Map<string, string>>
+
+export async function pollWith(
+  scan: Scan,
+  interval: number,
+  publish: (update: Update) => void,
+): Promise<Subscription> {
+  let previous = await scan()
+  let active = true
+  let running = false
+  const tick = async () => {
+    if (!active || running) return
+    running = true
+    try {
+      const next = await scan()
+      if (!active) return
+      for (const [file, signature] of next) {
+        const prior = previous.get(file)
+        if (prior === undefined) publish({ path: file, type: "create" })
+        else if (prior !== signature) publish({ path: file, type: "update" })
+      }
+      for (const file of previous.keys()) if (!next.has(file)) publish({ path: file, type: "delete" })
+      previous = next
+    } finally {
+      running = false
+    }
+  }
+  const timer = setInterval(tick, interval)
+  return {
+    unsubscribe: () => {
+      active = false
+      clearInterval(timer)
+      return Promise.resolve()
+    },
+    backend: "poll",
+  }
+}
+
+function scanEntries(directory: string, names: ReadonlySet<string>): Scan {
+  return async () => {
     const next = new Map<string, string>()
     let entries
     try {
-      entries = readdirSync(directory, { withFileTypes: true })
+      entries = await readdir(directory, { withFileTypes: true })
     } catch {
       return next
     }
@@ -215,39 +254,17 @@ function poll(directory: string, names: ReadonlySet<string>, publish: (update: U
         continue
       }
       try {
-        const stat = statSync(file)
-        next.set(file, `${stat.mtimeMs}:${stat.size}`)
+        const info = await stat(file)
+        next.set(file, `${info.mtimeMs}:${info.size}`)
       } catch {
         next.set(file, "file")
       }
     }
     return next
   }
-  let previous = scan()
-  const timer = setInterval(() => {
-    const next = scan()
-    for (const [file, signature] of next) {
-      const prior = previous.get(file)
-      if (prior === undefined) publish({ path: file, type: "create" })
-      else if (prior !== signature) publish({ path: file, type: "update" })
-    }
-    for (const file of previous.keys()) if (!next.has(file)) publish({ path: file, type: "delete" })
-    previous = next
-  }, 100)
-  return {
-    unsubscribe: () => {
-      clearInterval(timer)
-      return Promise.resolve()
-    },
-    backend: "poll",
-  }
 }
 
-function pollDirectory(
-  directory: string,
-  ignore: readonly string[],
-  publish: (update: Update) => void,
-): Subscription {
+function scanDirectory(directory: string, ignore: readonly string[]): Scan {
   const ignored = (file: string) => {
     const relative = path.relative(directory, file)
     return ignore.some((entry) => {
@@ -259,12 +276,12 @@ function pollDirectory(
       return relative === normalized || relative.startsWith(normalized + path.sep)
     })
   }
-  const scan = () => {
+  return async () => {
     const next = new Map<string, string>()
-    const visit = (dir: string) => {
+    const visit = async (dir: string) => {
       let entries
       try {
-        entries = readdirSync(dir, { withFileTypes: true })
+        entries = await readdir(dir, { withFileTypes: true })
       } catch {
         return
       }
@@ -273,37 +290,19 @@ function pollDirectory(
         if (ignored(file)) continue
         if (entry.isDirectory()) {
           next.set(file, "directory")
-          visit(file)
+          await visit(file)
           continue
         }
         try {
-          const stat = statSync(file)
-          next.set(file, `${stat.mtimeMs}:${stat.size}`)
+          const info = await stat(file)
+          next.set(file, `${info.mtimeMs}:${info.size}`)
         } catch {
           next.set(file, "file")
         }
       }
     }
-    visit(directory)
+    await visit(directory)
     return next
-  }
-  let previous = scan()
-  const timer = setInterval(() => {
-    const next = scan()
-    for (const [file, signature] of next) {
-      const prior = previous.get(file)
-      if (prior === undefined) publish({ path: file, type: "create" })
-      else if (prior !== signature) publish({ path: file, type: "update" })
-    }
-    for (const file of previous.keys()) if (!next.has(file)) publish({ path: file, type: "delete" })
-    previous = next
-  }, 250)
-  return {
-    unsubscribe: () => {
-      clearInterval(timer)
-      return Promise.resolve()
-    },
-    backend: "poll",
   }
 }
 
@@ -311,19 +310,13 @@ export const nativeLayer = Layer.succeed(
   Native,
   Native.of({
     subscribe: (input) => {
-      // FreeBSD's fs.watch is kqueue-backed: it reports that a directory
-      // changed without naming the new entry, and cannot watch paths that do
-      // not exist yet. Poll the tree from JS instead.
-      if (process.platform === "freebsd" && input.type === "directory") {
-        return Effect.sync(() => pollDirectory(input.target, input.ignore, input.publish))
-      }
       if (input.type === "file" || input.type === "entries") {
         const directory = input.type === "file" ? path.dirname(input.target) : input.target
         const names = new Set(input.type === "file" ? [path.basename(input.target)] : input.names)
-        // kqueue reports directory changes without the new entry's name.
-        // Poll the containing directory instead.
+        // kqueue reports directory changes without the new entry's name and
+        // cannot watch paths that do not exist yet.
         if (process.platform === "freebsd") {
-          return Effect.sync(() => poll(directory, names, input.publish))
+          return Effect.promise(() => pollWith(scanEntries(directory, names), 100, input.publish))
         }
         return Effect.sync(() => {
           const subscription = watch(directory, { recursive: false }, (_event, file) => {
@@ -337,6 +330,9 @@ export const nativeLayer = Layer.succeed(
           )
           return { unsubscribe: () => Promise.resolve(subscription.close()), backend: "node" }
         })
+      }
+      if (process.platform === "freebsd") {
+        return Effect.promise(() => pollWith(scanDirectory(input.target, input.ignore), 500, input.publish))
       }
       return subscribeDirectory(watcher(), getBackend(), input.target, input.ignore, input.publish)
     },
