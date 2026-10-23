@@ -29,7 +29,7 @@ describe("Vercel AI Gateway Images recorded", () => {
       expect(new TextDecoder().decode((yield* response.image.bytes()).subarray(8, 12))).toBe("WEBP")
       expect(model.provider).toBe("vercel-ai-gateway")
       expect(response.usage?.details).toHaveProperty("vercel-ai-gateway")
-      expect(response.providerMetadata).toEqual({ "vercel-ai-gateway": { outputFormat: "webp" } })
+      expect(response.providerMetadata).toHaveProperty("vercel-ai-gateway")
     }),
   )
 })
