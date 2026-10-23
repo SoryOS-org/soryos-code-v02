@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { execSync } from "node:child_process"
 import { Octokit } from "@octokit/rest"
 import * as github from "@actions/github"
@@ -16,8 +16,9 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
     const server = yield* ServerConnection.resolve({ standalone: input.standalone })
 
     // Permission check and reaction for GitHub Actions runs
-    const token = process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
-    const ctx = github.context
+    const token = Option.getOrUndefined(input.token) || process.env["GITHUB_TOKEN"] || process.env["TOKEN"]
+    const eventStr = Option.getOrUndefined(input.event)
+    const ctx = eventStr ? JSON.parse(eventStr) : github.context
     const issueNumber = (ctx.payload as any)?.issue?.number ?? (ctx.payload as any)?.pull_request?.number
     const commentId = (ctx.payload as any)?.comment?.id
     if (token && issueNumber) {
@@ -51,6 +52,25 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
       })
     }
 
+    // Post-completion comment
+    const postComment = async () => {
+      if (!token) return
+      const issueNumber = (ctx as any)?.payload?.issue?.number ?? (ctx as any)?.payload?.pull_request?.number ?? (ctx as any)?.issue?.number
+      if (!issueNumber) return
+      const owner = (ctx as any)?.repo?.owner ?? (ctx as any)?.repository?.owner?.login
+      const repo = (ctx as any)?.repo?.repo ?? (ctx as any)?.repository?.name
+      if (!owner || !repo) return
+      const octokit = new Octokit({ auth: token })
+      try {
+        await octokit.issues.createComment({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          body: "opencode run completed.",
+        })
+      } catch {}
+    }
+
     const prompt = process.env["PROMPT"] || "Summarize this repository"
     yield* Effect.promise(() =>
       runNonInteractive({
@@ -68,6 +88,7 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         auto: true,
       }),
     )
+    yield* Effect.promise(postComment)
 
     yield* Effect.promise(async () => {
       const cwd = process.cwd()
