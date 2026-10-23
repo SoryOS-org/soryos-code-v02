@@ -109,6 +109,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   warming: ConfigWarming.Warming.pipe(optional).annotate({
     description: "Keep recently active sessions warm with transient model requests (default: false)",
   }),
+  secret_shield: Schema.Literals(["off", "warn", "mask", "block"]).pipe(optional).annotate({
+    description: "Scan outbound messages for credential patterns before sending to the model provider",
+  }),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(optional),
   experimental: ConfigExperimental.Info.pipe(optional),
 }) {}

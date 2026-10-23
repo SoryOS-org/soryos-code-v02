@@ -113,6 +113,8 @@ export type {
   ToolSchema,
   ToolToModelOutput,
 } from "./tool.js"
+export { applySecretShield, isSecretShieldMode } from "./secret-shield.js"
+export type { SecretShieldMode, ShieldResult, ShieldReport } from "./secret-shield.js"
 export * as LLM from "./llm.js"
 export type {
   Definition as ProviderDefinition,
