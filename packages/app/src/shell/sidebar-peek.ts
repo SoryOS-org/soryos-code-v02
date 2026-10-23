@@ -44,7 +44,7 @@ const dwellKnob = (from: "edge" | "toggle", label: string, value: number) =>
   })
 
 // How long the pointer rests before the sidebar peeks, in ms. Both sit well under the ~100ms where a response still
-// reads as immediate, and above how long a pointer spends crossing: through the 8px edge strip in well under a frame,
+// reads as immediate, and above how long a pointer spends crossing: through the ~24px edge zone in a frame or two,
 // over the 28px toggle in ~30–60ms on the way to the breadcrumb or the traffic lights. The toggle waits longer because
 // the header row is crossed far more often than the bare window edge, and a peek that starts just before a click docks
 // smoothly. Both are tunable in Knobs → Experiments.
@@ -60,10 +60,21 @@ const menus = '[data-component="menu-v2-content"], [role="menu"]'
 // A drag in progress, or a dialog over the app, which no peek should open under.
 const busy = '[data-dragging="true"], [role="dialog"], [role="alertdialog"]'
 
-// The strip along the window's start edge that peeks the sidebar: the shell's 8px frame gutter, outside the content's
-// card, so no control, scrollbar or text lives in it. It starts below the session header's 56px band, which holds the
-// traffic lights and the toggle.
-const edge = 8
+// The zone along the window's start edge that peeks the sidebar: the shell's 8px frame gutter, outside the content's
+// card, plus a tunable reach into the content. It only reads where the pointer is, so clicks, scrollbars and text
+// selection under it work as usual, and a held button never peeks. It starts below the session header's 56px band,
+// which holds the traffic lights and the toggle.
+const gutter = 8
+
+const edgeZone = motionTuning.number("sidebar.peek.edgeZone", {
+  ...peekKnobs,
+  label: "Edge zone",
+  value: 16,
+  min: 0,
+  max: 48,
+  step: 1,
+  unit: "px",
+})
 
 const header = 56
 
@@ -120,7 +131,7 @@ export function createSidebarPeek(input: {
   // Whether the sidebar last docked from a peek, which already shows it.
   let handedOff = false
   let viewport = window.innerWidth
-  // Where the edge strip starts, and the box spanning the toggle and the sidebar, until the layout next changes.
+  // Where the edge zone starts, and the box spanning the toggle and the sidebar, until the layout next changes.
   let edgeTop: number | undefined
   let corridor: Box | undefined
 
@@ -266,6 +277,8 @@ export function createSidebarPeek(input: {
   const atEdge = (point: Point) => {
     const rtl = document.documentElement.dir === "rtl"
 
+    const edge = gutter + edgeZone()
+
     if (rtl ? point.x < viewport - edge : point.x > edge) return false
     edgeTop ??= (input.aside()?.getBoundingClientRect().top ?? Infinity) + header
 
@@ -404,7 +417,7 @@ export function createSidebarPeek(input: {
     const aside = input.aside()
 
     if (!aside) return
-    // A titlebar or panel that moves the sidebar's row changes where the edge strip starts.
+    // A titlebar or panel that moves the sidebar's row changes where the edge zone starts.
     const observer = new ResizeObserver(relayout)
     observer.observe(aside.parentElement ?? aside)
     onCleanup(() => observer.disconnect())

@@ -44,9 +44,9 @@ function mount() {
 }
 
 // Rests the pointer on the window's start edge, below the header band.
-function restOnEdge(target: Element) {
+function restOnEdge(target: Element, clientX = 2, buttons = 0) {
   target.dispatchEvent(
-    new PointerEvent("pointermove", { bubbles: true, clientX: 2, clientY: 300, pointerType: "mouse" }),
+    new PointerEvent("pointermove", { bubbles: true, clientX, clientY: 300, buttons, pointerType: "mouse" }),
   )
 }
 
@@ -57,6 +57,25 @@ it("peeks once the pointer rests on the window's start edge", async () => {
   restOnEdge(view.content)
   await afterDwell()
   expect(view.peek.shown()).toBe(true)
+})
+
+it("peeks from the edge zone 16px past the 8px gutter, and not beyond it", async () => {
+  const inside = mount()
+  restOnEdge(inside.content, 24)
+  await afterDwell()
+  expect(inside.peek.shown()).toBe(true)
+
+  const beyond = mount()
+  restOnEdge(beyond.content, 25)
+  await afterDwell()
+  expect(beyond.peek.shown()).toBe(false)
+})
+
+it("doesn't peek while a mouse button is held, as when a text selection drags into the edge zone", async () => {
+  const view = mount()
+  restOnEdge(view.content, 12, 1)
+  await afterDwell()
+  expect(view.peek.shown()).toBe(false)
 })
 
 it("a press, a drag, a dialog or a resize clears the pending peek", async () => {
