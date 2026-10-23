@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { mkdirSync, writeFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { execSync } from "node:child_process"
+import * as prompts from "@clack/prompts"
 import { Commands } from "../../commands"
 import { Runtime } from "../../../framework/runtime"
 
@@ -12,7 +13,7 @@ function parseRemote(url: string): { owner: string; repo: string } | null {
 }
 
 export default Runtime.handler(Commands.commands.github.commands.install, () =>
-  Effect.sync(() => {
+  Effect.promise(async () => {
     const cwd = process.cwd()
     let remoteUrl = ""
     try {
@@ -28,6 +29,22 @@ export default Runtime.handler(Commands.commands.github.commands.install, () =>
       process.exitCode = 1
       return
     }
+
+    prompts.intro("Install GitHub agent")
+
+    const model = await prompts.text({
+      message: "Model to use (provider/model)",
+      placeholder: "anthropic/claude-sonnet-4-20250514",
+      defaultValue: "anthropic/claude-sonnet-4-20250514",
+    })
+    if (prompts.isCancel(model)) {
+      prompts.cancel("Installation cancelled")
+      process.exitCode = 1
+      return
+    }
+
+    const provider = (model as string).split("/")[0]
+    const envVar = provider === "anthropic" ? "ANTHROPIC_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "MODEL_API_KEY"
 
     const workflowDir = join(cwd, ".github", "workflows")
     if (!existsSync(workflowDir)) mkdirSync(workflowDir, { recursive: true })
@@ -62,17 +79,22 @@ jobs:
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
-          ANTHROPIC_API_KEY: \${{ secrets.ANTHROPIC_API_KEY }}
+          ${envVar}: \${{ secrets.${envVar} }}
         with:
-          model: anthropic/claude-sonnet-4-20250514
+          model: ${model}
 `
     writeFileSync(workflowPath, content)
-    console.log(`Added workflow file: "${workflowPath}"`)
-    console.log("")
-    console.log("Next steps:")
-    console.log("  1. Commit the workflow file and push")
-    console.log("  2. Add your provider API key as a repository secret")
-    console.log("  3. Install the GitHub app: https://github.com/apps/opencode-agent")
-    console.log(`  4. Comment '/oc' on an issue in ${parsed.owner}/${parsed.repo} to try it`)
+    prompts.log.success(`Added workflow file: "${workflowPath}"`)
+
+    prompts.outro(
+      [
+        "Next steps:",
+        "",
+        `    1. Commit the workflow file and push`,
+        `    2. Add ${envVar} as a repository secret`,
+        "    3. Install the GitHub app: https://github.com/apps/opencode-agent",
+        `    4. Comment '/oc' on an issue in ${parsed.owner}/${parsed.repo} to try it`,
+      ].join("\n"),
+    )
   }),
 )
