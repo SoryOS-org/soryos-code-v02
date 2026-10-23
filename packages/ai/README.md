@@ -196,7 +196,8 @@ OpenAI.configure().experimental.evaluation("gpt-6-luna")
 ```
 
 OpenRouter reads `OPENROUTER_API_KEY`. Vercel reads `AI_GATEWAY_API_KEY`, then `VERCEL_OIDC_TOKEN`.
-Baseten reads `BASETEN_API_KEY` and accepts `max_len` in `options`. DigitalOcean reads
+Baseten reads `BASETEN_API_KEY`, accepts `max_len` in `options`, and returns unrounded values, so
+`response.rounding` is unset. DigitalOcean reads
 `DIGITALOCEAN_ACCESS_TOKEN`, `DIGITALOCEAN_API_KEY`, then `DO_INFERENCE_API_KEY`.
 OpenAI reads `OPENAI_API_KEY` and calls `/v1/decisions`.
 The common API uses `boolean`; System One routes lower it to native `noul`, and OpenAI lowers it to

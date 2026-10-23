@@ -45,6 +45,7 @@ export const model = (input: ModelInput) => {
               SystemOne.toResponse(
                 "answers" in output.value.result ? output.value.result : output.value.result.result,
                 input.provider,
+                SystemOne.jevRounding,
               ),
             ),
           ),

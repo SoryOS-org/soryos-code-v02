@@ -173,7 +173,7 @@ describe("experimental Evaluation recorded", () => {
         "decision-models/baseten-elephant-9b-latest",
       ),
       "baseten-",
-    ),
+    ).pipe(Effect.map((response) => expect(response.rounding).toBeUndefined())),
   )
 
   digitalocean.effect("evaluates choice score and boolean questions", () =>
@@ -181,6 +181,8 @@ describe("experimental Evaluation recorded", () => {
       DigitalOcean.configure({ apiKey: process.env.DIGITALOCEAN_API_KEY ?? "fixture" }).experimental.evaluation(
         "typesafe-jev-1.13.0",
       ),
+    ).pipe(
+      Effect.map((response) => expect(response.rounding).toMatchObject({ probabilityDecimals: 2, scoreDecimals: 2 })),
     ),
   )
 })
@@ -201,4 +203,5 @@ const assertEvaluation = <Options extends EvaluationOptions>(model: EvaluationMo
     expect(response.usage?.outputTokens).toBeDefined()
     expect(response.answers.department.confidence).toBeGreaterThan(0)
     expect(response.answers.urgency.confidence).toBeGreaterThan(0)
+    return response
   })

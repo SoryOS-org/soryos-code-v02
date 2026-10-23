@@ -97,7 +97,10 @@ export interface ModelInput {
   readonly baseURL: string
   readonly headers?: Record<string, string>
   readonly http?: HttpOptions
+  readonly rounding?: EvaluationRounding
 }
+
+export const jevRounding = new EvaluationRounding({ probabilityDecimals: 2, scoreDecimals: 2 })
 
 /** The System One request body without `model`, with `boolean` questions lowered to native `noul`. */
 export const encodeInput = (req: EvaluationRequestFor) =>
@@ -111,7 +114,7 @@ export const encodeInput = (req: EvaluationRequestFor) =>
     Effect.mapError((cause) => new AIError({ reason: new InvalidRequestError({ message: cause.message, cause }) })),
   )
 
-export const toResponse = (data: typeof Response.Type, providerMetadataKey: string) => {
+export const toResponse = (data: typeof Response.Type, providerMetadataKey: string, rounding?: EvaluationRounding) => {
   const legend: Record<string, Record<string, Schema.Json>> = {}
   const answers = Object.fromEntries(
     Object.entries(data.answers).map(([id, answer]): [string, EvaluationAnswer] => {
@@ -156,7 +159,7 @@ export const toResponse = (data: typeof Response.Type, providerMetadataKey: stri
           providerMetadata: { [providerMetadataKey]: data.usage },
         })
       : undefined,
-    rounding: new EvaluationRounding({ probabilityDecimals: 2, scoreDecimals: 2 }),
+    rounding,
     providerMetadata: Object.keys(meta).length === 0 ? undefined : { [providerMetadataKey]: meta },
   })
 }
@@ -195,9 +198,9 @@ export const model = <Options extends EvaluationOptions = EvaluationOptions>(cfg
           const data = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Response))(text).pipe(
             Effect.mapError((cause) => fail("System One returned an invalid response", cause, text)),
           )
-          return toResponse(data, cfg.providerMetadataKey)
+          return toResponse(data, cfg.providerMetadataKey, cfg.rounding)
         }),
     },
   })
 
-export const SystemOne = { Response, encodeInput, toResponse, model } as const
+export const SystemOne = { Response, encodeInput, toResponse, model, jevRounding } as const
