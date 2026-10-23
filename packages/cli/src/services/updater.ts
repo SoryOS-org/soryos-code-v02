@@ -267,7 +267,7 @@ const make = Effect.gen(function* () {
         exec(command, "5 minutes").pipe(
           Effect.flatMap((result) => (result.code === 0 ? Effect.void : Effect.fail(new Error(resultDetail(result))))),
         ),
-        global.tmp,
+        { directory: global.tmp, uninstall: true },
       ),
     }
   }
@@ -374,7 +374,11 @@ const make = Effect.gen(function* () {
   // while another link to it exists (see RetainedImage). Upgrades keep that link in the
   // cache, with a same-volume fallback for package installs. Uninstall has already
   // removed the cache, so it uses the temporary directory.
-  const retaining = <A, E, R>(method: Method, effect: Effect.Effect<A, E, R>, directory = global.cache) => {
+  const retaining = <A, E, R>(
+    method: Method,
+    effect: Effect.Effect<A, E, R>,
+    options: { directory?: string; uninstall?: boolean } = {},
+  ) => {
     if (process.platform !== "win32" || method === "brew") return effect
     // Only the installed binary is at stake; source checkouts run inside bun or node.
     const owned =
@@ -384,6 +388,7 @@ const make = Effect.gen(function* () {
           ? installedWinget
           : installedPackage !== undefined
     if (!owned) return effect
+    const directory = options.directory ?? global.cache
     return Effect.scoped(
       Effect.gen(function* () {
         const link = yield* RetainedImage.retain(directory, "upgrade")
@@ -392,11 +397,19 @@ const make = Effect.gen(function* () {
             new UpgradeError({
               title: "Could not protect the running OpenCode binary",
               detail:
-                "A retained hard link to the running executable could not be created. Package replacement was not started.",
-              retry: "Close all OpenCode processes, then run the package-manager command from a separate terminal.",
+                "A retained hard link to the running executable could not be created. Replacement or removal was not started.",
+              retry:
+                method === "curl"
+                  ? "Close all OpenCode processes, then rerun the OpenCode installer from a separate terminal."
+                  : "Close all OpenCode processes, then run the package-manager command from a separate terminal.",
             }),
           )
-        return yield* effect
+        const result = yield* effect
+        if (options.uninstall && path.dirname(link) !== directory)
+          yield* Effect.logWarning(
+            `Uninstall may leave retained executables in ${path.dirname(link)}; remove them after all OpenCode processes exit.`,
+          )
+        return result
       }),
     ).pipe(Effect.provideService(FileSystem.FileSystem, fs))
   }
