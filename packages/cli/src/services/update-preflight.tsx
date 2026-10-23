@@ -343,7 +343,8 @@ function UpdateFooter(props: {
     [downgrade() ? "downgraded to" : "updated to", colors.muted],
     [OPENCODE_VERSION, colors.accent],
   )
-  const pausedHeader = phrase(["OpenCode", colors.muted, true], ["update paused", colors.muted])
+  const pausedHeader = () =>
+    phrase(["OpenCode", colors.muted, true], [downgrade() ? "downgrade paused" : "update paused", colors.muted])
   const outcomeStatus = () =>
     props.outcome() === "success"
       ? [...styled("✓", colors.success), ...styled(" Ready", colors.text)]
@@ -364,7 +365,7 @@ function UpdateFooter(props: {
       (outcome) => {
         if (outcome === "running") return
         const visibleStatus = untrack(statusSweep.cells) ?? styled(previousStage, colors.text)
-        headerFade.start(runningHeader(), outcome === "success" ? completedHeader : pausedHeader)
+        headerFade.start(runningHeader(), outcome === "success" ? completedHeader : pausedHeader())
         statusSweep.start([...styled("  ", colors.text), ...visibleStatus], outcomeStatus(), props.onOutcomeSettled)
       },
       { defer: true },
@@ -376,7 +377,7 @@ function UpdateFooter(props: {
       (props.outcome() === "success"
         ? completedHeader
         : props.outcome() === "failure"
-          ? pausedHeader
+          ? pausedHeader()
           : runningHeader()),
   )
   const monogramInk = createMemo(() =>
