@@ -353,7 +353,7 @@ export const configure = (input: Options = {}) => {
       },
     })
   const media = MediaRoute.deployment({ ...input, baseURL: configured.endpoint.baseURL }, configured.auth)
-  const image = (modelID: string | ModelID) => OpenAIImages.model({ ...media, id: modelID })
+  const image = (modelID: string | ModelID) => OpenAIImages.model({ ...media, id: modelID, provider: id })
   return { id, model, messages, responses, chat, image, experimental: { evaluation }, configure }
 }
 

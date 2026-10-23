@@ -27,7 +27,9 @@ describe("Vercel AI Gateway Images recorded", () => {
       expect(response.images).toHaveLength(1)
       expect(response.image.mediaType).toBe("image/webp")
       expect(new TextDecoder().decode((yield* response.image.bytes()).subarray(8, 12))).toBe("WEBP")
-      expect(response.usage?.type).toBe("tokens")
+      expect(model.provider).toBe("vercel-ai-gateway")
+      expect(response.usage?.details).toHaveProperty("vercel-ai-gateway")
+      expect(response.providerMetadata).toEqual({ "vercel-ai-gateway": { outputFormat: "webp" } })
     }),
   )
 })

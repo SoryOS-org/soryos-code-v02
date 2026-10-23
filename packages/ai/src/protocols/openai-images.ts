@@ -11,7 +11,7 @@ import { Media } from "../media.js"
 import { Framing } from "../route/framing.js"
 import { MediaProtocol } from "../route/media-protocol.js"
 import { MediaRoute } from "../route/media.js"
-import { mergeJsonRecords, type MediaUsage, type OpenString } from "../schema/index.js"
+import { mergeJsonRecords, ProviderID, type MediaUsage, type OpenString } from "../schema/index.js"
 import { ProviderShared } from "./shared.js"
 import { MediaInput } from "./utils/media-input.js"
 
@@ -99,7 +99,7 @@ interface State {
   readonly size?: string
   readonly quality?: string
   readonly background?: string
-  readonly usage?: MediaUsage
+  readonly usage?: Schema.Schema.Type<typeof Usage>
 }
 
 // ---------------------------------------------------------------------------
@@ -128,8 +128,8 @@ const isEdit = (request: Request) => (request.images?.length ?? 0) > 0
 
 const isInline = (asset: Media.Asset) => asset.source.type === "bytes" || asset.source.type === "base64"
 
-const reference = (asset: Media.Asset) =>
-  ProviderShared.mediaReference(asset, route.provider, route.name).pipe(
+const reference = (asset: Media.Asset, provider: ProviderID) =>
+  ProviderShared.mediaReference(asset, provider, route.name).pipe(
     Effect.map((item) => (item.type === "ref" ? { file_id: item.value } : { image_url: item.value })),
   )
 
@@ -161,8 +161,8 @@ const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (request: Me
     return MediaProtocol.multipart(form)
   }
 
-  const references = yield* Effect.forEach(images, reference)
-  const maskReference = mask === undefined ? undefined : yield* reference(mask)
+  const references = yield* Effect.forEach(images, (image) => reference(image, request.model.provider))
+  const maskReference = mask === undefined ? undefined : yield* reference(mask, request.model.provider)
   return MediaProtocol.json(
     mergeJsonRecords(
       {
@@ -180,7 +180,7 @@ const fromRequest = Effect.fn("OpenAIImages.fromRequest")(function* (request: Me
 // 6. Stream parsing
 // ---------------------------------------------------------------------------
 
-const usage = (value: Schema.Schema.Type<typeof Usage> | undefined): MediaUsage | undefined =>
+const usage = (value: Schema.Schema.Type<typeof Usage> | undefined, provider: ProviderID): MediaUsage | undefined =>
   value === undefined
     ? undefined
     : {
@@ -188,7 +188,7 @@ const usage = (value: Schema.Schema.Type<typeof Usage> | undefined): MediaUsage 
         input: value.input_tokens,
         output: value.output_tokens,
         total: value.total_tokens,
-        details: { openai: value },
+        details: { [provider]: value },
       }
 
 /** `size` echoes the rendered `WIDTHxHEIGHT`; `auto` or any other value leaves the dimensions unknown. */
@@ -217,7 +217,7 @@ const onEvent = Effect.fnUntraced(function* (state: State, frame: string) {
       size: event.size,
       quality: event.quality,
       background: event.background,
-      usage: usage(event.usage),
+      usage: event.usage,
     },
     [ImageOutputEvent.make({ index: state.completed, image })],
   ] as const
@@ -243,20 +243,21 @@ const onDocument = Effect.fnUntraced(function* (frame: Exclude<Frame, string>) {
     size: decoded.size,
     quality: decoded.quality,
     background: decoded.background,
-    usage: usage(decoded.usage),
+    usage: decoded.usage,
   }
   return [state, images.map((image, index) => ImageOutputEvent.make({ index, image }))] as const
 })
 
 const step = (state: State, frame: Frame) => (typeof frame === "string" ? onEvent(state, frame) : onDocument(frame))
 
-const finish = (state: State) => {
+const finish = (state: State, context: MediaProtocol.ResponseContext<Request>) => {
   if (state.completed === 0) return Effect.fail(route.incomplete())
+  const provider = context.request.model.provider
   return Effect.succeed([
     ImageFinishEvent.make({
-      usage: state.usage,
+      usage: usage(state.usage, provider),
       providerMetadata: {
-        openai: {
+        [provider]: {
           outputFormat: state.format,
           size: state.size,
           quality: state.quality,
@@ -283,9 +284,14 @@ export const protocol = MediaProtocol.stream<Request, ImageEvent, Frame, State>(
   finish,
 })
 
-export const model = (input: MediaRoute.ModelInput) =>
+/** `provider` attributes models, refs, and metadata to an OpenAI-compatible host; it defaults to `openai`. */
+export const model = (input: MediaRoute.ModelInput & { readonly provider?: string }) =>
   ImageModel.fromRoute<OpenAIImageOptions, Frame, State>(
-    { protocol, baseURL: DEFAULT_BASE_URL, path: ({ request }) => (isEdit(request) ? EDIT_PATH : PATH) },
+    {
+      protocol: input.provider === undefined ? protocol : { ...protocol, provider: ProviderID.make(input.provider) },
+      baseURL: DEFAULT_BASE_URL,
+      path: ({ request }) => (isEdit(request) ? EDIT_PATH : PATH),
+    },
     input,
   )
 
