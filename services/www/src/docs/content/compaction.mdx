@@ -88,10 +88,25 @@ Add `compaction` to any [OpenCode configuration file](/config):
 
 `keep.tokens` and `buffer` accept non-negative integers.
 
+## Model
+
+By default OpenCode writes the summary itself, using the session's model. Set
+`agents.compaction.model` to use another model for summaries:
+
+```jsonc title="opencode.jsonc"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agents": {
+    "compaction": { "model": "anthropic/claude-sonnet-5-5" },
+  },
+}
+```
+
+If that model cannot be resolved, OpenCode falls back to the session's model.
+
 ## Providers
 
-By default OpenCode writes the summary itself, using the session's model. Some
-providers can compact the conversation on their side instead. Enable it per
+Some providers can compact the conversation on their side instead. Enable it per
 provider or model with `settings.compaction`:
 
 ```jsonc title="opencode.jsonc"
@@ -153,7 +168,7 @@ session's baseline; see [Instructions](/instructions).
 
 | Limit | Result |
 | --- | --- |
-| Model | Compaction uses the session's model. There is no separate compaction model. |
+| Model | Summary compaction honors `agents.compaction.model`; otherwise it uses the session's model. Native compaction always uses the session's model. |
 | History | Compaction needs older conversation to replace. It cannot create room when a request is mostly fixed instructions and tool schemas. |
 | Size | If the conversation to compact is itself too long, OpenCode sends a shortened text version and may leave out the oldest exchanges. |
 | Recovery | A request rejected as too long is compacted and retried once. A second rejection is returned as an error. |
