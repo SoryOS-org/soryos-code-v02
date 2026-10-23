@@ -30,6 +30,9 @@ access creates a new route; register again from the new origin.
 2. On iPhone or iPad, add the web app to the Home Screen and open it from that icon.
 3. Open **Settings → Notifications**.
 4. Choose the server, press **Enable push**, and allow notifications.
+   Chrome and Edge may also ask when the first in-app notification is shown. iOS never
+   requests permission from page code; on iPhone and iPad the **Enable push** button is
+   the prompt, and it only works after the Home Screen installation.
 5. Use the Agent, Permissions, Questions, and Errors switches to choose which events send
    a push. The same switches control in-app alerts; sounds remain a separate setting.
 

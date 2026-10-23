@@ -725,7 +725,7 @@ export const dict = {
 
   "settings.notifications.push.title": "Background push",
   "settings.notifications.push.description":
-    "Notify this device even when the app is closed. The OpenCode server must stay awake and online.",
+    "Notify this device even when the app is closed. The server must stay awake. On iPhone and iPad, add OpenCode to the Home Screen first.",
   "settings.notifications.push.server": "Server",
   "settings.notifications.push.enable": "Enable push",
   "settings.notifications.push.disable": "Disable push",
