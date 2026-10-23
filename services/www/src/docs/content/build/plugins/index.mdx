@@ -283,7 +283,7 @@ await ctx.provider.transform((editor) => {
   editor.update("anthropic", (provider) => {
     provider.headers = { ...provider.headers, "x-company": "engineering" }
   })
-  editor.models.update("anthropic", "claude-sonnet-4-5", (model) => {
+  editor.models.update("anthropic", "claude-sonnet-5-5", (model) => {
     model.name = "Team Sonnet"
   })
   editor.models.remove("anthropic", "legacy-model")
@@ -364,7 +364,7 @@ await ctx.model.transform((editor) => {
       draft.enabled = draft.capabilities.tools
     })
   })
-  editor.default.set("anthropic", "claude-sonnet-4-5")
+  editor.default.set("anthropic", "claude-sonnet-5-5")
   editor.remove("anthropic", "legacy-model")
 })
 ```
@@ -375,7 +375,7 @@ model-transform output.
 
 ```ts
 await ctx.model.transform((editor) => {
-  const source = editor.provider.get("anthropic")?.models.get("claude-sonnet-4-5")
+  const source = editor.provider.get("anthropic")?.models.get("claude-sonnet-5-5")
   if (!source) return
   editor.update("anthropic", source.id, (model) => {
     model.limit.context = Math.min(model.limit.context, source.limit.context)
@@ -731,7 +731,7 @@ Generate text with a selected model without creating a session, invoking tools, 
 
 ```ts
 const review = await ctx.generate.text({
-  model: { providerID: "anthropic", id: "claude-sonnet-4-6" },
+  model: { providerID: "anthropic", id: "claude-sonnet-5-5" },
   prompt: "Review this proposed action.",
 })
 ```
@@ -804,7 +804,7 @@ Change the agent or model used by subsequent requests.
 
 ```ts
 await ctx.session.switchAgent({ sessionID, agent: "build" })
-await ctx.session.switchModel({ sessionID, model: { providerID: "anthropic", id: "claude-sonnet-4-5" } })
+await ctx.session.switchModel({ sessionID, model: { providerID: "anthropic", id: "claude-sonnet-5-5" } })
 ```
 
 Send user prompts, transient generation requests, commands, or synthetic messages.
@@ -1667,7 +1667,7 @@ await ctx.permission.hook("evaluate", async (event) => {
 
   const messages = await ctx.session.context({ sessionID: event.sessionID })
   const review = await ctx.generate.text({
-    model: { providerID: "anthropic", id: "claude-sonnet-4-6" },
+    model: { providerID: "anthropic", id: "claude-sonnet-5-5" },
     prompt: buildSafetyPrompt({ messages, action: event.action, resources: event.resources }),
   })
   const decision = parseDecision(review.text)

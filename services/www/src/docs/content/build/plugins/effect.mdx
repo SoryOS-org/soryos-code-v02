@@ -325,7 +325,7 @@ effect: (ctx) =>
       editor.update("anthropic", (provider) => {
         provider.headers = { ...provider.headers, "x-company": "engineering" }
       })
-      editor.models.update("anthropic", "claude-sonnet-4-5", (model) => (model.name = "Team Sonnet"))
+      editor.models.update("anthropic", "claude-sonnet-5-5", (model) => (model.name = "Team Sonnet"))
       editor.models.remove("anthropic", "legacy-model")
       editor.remove("legacy-provider")
     })
@@ -412,7 +412,7 @@ effect: (ctx) =>
           draft.enabled = draft.capabilities.tools
         })
       })
-      editor.default.set("anthropic", "claude-sonnet-4-5")
+      editor.default.set("anthropic", "claude-sonnet-5-5")
       editor.remove("anthropic", "legacy-model")
     })
   }),
@@ -427,7 +427,7 @@ effect: (ctx) =>
   Effect.gen(function* () {
     const model = ctx.model
     yield* model.transform((editor) => {
-      const source = editor.provider.get("anthropic")?.models.get("claude-sonnet-4-5")
+      const source = editor.provider.get("anthropic")?.models.get("claude-sonnet-5-5")
       if (!source) return
       editor.update("anthropic", source.id, (draft) => {
         draft.limit.context = Math.min(draft.limit.context, source.limit.context)
@@ -800,7 +800,7 @@ effect: (ctx) =>
     yield* session
       .switchModel({
         sessionID: current.id,
-        model: { providerID: Provider.ID.make("anthropic"), id: Model.ID.make("claude-sonnet-4-5") },
+        model: { providerID: Provider.ID.make("anthropic"), id: Model.ID.make("claude-sonnet-5-5") },
       })
       .pipe(Effect.orDie)
   }),
