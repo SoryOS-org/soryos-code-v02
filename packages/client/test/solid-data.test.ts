@@ -904,6 +904,79 @@ test("preserves sibling catalogs through location preload, branch, shell, and we
   }
 })
 
+// The session review panel offers "Branch changes" only when the location's VCS info has both a
+// current and a default branch and the two differ:
+//
+//   packages/gui-extensions/src/review/model.ts
+//   if (project?.vcs && vcs()?.branch.current && vcs()?.branch.default &&
+//       vcs()?.branch.current !== vcs()?.branch.default) list.push("branch")
+//
+// The panel reads that info from the client's per-location VCS cache (packages/client/src/solid/data.ts).
+// The server fills its own cache asynchronously, so the first read in non-default worktrees provides
+// empty branch info.
+test("an empty first VCS read leaves Branch changes hidden for a non-default worktree", async () => {
+  const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
+  const location = { directory: "/worktree", project: { id: "project", directory: "/worktree", canonical: "/worktree" } }
+  const requests: string[] = []
+  const api = OpenCode.make({
+    baseUrl: "http://opencode.local",
+    fetch: async (input, init) => {
+      const pathname = new URL((input instanceof Request ? input : new Request(input, init)).url).pathname
+      if (pathname !== "/api/vcs") throw new Error(`Unexpected request: ${pathname}`)
+      requests.push(pathname)
+      return Response.json({
+        location,
+        data: requests.length === 1 ? { branch: {} } : { branch: { current: "feature", default: "main" } },
+      })
+    },
+  })
+  const setup = createRoot((dispose) => ({
+    data: createData({
+      api: () => api,
+      directory: location.directory,
+      event: {
+        on: () => () => {},
+        listen(handler) {
+          listeners.add(handler)
+          return () => listeners.delete(handler)
+        },
+      },
+    }),
+    dispose,
+  }))
+  const emit = (details: OpenCodeEvent) => listeners.forEach((listener) => listener({ name: details.type, details }))
+  const branch = () => setup.data.location.vcs.info()?.branch
+  // The branch the review gate reads, after briefly allowing a repaired read to land so a failure shows
+  // the value the gate actually sees.
+  const settledBranch = async () => {
+    const deadline = Date.now() + 500
+    while (Date.now() < deadline && !branch()?.default) await Bun.sleep(10)
+    return branch()
+  }
+
+  try {
+    // 1. Startup window: the location syncs while the git provider is still registering, so the read
+    //    answers with the placeholder.
+    await setup.data.location.vcs.sync()
+    expect(branch()).toEqual({})
+
+    // 2. The client marks that read complete, so syncing again issues no request and reads nothing new.
+    await setup.data.location.vcs.sync()
+    expect(requests).toEqual(["/api/vcs"])
+
+    // 3. A branch event later reports the worktree branch on the push channel...
+    emit({ type: "vcs.branch.updated", location, data: { branch: "feature" } })
+    expect(branch()).toEqual({ current: "feature" })
+
+    // 4. ...but that channel carries only `current`, never `default`. The reply that does carry the
+    //    default is never re-read, so the gate keeps missing it and Branch changes stays hidden for a
+    //    worktree that is genuinely on a non-default branch.
+    expect(await settledBranch()).toEqual({ current: "feature", default: "main" })
+  } finally {
+    setup.dispose()
+  }
+})
+
 test("reports optimistic sessions as creating until the request settles", async () => {
   const release = Promise.withResolvers<void>()
   const api = OpenCode.make({
