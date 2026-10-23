@@ -8,6 +8,7 @@ import { Context, Effect, FileSystem, Option, Queue, Schedule, Semaphore } from 
 import { ServerConnection } from "../../services/server-connection"
 import { Updater } from "../../services/updater"
 import { UpdatePreflight } from "../../services/update-preflight"
+import { isNewerRelease } from "../../services/updater-action"
 import { Npm } from "@opencode/util/npm"
 import { OPENCODE_ARTIFACT, OPENCODE_CHANNEL, OPENCODE_HIGHLIGHTS, OPENCODE_VERSION } from "../../version"
 import { Env } from "../../env"
@@ -32,11 +33,13 @@ export default Runtime.handler(Commands, (input) =>
       Effect.forever,
       Effect.forkScoped,
     )
+    let startedFrom: string | undefined
     const server = yield* ServerConnection.resolve({
       server: requestedServer,
       standalone: input.standalone,
       mismatch: "replace",
       onStart: (reason, previousVersion) => {
+        startedFrom = previousVersion
         Queue.offerUnsafe(serviceStarts, { reason, previousVersion })
         if (reason === "version-mismatch" && preflight.begin(previousVersion)) return
         process.stderr.write(
@@ -47,7 +50,13 @@ export default Runtime.handler(Commands, (input) =>
       },
     }).pipe(
       Effect.tapError(() =>
-        Effect.promise(() => preflight.fail("OpenCode update could not start the new background service")),
+        Effect.promise(() =>
+          preflight.fail(
+            startedFrom && isNewerRelease(startedFrom, OPENCODE_VERSION)
+              ? "OpenCode downgrade could not start the new background service"
+              : "OpenCode update could not start the new background service",
+          ),
+        ),
       ),
     )
     const session = Option.getOrUndefined(input.session)
