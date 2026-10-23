@@ -182,32 +182,44 @@ export default Runtime.handler(Commands.commands.github.commands.run, (input) =>
         console.log("Working tree changed but no token provided; skipping PR creation")
         return
       }
+      // Save original extraheader
+      let originalExtra: string | undefined
+      try { originalExtra = git(["config", "--local", "--get", "http.https://github.com/.extraheader"], cwd) } catch {}
       // Configure git credentials and identity
       const newCredentials = Buffer.from(`x-access-token:${pushToken}`, "utf8").toString("base64")
       gitSafe(["config", "--local", "http.https://github.com/.extraheader", `AUTHORIZATION: basic ${newCredentials}`], cwd)
       gitSafe(["config", "--global", "user.name", "opencode-agent[bot]"], cwd)
       gitSafe(["config", "--global", "user.email", "opencode-agent[bot]@users.noreply.github.com"], cwd)
 
-      const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
-      const branch = `opencode/run-${Date.now()}`
-      git(["checkout", "-b", branch], cwd)
-      git(["add", "-A"], cwd)
-      git(["commit", "-m", "opencode: automated changes"], cwd)
-      const octokit = new Octokit({ auth: pushToken })
-      if (isFork && prPayload) {
-        const forkRepo = prPayload.head.repo.full_name
-        const headRef = prPayload.head.ref
-        try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd) }
-        git(["push", "fork", `HEAD:${headRef}`], cwd)
-      } else if (prPayload) {
-        git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
-      } else {
-        git(["push", "-u", "origin", branch], cwd)
-        try {
-          const pr = await octokit.pulls.create({ owner, repo, title: "opencode: automated changes", head: branch, base, body: "Automated changes produced by opencode github run." })
-          console.log(`Created PR #${pr.data.number}: ${pr.data.html_url}`)
-        } catch (e: any) {
-          console.log(`PR creation failed: ${e?.message || e}`)
+      try {
+        const base = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd)
+        const branch = `opencode/run-${Date.now()}`
+        git(["checkout", "-b", branch], cwd)
+        git(["add", "-A"], cwd)
+        git(["commit", "-m", "opencode: automated changes"], cwd)
+        const octokit = new Octokit({ auth: pushToken })
+        if (isFork && prPayload) {
+          const forkRepo = prPayload.head.repo.full_name
+          const headRef = prPayload.head.ref
+          try { git(["remote", "get-url", "fork"], cwd) } catch { git(["remote", "add", "fork", `https://github.com/${forkRepo}.git`], cwd) }
+          git(["push", "fork", `HEAD:${headRef}`], cwd)
+        } else if (prPayload) {
+          git(["push", "origin", `HEAD:${prPayload.head.ref}`], cwd)
+        } else {
+          git(["push", "-u", "origin", branch], cwd)
+          try {
+            const pr = await octokit.pulls.create({ owner, repo, title: "opencode: automated changes", head: branch, base, body: "Automated changes produced by opencode github run." })
+            console.log(`Created PR #${pr.data.number}: ${pr.data.html_url}`)
+          } catch (e: any) {
+            console.log(`PR creation failed: ${e?.message || e}`)
+          }
+        }
+      } finally {
+        // Restore original extraheader
+        if (originalExtra) {
+          gitSafe(["config", "--local", "http.https://github.com/.extraheader", originalExtra], cwd)
+        } else {
+          gitSafe(["config", "--local", "--unset-all", "http.https://github.com/.extraheader"], cwd)
         }
       }
     })
