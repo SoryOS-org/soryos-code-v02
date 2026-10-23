@@ -7,7 +7,7 @@ import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Cause, Context, Effect, Layer, PubSub, RcMap, Stream } from "effect"
 import { lazy } from "../util/lazy.js"
-import { watch } from "node:fs"
+import { readdirSync, statSync, watch } from "node:fs"
 import path from "path"
 import loadBinding from "./watcher-binding.js"
 
@@ -198,14 +198,134 @@ export const testLayer = Layer.effectContext(
   }),
 )
 
+function poll(directory: string, names: ReadonlySet<string>, publish: (update: Update) => void): Subscription {
+  const scan = () => {
+    const next = new Map<string, string>()
+    let entries
+    try {
+      entries = readdirSync(directory, { withFileTypes: true })
+    } catch {
+      return next
+    }
+    for (const entry of entries) {
+      if (!names.has(entry.name)) continue
+      const file = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        next.set(file, "directory")
+        continue
+      }
+      try {
+        const stat = statSync(file)
+        next.set(file, `${stat.mtimeMs}:${stat.size}`)
+      } catch {
+        next.set(file, "file")
+      }
+    }
+    return next
+  }
+  let previous = scan()
+  const timer = setInterval(() => {
+    const next = scan()
+    for (const [file, signature] of next) {
+      const prior = previous.get(file)
+      if (prior === undefined) publish({ path: file, type: "create" })
+      else if (prior !== signature) publish({ path: file, type: "update" })
+    }
+    for (const file of previous.keys()) if (!next.has(file)) publish({ path: file, type: "delete" })
+    previous = next
+  }, 100)
+  return {
+    unsubscribe: () => {
+      clearInterval(timer)
+      return Promise.resolve()
+    },
+    backend: "poll",
+  }
+}
+
+function pollDirectory(
+  directory: string,
+  ignore: readonly string[],
+  publish: (update: Update) => void,
+): Subscription {
+  const ignored = (file: string) => {
+    const relative = path.relative(directory, file)
+    return ignore.some((entry) => {
+      if (entry.includes("*") || entry.includes("?") || entry.includes("[")) {
+        const matchesGlob = (path as typeof path & { matchesGlob?: (p: string, g: string) => boolean }).matchesGlob
+        return matchesGlob?.(relative, entry) ?? false
+      }
+      const normalized = entry.replace(/^\.\//, "")
+      return relative === normalized || relative.startsWith(normalized + path.sep)
+    })
+  }
+  const scan = () => {
+    const next = new Map<string, string>()
+    const visit = (dir: string) => {
+      let entries
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const entry of entries) {
+        const file = path.join(dir, entry.name)
+        if (ignored(file)) continue
+        if (entry.isDirectory()) {
+          next.set(file, "directory")
+          visit(file)
+          continue
+        }
+        try {
+          const stat = statSync(file)
+          next.set(file, `${stat.mtimeMs}:${stat.size}`)
+        } catch {
+          next.set(file, "file")
+        }
+      }
+    }
+    visit(directory)
+    return next
+  }
+  let previous = scan()
+  const timer = setInterval(() => {
+    const next = scan()
+    for (const [file, signature] of next) {
+      const prior = previous.get(file)
+      if (prior === undefined) publish({ path: file, type: "create" })
+      else if (prior !== signature) publish({ path: file, type: "update" })
+    }
+    for (const file of previous.keys()) if (!next.has(file)) publish({ path: file, type: "delete" })
+    previous = next
+  }, 250)
+  return {
+    unsubscribe: () => {
+      clearInterval(timer)
+      return Promise.resolve()
+    },
+    backend: "poll",
+  }
+}
+
 export const nativeLayer = Layer.succeed(
   Native,
   Native.of({
     subscribe: (input) => {
+      // FreeBSD's fs.watch is kqueue-backed: it reports that a directory
+      // changed without naming the new entry, and cannot watch paths that do
+      // not exist yet. Poll the tree from JS instead.
+      if (process.platform === "freebsd" && input.type === "directory") {
+        return Effect.sync(() => pollDirectory(input.target, input.ignore, input.publish))
+      }
       if (input.type === "file" || input.type === "entries") {
+        const directory = input.type === "file" ? path.dirname(input.target) : input.target
+        const names = new Set(input.type === "file" ? [path.basename(input.target)] : input.names)
+        // kqueue reports directory changes without the new entry's name.
+        // Poll the containing directory instead.
+        if (process.platform === "freebsd") {
+          return Effect.sync(() => poll(directory, names, input.publish))
+        }
         return Effect.sync(() => {
-          const directory = input.type === "file" ? path.dirname(input.target) : input.target
-          const names = new Set(input.type === "file" ? [path.basename(input.target)] : input.names)
           const subscription = watch(directory, { recursive: false }, (_event, file) => {
             if (file && !names.has(file)) return
             for (const name of file ? [file] : names) {
