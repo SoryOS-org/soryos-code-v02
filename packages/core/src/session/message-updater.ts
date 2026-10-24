@@ -19,6 +19,8 @@ export interface Adapter {
 
 type DraftAssistant = WritableDraft<SessionMessage.Assistant>
 
+const decodeAssistantContent = Schema.decodeUnknownSync(Schema.Array(SessionMessage.AssistantContent))
+
 const projectTerminalSnapshot = (draft: DraftAssistant, event: SessionEvent.Step.Ended | SessionEvent.Step.Failed) => {
   if (event.data.snapshot || event.data.files)
     draft.snapshot = {
@@ -85,9 +87,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
       "session.unarchived": () => Effect.void,
       "session.message.content.updated": (event) =>
         updateOwnedAssistant(event.data.messageID, (draft) => {
-          draft.content = castDraft(
-            Schema.decodeUnknownSync(Schema.Array(SessionMessage.AssistantContent))(event.data.content),
-          )
+          draft.content = castDraft(decodeAssistantContent(event.data.content))
         }),
       "session.usage.recorded": () => Effect.void,
       "session.agent.selected": (event) =>
@@ -269,6 +269,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           draft.rawFinish = event.data.rawFinish
           draft.native = castDraft(event.data.native)
           draft.cost = event.data.cost
+          draft.allowance = event.data.allowance
           draft.tokens = event.data.tokens
           projectTerminalSnapshot(draft, event)
         })
@@ -283,6 +284,7 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
           draft.retry = undefined
           if (event.data.cost !== undefined && event.data.tokens !== undefined) {
             draft.cost = event.data.cost
+            draft.allowance = event.data.allowance
             draft.tokens = castDraft(event.data.tokens)
           }
           projectTerminalSnapshot(draft, event)

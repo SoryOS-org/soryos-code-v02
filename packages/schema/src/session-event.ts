@@ -26,15 +26,6 @@ import { Project } from "./project.js"
 import { SessionFork } from "./session-fork.js"
 import { Permission } from "./permission.js"
 
-export const Source = Schema.Struct({
-  start: NonNegativeInt,
-  end: NonNegativeInt,
-  text: Schema.String,
-}).annotate({
-  identifier: "Session.Event.Source",
-})
-export interface Source extends Schema.Schema.Type<typeof Source> {}
-
 const Base = {
   sessionID: SessionID,
 }
@@ -173,6 +164,7 @@ export const UsageRecorded = Event.durable({
     ...Base,
     source: Schema.Literals(["title", "compaction"]),
     cost: Money.USD,
+    allowance: Money.USD.pipe(optional),
     tokens: TokenUsage.Info,
   },
 })
@@ -183,6 +175,7 @@ export const UsageUpdated = Event.ephemeral({
   schema: {
     ...Base,
     cost: Money.USD,
+    allowance: Money.USD.pipe(optional),
     tokens: TokenUsage.Info,
   },
 })
@@ -376,6 +369,7 @@ export namespace Step {
       rawFinish: Schema.String.pipe(optional),
       native: SessionMessage.Native.pipe(optional),
       cost: Money.USD,
+      allowance: Money.USD.pipe(optional),
       tokens: TokenUsage.Info,
       snapshot: Snapshot.ID.pipe(optional),
       files: Schema.Array(RelativePath).pipe(optional),
@@ -394,6 +388,7 @@ export namespace Step {
       rawFinish: Schema.String.pipe(optional),
       native: SessionMessage.Native.pipe(optional),
       cost: Money.USD.pipe(optional),
+      allowance: Money.USD.pipe(optional),
       tokens: TokenUsage.Info.pipe(optional),
       snapshot: Snapshot.ID.pipe(optional),
       files: Schema.Array(RelativePath).pipe(optional),
@@ -725,8 +720,8 @@ export const EphemeralDefinitions = Event.inventory(
 )
 
 export const Durable = Schema.Union(DurableDefinitions, { mode: "oneOf" })
-  .pipe(Schema.toTaggedUnion("type"))
   .annotate({ identifier: "Session.Event.Durable" })
+  .pipe(Schema.toTaggedUnion("type"))
 export type DurableEvent = typeof Durable.Type
 
 export const All = Schema.Union([Durable, ...EphemeralDefinitions], { mode: "oneOf" }).pipe(
