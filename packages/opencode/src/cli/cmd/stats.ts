@@ -53,6 +53,14 @@ export interface StatsJsonOptions {
   now?: Date
 }
 
+export interface CacheSummary {
+  read: number
+  write: number
+  miss: number
+  totalInput: number
+  hitRate: number
+}
+
 export interface StatsJson {
   schemaVersion: 1
   generatedAt: string
@@ -76,10 +84,7 @@ export interface StatsJson {
       input: number
       output: number
       reasoning: number
-      cache: {
-        read: number
-        write: number
-      }
+      cache: CacheSummary
     }
   }
   averages: {
@@ -94,10 +99,7 @@ export interface StatsJson {
     tokens: {
       input: number
       output: number
-      cache: {
-        read: number
-        write: number
-      }
+      cache: CacheSummary
     }
   }>
   tools: Array<{ name: string; count: number }>
@@ -105,6 +107,20 @@ export interface StatsJson {
 
 function finite(value: number): number {
   return Number.isFinite(value) ? value : 0
+}
+
+export function cacheSummary(tokens: { input: number; cache: { read: number; write: number } }): CacheSummary {
+  const miss = finite(tokens.input)
+  const read = finite(tokens.cache.read)
+  const write = finite(tokens.cache.write)
+  const totalInput = miss + read + write
+  return {
+    read,
+    write,
+    miss,
+    totalInput,
+    hitRate: totalInput > 0 ? read / totalInput : 0,
+  }
 }
 
 function isoOrNull(value: number): string | null {
@@ -148,10 +164,7 @@ export function toStatsJson(stats: SessionStats, options: StatsJsonOptions = {})
         input: finite(stats.totalTokens.input),
         output: finite(stats.totalTokens.output),
         reasoning: finite(stats.totalTokens.reasoning),
-        cache: {
-          read: finite(stats.totalTokens.cache.read),
-          write: finite(stats.totalTokens.cache.write),
-        },
+        cache: cacheSummary(stats.totalTokens),
       },
     },
     averages: {
@@ -167,10 +180,7 @@ export function toStatsJson(stats: SessionStats, options: StatsJsonOptions = {})
         tokens: {
           input: finite(usage.tokens.input),
           output: finite(usage.tokens.output),
-          cache: {
-            read: finite(usage.tokens.cache.read),
-            write: finite(usage.tokens.cache.write),
-          },
+          cache: cacheSummary(usage.tokens),
         },
       }))
       .sort((a, b) => b.messages - a.messages || a.id.localeCompare(b.id)),
@@ -480,6 +490,9 @@ export function displayStats(stats: SessionStats, toolLimit?: number, modelLimit
   console.log(renderRow("Output", formatNumber(stats.totalTokens.output)))
   console.log(renderRow("Cache Read", formatNumber(stats.totalTokens.cache.read)))
   console.log(renderRow("Cache Write", formatNumber(stats.totalTokens.cache.write)))
+  const cache = cacheSummary(stats.totalTokens)
+  console.log(renderRow("Cache Miss", formatNumber(cache.miss)))
+  console.log(renderRow("Cache Hit Rate", `${(cache.hitRate * 100).toFixed(1)}%`))
   console.log("└────────────────────────────────────────────────────────┘")
   console.log()
 
@@ -499,6 +512,8 @@ export function displayStats(stats: SessionStats, toolLimit?: number, modelLimit
       console.log(renderRow("  Output Tokens", formatNumber(usage.tokens.output)))
       console.log(renderRow("  Cache Read", formatNumber(usage.tokens.cache.read)))
       console.log(renderRow("  Cache Write", formatNumber(usage.tokens.cache.write)))
+      const modelCache = cacheSummary(usage.tokens)
+      console.log(renderRow("  Cache Hit Rate", `${(modelCache.hitRate * 100).toFixed(1)}%`))
       console.log(renderRow("  Cost", `$${usage.cost.toFixed(4)}`))
       console.log("├────────────────────────────────────────────────────────┤")
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { toStatsJson, type SessionStats } from "../../src/cli/cmd/stats"
+import { cacheSummary, toStatsJson, type SessionStats } from "../../src/cli/cmd/stats"
 
 const empty: SessionStats = {
   totalSessions: 0,
@@ -64,10 +64,26 @@ describe("stats JSON", () => {
       sessions: 0,
       messages: 0,
       cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: { read: 0, write: 0, miss: 0, totalInput: 0, hitRate: 0 },
+      },
     })
     expect(report.models).toEqual([])
     expect(report.tools).toEqual([])
+  })
+
+  it("derives cache miss and hit rate from non-cached input", () => {
+    expect(cacheSummary({ input: 200, cache: { read: 800, write: 0 } })).toEqual({
+      read: 800,
+      write: 0,
+      miss: 200,
+      totalInput: 1000,
+      hitRate: 0.8,
+    })
+    expect(cacheSummary({ input: 0, cache: { read: 0, write: 0 } }).hitRate).toBe(0)
   })
 
   it("emits totals, filters, ISO dates, and deterministic ordering", () => {
@@ -83,12 +99,13 @@ describe("stats JSON", () => {
       earliest: "2026-10-01T00:00:00.000Z",
       latest: "2026-10-03T00:00:00.000Z",
     })
-    expect(report.totals.tokens).toEqual({
+    expect(report.totals.tokens).toMatchObject({
       input: 1000,
       output: 200,
       reasoning: 50,
-      cache: { read: 300, write: 0 },
+      cache: { read: 300, write: 0, miss: 1000, totalInput: 1300 },
     })
+    expect(report.totals.tokens.cache.hitRate).toBeCloseTo(300 / 1300, 10)
     expect(report.models.map((model) => model.id)).toEqual(["anthropic/claude", "deepseek/deepseek-flash"])
     expect(report.tools).toEqual([
       { name: "read", count: 5 },
@@ -131,7 +148,11 @@ describe("stats JSON", () => {
       id: "test/model",
       messages: 0,
       cost: 0,
-      tokens: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+      tokens: {
+        input: 0,
+        output: 0,
+        cache: { read: 0, write: 0, miss: 0, totalInput: 0, hitRate: 0 },
+      },
     })
   })
 
