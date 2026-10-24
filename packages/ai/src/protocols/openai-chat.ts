@@ -671,7 +671,9 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, options:
 
 // Anthropic via LiteLLM and Amazon Bedrock require `tools` to be present
 // whenever the conversation history contains tool calls/results. Send an
-// explicit empty array when we have history but no active tools.
+// explicit empty array when we have history but no active tools, unless
+// `compatibility.omitEmptyTools` opts out for strict upstreams that reject
+// an empty `tools` array outright.
 const hasToolHistory = (messages: ReadonlyArray<LLMRequest["messages"][number]>) => {
   for (const message of messages) {
     if (message.role === "tool") return true
@@ -798,6 +800,7 @@ export const fromRequest = Effect.fn("OpenAIChat.fromRequest")(function* (
   const zaiToolStream =
     request.model.compatibility?.zaiToolStream ?? detectZaiToolStream(provider, baseURL, request.model.id)
   const hasHistory = hasToolHistory(request.messages)
+  const omitEmptyTools = request.model.compatibility?.omitEmptyTools ?? false
   const hasActiveTools = flattened.tools.length > 0
   const lowering = { ...options, cacheControl: options.cacheControl ?? declaredCacheControl(request) }
   return {
@@ -805,7 +808,7 @@ export const fromRequest = Effect.fn("OpenAIChat.fromRequest")(function* (
     messages: yield* lowerMessages(flattened.request, lowering),
     tools:
       flattened.tools.length === 0
-        ? hasHistory
+        ? hasHistory && !omitEmptyTools
           ? []
           : undefined
         : flattened.tools.map((tool) => lowerTool(tool, lowering, supportsStrictMode)),
