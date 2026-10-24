@@ -6,7 +6,6 @@ import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { useFilteredList } from "@opencode/ui/hooks"
 import { Icon } from "@opencode/ui/icon"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
@@ -189,7 +188,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
                   onClearClick={() => list.clear()}
                 />
               </div>
-              <ScrollView class="search-list-scroll" viewportRef={(el) => (resultsRef = el)}>
+              <div class="search-list-scroll" data-scrollable ref={(el) => (resultsRef = el)}>
                 <Show
                   when={list.flat().length > 0}
                   fallback={
@@ -284,7 +283,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
                     </For>
                   </div>
                 </Show>
-              </ScrollView>
+              </div>
             </DialogBody>
           </>
         }

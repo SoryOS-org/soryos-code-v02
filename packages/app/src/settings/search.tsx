@@ -4,7 +4,6 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { Icon } from "@opencode/ui/icon"
 import { TextInput } from "@opencode/ui/text-input"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -138,7 +137,7 @@ export function SettingsSearch() {
       data-expanded={search.state.expanded}
       data-empty={!search.state.query.trim()}
       on:keydown={{
-        // Handle result navigation before ScrollView's generic scrolling keys.
+        // Handle result navigation instead of the results list's native key scrolling.
         capture: true,
         handleEvent: (event) => {
           if (
@@ -223,10 +222,11 @@ export function SettingsSearch() {
       />
       <Show when={search.state.query.trim()}>
         <div class="settings-search-matches">
-          <ScrollView
+          <div
             class="settings-search-scroll"
+            data-scrollable
             data-empty={!shown().length}
-            viewportRef={(element) => {
+            ref={(element) => {
               results = element
               queueMicrotask(() => {
                 if (element.isConnected) element.scrollTop = search.state.scrollTop
@@ -313,7 +313,7 @@ export function SettingsSearch() {
                 )}
               </For>
             </div>
-          </ScrollView>
+          </div>
           <Show when={!matches().length}>
             <SettingsSearchEmpty query={search.state.query} />
           </Show>

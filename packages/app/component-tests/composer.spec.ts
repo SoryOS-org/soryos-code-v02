@@ -91,7 +91,7 @@ story(
     const options = component.getByRole("option")
     const composer = component.locator('[data-component="composer"]')
     const content = component.locator('[data-slot="composer-content"]')
-    const viewport = component.locator('[data-component="composer-scroll"] > .scroll-view__viewport')
+    const viewport = component.locator('[data-component="composer-scroll"]')
     await page.evaluate(() => document.fonts.ready.then(() => undefined))
     const height = await composer.evaluate((element) => element.getBoundingClientRect().height)
 

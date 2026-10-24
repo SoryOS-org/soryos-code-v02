@@ -1,7 +1,6 @@
 import { createMemo, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Popover } from "@kobalte/core/popover"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import {
   displayName,
   getProjectAvatarGenerated,
@@ -198,101 +197,103 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
           </Show>
         </div>
       </Show>
-      <ScrollView data-slot="home-projects-scroll" class="min-h-0 min-w-0 shrink">
-        <Show when={props.dropdown && props.servers.length === 1}>
-          <HomeProjectNavButton
-            type="button"
-            class="mb-1"
-            data-selected={!props.selection.directory ? "" : undefined}
-            onClick={() => props.onFocusServer(props.servers[0])}
-          >
-            <Icon name="folder" size="small" />
-            <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("home.projects.all")}</span>
-          </HomeProjectNavButton>
-        </Show>
-        <Show
-          when={
-            props.servers.length > 1 ||
-            props.servers.some(
-              (server) =>
-                signInRequired(server, props.serverHealth(server)) ||
-                (server.type === "extension" && server.connecting),
-            )
-          }
-          fallback={
-            <Show when={props.servers[0]}>
-              {(server) => (
-                <div class={props.dropdown ? "" : "pr-3"}>
-                  <Show when={props.projects.length > 0} fallback={<HomeProjectEmpty {...props} server={server()} />}>
-                    <HomeProjectList {...props} {...contextMenuProps} server={server()} items={props.projects} />
-                    <Show when={props.dropdown}>
-                      <HomeProjectNavButton
-                        type="button"
-                        data-action="home-add-project-row"
-                        class="mt-1 disabled:opacity-60"
-                        disabled={props.serverHealth(server())?.healthy === false}
-                        onClick={() => props.onChooseProject(server())}
-                      >
-                        <Icon name="folder-add-left" size="small" />
-                        <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("home.project.add")}</span>
-                      </HomeProjectNavButton>
-                    </Show>
-                  </Show>
-                </div>
-              )}
-            </Show>
-          }
-        >
-          <div class={`flex min-w-0 flex-col ${props.dropdown ? "gap-1" : "gap-4 pr-3"}`}>
-            <For each={props.servers}>
-              {(item) => {
-                const projects = () => props.projectsForServer(item)
-                const healthy = () => !!props.serverHealth(item)?.healthy
-                const hasProjects = () => projects().length > 0
-                const collapsed = () => props.collapsed(item)
-                const authentication = () => signInRequired(item, props.serverHealth(item))
-                const connecting = () => item.type === "extension" && item.connecting
-
-                return (
-                  <div class="flex min-w-0 flex-col gap-1">
-                    <HomeServerRow
-                      server={item}
-                      {...props}
-                      {...contextMenuProps}
-                      selected={props.selection.server === ServerConnection.key(item) && !props.selection.directory}
-                      collapsed={collapsed()}
-                      health={props.serverHealth(item)}
-                    />
-                    <Show when={authentication() || connecting()}>
-                      <div class="mx-3 h-px bg-v2-border-border-base" />
-                      <div class="px-1.5 py-1">
-                        <Button
-                          data-action="home-server-authenticate"
-                          class="w-full"
-                          size="small"
-                          variant="neutral"
-                          disabled={connecting()}
-                          aria-busy={!!connecting()}
-                          onClick={() => props.onAuthenticateServer?.(item)}
+      <div data-slot="home-projects-scroll" class="relative flex min-h-0 min-w-0 shrink flex-col">
+        <div data-slot="home-projects-viewport" data-scrollable class="min-h-0 flex-1 overflow-y-auto">
+          <Show when={props.dropdown && props.servers.length === 1}>
+            <HomeProjectNavButton
+              type="button"
+              class="mb-1"
+              data-selected={!props.selection.directory ? "" : undefined}
+              onClick={() => props.onFocusServer(props.servers[0])}
+            >
+              <Icon name="folder" size="small" />
+              <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("home.projects.all")}</span>
+            </HomeProjectNavButton>
+          </Show>
+          <Show
+            when={
+              props.servers.length > 1 ||
+              props.servers.some(
+                (server) =>
+                  signInRequired(server, props.serverHealth(server)) ||
+                  (server.type === "extension" && server.connecting),
+              )
+            }
+            fallback={
+              <Show when={props.servers[0]}>
+                {(server) => (
+                  <div class={props.dropdown ? "" : "pr-3"}>
+                    <Show when={props.projects.length > 0} fallback={<HomeProjectEmpty {...props} server={server()} />}>
+                      <HomeProjectList {...props} {...contextMenuProps} server={server()} items={props.projects} />
+                      <Show when={props.dropdown}>
+                        <HomeProjectNavButton
+                          type="button"
+                          data-action="home-add-project-row"
+                          class="mt-1 disabled:opacity-60"
+                          disabled={props.serverHealth(server())?.healthy === false}
+                          onClick={() => props.onChooseProject(server())}
                         >
-                          <Show when={connecting()}>
-                            <Loader class="size-3.5" />
-                          </Show>
-                          {props.language.t(connecting() ? "server.status.connecting" : "server.action.authenticate")}
-                        </Button>
-                      </div>
-                    </Show>
-                    <Show when={healthy() && !authentication() && !connecting() && hasProjects() && !collapsed()}>
-                      <div class="mx-3 h-px bg-v2-border-border-base" />
-                      <HomeProjectList {...props} {...contextMenuProps} server={item} items={projects()} />
+                          <Icon name="folder-add-left" size="small" />
+                          <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("home.project.add")}</span>
+                        </HomeProjectNavButton>
+                      </Show>
                     </Show>
                   </div>
-                )
-              }}
-            </For>
-          </div>
-        </Show>
-      </ScrollView>
+                )}
+              </Show>
+            }
+          >
+            <div class={`flex min-w-0 flex-col ${props.dropdown ? "gap-1" : "gap-4 pr-3"}`}>
+              <For each={props.servers}>
+                {(item) => {
+                  const projects = () => props.projectsForServer(item)
+                  const healthy = () => !!props.serverHealth(item)?.healthy
+                  const hasProjects = () => projects().length > 0
+                  const collapsed = () => props.collapsed(item)
+                  const authentication = () => signInRequired(item, props.serverHealth(item))
+                  const connecting = () => item.type === "extension" && item.connecting
+
+                  return (
+                    <div class="flex min-w-0 flex-col gap-1">
+                      <HomeServerRow
+                        server={item}
+                        {...props}
+                        {...contextMenuProps}
+                        selected={props.selection.server === ServerConnection.key(item) && !props.selection.directory}
+                        collapsed={collapsed()}
+                        health={props.serverHealth(item)}
+                      />
+                      <Show when={authentication() || connecting()}>
+                        <div class="mx-3 h-px bg-v2-border-border-base" />
+                        <div class="px-1.5 py-1">
+                          <Button
+                            data-action="home-server-authenticate"
+                            class="w-full"
+                            size="small"
+                            variant="neutral"
+                            disabled={connecting()}
+                            aria-busy={!!connecting()}
+                            onClick={() => props.onAuthenticateServer?.(item)}
+                          >
+                            <Show when={connecting()}>
+                              <Loader class="size-3.5" />
+                            </Show>
+                            {props.language.t(connecting() ? "server.status.connecting" : "server.action.authenticate")}
+                          </Button>
+                        </div>
+                      </Show>
+                      <Show when={healthy() && !authentication() && !connecting() && hasProjects() && !collapsed()}>
+                        <div class="mx-3 h-px bg-v2-border-border-base" />
+                        <HomeProjectList {...props} {...contextMenuProps} server={item} items={projects()} />
+                      </Show>
+                    </div>
+                  )
+                }}
+              </For>
+            </div>
+          </Show>
+        </div>
+      </div>
       <HomeUtilityNav
         class="mb-8 mt-4 hidden shrink-0 lg:flex"
         onOpenSettings={props.onOpenSettings}

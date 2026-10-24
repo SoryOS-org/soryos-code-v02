@@ -10,7 +10,6 @@ import {
   getProjectAvatarVariant,
   ProjectAvatar,
 } from "@opencode/ui/project-avatar"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { TextInput } from "@opencode/ui/text-input"
 import { createTypeahead } from "@opencode/ui/typeahead"
 import { getFilename } from "@opencode/util/path"
@@ -421,7 +420,7 @@ function NewSessionLocationDialog(props: {
           <Show when={pinned()}>
             <div class="new-session-location-pinned">{option(addEntry)}</div>
           </Show>
-          <ScrollView class="command-palette-scroll" viewportRef={(el) => (resultsRef = el)}>
+          <div class="command-palette-scroll" data-scrollable ref={(el) => (resultsRef = el)}>
             <div class="command-palette-results">
               <Show
                 when={listEntries().length > 0}
@@ -438,7 +437,7 @@ function NewSessionLocationDialog(props: {
                 </div>
               </Show>
             </div>
-          </ScrollView>
+          </div>
         </div>
         <div class="new-session-location-hints">
           <span>

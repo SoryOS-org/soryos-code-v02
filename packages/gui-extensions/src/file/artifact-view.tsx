@@ -18,7 +18,6 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { FileIcon } from "@opencode/ui/file-icon"
 import { ImagePreview } from "@opencode/ui/image-preview"
 import { SegmentedControl, SegmentedControlItem } from "@opencode/ui/segmented-control"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { Loader } from "@opencode/ui/loader"
 import { Markdown } from "@opencode/session-ui/markdown"
 import { MarkdownProvider, useMarkdown } from "@opencode/session-ui/context/markdown"
@@ -137,7 +136,7 @@ export default function ArtifactView(props: {
   })
 
   const rendered = () => (
-    <ScrollView class="min-h-0 flex-1">
+    <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable>
       <Show
         when={kind() === "markdown"}
         fallback={<ArtifactMermaid text={props.content.content} cacheKey={props.cacheKey} />}
@@ -149,7 +148,7 @@ export default function ArtifactView(props: {
           cacheKey={props.cacheKey}
         />
       </Show>
-    </ScrollView>
+    </div>
   )
 
   return (

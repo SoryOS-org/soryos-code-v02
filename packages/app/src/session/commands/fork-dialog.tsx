@@ -6,7 +6,6 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { useFilteredList } from "@opencode/ui/hooks"
 import { Icon } from "@opencode/ui/icon"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { TextInput } from "@opencode/ui/text-input"
 import { showToast } from "@/shell/notifications/toast"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -151,7 +150,7 @@ export const DialogFork: Component = () => {
             onClearClick={() => list.clear()}
           />
         </div>
-        <ScrollView class="search-list-scroll" viewportRef={(el) => (resultsRef = el)}>
+        <div class="search-list-scroll" data-scrollable ref={(el) => (resultsRef = el)}>
           <Show
             when={list.flat().length > 0}
             fallback={
@@ -186,7 +185,7 @@ export const DialogFork: Component = () => {
               </For>
             </div>
           </Show>
-        </ScrollView>
+        </div>
       </DialogBody>
     </Dialog>
   )

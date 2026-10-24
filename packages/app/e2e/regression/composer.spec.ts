@@ -571,20 +571,19 @@ test("keeps a 25000-line crash report editable in a new session", async ({ page 
   await expect(input).toBeFocused()
   await expectCaretVisible(input)
   const scroll = page.locator('[data-component="composer-scroll"]')
-  await expect(scroll.locator(".scroll-view__viewport")).toHaveCSS("scrollbar-width", "none")
-  await expect(scroll.locator(".scroll-view__thumb")).toBeVisible()
   await page.keyboard.type("!")
   await expect.poll(async () => (await input.innerText()) === text + "!").toBe(true)
   await expectCaretVisible(input)
-  const thumb = await scroll.locator(".scroll-view__thumb").boundingBox()
   const bounds = await scroll.boundingBox()
 
-  if (!thumb || !bounds) throw new Error("Missing composer scrollbar bounds")
-  await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + thumb.height / 2)
+  if (!bounds) throw new Error("Missing composer scroll bounds")
+  // The caret reveal leaves the 32px thumb at the bottom of the 8px gutter, inside the track's 4px end margin.
+  const x = bounds.x + bounds.width - 4
+  await page.mouse.move(x, bounds.y + bounds.height - 20)
   await page.mouse.down()
-  await page.mouse.move(thumb.x + thumb.width / 2, bounds.y + 8 + thumb.height / 2)
+  await page.mouse.move(x, bounds.y)
   await page.mouse.up()
-  await expect(scroll.locator(".scroll-view__viewport")).toHaveJSProperty("scrollTop", 0)
+  await expect(scroll).toHaveJSProperty("scrollTop", 0)
   await expect(input).toBeFocused()
   await page.keyboard.press("ControlOrMeta+Home")
   await page.keyboard.press("ControlOrMeta+End")
@@ -606,7 +605,7 @@ test("keeps a line added at the end of a scrolling prompt clear of the bottom fa
   await expect
     .poll(() =>
       editor.evaluate((element) => {
-        const viewport = element.closest(".scroll-view__viewport")!
+        const viewport = element.closest('[data-component="composer-scroll"]')!
         const range = document.createRange()
         range.selectNodeContents(element)
         const line = Array.from(range.getClientRects()).reduce((last, rect) => (rect.bottom > last.bottom ? rect : last))

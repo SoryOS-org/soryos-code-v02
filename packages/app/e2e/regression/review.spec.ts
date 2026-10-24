@@ -506,7 +506,7 @@ test("file tree expands Windows paths and scrolls long names in both directions"
   await frontend.click()
   await expect(frontend).toHaveAttribute("aria-expanded", "true")
 
-  const viewport = sidebar.locator('[data-slot="session-review-v2-sidebar-tree"] .scroll-view__viewport')
+  const viewport = sidebar.locator('[data-slot="session-review-v2-sidebar-viewport"]')
   const longRow = panel.locator(`[data-type="item"][data-item-path="${longPath}"]`)
   const content = longRow.locator('[data-item-section="content"]')
   const status = longRow.locator('[data-item-section="git"]')
@@ -569,17 +569,10 @@ test("file tree expands Windows paths and scrolls long names in both directions"
   await page.mouse.wheel(1_000, 0)
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
   await expect.poll(() => statusInset(filteredStatus, "right")).toBeLessThanOrEqual(24)
-  const thumb = sidebar.locator('.scroll-view__thumb[data-orientation="horizontal"]')
-  const scrolled = await viewport.evaluate((element) => element.scrollLeft)
-  await dragThumb(page, thumb, -40)
-  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeLessThan(scrolled)
   await viewport.evaluate((element) => {
     element.setAttribute("dir", "rtl")
-    element.scrollLeft = 0
-    element.dispatchEvent(new Event("scroll"))
+    element.scrollLeft = -1_000_000
   })
-  await viewport.hover()
-  await dragThumb(page, thumb, -40)
   await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeLessThan(0)
   await expect.poll(() => statusInset(filteredStatus, "left")).toBeLessThanOrEqual(24)
   await viewport.evaluate((element) => {
@@ -625,7 +618,7 @@ test("rereads a file each time an artifact link opens it @quarantine", async ({ 
   await expect(panel.getByText("first draft", { exact: true })).toBeVisible()
 
   // Rereading the open file updates it in place: the code view keeps its node and never jumps back to the top.
-  const code = panel.locator(".scroll-view__viewport", { has: page.locator('[data-component="file"]') })
+  const code = panel.locator("[data-scrollable]", { has: page.locator('[data-component="file"]') })
   await code.hover()
   await page.mouse.wheel(0, 100_000)
   await expect
@@ -1407,20 +1400,11 @@ for (const direction of ["ltr", "rtl"] as const) {
   })
 }
 
-async function dragThumb(page: Page, thumb: Locator, dx: number) {
-  await expect(thumb).toBeVisible()
-  const box = (await thumb.boundingBox())!
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(box.x + box.width / 2 + dx, box.y + box.height / 2)
-  await page.mouse.up()
-}
-
 async function statusInset(status: Locator, side: "left" | "right") {
   return status.evaluate((element, side) => {
     const root = element.getRootNode()
     const host = root instanceof ShadowRoot ? root.host : element
-    const viewport = host.closest<HTMLElement>(".scroll-view__viewport")!.getBoundingClientRect()
+    const viewport = host.closest<HTMLElement>("[data-scrollable]")!.getBoundingClientRect()
     const box = element.getBoundingClientRect()
 
     return side === "right" ? viewport.right - box.right : box.left - viewport.left

@@ -14,6 +14,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /* The width a scrollbar takes from layout. Containers that reserve it with `scrollbar-gutter: stable` subtract it
+     from their padding, so content keeps its width; it stays 0 where scrollbars overlay the content. */
+  @supports selector(::-webkit-scrollbar) {
+    :root {
+      --scrollbar-size: 8px;
+    }
+  }
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -32,7 +40,10 @@
     margin: 0 4px;
   }
 
+  /* Matches ScrollView's minimum thumb length, so a long document keeps a thumb you can grab. */
   ::-webkit-scrollbar-thumb {
+    min-width: 32px;
+    min-height: 32px;
     border: 2px solid transparent;
     border-radius: 9999px;
     background-color: transparent;

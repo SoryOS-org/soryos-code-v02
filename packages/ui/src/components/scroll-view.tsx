@@ -128,6 +128,10 @@ export function scrollOffsetFromThumbPointer(input: {
   return progress * Math.max(0, input.scrollSize - (input.scrollClientSize ?? input.clientSize))
 }
 
+/**
+ * A scroll container that draws its own thumb, for a thumb in an external track or one corrected for virtualized
+ * rows. Everything else scrolls with a plain `overflow: auto` element, which `styles/scrollbar.css` already styles.
+ */
 export function ScrollView(props: ScrollViewProps) {
   const i18n = useI18n()
   const merged = mergeProps({ orientation: "vertical", thumbVisibility: "hover" }, props)

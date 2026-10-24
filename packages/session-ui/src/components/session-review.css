@@ -5,13 +5,11 @@
   height: 100%;
 
   [data-slot="session-review-scroll"] {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  .scroll-view__viewport {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   [data-slot="session-review-container"] {

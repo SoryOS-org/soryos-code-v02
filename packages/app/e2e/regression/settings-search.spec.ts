@@ -37,7 +37,7 @@ async function open(page: Page, input: { count?: number; seed?: SeedInput } = {}
     settings,
     search: settings.getByRole("combobox", { name: "Search", exact: true }),
     results: settings.getByRole("listbox", { name: "Settings results", exact: true }),
-    viewport: settings.locator(".settings-search-scroll > .scroll-view__viewport"),
+    viewport: settings.locator(".settings-search-scroll"),
   }
 
   // Readiness includes the server-backed project inventory, not just the settings shell.

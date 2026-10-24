@@ -166,7 +166,7 @@ export const SessionQuestionDock: Component<{ request: FormInfo; onSubmit: () =>
   const measure = () => {
     if (!root) return
 
-    const scroller = document.querySelector(".scroll-view__viewport")
+    const scroller = document.querySelector('[data-slot="session-timeline-scroll"] > .scroll-view__viewport')
     const head = scroller instanceof HTMLElement ? scroller.firstElementChild : undefined
 
     const top =
@@ -232,7 +232,7 @@ export const SessionQuestionDock: Component<{ request: FormInfo; onSubmit: () =>
     makeEventListener(window, "resize", update)
 
     const dock = root?.closest('[data-component="session-composer-dock"]')
-    const scroller = document.querySelector(".scroll-view__viewport")
+    const scroller = document.querySelector('[data-slot="session-timeline-scroll"] > .scroll-view__viewport')
     createResizeObserver([dock, scroller], update)
 
     onCleanup(() => {

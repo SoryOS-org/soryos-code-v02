@@ -11,8 +11,8 @@
 }
 
 /* Matches the 16px session title fade. The top fade only covers the editor's 16px top padding until text scrolls
-   under it; the mask sits on the viewport so the thumb stays solid. */
-[data-component="composer-scroll"] > .scroll-view__viewport,
+   under it. */
+[data-component="composer-scroll"],
 [data-slot="composer-content"][data-history-preview] {
   mask-image: linear-gradient(
     to bottom,
@@ -25,13 +25,20 @@
 
 /* Chromium reveals the caret flush with the viewport edge after Enter or typing, ignoring the editor padding, so the
    last line would land under the fade. Keep revealed carets clear of both 16px fades. */
-[data-component="composer-scroll"] > .scroll-view__viewport,
+[data-component="composer-scroll"],
 [data-slot="composer-content"][data-history-preview] {
   scroll-padding-block: 16px;
 }
 
+/* Reserving the scrollbar keeps a long prompt from rewrapping when it starts to scroll; the editor's end padding gives
+   the reserved width back, so text keeps the same 12px inset. */
+[data-component="composer-scroll"] {
+  --composer-scroll-end: calc(12px - var(--scrollbar-size, 0px));
+  scrollbar-gutter: stable;
+}
+
 /* History scrolls text and attachments together, so only the outer viewport applies the mask. */
-[data-slot="composer-content"][data-history-preview] [data-component="composer-scroll"] > .scroll-view__viewport {
+[data-slot="composer-content"][data-history-preview] [data-component="composer-scroll"] {
   mask-image: none;
 }
 

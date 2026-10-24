@@ -1,7 +1,6 @@
 import { createContext, createEffect, createMemo, For, type JSX, on, onCleanup, Show, useContext } from "solid-js"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { Icon } from "@opencode/ui/icon"
-import { ScrollView } from "../../components/scroll-view"
 import { TextInput } from "../text-input/text-input"
 import { createTypeahead } from "../typeahead/controller"
 import { searchListMove, searchListTarget } from "./navigation"
@@ -249,7 +248,7 @@ export function SearchList<T>(props: {
             onKeyDown={onKeyDown}
           />
         </div>
-        <ScrollView data-slot="search-list-scroll" viewportRef={(element) => (viewport = element)} onScroll={edges}>
+        <div data-slot="search-list-scroll" data-scrollable ref={(element) => (viewport = element)} onScroll={edges}>
           <div data-slot="search-list-fade" aria-hidden="true" />
           <div
             ref={results}
@@ -297,7 +296,7 @@ export function SearchList<T>(props: {
           <Show when={rows().length === 0}>
             <div data-slot="search-list-empty">{props.empty}</div>
           </Show>
-        </ScrollView>
+        </div>
       </div>
     </QueryContext.Provider>
   )

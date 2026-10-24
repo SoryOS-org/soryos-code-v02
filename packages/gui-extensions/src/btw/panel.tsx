@@ -4,7 +4,6 @@ import { Button } from "@opencode/ui/button"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { showToast } from "@opencode/ui/toast"
@@ -101,7 +100,7 @@ export default function SessionBtwPanel(props: { btw: BtwModel; session: Mounted
 
   return (
     <div class="flex h-full min-h-0 flex-col bg-v2-background-bg-base" data-slot="session-btw-panel">
-      <ScrollView class="min-h-0 flex-1">
+      <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable>
         <div class="min-w-0 w-full max-w-full px-4 pt-6 pb-8 md:max-w-session md:mx-auto md:px-6">
           <div data-component="user-message">
             <div data-slot="user-message-body">
@@ -198,7 +197,7 @@ export default function SessionBtwPanel(props: { btw: BtwModel; session: Mounted
             </Match>
           </Switch>
         </div>
-      </ScrollView>
+      </div>
     </div>
   )
 }

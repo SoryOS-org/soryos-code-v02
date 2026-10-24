@@ -1,11 +1,10 @@
-import { createMemo, on, onCleanup, For, Show } from "solid-js"
+import { createMemo, on, onCleanup, onMount, For, Show } from "solid-js"
 import type { JSX } from "solid-js"
 import { checksum } from "@opencode/util/encode"
 import { Icon } from "@opencode/ui/icon"
 import { Button } from "@opencode/ui/button"
 import { Accordion } from "@opencode/ui/accordion"
 import { StickyAccordionHeader } from "@opencode/ui/sticky-accordion-header"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { showToast } from "@opencode/ui/toast"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { File } from "@opencode/session-ui/file"
@@ -282,11 +281,13 @@ export default function SessionContextTab(props: { session: MountedSession }) {
   })
 
   return (
-    <ScrollView
-      class="@container h-full"
-      viewportRef={(el) => {
+    <div
+      class="@container h-full overflow-y-auto"
+      data-scrollable
+      ref={(el) => {
         scroll = el
-        restoreScroll()
+        // The ref runs before the content renders into the element.
+        onMount(restoreScroll)
       }}
       onScroll={handleScroll}
     >
@@ -326,7 +327,7 @@ export default function SessionContextTab(props: { session: MountedSession }) {
           </Accordion>
         </div>
       </div>
-    </ScrollView>
+    </div>
   )
 }
 

@@ -308,6 +308,7 @@
 .settings-notices-scroll {
   min-height: 0;
   flex: 1;
+  overflow-y: auto;
 }
 
 .settings-notices {

@@ -768,7 +768,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
   // As on the home page, every header sticks for the whole list, so the next one slides over the stuck one while the
   // stuck label fades out over 16px. The topmost stuck header also fades a gradient in as rows scroll beneath it.
   const fadeHeaders = () => {
-    const viewport = scroller?.querySelector<HTMLElement>(".scroll-view__viewport")
+    const viewport = scroller?.querySelector<HTMLElement>('[data-slot="search-list-scroll"]')
 
     if (!viewport) return
     const origin = viewport.getBoundingClientRect().top

@@ -26,7 +26,6 @@ import { Button } from "@opencode/ui/button"
 import { Keybind } from "@opencode/ui/keybind"
 import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { AttachmentCard } from "@opencode/session-ui/attachment-card"
 import { ProgressCircle } from "@opencode/ui/progress-circle"
 import type { Upload } from "../attachments/uploads"
@@ -280,14 +279,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
             />
           </Show>
 
-          <ScrollView
+          <div
             data-component="composer-scroll"
-            class={historyLayout.height === undefined ? "max-h-[180px]" : undefined}
+            data-scrollable
+            class="relative overflow-y-auto"
+            classList={{ "max-h-[180px]": historyLayout.height === undefined }}
             onScroll={updateScroll}
-            viewportRef={(element) => {
-              viewport = element
-              element.tabIndex = -1
-            }}
+            ref={viewport}
           >
             <div
               ref={(element) => {
@@ -311,7 +309,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               spellcheck={state.mode === "normal"}
               // @ts-expect-error
               autocomplete="off"
-              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-3 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
+              class="relative z-10 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-[var(--composer-scroll-end)] pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
               classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell", "opacity-50": props.disabled }}
               style={{
                 "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined,
@@ -383,7 +381,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={!props.controller.value()}>
               <div
                 dir={state.mode === "normal" ? "auto" : "ltr"}
-                class="pointer-events-none absolute inset-x-0 top-0 ps-4 pe-3 pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                class="pointer-events-none absolute inset-x-0 top-0 ps-4 pe-[var(--composer-scroll-end)] pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
                 classList={{ "font-mono! tracking-[-0.04px]": state.mode === "shell" }}
                 style={{ "unicode-bidi": state.mode === "normal" ? "plaintext" : undefined, "text-align": "start" }}
               >
@@ -393,7 +391,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     : i18n.t("ui.promptInput.placeholder.normal", { slash: "/", at: "@" }))}
               </div>
             </Show>
-          </ScrollView>
+          </div>
         </div>
 
         <div class="flex h-11 shrink-0 items-center px-2">
@@ -1271,7 +1269,7 @@ function ComposerEditorPopover(props: {
             <Keybind keys={formatKeybindParts("mod+f")} variant="ghost" />
           </button>
         </Show>
-        <ScrollView class="min-h-0 flex-1">
+        <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable>
           <div id={listID} role="listbox" aria-label={i18n.t("ui.promptInput.history")} class="flex flex-col">
             <Show
               when={props.items.length}
@@ -1313,7 +1311,7 @@ function ComposerEditorPopover(props: {
               </For>
             </Show>
           </div>
-        </ScrollView>
+        </div>
       </Show>
       <Show when={!props.history}>
         <Show when={props.search}>

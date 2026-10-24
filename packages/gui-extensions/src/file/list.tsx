@@ -17,7 +17,7 @@ const kindLabel = (kind: ChangeKind) => {
 }
 
 function virtualScrollElement(root: HTMLElement | undefined) {
-  return root?.isConnected ? root.closest<HTMLDivElement>(".scroll-view__viewport") : null
+  return root?.isConnected ? root.closest<HTMLDivElement>("[data-scrollable]") : null
 }
 
 // Drives the highlight/selection of the flat search-result list from the filter

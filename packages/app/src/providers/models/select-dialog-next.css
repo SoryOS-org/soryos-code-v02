@@ -13,11 +13,6 @@
     padding-top: 6px;
   }
 
-  /* The 4px bar is centered in a 12px track; pulling the track out puts the bar 2px from the edge. */
-  [data-component="search-list"] .scroll-view__thumb[data-orientation="vertical"] {
-    inset-inline-end: -2px;
-  }
-
   [data-component="search-list"] [data-slot="search-list-search"] {
     display: flex;
     flex-direction: column;
@@ -69,7 +64,7 @@
   }
 
   /* Arrow keys keep the active row clear of the stuck header. */
-  [data-component="search-list"] [data-slot="search-list-scroll"] > .scroll-view__viewport {
+  [data-component="search-list"] [data-slot="search-list-scroll"] {
     scroll-padding-top: 36px;
   }
 

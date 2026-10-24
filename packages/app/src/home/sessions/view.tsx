@@ -4,7 +4,6 @@ import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show } f
 import { createStore, type SetStoreFunction } from "solid-js/store"
 import { InlineInput } from "@opencode/ui/inline-input"
 import { Loader } from "@opencode/ui/loader"
-import { ScrollView } from "@opencode/ui/scroll-view"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -326,7 +325,7 @@ function HomeSessionSearch(
                       >
                         {props.language.t("home.sessions.search.sessions")}
                       </p>
-                      <ScrollView class="max-h-[min(20rem,40dvh)]" viewportRef={props.onSetSearchList}>
+                      <div class="max-h-[min(20rem,40dvh)] overflow-y-auto" data-scrollable ref={props.onSetSearchList}>
                         <div class="flex flex-col gap-px pb-2">
                           <For each={props.searchResults}>
                             {(record) => (
@@ -338,7 +337,7 @@ function HomeSessionSearch(
                             )}
                           </For>
                         </div>
-                      </ScrollView>
+                      </div>
                     </div>
                   </Show>
                 </Show>
