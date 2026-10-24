@@ -17542,6 +17542,9 @@
           },
           "supportsEffortUpdates": {
             "type": "boolean"
+          },
+          "supportsToolCacheControl": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -18661,6 +18664,9 @@
           },
           "cacheFormat": {
             "$ref": "#/components/schemas/Model.CacheFormat"
+          },
+          "supportsToolCacheControl": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

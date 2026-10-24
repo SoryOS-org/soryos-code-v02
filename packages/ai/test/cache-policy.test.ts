@@ -400,6 +400,56 @@ describe("applyCachePolicy", () => {
     }),
   )
 
+  it.effect("tool cache compatibility suppresses manual tool hints on OpenAI-compatible routes", () =>
+    Effect.gen(function* () {
+      const model = LanguageModel.update(openaiModel, {
+        compatibility: { cacheFormat: "anthropic", supportsToolCacheControl: false },
+      })
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          tools: [
+            {
+              name: "t1",
+              description: "t1",
+              inputSchema: { type: "object", properties: {} },
+              cache: new CacheHint({ type: "ephemeral" }),
+            },
+          ],
+        }),
+      )
+
+      expect(prepared.body).toMatchObject({
+        tools: [{ function: { name: "t1" }, cache_control: undefined }],
+      })
+    }),
+  )
+
+  it.effect("tool cache compatibility keeps tool hints by default on OpenAI-compatible routes", () =>
+    Effect.gen(function* () {
+      const model = LanguageModel.update(openaiModel, {
+        compatibility: { cacheFormat: "anthropic" },
+      })
+      const prepared = yield* compileRequest(
+        LLM.request({
+          model,
+          tools: [
+            {
+              name: "t1",
+              description: "t1",
+              inputSchema: { type: "object", properties: {} },
+              cache: new CacheHint({ type: "ephemeral" }),
+            },
+          ],
+        }),
+      )
+
+      expect(prepared.body).toMatchObject({
+        tools: [{ function: { name: "t1" }, cache_control: { type: "ephemeral" } }],
+      })
+    }),
+  )
+
   it.effect("deduplicates tools before counting cache hints", () =>
     Effect.gen(function* () {
       const manual = new CacheHint({ type: "ephemeral" })
