@@ -218,38 +218,61 @@ test("an unknown slash remains prompt text after the destination commands load",
   expect(fixture.sent[0]).toMatchObject({ text: "/unknown changed files" })
 })
 
-test("the external-editor shortcut cancels a deferred submit and preserves the edited draft", async () => {
-  const editor = await import("../src/editor")
-  const opened = Promise.withResolvers<void>()
-  const content = Promise.withResolvers<string>()
-  using open = spyOn(editor, "openEditor").mockImplementation(() => {
-    opened.resolve()
-    return content.promise
-  })
+test("opening and closing a dialog cancels an Enter whose native callbacks have not run", async () => {
   await using fixture = await workspace("agent")
-  try {
-    await fixture.switchWorkspace()
-    fixture.setup.mockInput.pressEnter()
-    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
-    fixture.setup.mockInput.pressKey("F9")
-    await opened.promise
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ value: "Review the changes" }))
-    fixture.release()
-    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
-    expect(fixture.created).toHaveLength(0)
-    expect(fixture.sent).toHaveLength(0)
-
-    content.resolve("Edited changes")
-    await fixture.setup.waitForFrame((frame) => frame.includes("Edited changes"))
-    expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Edited changes")
-    fixture.setup.mockInput.pressEnter()
-    await fixture.setup.waitFor(() => fixture.sent.length === 1)
-    expect(fixture.sent[0]).toMatchObject({ text: "Edited changes" })
-  } finally {
-    content.resolve("Edited changes")
-    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
-  }
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  fixture.setup.mockInput.pressKey("p", { ctrl: true })
+  fixture.setup.mockInput.pressEscape()
+  fixture.release()
+  await fixture.setup.waitForVisualIdle({ quietFrames: 3 })
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.sent).toHaveLength(0)
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
 })
+
+test.each(["pending", "before-native-submit", "fast-return"])(
+  "the external-editor shortcut cancels submission and preserves the edited draft (%s)",
+  async (timing) => {
+    const editor = await import("../src/editor")
+    const opened = Promise.withResolvers<void>()
+    const content = Promise.withResolvers<string>()
+    using open = spyOn(editor, "openEditor").mockImplementation(() => {
+      opened.resolve()
+      return content.promise
+    })
+    await using fixture = await workspace("agent")
+    try {
+      await fixture.switchWorkspace()
+      fixture.setup.mockInput.pressEnter()
+      if (timing === "pending") await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+      fixture.setup.mockInput.pressKey("F9")
+      await opened.promise
+      expect(open).toHaveBeenCalledWith(expect.objectContaining({ value: "Review the changes" }))
+      if (timing === "fast-return") {
+        content.resolve("Edited changes")
+        await fixture.setup.waitForFrame((frame) => frame.includes("Edited changes"))
+      }
+      fixture.release()
+      await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+      expect(fixture.created).toHaveLength(0)
+      expect(fixture.sent).toHaveLength(0)
+
+      content.resolve("Edited changes")
+      await fixture.setup.waitForFrame((frame) => frame.includes("Edited changes"))
+      expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Edited changes")
+      fixture.setup.mockInput.pressEnter()
+      await fixture.setup.waitFor(() => fixture.sent.length === 1)
+      expect(fixture.sent[0]).toMatchObject({ text: "Edited changes" })
+    } finally {
+      content.resolve("Edited changes")
+      await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    }
+  },
+)
 
 async function workspace(catalog: string, options: { text?: string; command?: boolean } = {}) {
   const source = process.cwd()

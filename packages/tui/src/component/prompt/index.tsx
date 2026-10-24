@@ -382,6 +382,8 @@ export function Prompt(props: PromptProps) {
     interrupt: 0,
   })
   let disposed = false
+  let editorOpen = false
+  let nativeSubmitVersion = 0
   let pasteQueue = Promise.resolve()
 
   function enqueuePaste(run: (changed: () => boolean) => Promise<void>) {
@@ -565,32 +567,41 @@ export function Prompt(props: PromptProps) {
         name: "prompt.editor",
         slash: { name: "editor" },
         run: async () => {
-          setPendingSubmit(undefined)
-          dialog.clear()
+          if (editorOpen) return
+          editorOpen = true
+          nativeSubmitVersion++
 
-          const editorPrompt = expandPromptInputPastedText(store.prompt, store.prompt.pasted, renderer.widthMethod)
-          const value = editorPrompt.text
-          const content = await openEditor({
-            renderer,
-            value,
-            cwd:
-              (data.location.info()?.project.directory === "/" ? undefined : data.location.info()?.project.directory) ||
-              data.location.default().directory ||
-              paths.cwd,
-          }).catch((error) => {
-            toast.show({ title: "Failed to open editor", message: errorMessage(error), variant: "error" })
-          })
-          if (!content) return
-          const normalized = normalizePromptContent(content)
+          try {
+            setPendingSubmit(undefined)
+            dialog.clear()
+            const editorPrompt = expandPromptInputPastedText(store.prompt, store.prompt.pasted, renderer.widthMethod)
+            const value = editorPrompt.text
+            const content = await openEditor({
+              renderer,
+              value,
+              cwd:
+                (data.location.info()?.project.directory === "/"
+                  ? undefined
+                  : data.location.info()?.project.directory) ||
+                data.location.default().directory ||
+                paths.cwd,
+            }).catch((error) => {
+              toast.show({ title: "Failed to open editor", message: errorMessage(error), variant: "error" })
+            })
+            if (!content) return
+            const normalized = normalizePromptContent(content)
 
-          input.setText(normalized)
+            input.setText(normalized)
 
-          setStore("prompt", {
-            ...realignPromptInputMentions(normalized, editorPrompt, renderer.widthMethod),
-            pasted: [],
-          })
-          restoreExtmarksFromPrompt(store.prompt)
-          input.cursorOffset = measure(normalized)
+            setStore("prompt", {
+              ...realignPromptInputMentions(normalized, editorPrompt, renderer.widthMethod),
+              pasted: [],
+            })
+            restoreExtmarksFromPrompt(store.prompt)
+            input.cursorOffset = measure(normalized)
+          } finally {
+            editorOpen = false
+          }
         },
       },
       {
@@ -1117,13 +1128,16 @@ export function Prompt(props: PromptProps) {
     slash: boolean
   }>()
   createEffect(() => {
+    // Cancel even native Enter callbacks that have not created a pending load yet.
+    const modalOpen = dialog.stack.length > 0
+    if (modalOpen) nativeSubmitVersion++
     const pending = pendingSubmit()
     if (!pending) return
     const location = currentLocation.ref ?? data.location.default()
     // Dialog handlers can clear the modal before navigating. Cancel on open so
     // closing a workspace picker cannot retry against the previous location.
     if (
-      dialog.stack.length > 0 ||
+      modalOpen ||
       disabled() ||
       props.sessionID !== pending.sessionID ||
       store.mode !== pending.mode ||
@@ -1147,7 +1161,7 @@ export function Prompt(props: PromptProps) {
   })
 
   async function submit(delivery: SessionInbox.Delivery = "steer") {
-    if (disabled()) return false
+    if (disabled() || editorOpen) return false
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
     // input's native onSubmit racing another dispatch). Without this guard,
     // a second call slips past the empty-input check before the first call
@@ -1852,10 +1866,18 @@ export function Prompt(props: PromptProps) {
                 }
               }}
               onSubmit={() => {
-                if (disabled()) return
+                if (disabled() || editorOpen) return
+                const version = nativeSubmitVersion
                 // IME: double-defer so the last composed character (e.g. Korean
                 // hangul) is flushed to plainText before we read it for submission.
-                setTimeout(() => setTimeout(() => submit(), 0), 0)
+                setTimeout(
+                  () =>
+                    setTimeout(() => {
+                      if (disposed || version !== nativeSubmitVersion) return
+                      void submit()
+                    }, 0),
+                  0,
+                )
               }}
               onPaste={(event: PasteEvent) => {
                 if (disabled()) {
