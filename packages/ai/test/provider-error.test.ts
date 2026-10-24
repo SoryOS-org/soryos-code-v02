@@ -449,6 +449,26 @@ describe("provider error classification", () => {
     expect(isContextOverflow("Too many tokens")).toBe(true)
   })
 
+  test("classifies per-window token rate limits as retryable, not context overflow", () => {
+    // "Token limit reached: too many tokens per minute..." is a tokens-per-minute throttle; the plain
+    // /too many tokens/i phrasing used to classify it as overflow and compact instead of retrying.
+    const messages = [
+      "Token limit reached: too many tokens per minute for this model.",
+      "Slow down: too many tokens per second for this model.",
+    ]
+    for (const message of messages) {
+      const error = new AIError({
+        reason: classifyProviderFailure({ message, status: 429 }),
+      })
+      expect(error.reason._tag).toBe("RateLimit")
+      expect(isContextOverflowFailure(error)).toBe(false)
+      expect(isRetryable(error)).toBe(true)
+      expect(isContextOverflow(message)).toBe(false)
+    }
+    // Plain overflow phrasing without the throttle cue still compacts.
+    expect(isContextOverflow("Too many tokens")).toBe(true)
+  })
+
   test("does not let substituted server codes make a 4xx retryable", () => {
     const openai = { error: { type: "server_error", message: "Upstream request failed: Model is unavailable." } }
     const anthropic = {

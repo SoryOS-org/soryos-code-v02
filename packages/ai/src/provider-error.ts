@@ -67,6 +67,9 @@ const exclusions = [
   /max[_ ]tokens must be less than/i,
   // Bedrock phrases throttling as "Too many tokens[, per day], please wait..."; it is a 429 to retry, not overflow.
   /too many tokens(?: per day)?, please wait/i,
+  // Per-window token throttles ("too many tokens per minute for this model") are a 429 to retry, not overflow:
+  // compaction cannot shorten a transcript to stay under a tokens-per-minute ceiling.
+  /too many tokens per (?:minute|second|hour|day)\b/i,
 ]
 
 export const isContextOverflow = (message: string) =>
@@ -173,7 +176,7 @@ const CONTENT_POLICY_CODES = new Set([
 const GATEWAY_CODE_LABEL = /^[^:\n]+: \[([A-Za-z0-9_.-]+)\]/
 // xAI reports an invalid API key as HTTP 400 with the generic `invalid-argument` code.
 const AUTH_TEXT = /incorrect api key provided/i
-const RATE_LIMIT_TEXT = /rate increased too quickly|rate[-_\s]?limit|too[_\s]?many[_\s]?requests/i
+const RATE_LIMIT_TEXT = /rate increased too quickly|rate[-_\s]?limit|too[_\s]?many[_\s]?requests|too many tokens per (?:minute|second|hour|day)/i
 // Only consulted on 429, where throttles and account caps share a status.
 // Z.ai reports balance, plan expiry, plan limits, and plan model access on 429.
 const QUOTA_TEXT =
