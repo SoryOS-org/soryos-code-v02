@@ -500,6 +500,32 @@ describe("PatchTool", () => {
     ),
   )
 
+  it.live("preserves the executable bit when moving a file", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        if (process.platform === "win32") return
+        const source = path.join(directory, "script.sh")
+        const destination = path.join(directory, "nested", "renamed.sh")
+        yield* Effect.promise(async () => {
+          await fs.writeFile(source, "#!/bin/sh\necho before\n")
+          await fs.chmod(source, 0o755)
+        })
+        expect(
+          yield* executeTool(
+            registry,
+            call(
+              "*** Begin Patch\n*** Update File: script.sh\n*** Move to: nested/renamed.sh\n@@\n-echo before\n+echo after\n*** End Patch",
+            ),
+          ),
+        ).toMatchObject({ status: "completed" })
+        expect(yield* exists(source)).toBe(false)
+        expect(yield* Effect.promise(() => fs.readFile(destination, "utf8"))).toBe("#!/bin/sh\necho after\n")
+        const executable = yield* Effect.promise(async () => ((await fs.stat(destination)).mode & 0o111) !== 0)
+        expect(executable).toBe(true)
+      }),
+    ),
+  )
+
   it.live("includes move file info in output and metadata", () =>
     withTempTool((directory, registry) =>
       Effect.gen(function* () {
