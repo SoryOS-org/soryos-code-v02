@@ -9,7 +9,19 @@ import {
   stripAnsiSequences,
   type KeyEvent,
 } from "@opentui/core"
-import { createEffect, createMemo, onMount, createSignal, onCleanup, on, Show, Switch, Match, For } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  onMount,
+  createSignal,
+  onCleanup,
+  on,
+  Show,
+  Switch,
+  Match,
+  For,
+  untrack,
+} from "solid-js"
 import path from "path"
 import { useLocal } from "../../context/local"
 import { useTheme, useThemes } from "../../context/theme"
@@ -70,6 +82,7 @@ import { directoryRecentValue } from "../../prompt/directory-completion"
 import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
+import { isDeepEqual } from "remeda"
 
 export type PromptProps = {
   sessionID?: string
@@ -369,6 +382,8 @@ export function Prompt(props: PromptProps) {
     interrupt: 0,
   })
   let disposed = false
+  let editorOpen = false
+  let nativeSubmitVersion = 0
   let pasteQueue = Promise.resolve()
 
   function enqueuePaste(run: (changed: () => boolean) => Promise<void>) {
@@ -552,31 +567,41 @@ export function Prompt(props: PromptProps) {
         name: "prompt.editor",
         slash: { name: "editor" },
         run: async () => {
-          dialog.clear()
+          if (editorOpen) return
+          editorOpen = true
+          nativeSubmitVersion++
 
-          const editorPrompt = expandPromptInputPastedText(store.prompt, store.prompt.pasted, renderer.widthMethod)
-          const value = editorPrompt.text
-          const content = await openEditor({
-            renderer,
-            value,
-            cwd:
-              (data.location.info()?.project.directory === "/" ? undefined : data.location.info()?.project.directory) ||
-              data.location.default().directory ||
-              paths.cwd,
-          }).catch((error) => {
-            toast.show({ title: "Failed to open editor", message: errorMessage(error), variant: "error" })
-          })
-          if (!content) return
-          const normalized = normalizePromptContent(content)
+          try {
+            setPendingSubmit(undefined)
+            dialog.clear()
+            const editorPrompt = expandPromptInputPastedText(store.prompt, store.prompt.pasted, renderer.widthMethod)
+            const value = editorPrompt.text
+            const content = await openEditor({
+              renderer,
+              value,
+              cwd:
+                (data.location.info()?.project.directory === "/"
+                  ? undefined
+                  : data.location.info()?.project.directory) ||
+                data.location.default().directory ||
+                paths.cwd,
+            }).catch((error) => {
+              toast.show({ title: "Failed to open editor", message: errorMessage(error), variant: "error" })
+            })
+            if (!content) return
+            const normalized = normalizePromptContent(content)
 
-          input.setText(normalized)
+            input.setText(normalized)
 
-          setStore("prompt", {
-            ...realignPromptInputMentions(normalized, editorPrompt, renderer.widthMethod),
-            pasted: [],
-          })
-          restoreExtmarksFromPrompt(store.prompt)
-          input.cursorOffset = measure(normalized)
+            setStore("prompt", {
+              ...realignPromptInputMentions(normalized, editorPrompt, renderer.widthMethod),
+              pasted: [],
+            })
+            restoreExtmarksFromPrompt(store.prompt)
+            input.cursorOffset = measure(normalized)
+          } finally {
+            editorOpen = false
+          }
         },
       },
       {
@@ -1094,8 +1119,49 @@ export function Prompt(props: PromptProps) {
   })
 
   let submitting = false
+  const [pendingSubmit, setPendingSubmit] = createSignal<{
+    location: string
+    sessionID?: string
+    mode: "normal" | "shell"
+    prompt: PromptInfo
+    delivery: SessionInbox.Delivery
+    slash: boolean
+  }>()
+  createEffect(() => {
+    // Cancel even native Enter callbacks that have not created a pending load yet.
+    const modalOpen = dialog.stack.length > 0
+    if (modalOpen) nativeSubmitVersion++
+    const pending = pendingSubmit()
+    if (!pending) return
+    const location = currentLocation.ref ?? data.location.default()
+    // Dialog handlers can clear the modal before navigating. Cancel on open so
+    // closing a workspace picker cannot retry against the previous location.
+    if (
+      modalOpen ||
+      disabled() ||
+      props.sessionID !== pending.sessionID ||
+      store.mode !== pending.mode ||
+      !isDeepEqual(store.prompt, pending.prompt) ||
+      locationKey(location) !== pending.location
+    ) {
+      setPendingSubmit(undefined)
+      return
+    }
+    if (
+      [
+        data.location.agent,
+        data.location.model,
+        data.location.config,
+        ...(pending.slash ? [data.location.command] : []),
+      ].some((catalog) => catalog.list(location) === undefined)
+    )
+      return
+    setPendingSubmit(undefined)
+    untrack(() => void submit(pending.delivery))
+  })
+
   async function submit(delivery: SessionInbox.Delivery = "steer") {
-    if (disabled()) return false
+    if (disabled() || editorOpen) return false
     // Prevent overlapping invocations (e.g. a double-pressed Enter, or the
     // input's native onSubmit racing another dispatch). Without this guard,
     // a second call slips past the empty-input check before the first call
@@ -1150,7 +1216,34 @@ export function Prompt(props: PromptProps) {
       await slash.command.run(slash.input)
       return true
     }
+    // A worktree switch updates the active location before its catalogs arrive.
+    // Join their in-flight loads instead of silently dropping this submission.
+    const location = currentLocation.ref ?? data.location.default()
     const slashHead = parseSlashHead(inputText, /\s/)
+    const slashInput = store.mode === "normal" && slashHead !== undefined
+    const catalogs = [
+      data.location.agent,
+      data.location.model,
+      data.location.config,
+      ...(slashInput ? [data.location.command] : []),
+    ].filter((catalog) => catalog.list(location) === undefined)
+    if (catalogs.length > 0) {
+      const pending = {
+        location: locationKey(location),
+        sessionID: props.sessionID,
+        mode: store.mode,
+        prompt: structuredClone(unwrap(store.prompt)),
+        delivery,
+        slash: slashInput,
+      }
+      setPendingSubmit(pending)
+      void Promise.all(catalogs.map((catalog) => catalog.sync(location))).catch((error: unknown) => {
+        if (disposed || pendingSubmit() !== pending) return
+        setPendingSubmit(undefined)
+        toast.show({ title: "Failed to prepare prompt", message: errorMessage(error), variant: "error" })
+      })
+      return false
+    }
     const isCommand =
       slashHead !== undefined &&
       (data.location.command.list(currentLocation.ref) ?? []).some((command) => command.name === slashHead.name)
@@ -1594,7 +1687,7 @@ export function Prompt(props: PromptProps) {
   const footerInput = () => ({
     sessionID: props.sessionID,
     mode: store.mode,
-    showDetails: store.interrupt === 0 || dimensions().width >= 80,
+    showDetails: (store.interrupt === 0 && !pendingSubmit()) || dimensions().width >= 80,
   })
 
   const placeholderText = createMemo(() => {
@@ -1773,10 +1866,18 @@ export function Prompt(props: PromptProps) {
                 }
               }}
               onSubmit={() => {
-                if (disabled()) return
+                if (disabled() || editorOpen) return
+                const version = nativeSubmitVersion
                 // IME: double-defer so the last composed character (e.g. Korean
                 // hangul) is flushed to plainText before we read it for submission.
-                setTimeout(() => setTimeout(() => submit(), 0), 0)
+                setTimeout(
+                  () =>
+                    setTimeout(() => {
+                      if (disposed || version !== nativeSubmitVersion) return
+                      void submit()
+                    }, 0),
+                  0,
+                )
               }}
               onPaste={(event: PasteEvent) => {
                 if (disabled()) {
@@ -1893,21 +1994,30 @@ export function Prompt(props: PromptProps) {
                 }}
               >
                 <Switch>
-                  <Match when={status() === "running"}>
+                  <Match when={status() === "running" || pendingSubmit()}>
                     <box flexDirection="row" gap={1} flexGrow={1} justifyContent="flex-start">
-                      <box marginLeft={1}>
+                      <box marginLeft={1} flexShrink={0}>
                         <Show when={config.animations ?? true} fallback={<text fg={theme.text.muted}>[⋯]</text>}>
                           <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                         </Show>
                       </box>
-                      <PromptInterruptStatus
-                        armed={store.interrupt > 0}
-                        animations={animationsEnabled()}
-                        text={theme.text.base}
-                        subdued={theme.text.muted}
-                        warning={theme.text.feedback.warning.base}
-                        flash={theme.decrease(theme.text.feedback.warning.base, 2)}
-                      />
+                      <Show
+                        when={status() === "running"}
+                        fallback={
+                          <text fg={theme.text.muted} wrapMode="none" truncate flexShrink={1}>
+                            Loading workspace…
+                          </text>
+                        }
+                      >
+                        <PromptInterruptStatus
+                          armed={store.interrupt > 0}
+                          animations={animationsEnabled()}
+                          text={theme.text.base}
+                          subdued={theme.text.muted}
+                          warning={theme.text.feedback.warning.base}
+                          flash={theme.decrease(theme.text.feedback.warning.base, 2)}
+                        />
+                      </Show>
                     </box>
                   </Match>
                   <Match when={move.progress()}>
