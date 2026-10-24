@@ -59,6 +59,14 @@ const syncSchedule = Schedule.max([
   Schedule.recurs(8),
 ])
 
+// The Azure CLI mints the token that both discovery paths need, so an `external` connection fails offline inside
+// `az account get-access-token` before any request is made, and `isTransient` does not recognise that failure. A short
+// ladder covers it without holding the warning for two minutes when the CLI is simply not signed in.
+const cliSchedule = Schedule.max([
+  Schedule.min([Schedule.exponential("1 seconds"), Schedule.spaced("5 seconds")]),
+  Schedule.recurs(3),
+])
+
 // Azure answers a transport failure, a 408 or 429, or a 5xx other than 501 while it restarts or the network is down,
 // and a timed-out attempt may pass on the next one. A rejected key or an unmatchable body fails the same way however
 // often it is asked, so retrying it would only delay the warning.
@@ -70,6 +78,16 @@ const isTransient = (cause: unknown) => {
   const status = cause.reason.response.status
   return status === 408 || status === 429 || (status >= 500 && status !== 501)
 }
+
+// A CLI run that failed is the only signal available: `run` reports a timeout, a non-zero exit and an unreachable
+// network as the same `AppProcessError`, so the choice is between retrying all of them and retrying none. Retrying is
+// what reaches a machine whose network came back; the short ladder bounds the cost when it did not.
+const isCliFailure = (cause: unknown) => cause instanceof AppProcess.AppProcessError
+
+// Only a failure that can pass is retried, and only that one is worth a warning: a rejected key reaches the single
+// warning `discover` already logs, without a retry message in between.
+const retryWarning = (message: string, cause: unknown, retryable: (cause: unknown) => boolean) =>
+  retryable(cause) ? Effect.logWarning(message, { cause }).pipe(Effect.as(true)) : Effect.succeed(false)
 
 type Deployment = { readonly name: string; readonly model: string }
 
@@ -277,21 +295,25 @@ export function make(
       // data-plane version 2022-12-01 has it; later versions dropped `/deployments` and keep `/models`, which lists
       // models the resource can deploy rather than its deployments.
       // https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cognitiveservices/data-plane/OpenAIAuthoring/stable/2022-12-01/azureopenai.json
+
+      // A switch interrupts discovery through the fiber handle, so a pending retry never answers the old connection.
+      // The inner ladder waits out an Azure outage; the outer one covers the CLI failure that happens before any
+      // request is made, and stays short so a login that really expired still reaches the warning below in seconds.
       const deployments = (url: string, resource: string, credential: Credential.Key | Credential.External) =>
         Effect.retry(
-          credential.type === "external"
-            ? managementDeployments(resource).pipe(Effect.catch(() => resourceDeployments(url, credential)))
-            : resourceDeployments(url, credential),
-          // A switch interrupts discovery through the fiber handle, so a pending retry never answers the old
-          // connection. Only a failure that can pass is retried; the rest reaches the warning below at once.
-          syncSchedule.pipe(
-            Schedule.setInputType<unknown>(),
-            Schedule.while(({ input }) =>
-              isTransient(input)
-                ? Effect.logWarning("retrying Azure deployment sync", { cause: input }).pipe(Effect.as(true))
-                : Effect.succeed(false),
-            ),
+          Effect.retry(
+            credential.type === "external"
+              ? managementDeployments(resource).pipe(Effect.catch(() => resourceDeployments(url, credential)))
+              : resourceDeployments(url, credential),
+            {
+              schedule: syncSchedule,
+              while: (cause) => retryWarning("retrying Azure deployment sync", cause, isTransient),
+            },
           ),
+          {
+            schedule: cliSchedule,
+            while: (cause) => retryWarning("retrying Azure discovery after a CLI failure", cause, isCliFailure),
+          },
         )
 
       // Local and quick, so a switch rebinds the provider before discovery for the new connection calls Azure.
