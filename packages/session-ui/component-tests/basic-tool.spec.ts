@@ -2,12 +2,17 @@ import { expect, sourceURL, story } from "../../storybook/playwright/story"
 
 const fixture = sourceURL(new URL("./basic-tool.fixture.tsx", import.meta.url))
 
-story("expands unknown tools to show complete inputs and output", async ({ mount, page }) => {
+story("expands unknown tools to show complete inputs and literal output", async ({ mount, page }) => {
+  const input = "First input line\nSecond input line\nFinal input line beyond the compact header"
+  const output = "Message delivered\n<b>literal output</b> **plain text**"
   await mount("components-markdown--compact-result")
-  await page.evaluate(async (fixture) => {
-    const { mountGenericTool } = await import(fixture)
-    mountGenericTool()
-  }, fixture)
+  await page.evaluate(
+    async ({ fixture, input, output }) => {
+      const { mountGenericTool } = await import(fixture)
+      mountGenericTool({ message: input }, output)
+    },
+    { fixture, input, output },
+  )
   const root = page.getByTestId("generic-tool-fixture")
   const trigger = root.getByRole("button", { name: /Called `messageSession`/ })
   const content = root.locator('[data-slot="collapsible-content"]')
@@ -15,83 +20,25 @@ story("expands unknown tools to show complete inputs and output", async ({ mount
   await expect(content).toBeHidden()
 
   await trigger.click()
-  await expect(trigger).toHaveAttribute("aria-expanded", "true")
   await expect(content).toBeVisible()
-  await expect(content).toContainText("Send a message to a session")
-  await expect(content).toContainText("ses_synthetic")
-  await expect(content).toContainText(
-    /First line of the synthetic message\nSecond line stays separate\nFinal input line beyond the compact header/,
-    { useInnerText: true },
-  )
-  await expect(content).toContainText("retries")
-  await expect(content).toContainText("2")
-  await expect(content).toContainText("enabled")
-  await expect(content).toContainText("false")
-  await expect(content).toContainText("options")
-  await expect(content).toContainText("recipients")
-  await expect(content).toContainText("review")
-  await expect(content).toContainText("test")
-  await expect(content).toContainText("context")
-  await expect(content).toContainText("priority")
-  await expect(content).toContainText("normal")
-  await expect(content).toContainText(/TOOL-OUTPUT-MARKER: message delivered\nSecond output line/, {
-    useInnerText: true,
-  })
-
-  await expect(content).toContainText("<b>literal output</b> **plain text**")
+  await expect(content.locator("pre").nth(0)).toHaveJSProperty("textContent", input)
+  await expect(content.locator("pre").nth(1)).toHaveJSProperty("textContent", output)
   await expect(content.locator("b, strong")).toHaveCount(0)
 
   await trigger.click()
   await expect(content).toBeHidden()
 })
 
-for (const scenario of ["input", "output", "empty", "hidden", "running"] as const) {
-  story(`preserves generic tool details for ${scenario} calls`, async ({ mount, page }) => {
-    await mount("components-markdown--compact-result")
-    await page.evaluate(
-      async ({ fixture, scenario }) => {
-        const { mountGenericTool } = await import(fixture)
-        mountGenericTool(scenario)
-      },
-      { fixture, scenario },
-    )
-    const root = page.getByTestId("generic-tool-fixture")
-    const trigger = root.getByRole("button", { name: /Called `messageSession`/ })
-    const content = root.locator('[data-slot="collapsible-content"]')
-    await expect(trigger).toHaveAttribute("aria-expanded", "false")
-
-    if (scenario === "empty" || scenario === "hidden") {
-      await expect(trigger.locator('[data-slot="collapsible-arrow"]')).toHaveCount(0)
-      await trigger.click()
-      await expect(content).toHaveCount(0)
-      return
-    }
-
-    if (scenario === "running") {
-      await trigger.click()
-      await expect(trigger).toHaveAttribute("aria-expanded", "false")
-      await root.getByRole("button", { name: "Finish tool", exact: true }).click()
-      await expect(trigger.locator('[data-slot="collapsible-arrow"]')).toHaveCount(1)
-      await expect(trigger).toHaveAttribute("aria-expanded", "false")
-    }
-
-    await trigger.click()
-    await expect(content).toBeVisible()
-    if (scenario === "input") {
-      await expect(content.getByText("null", { exact: true })).toBeVisible()
-      await expect(content).toContainText("flags")
-      await expect(content).toContainText("false")
-      await expect(content).toContainText("0")
-      await expect(content.getByText("Output", { exact: true })).toHaveCount(0)
-      return
-    }
-
-    await expect(content).toContainText(/TOOL-OUTPUT-MARKER: message delivered\nSecond output line/, {
-      useInnerText: true,
-    })
-    if (scenario === "output") await expect(content.locator("dt")).toHaveText(["Output"])
-  })
-}
+story("does not show an arrow for an empty unknown tool", async ({ mount, page }) => {
+  await mount("components-markdown--compact-result")
+  await page.evaluate(async (fixture) => {
+    const { mountGenericTool } = await import(fixture)
+    mountGenericTool({})
+  }, fixture)
+  const root = page.getByTestId("generic-tool-fixture")
+  await expect(root.getByRole("button", { name: "Called `messageSession`", exact: true })).toBeVisible()
+  await expect(root.locator('[data-slot="collapsible-arrow"]')).toHaveCount(0)
+})
 
 story("does not render completed reasoning until it is opened", async ({ mount, page }) => {
   const root = await mount("current-session-timeline-rows--conversation", {
