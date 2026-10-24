@@ -600,6 +600,52 @@ describe("AzurePlugin sync failures", () => {
       expect(yield* azureModelIDs).toEqual(["prod-mini"])
     }),
   )
+
+  it.effect("keeps retrying the Azure CLI past a wake-up that takes more than a few seconds", () =>
+    Effect.gen(function* () {
+      // Each attempt mints two tokens before it fails: the management scope, then the resource scope it falls back to.
+      // Failing eight of them is four failed attempts, so the fifth attempt is the first that can reach Azure, and the
+      // ladder reaches it only after waiting 1, 2, 4 and 8 seconds.
+      let tokenCalls = 0
+      const loaded = Promise.withResolvers<void>()
+      const cli = yield* fakeAzureCli((args) => {
+        if (!args.includes("get-access-token")) return { value: [] }
+        tokenCalls++
+        if (tokenCalls > 8) return cliToken(args)
+        return new Error("Unable to connect to login.microsoftonline.com")
+      })
+      const azure = yield* fakeAzure({
+        resource: () => {
+          loaded.resolve()
+          return resourceList(listed("prod-mini", "gpt-5-mini"))
+        },
+        management: notFound,
+      })
+      yield* seedCatalog
+      yield* connect(cliCredential())
+      yield* addPlugin(azure.endpoints).pipe(cli.provide)
+
+      yield* settle
+      expect(tokenCalls).toBe(2)
+
+      // Seven seconds is where a three-step ladder gives up, and discovery has to still be running here: this is the
+      // wake-from-sleep that takes about as long as a modem and a VPN, which is the case #57690 reports.
+      yield* TestClock.adjust("1 seconds")
+      yield* settle
+      yield* TestClock.adjust("2 seconds")
+      yield* settle
+      yield* TestClock.adjust("4 seconds")
+      yield* settle
+      expect(tokenCalls).toBe(8)
+      expect(azure.requests).toEqual([])
+
+      // The fourth wait buys the attempt that reaches Azure, and the deployments arrive without a restart.
+      yield* TestClock.adjust("8 seconds")
+      yield* Effect.promise(() => loaded.promise)
+      yield* settle
+      expect(yield* azureModelIDs).toEqual(["prod-mini"])
+    }),
+  )
 })
 
 describe("AzurePlugin switching accounts", () => {

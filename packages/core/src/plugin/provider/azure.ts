@@ -59,14 +59,6 @@ const syncSchedule = Schedule.max([
   Schedule.recurs(8),
 ])
 
-// The Azure CLI mints the token that both discovery paths need, so an `external` connection fails offline inside
-// `az account get-access-token` before any request is made, and `isTransient` does not recognise that failure. A short
-// ladder covers it without holding the warning for two minutes when the CLI is simply not signed in.
-const cliSchedule = Schedule.max([
-  Schedule.min([Schedule.exponential("1 seconds"), Schedule.spaced("5 seconds")]),
-  Schedule.recurs(3),
-])
-
 // Azure answers a transport failure, a 408 or 429, or a 5xx other than 501 while it restarts or the network is down,
 // and a timed-out attempt may pass on the next one. A rejected key or an unmatchable body fails the same way however
 // often it is asked, so retrying it would only delay the warning.
@@ -81,7 +73,10 @@ const isTransient = (cause: unknown) => {
 
 // A CLI run that failed is the only signal available: `run` reports a timeout, a non-zero exit and an unreachable
 // network as the same `AppProcessError`, so the choice is between retrying all of them and retrying none. Retrying is
-// what reaches a machine whose network came back; the short ladder bounds the cost when it did not.
+// what reaches a machine whose network came back, so the CLI gets the same ladder as the request rather than a shorter
+// one: the CLI is what an `external` connection needs first, and a wake-from-sleep that takes half a minute to get its
+// network back would otherwise stay unfixed for exactly the users this covers. A CLI that really is signed out pays by
+// delaying its one warning about two minutes, and a run that fails locally is cheap.
 const isCliFailure = (cause: unknown) => cause instanceof AppProcess.AppProcessError
 
 // Only a failure that can pass is retried, and only that one is worth a warning: a rejected key reaches the single
@@ -297,8 +292,9 @@ export function make(
       // https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cognitiveservices/data-plane/OpenAIAuthoring/stable/2022-12-01/azureopenai.json
 
       // A switch interrupts discovery through the fiber handle, so a pending retry never answers the old connection.
-      // The inner ladder waits out an Azure outage; the outer one covers the CLI failure that happens before any
-      // request is made, and stays short so a login that really expired still reaches the warning below in seconds.
+      // The inner ladder waits out an Azure outage, the outer one a failure that happens before any request is made,
+      // and both run the same schedule: whichever way the network is missing, discovery has about two minutes to reach
+      // it. Only one of them ever applies to a given failure, so the two do not add up.
       const deployments = (url: string, resource: string, credential: Credential.Key | Credential.External) =>
         Effect.retry(
           Effect.retry(
@@ -311,7 +307,7 @@ export function make(
             },
           ),
           {
-            schedule: cliSchedule,
+            schedule: syncSchedule,
             while: (cause) => retryWarning("retrying Azure discovery after a CLI failure", cause, isCliFailure),
           },
         )
