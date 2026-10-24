@@ -40,6 +40,8 @@ export const decodeArguments = Schema.decodeUnknownSync(
       title: Schema.optional(Schema.String),
       text: Schema.optional(Schema.String),
       delivery: Schema.optional(Schema.Literals(["steer", "queue"])),
+      model: Schema.optional(Schema.String),
+      variant: Schema.optional(Schema.String),
     }),
   ),
 )

@@ -1,5 +1,5 @@
 import { createSimpleContext } from "@opencode/ui/context"
-import { useNavigate } from "@solidjs/router"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionInfo } from "@opencode/client/promise"
@@ -7,6 +7,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import type { ServerCtx } from "@/runtime/server/runtime"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { sessionHref } from "@/shell/routes/session"
+import { findSessionTab, useTabs } from "@/shell/tabs/tabs"
 import type { CallState, createVoiceCall } from "./call"
 
 export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
@@ -14,6 +15,8 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
   init: () => {
     const platform = usePlatform()
     const navigate = useNavigate()
+    const location = useLocation()
+    const tabs = useTabs()
 
     const [state, setState] = createStore<CallState & { server?: ServerConnection.Key; composers: number }>({
       status: "idle",
@@ -26,6 +29,21 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
     })
 
     const current: { call?: ReturnType<typeof createVoiceCall>; generation: number } = { generation: 0 }
+
+    // Resolves once the router shows href; voice must not report a move that didn't happen.
+    const routed = (href: string) =>
+      new Promise<void>((resolve, reject) => {
+        const started = Date.now()
+
+        const check = () => {
+          if (location.pathname === href) return resolve()
+
+          if (Date.now() - started > 3000) return reject(new Error("Desktop did not show the session"))
+          setTimeout(check, 50)
+        }
+
+        check()
+      })
 
     const end = async () => {
       const generation = ++current.generation
@@ -73,7 +91,19 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
               ctx,
               session,
               platform,
-              open: (next) => navigate(sessionHref(server, next.id)),
+              open: async (next) => {
+                const href = sessionHref(server, next.id)
+                // Subagent sessions open inside their root session's tab, which the titlebar finds from the route.
+                const tab =
+                  findSessionTab(tabs.store, server, next.id) ??
+                  (next.parentID ? undefined : tabs.addSessionTab({ server, sessionId: next.id }))
+
+                if (tab) tabs.remember(tab)
+                navigate(href)
+                await routed(href)
+              },
+              tabs: () =>
+                tabs.store.flatMap((tab) => (tab.type === "session" && tab.server === server ? [tab.sessionId] : [])),
               change: (change) => {
                 if (current.generation === generation) setState(change)
               },

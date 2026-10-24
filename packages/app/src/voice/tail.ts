@@ -24,6 +24,7 @@ export class TranscriptTail {
     return delta
   }
 
+  /** Both sides' lines since the previous delegation, as the iOS app's `transcript_delta`. */
   capture(id: string) {
     const pending = this.entries.filter(
       (entry) =>
@@ -34,11 +35,7 @@ export class TranscriptTail {
     const versions = new Map(pending.map((entry) => [entry.id, entry.version]))
     this.reservations.set(id, versions)
 
-    return pending
-      .filter((entry) => entry.role === "user")
-      .map((entry) => entry.text)
-      .join(" ")
-      .slice(-4000)
+    return pending.map((entry) => `${entry.role}${entry.sent ? " (updated utterance)" : ""}: ${entry.text.trim()}`)
   }
 
   accept(id: string) {
