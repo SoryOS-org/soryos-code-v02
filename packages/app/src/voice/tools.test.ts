@@ -11,20 +11,20 @@ afterEach(() => {
 
 const models = [
   {
-    id: "claude-opus-5-5",
-    name: "Claude Opus 5.5",
-    providerID: "console-anthropic",
+    id: "claude-opus-4",
+    name: "Claude Opus 4",
+    providerID: "anthropic",
     enabled: true,
     variants: [{ id: "medium" }, { id: "high" }],
   },
   {
-    id: "gpt-6-astra",
-    name: "GPT-6 Astra",
+    id: "gpt-5",
+    name: "GPT-5",
     providerID: "openai",
     enabled: true,
     variants: [{ id: "high" }, { id: "xhigh" }],
   },
-  { id: "gemini-4-argon", name: "Gemini 4 Argon", providerID: "console-google", enabled: true, variants: [] },
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", providerID: "google", enabled: true, variants: [] },
   { id: "gpt-4", name: "GPT-4", providerID: "openai", enabled: false, variants: [] },
 ]
 
@@ -32,7 +32,7 @@ const session = (id: string, title: string, extra: Partial<SessionInfo> = {}) =>
   ({
     id,
     title,
-    location: { directory: `/Users/kit/code/${title.toLowerCase()}` },
+    location: { directory: `/home/alex/code/${title.toLowerCase()}` },
     time: { created: 1, updated: 1 },
     ...extra,
   }) as SessionInfo
@@ -46,7 +46,7 @@ function setup(
 ) {
   const sessions = [
     session("ses_here", "HERE", {
-      model: { id: "claude-opus-5-5", providerID: "console-anthropic", variant: "high" },
+      model: { id: "claude-opus-4", providerID: "anthropic", variant: "high" },
     } as Partial<SessionInfo>),
     session("ses_desktop", "DESKTOP"),
     session("ses_old", "OLD", { time: { created: 1, updated: 1, archived: 2 } }),
@@ -217,14 +217,14 @@ describe("models", () => {
     const voice = setup()
 
     const gpt = await voice.run("list_models", { query: "gpt" })
-    expect(gpt.models.map((model: { id: string }) => model.id)).toEqual(["openai/gpt-6-astra"])
+    expect(gpt.models.map((model: { id: string }) => model.id)).toEqual(["openai/gpt-5"])
 
     const all = await voice.run("list_models")
     expect(all.matches).toBe(3)
     expect(all.models[0]).toEqual({
-      id: "console-anthropic/claude-opus-5-5",
-      name: "Claude Opus 5.5",
-      provider: "console-anthropic",
+      id: "anthropic/claude-opus-4",
+      name: "Claude Opus 4",
+      provider: "anthropic",
       variants: ["medium", "high"],
       current: true,
       current_variant: "high",
@@ -234,15 +234,15 @@ describe("models", () => {
   test("switch_model keeps a variant the new model offers and drops one it doesn't", async () => {
     const voice = setup()
 
-    expect(await voice.run("switch_model", { model: "openai/gpt-6-astra" })).toEqual({
-      switched_to: "GPT-6 Astra",
+    expect(await voice.run("switch_model", { model: "openai/gpt-5" })).toEqual({
+      switched_to: "GPT-5",
       variant: "high",
       session: "HERE",
     })
-    expect((await voice.run("switch_model", { model: "console-google/gemini-4-argon" })).variant).toBe("default")
+    expect((await voice.run("switch_model", { model: "google/gemini-2.5-pro" })).variant).toBe("default")
     expect(voice.calls.switched).toEqual([
-      { sessionID: "ses_here", model: { id: "gpt-6-astra", providerID: "openai", variant: "high" } },
-      { sessionID: "ses_here", model: { id: "gemini-4-argon", providerID: "console-google", variant: undefined } },
+      { sessionID: "ses_here", model: { id: "gpt-5", providerID: "openai", variant: "high" } },
+      { sessionID: "ses_here", model: { id: "gemini-2.5-pro", providerID: "google", variant: undefined } },
     ])
   })
 
@@ -251,7 +251,7 @@ describe("models", () => {
 
     expect((await voice.run("switch_model", { model: "openai/gpt-9" })).error).toContain("did not change")
     expect((await voice.run("switch_model", { model: "openai/gpt-4" })).error).toContain("did not change")
-    expect((await voice.run("switch_model", { model: "openai/gpt-6-astra", variant: "ultra" })).error).toContain(
+    expect((await voice.run("switch_model", { model: "openai/gpt-5", variant: "ultra" })).error).toContain(
       "high, xhigh",
     )
     expect(voice.calls.switched).toEqual([])
