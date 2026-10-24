@@ -271,7 +271,7 @@ story("pins history search above the scrolling prompts", async ({ mount }) => {
   await input.press("Shift+ArrowUp")
   const menu = component.locator('[data-component="composer-suggestions"]')
   const search = menu.getByRole("button", { name: /^Search/ })
-  const viewport = menu.getByRole("region", { name: "scrollable content" })
+  const viewport = menu.locator("[data-scrollable]")
   await expect.poll(() => viewport.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
 
   const clippedTop = () =>

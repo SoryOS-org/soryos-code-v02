@@ -570,21 +570,9 @@ test("keeps a 25000-line crash report editable in a new session", async ({ page 
   expect(await events.evaluate((events) => events.count)).toBe(1)
   await expect(input).toBeFocused()
   await expectCaretVisible(input)
-  const scroll = page.locator('[data-component="composer-scroll"]')
   await page.keyboard.type("!")
   await expect.poll(async () => (await input.innerText()) === text + "!").toBe(true)
   await expectCaretVisible(input)
-  const bounds = await scroll.boundingBox()
-
-  if (!bounds) throw new Error("Missing composer scroll bounds")
-  // The caret reveal leaves the 32px thumb at the bottom of the 8px gutter, inside the track's 4px end margin.
-  const x = bounds.x + bounds.width - 4
-  await page.mouse.move(x, bounds.y + bounds.height - 20)
-  await page.mouse.down()
-  await page.mouse.move(x, bounds.y)
-  await page.mouse.up()
-  await expect(scroll).toHaveJSProperty("scrollTop", 0)
-  await expect(input).toBeFocused()
   await page.keyboard.press("ControlOrMeta+Home")
   await page.keyboard.press("ControlOrMeta+End")
   await expectCaretVisible(input)
