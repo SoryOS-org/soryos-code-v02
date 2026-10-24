@@ -4,7 +4,7 @@ import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Loader } from "@opencode/ui/loader"
 import { Schema } from "effect"
-import { createEffect, For, onCleanup, onMount, Show, type ParentProps } from "solid-js"
+import { createEffect, For, onCleanup, onMount, Show, untrack, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionInfo } from "@opencode/client/promise"
 import { useServer } from "@/runtime/server/current"
@@ -142,7 +142,7 @@ function VoicePanel() {
 
   // A saved position from a larger window is pulled back on screen once storage has loaded.
   createEffect(() => {
-    if (ready()) settle()
+    if (ready()) untrack(settle)
   })
 
   const speaker = (value: "user" | "assistant") => language.t(value === "user" ? "voice.you" : "voice.assistant")
