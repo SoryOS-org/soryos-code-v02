@@ -38,6 +38,8 @@ export function ImagePreview(props: ImagePreviewProps) {
   }
 
   onMount(() => {
+    if (images().length < 2) return
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
 

@@ -57,7 +57,6 @@
         max-height: calc(90vh - 100px);
         object-fit: contain;
         border-radius: var(--radius-md);
-        cursor: zoom-in;
       }
 
       &:has([data-slot="image-preview-footer"]) [data-slot="image-preview-image"] {
