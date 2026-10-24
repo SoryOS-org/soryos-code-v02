@@ -7,6 +7,7 @@ import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
 import { EventTable } from "@opencode/core/event/sql"
+import { Instructions } from "@opencode/core/instructions/index"
 import { SessionCompaction } from "@opencode/core/session/compaction"
 import type { SessionContext } from "@opencode/core/session/context"
 import { SessionEvent } from "@opencode/core/session/event"
@@ -306,7 +307,7 @@ it.effect("auto compaction estimates current content against the buffered prompt
         id: Agent.defaultID,
         info: { ...Agent.Info.default(Agent.defaultID), system: "You are a helpful assistant." },
       },
-      initial: "Project instructions.",
+      initial: [{ key: Instructions.Key.make("test/project"), text: "Project instructions." }],
       tools: {
         definitions: [
           ToolDefinition.make({ name: "read", description: "Read files", inputSchema: { type: "object" } }),
@@ -450,7 +451,7 @@ const loaded = (session: Session.Info, messages: readonly SessionMessage.Info[])
   messages,
   model: resolved,
   agent: { id: Agent.defaultID, info: Agent.Info.default(Agent.defaultID) },
-  initial: "Session instructions",
+  initial: [{ key: Instructions.Key.make("test/session"), text: "Session instructions" }],
   tools: { definitions: [], execute: () => Effect.die("Compaction must not execute tools") },
 })
 
