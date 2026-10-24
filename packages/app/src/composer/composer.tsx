@@ -13,6 +13,7 @@ import { DialogSelectModel, ModelSelectorDrawer } from "@/providers/models/selec
 import { DialogSelectModelNext, ModelSelectorDrawerNext } from "@/providers/models/select-dialog-next"
 import { useSettings } from "@/settings/model"
 import { ModelDetails } from "@/providers/models/details"
+import { createModelUsage } from "@/usage/model"
 import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -94,6 +95,7 @@ function ComposerModelControl(props: {
   const dialog = useDialog()
   const settings = useSettings()
   const managed = createMemo(() => consoleModelGroup(props.model.list()))
+  const usage = createModelUsage()
 
   const open = (detail: number) => {
     if (!props.paid) return props.onUnpaidClick()
@@ -172,7 +174,7 @@ function ComposerModelControl(props: {
           >
             {(model) => (
               <div class="flex w-[188px] max-w-[calc(100vw-24px)] flex-col">
-                <ModelDetails model={model()} provider={providerName(model().provider)} />
+                <ModelDetails model={model()} provider={providerName(model().provider)} usage={usage(model())} />
                 <div class="flex h-7 min-w-0 items-center gap-2 border-t-[0.5px] border-v2-border-border-base px-2">
                   <span class="min-w-0 flex-1 truncate text-v2-text-text-faint">{props.title}</span>
                   <Keybind keys={props.keybind} variant="neutral" />

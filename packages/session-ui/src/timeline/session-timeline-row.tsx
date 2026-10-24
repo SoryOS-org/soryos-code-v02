@@ -6,7 +6,18 @@ import type {
 } from "@opencode/client/promise"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { Option, Predicate, Schema } from "effect"
-import { For, Show, createEffect, createMemo, onCleanup, untrack, type Accessor, type JSX } from "solid-js"
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  onCleanup,
+  untrack,
+  type Accessor,
+  type JSX,
+} from "solid-js"
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Icon } from "@opencode/ui/icon"
 import { Spring, frameLoop, prefersReducedMotion } from "@opencode/ui/motion"
@@ -1158,19 +1169,75 @@ export function createSessionTimelineRowRenderer(input: {
       return i18n.t("ui.sessionTurn.freeLimit.lineReset", { time })
     })
 
+    // A budget pauses paid models, or only the ones it covers, until it resets at the start of a month.
+    const budgetLimit = createMemo(() => {
+      const kind = current().kind
+      if (kind !== "budget-limit" && kind !== "model-budget-limit") return
+      const at = current().resetAt
+      const time =
+        at === undefined
+          ? undefined
+          : new Intl.DateTimeFormat(i18n.locale(), {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+              timeZoneName: "shortOffset",
+            }).format(at)
+      if (kind === "budget-limit")
+        return {
+          text: time
+            ? i18n.t("ui.sessionTurn.budgetLimit.all", { time })
+            : i18n.t("ui.sessionTurn.budgetLimit.allUntilReset"),
+          action: i18n.t("ui.sessionTurn.budgetLimit.useFreeModel"),
+        }
+      return {
+        text: time
+          ? i18n.t("ui.sessionTurn.budgetLimit.models", { time })
+          : i18n.t("ui.sessionTurn.budgetLimit.modelsUntilReset"),
+        action: i18n.t("ui.sessionTurn.budgetLimit.switchModel"),
+      }
+    })
+
     return (
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
-          <Show when={freeLimit()} fallback={<SessionError message={current().text} />}>
-            {(text) => (
-              <div
-                role="status"
-                class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
-              >
-                {text()}
-              </div>
-            )}
-          </Show>
+          <Switch fallback={<SessionError message={current().text} />}>
+            <Match when={budgetLimit()}>
+              {(notice) => (
+                <div
+                  role="status"
+                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                >
+                  {notice().text}
+                  <Show when={input.actions?.chooseModel}>
+                    {(choose) => (
+                      <>
+                        <span aria-hidden="true">{" · "}</span>
+                        <button
+                          type="button"
+                          class="font-[530] text-v2-text-text-base hover:underline focus-visible:underline focus-visible:outline-none"
+                          onClick={() => choose()()}
+                        >
+                          {notice().action}
+                        </button>
+                      </>
+                    )}
+                  </Show>
+                </div>
+              )}
+            </Match>
+            <Match when={freeLimit()}>
+              {(text) => (
+                <div
+                  role="status"
+                  class="text-[13px] font-[440] leading-text-compact tracking-[-0.04px] text-v2-text-text-muted"
+                >
+                  {text()}
+                </div>
+              )}
+            </Match>
+          </Switch>
         </div>
       </Frame>
     )

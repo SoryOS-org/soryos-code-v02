@@ -574,6 +574,7 @@ export namespace Timeline {
             userMessageID: turnID,
             text: unwrapErrorMessage(lastAssistant.error.message),
             ...freeLimit(lastAssistant),
+            ...budgetLimit(lastAssistant),
           }),
         )
     }
@@ -595,6 +596,7 @@ export namespace Timeline {
                 userMessageID: turnID,
                 text: unwrapErrorMessage(entry.message.error.message),
                 ...freeLimit(entry.message),
+                ...budgetLimit(entry.message),
               }),
             )
 
@@ -667,6 +669,17 @@ function freeLimit(
   return {
     kind: "free-limit" as const,
     resetAt: base + delay,
+  }
+}
+
+// OpenCode Console says when the budget resets in its refusal's metadata, which every protocol's envelope names `resetsAt`.
+function budgetLimit(message: Pick<SessionMessageAssistant, "error">) {
+  const type = message.error?.type
+  if (type !== "provider.budget-limit" && type !== "provider.model-budget-limit") return {}
+  const at = Date.parse(/"resetsAt"\s*:\s*"([^"]+)"/.exec(message.error?.response?.body ?? "")?.[1] ?? "")
+  return {
+    kind: type === "provider.budget-limit" ? ("budget-limit" as const) : ("model-budget-limit" as const),
+    ...(Number.isNaN(at) ? {} : { resetAt: at }),
   }
 }
 

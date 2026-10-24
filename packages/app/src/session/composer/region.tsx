@@ -347,6 +347,11 @@ export function createActiveSessionRegion(input: {
 
           return pendingSteer
         },
+        get chooseModel() {
+          if (input.session.data.isChild()) return
+
+          return () => command.trigger("model.choose")
+        },
         openAttachment,
       } satisfies SessionUserActions,
     },

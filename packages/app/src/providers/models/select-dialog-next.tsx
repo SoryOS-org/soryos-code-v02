@@ -33,6 +33,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { ExternalLink } from "@/runtime/platform/external-link"
 import { useData } from "@/runtime/server/current"
 import { useWorkspaceLocation } from "@/workspaces/location"
+import { createModelUsage, ModelUsageTag } from "@/usage/model"
 import { createSafeTriangle } from "@/shell/commands/safe-triangle"
 import { formatKeybindParts, matchKeybind, parseKeybind } from "@/shell/commands/command"
 import { createEventListener } from "@solid-primitives/event-listener"
@@ -87,6 +88,7 @@ const ModelList: Component<{
   model?: ModelState
 }> = (props) => {
   const language = useLanguage()
+  const usage = createModelUsage({ refresh: true })
 
   const controller = createModelSelectorController({
     model: props.model,
@@ -198,6 +200,7 @@ const ModelList: Component<{
                   <Show when={item.latest}>
                     <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
                   </Show>
+                  <Show when={usage(item)}>{(value) => <ModelUsageTag usage={value()} />}</Show>
                 </div>
               </div>
               <div data-slot="settings-row-control" class="size-4">
@@ -618,6 +621,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
 
   const labels = createProviderLabels(controller.all)
   const chatgptPlan = createChatgptPlan(controller.current)
+  const usage = createModelUsage({ refresh: true })
 
   const [store, setStore] = createStore({
     search: "",
@@ -935,6 +939,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
             <Badge class="shrink-0">{language.t("model.tag.latest")}</Badge>
           </Show>
         </span>
+        <Show when={usage(item())}>{(value) => <ModelUsageTag usage={value()} />}</Show>
         <Show when={active()}>
           <span data-slot="model-dialog-variant">
             <span class="truncate capitalize">{variant(item()) ?? language.t("common.default")}</span>
@@ -1076,6 +1081,7 @@ export function DialogSelectModelNext(props: { provider?: string; model?: ModelS
               provider={labels.workspace(item().provider) ? item().provider.name : labels.name(item().provider)}
               compact
               standalone
+              usage={usage(item())}
             />
           </div>
         )}

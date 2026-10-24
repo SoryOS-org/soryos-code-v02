@@ -34,6 +34,8 @@ export type SessionUserAttachmentReference = {
 
 export type SessionUserActions = {
   openAttachment?: (file: PromptFileAttachment) => void
+  /** Opens the model picker, which a budget notice offers when a budget pauses the model in use. */
+  chooseModel?: () => void
   revert?: (input: { sessionID: string; messageID: string }) => Promise<void> | void
   /**
    * An input the server has not delivered yet. Like the TUI, a pending steer can move to the queue or be deleted;

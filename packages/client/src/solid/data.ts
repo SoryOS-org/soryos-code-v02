@@ -35,6 +35,7 @@ import type {
   ShellInfo,
   SkillInfo,
   ToolContent,
+  UsageLimitsInfo,
   VcsInfo,
   OpenCodeEvent,
   OpenCodeClient,
@@ -109,6 +110,9 @@ type LocationData = {
   provider?: ProviderInfo[]
   reference?: ReferenceInfo[]
   websearch?: WebSearchProvider[]
+  // The Go allowance and Console budgets of the OpenCode Console workspace the location is signed in to; null when it
+  // isn't signed in.
+  usageLimits?: UsageLimitsInfo | null
   // Currently running shell commands for this location, keyed by shell id. Entries are removed
   // once the command exits or is deleted, so this only ever holds in-flight shells.
   shell?: Record<string, ShellWithLocation>
@@ -965,6 +969,12 @@ export function createData(config: CreateDataInput) {
         return
       }
       case "session.step.failed":
+        // A budget refusal means the cached usage limits are out of date, which is what the refusal sends people to.
+        if (
+          event.location &&
+          (event.data.error.type === "provider.budget-limit" || event.data.error.type === "provider.model-budget-limit")
+        )
+          refreshLocation("usageLimits", result.location.usage, event.location)
         message.editAssistant(event.data.sessionID, event.data.assistantMessageID, (assistant) => {
           assistant.time.completed = event.created
           assistant.finish = event.data.finish ?? "error"
@@ -1249,6 +1259,7 @@ export function createData(config: CreateDataInput) {
       Object.keys(store.location).forEach((key) => {
         const ref = JSON.parse(key) as [string, string | null]
         const location = { directory: ref[0], workspaceID: ref[1] ?? undefined }
+        refreshLocation("usageLimits", result.location.usage, location)
         if (event.type === "credential.updated") {
           refreshLocation("integration", result.location.integration, location)
           return
@@ -1332,6 +1343,7 @@ export function createData(config: CreateDataInput) {
         refreshLocation("reference", result.location.reference, location)
         break
       case "integration.updated": {
+        refreshLocation("usageLimits", result.location.usage, location)
         const active =
           hasLocation("integration", location) || hasLocation("model", location) || hasLocation("provider", location)
         result.location.integration.invalidate(location)
@@ -1410,6 +1422,7 @@ export function createData(config: CreateDataInput) {
   }
 
   const vcs = locationResource("vcs", (location) => api().vcs.get({ location }))
+  const usageLimits = locationResource("usageLimits", (location) => api().usage.limits({ location }))
   const shells = locationResource("shell", async (location) => {
     const response = await api().shell.list({ location })
     const ref = { directory: response.location.directory }
@@ -2011,6 +2024,7 @@ export function createData(config: CreateDataInput) {
         result.session.form.invalidate("global", location)
       },
       vcs: { info: vcs.list, sync: vcs.sync, invalidate: vcs.invalidate },
+      usage: { limits: usageLimits.list, sync: usageLimits.sync, invalidate: usageLimits.invalidate },
       agent: locationResource("agent", (location) => api().agent.list({ location })),
       command: locationResource("command", (location) => api().command.list({ location })),
       config: locationResource("config", async (location) => ({

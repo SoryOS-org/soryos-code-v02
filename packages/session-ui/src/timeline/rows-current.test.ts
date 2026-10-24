@@ -1666,6 +1666,52 @@ describe("current session timeline rows", () => {
     )
   })
 
+  test("marks a Console budget refusal with the reset its envelope names", () => {
+    const user = { id: "msg_user", type: "user", text: "prompt", time: { created: 1 } } satisfies SessionMessageInfo
+    const refused = (type: string, body?: string) =>
+      Timeline.constructSessionMessageRows(
+        [
+          user,
+          {
+            id: "msg_assistant",
+            type: "assistant",
+            agent: "build",
+            model: { id: "claude-opus-5", providerID: "opencode" },
+            content: [],
+            finish: "error",
+            error: { type, message: "Budget reached.", status: 429, ...(body ? { response: { body } } : {}) },
+            time: { created: 2, completed: 3 },
+          },
+        ],
+        true,
+        { type: "idle" },
+      ).rows.at(-1)
+
+    // Anthropic and OpenAI clients get Console's own envelope; Google clients get the reset in ErrorInfo's metadata.
+    expect(
+      refused(
+        "provider.model-budget-limit",
+        '{"type":"error","error":{"type":"BudgetLimitError","message":"A budget policy for this model has been reached."},"metadata":{"coverage":"models","resetsAt":"2026-11-01T00:00:00.000Z"}}',
+      ),
+    ).toEqual(
+      new TimelineRow.Error({
+        userMessageID: "msg_user",
+        text: "Budget reached.",
+        kind: "model-budget-limit",
+        resetAt: Date.UTC(2026, 10, 1),
+      }),
+    )
+    expect(
+      refused(
+        "provider.budget-limit",
+        '{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","message":"Budget reached.","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"BudgetLimitError","domain":"opencode.ai","metadata":{"coverage":"all","resetsAt":"2026-11-01T00:00:00.000Z"}}]}}',
+      ),
+    ).toMatchObject({ kind: "budget-limit", resetAt: Date.UTC(2026, 10, 1) })
+    expect(refused("provider.budget-limit")).toEqual(
+      new TimelineRow.Error({ userMessageID: "msg_user", text: "Budget reached.", kind: "budget-limit" }),
+    )
+  })
+
   test("summarizes a turn's changed files after the idle marker that ends it", () => {
     const step = (id: string, files?: string[]) =>
       ({

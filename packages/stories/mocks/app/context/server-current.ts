@@ -1,4 +1,4 @@
-// Stories render without a connected server: no location has synced integrations yet.
+// Stories render without a connected server: no location has synced integrations or usage limits yet.
 const data = {
   location: {
     default: () => ({ directory: "/tmp/story" }),
@@ -6,6 +6,11 @@ const data = {
     integration: {
       list: () => undefined,
       sync: async () => {},
+    },
+    usage: {
+      limits: () => undefined,
+      sync: async () => {},
+      invalidate: () => {},
     },
   },
 }
