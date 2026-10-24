@@ -15,6 +15,7 @@ export type CallState = {
   level: number
   caption: string
   speaker: "user" | "assistant"
+  utterance?: number
   title: string
 }
 
@@ -156,7 +157,7 @@ export function createVoiceCall(input: {
       if (speaker === "user") gates.user(true)
 
       if (speaker === "assistant") gates.assistant(true)
-      input.change({ caption, speaker })
+      input.change({ caption, speaker, utterance: tail.latest })
 
       return
     }

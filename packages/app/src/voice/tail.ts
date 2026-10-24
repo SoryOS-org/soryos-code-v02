@@ -60,4 +60,9 @@ export class TranscriptTail {
       .join("\n")
       .slice(-2000)
   }
+
+  /** The newest utterance; it changes only when `append` starts a new one. */
+  get latest() {
+    return this.entries.at(-1)?.id
+  }
 }

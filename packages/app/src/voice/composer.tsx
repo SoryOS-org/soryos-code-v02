@@ -104,14 +104,22 @@ function VoicePanel() {
     y: Math.min(Math.max(y, limits.y[0]), Math.max(limits.y[0], limits.y[1])),
   })
 
+  // Before stored state loads, a write would mark the store edited and drop the saved position.
   const settle = () => {
+    if (!ready()) return
     const next = clamp(bounds(), position.x, position.y)
 
     if (next.x !== position.x || next.y !== position.y) setPosition(next)
   }
 
   const grab = (event: PointerEvent) => {
-    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest("button")) return
+    if (
+      event.button !== 0 ||
+      !(event.target instanceof Element) ||
+      event.target.closest("button") ||
+      onScrollbar(event)
+    )
+      return
     event.preventDefault()
     const limits = bounds()
     const start = { x: event.clientX - position.x, y: event.clientY - position.y }
@@ -123,11 +131,13 @@ function VoicePanel() {
       panel.removeEventListener("pointermove", move)
       panel.removeEventListener("pointerup", drop)
       panel.removeEventListener("pointercancel", drop)
+      panel.removeEventListener("lostpointercapture", drop)
     }
 
     panel.addEventListener("pointermove", move)
     panel.addEventListener("pointerup", drop)
     panel.addEventListener("pointercancel", drop)
+    panel.addEventListener("lostpointercapture", drop)
   }
 
   onMount(() => {
@@ -155,7 +165,9 @@ function VoicePanel() {
       style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
       onPointerDown={grab}
       // Pointer presses never move focus, so typing in the composer carries on while the call is controlled.
-      onMouseDown={(event) => event.preventDefault()}
+      onMouseDown={(event) => {
+        if (!onScrollbar(event)) event.preventDefault()
+      }}
     >
       <div class="voice-controls">
         <meter class="voice-level" min={0} max={1} value={voice.state.level} aria-label={language.t("voice.level")} />
@@ -208,7 +220,7 @@ function VoicePanel() {
           </Show>
         }
       >
-        <div class="voice-captions">
+        <div class="voice-captions" data-scrollable>
           <For each={voice.state.captions}>
             {(caption) => (
               <p class="voice-caption">
@@ -219,5 +231,16 @@ function VoicePanel() {
         </div>
       </Show>
     </section>
+  )
+}
+
+// A press on a scroll container's own scrollbar lands outside its client box; it scrolls rather than drags.
+function onScrollbar(event: MouseEvent) {
+  const target = event.target
+
+  return (
+    target instanceof HTMLElement &&
+    target.hasAttribute("data-scrollable") &&
+    (event.offsetX >= target.clientWidth || event.offsetY >= target.clientHeight)
   )
 }

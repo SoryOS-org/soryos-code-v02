@@ -16,7 +16,10 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
     const navigate = useNavigate()
 
     const [state, setState] = createStore<
-      CallState & { server?: ServerConnection.Key; captions: { speaker: CallState["speaker"]; text: string }[] }
+      CallState & {
+        server?: ServerConnection.Key
+        captions: { utterance: number; speaker: CallState["speaker"]; text: string }[]
+      }
     >({
       status: "idle",
       muted: false,
@@ -51,6 +54,19 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
       void end()
     })
 
+    // The call reports each utterance as it grows: its line is extended in place, and the next utterance starts a
+    // new one.
+    const caption = (change: Partial<CallState>) => {
+      const text = change.caption
+      const utterance = change.utterance
+
+      if (!text || utterance === undefined) return
+      const last = state.captions.length - 1
+
+      if (state.captions[last]?.utterance === utterance) return setState("captions", last, "text", text)
+      setState("captions", (list) => [...list, { utterance, speaker: state.speaker, text }].slice(-4))
+    }
+
     return {
       state,
       end,
@@ -81,9 +97,7 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
               change: (change) => {
                 if (current.generation !== generation) return
                 setState(change)
-                const caption = change.caption
-
-                if (caption) setState("captions", (list) => withCaption(list, state.speaker, caption))
+                caption(change)
               },
             })
             await current.call.join()
@@ -95,17 +109,3 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
     }
   },
 })
-
-// The call reports each utterance as it grows, so a caption that extends the last one from the same speaker
-// replaces it rather than adding a line.
-function withCaption(
-  list: { speaker: CallState["speaker"]; text: string }[],
-  speaker: CallState["speaker"],
-  text: string,
-) {
-  const last = list.at(-1)
-
-  if (last?.speaker === speaker && text.startsWith(last.text)) return [...list.slice(0, -1), { speaker, text }]
-
-  return [...list, { speaker, text }].slice(-4)
-}

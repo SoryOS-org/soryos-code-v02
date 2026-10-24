@@ -76,6 +76,8 @@
 .voice-captions {
   max-height: 160px;
   overflow-y: auto;
+  cursor: auto;
+  touch-action: pan-y;
 }
 .voice-caption span {
   color: var(--v2-text-text-faint);
