@@ -1,4 +1,4 @@
-import { Effect, Schema, Stream } from "effect"
+import { Effect, Schema, SchemaGetter, Stream } from "effect"
 import {
   ImageFinishEvent,
   ImageModel,
@@ -73,6 +73,22 @@ const OpenAIImageResponse = Schema.Struct({
 // 3. Streaming event schema
 // ---------------------------------------------------------------------------
 
+const EVENT_TYPES = new Set([
+  "image_generation.partial_image",
+  "image_edit.partial_image",
+  "image_generation.completed",
+  "image_edit.completed",
+  "error",
+])
+/** OpenAI may add stream event types; frames outside `EVENT_TYPES` are ignored, while a malformed known type still fails decoding. */
+const UnknownEvent = Schema.Struct({
+  type: Schema.String.check(Schema.makeFilter((type) => !EVENT_TYPES.has(type))),
+}).pipe(
+  Schema.decodeTo(Schema.Struct({ type: Schema.Literal("unknown"), rawType: Schema.String }), {
+    decode: SchemaGetter.transform((event) => ({ type: "unknown" as const, rawType: event.type })),
+    encode: SchemaGetter.forbidden(() => "Unknown OpenAI Images stream events are decode-only"),
+  }),
+)
 const StreamEvent = Schema.Union([
   Schema.Struct({
     type: Schema.Literals(["image_generation.partial_image", "image_edit.partial_image"]),
@@ -92,6 +108,7 @@ const StreamEvent = Schema.Union([
     type: Schema.Literal("error"),
     error: Schema.optional(Schema.Struct({ message: Schema.optional(Schema.String) })),
   }),
+  UnknownEvent,
 ])
 
 const decodeEvent = route.decodeFrame(StreamEvent)
@@ -254,6 +271,7 @@ const eventImage = (frame: string, label: string, data: string, format: string, 
 
 const onEvent = Effect.fnUntraced(function* (state: State, frame: string) {
   const event = yield* decodeEvent(frame)
+  if (event.type === "unknown") return [state, []] as const
   if (event.type === "error")
     return yield* new AIError({
       reason: classifyProviderFailure({
