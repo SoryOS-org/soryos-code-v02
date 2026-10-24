@@ -112,8 +112,6 @@ import type {
   VoiceModelsOutput,
   VoiceSessionInput,
   VoiceSessionOutput,
-  VoiceInstructionsInput,
-  VoiceInstructionsOutput,
   ProviderListInput,
   ProviderListOutput,
   ProviderGetInput,
@@ -264,6 +262,7 @@ import type {
   VcsBranchListOutput,
   VcsDiffInput,
   VcsDiffOutput,
+  DebugHeapDumpInput,
   DebugHeapDumpOutput,
   DebugLocationListOutput,
   DebugLocationEvictInput,
@@ -273,6 +272,8 @@ import type {
   WebsearchProvidersOutput,
   WebsearchQueryInput,
   WebsearchQueryOutput,
+  UsageLimitsInput,
+  UsageLimitsOutput,
   ConfigGetInput,
   ConfigGetOutput,
   ConfigShellsOutput,
@@ -1191,18 +1192,6 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
-      instructions: (input: VoiceInstructionsInput, requestOptions?: RequestOptions) =>
-        request<VoiceInstructionsOutput>(
-          {
-            method: "POST",
-            path: `/api/experimental/voice/session/${encodeURIComponent(input.sessionID)}/instructions`,
-            body: { instructions: input["instructions"] },
-            successStatus: 204,
-            declaredStatuses: [400, 401, 404, 503],
-            empty: true,
-          },
-          requestOptions,
-        ),
     },
     provider: {
       list: (input?: ProviderListInput, requestOptions?: RequestOptions) =>
@@ -2221,11 +2210,12 @@ export function make(options: ClientOptions) {
         ),
     },
     debug: {
-      heapDump: (requestOptions?: RequestOptions) =>
+      heapDump: (input?: DebugHeapDumpInput, requestOptions?: RequestOptions) =>
         request<DebugHeapDumpOutput>(
           {
             method: "POST",
             path: `/api/debug/heap-dump`,
+            query: { directory: input?.["directory"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 500],
             empty: false,
@@ -2293,6 +2283,20 @@ export function make(options: ClientOptions) {
             path: `/api/websearch`,
             query: { location: input["location"] },
             body: { query: input["query"], providerID: input["providerID"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    usage: {
+      limits: (input?: UsageLimitsInput, requestOptions?: RequestOptions) =>
+        request<UsageLimitsOutput>(
+          {
+            method: "GET",
+            path: `/api/experimental/usage/limits`,
+            query: { location: input?.["location"] },
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 503],
             empty: false,

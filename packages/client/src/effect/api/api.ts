@@ -40,6 +40,7 @@ import type { Reference } from "@opencode/schema/reference"
 import type { Worktree } from "@opencode/schema/worktree"
 import type { Vcs } from "@opencode/schema/vcs"
 import type { WebSearch } from "@opencode/schema/websearch"
+import type { UsageLimits } from "@opencode/schema/usage-limits"
 import type { Config } from "@opencode/schema/config"
 
 export type ServerInfoOutput = {
@@ -826,6 +827,7 @@ export type SessionLogOutput =
             readonly rawFinish?: string | undefined
             readonly native?: SessionMessage.Native | undefined
             readonly cost: Money.USD
+            readonly allowance?: Money.USD | undefined
             readonly tokens: {
               readonly input: number
               readonly output: number
@@ -859,6 +861,7 @@ export type SessionLogOutput =
             readonly rawFinish?: string | undefined
             readonly native?: SessionMessage.Native | undefined
             readonly cost?: Money.USD | undefined
+            readonly allowance?: Money.USD | undefined
             readonly tokens?:
               | {
                   readonly input: number
@@ -1212,6 +1215,7 @@ export type SessionLogOutput =
             readonly sessionID: Session.ID
             readonly source: "title" | "compaction"
             readonly cost: Money.USD
+            readonly allowance?: Money.USD | undefined
             readonly tokens: {
               readonly input: number
               readonly output: number
@@ -1424,8 +1428,6 @@ export type VoiceModelsOutput = {
     readonly provider: string
     readonly transports: ReadonlyArray<"webrtc" | "websocket">
     readonly available: boolean
-    readonly integration?: string | undefined
-    readonly workspace?: string | undefined
   }>
   readonly default?: string | undefined
 }
@@ -1442,20 +1444,12 @@ export type VoiceSessionOutput = {
   readonly transport:
     | { readonly type: "webrtc"; readonly sdp: string }
     | { readonly type: "websocket"; readonly url: string; readonly token: string; readonly expiresAt: number }
-  readonly session?: { readonly id: string } | undefined
 }
 export type VoiceSessionOperation<E = never> = (input: VoiceSessionInput) => Effect.Effect<VoiceSessionOutput, E>
-
-export type VoiceInstructionsInput = { readonly sessionID: string; readonly instructions: string }
-export type VoiceInstructionsOutput = void
-export type VoiceInstructionsOperation<E = never> = (
-  input: VoiceInstructionsInput,
-) => Effect.Effect<VoiceInstructionsOutput, E>
 
 export interface VoiceApi<E = never> {
   readonly models: VoiceModelsOperation<E>
   readonly session: VoiceSessionOperation<E>
-  readonly instructions: VoiceInstructionsOperation<E>
 }
 
 export type ProviderListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
@@ -2269,8 +2263,19 @@ export interface VcsApi<E = never> {
   readonly diff: VcsDiffOperation<E>
 }
 
-export type DebugHeapDumpOutput = { readonly path: string; readonly pid: number }
-export type DebugHeapDumpOperation<E = never> = () => Effect.Effect<DebugHeapDumpOutput, E>
+export type DebugHeapDumpInput = { readonly directory?: string | undefined }
+export type DebugHeapDumpOutput = {
+  readonly path: string
+  readonly pid: number
+  readonly memory: {
+    readonly rss: number
+    readonly heapTotal: number
+    readonly heapUsed: number
+    readonly external: number
+    readonly arrayBuffers: number
+  }
+}
+export type DebugHeapDumpOperation<E = never> = (input?: DebugHeapDumpInput) => Effect.Effect<DebugHeapDumpOutput, E>
 
 export type DebugLocationListOutput = ReadonlyArray<Location.PublicRef>
 export type DebugLocationListOperation<E = never> = () => Effect.Effect<DebugLocationListOutput, E>
@@ -2325,6 +2330,14 @@ export interface WebsearchApi<E = never> {
   readonly query: WebsearchQueryOperation<E>
 }
 
+export type UsageLimitsInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type UsageLimitsOutput = { readonly location: Location.PublicRef; readonly data: UsageLimits.Info | null }
+export type UsageLimitsOperation<E = never> = (input?: UsageLimitsInput) => Effect.Effect<UsageLimitsOutput, E>
+
+export interface UsageApi<E = never> {
+  readonly limits: UsageLimitsOperation<E>
+}
+
 export type ConfigGetInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 export type ConfigGetOutput = ReadonlyArray<Config.Entry>
 export type ConfigGetOperation<E = never> = (input?: ConfigGetInput) => Effect.Effect<ConfigGetOutput, E>
@@ -2377,5 +2390,6 @@ export interface AppApi<E = never> {
   readonly debug: DebugApi<E>
   readonly migration: MigrationApi<E>
   readonly websearch: WebsearchApi<E>
+  readonly usage: UsageApi<E>
   readonly config: ConfigApi<E>
 }
