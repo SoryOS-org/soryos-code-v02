@@ -182,6 +182,8 @@ export type GenerateTextResponse = { data: { text: string } }
 
 export type VoiceTransportType = "webrtc" | "websocket"
 
+export type VoiceRoute = { type: "key" } | { type: "console"; workspace: { id: string; name: string } }
+
 export type VoiceWebRTCTransport = { type: "webrtc"; sdp: string }
 
 export type VoiceWebSocketTransport = { type: "websocket"; url: string; token: string; expiresAt: number }
@@ -664,7 +666,14 @@ export type ModelCost = {
   cache: { read: MoneyUSDPerMillionTokens; write: MoneyUSDPerMillionTokens }
 }
 
-export type VoiceModel = { model: string; provider: string; transports: Array<VoiceTransportType>; available: boolean }
+export type VoiceModel = {
+  model: string
+  provider: string
+  transports: Array<VoiceTransportType>
+  available: boolean
+  route?: VoiceRoute | undefined
+  unavailableReason?: string | undefined
+}
 
 export type VoiceTransport = VoiceWebRTCTransport | VoiceWebSocketTransport
 
@@ -1991,7 +2000,9 @@ export type ProviderInfo = {
 
 export type VoiceModelsResponse = { data: { models: Array<VoiceModel>; default?: string | undefined } }
 
-export type VoiceSessionResponse = { data: { transport: VoiceTransport } }
+export type VoiceSessionResponse = {
+  data: { transport: VoiceTransport; route: VoiceRoute; call?: { id: string } | undefined }
+}
 
 export type CredentialValue = CredentialOAuth | CredentialKey | CredentialExternal
 
@@ -2340,6 +2351,7 @@ export type ConfigEntry =
           }
         }
         experimental?: {
+          voice?: { route?: "key" | "console" }
           portable_shell_scanner?: boolean
           todo?: boolean
           background_compaction?: boolean
@@ -2809,6 +2821,10 @@ export type FormAlreadySettledError = {
 }
 export const isFormAlreadySettledError = (value: unknown): value is FormAlreadySettledError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "FormAlreadySettledError"
+
+export type ForbiddenError = { readonly _tag: "ForbiddenError"; readonly message: string }
+export const isForbiddenError = (value: unknown): value is ForbiddenError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ForbiddenError"
 
 export type ProviderNotFoundError = {
   readonly _tag: "ProviderNotFoundError"
@@ -4982,6 +4998,12 @@ export type VoiceSessionInput = {
     readonly transport:
       | { readonly type: "webrtc"; readonly sdp: string; readonly dcid?: number | undefined }
       | { readonly type: "websocket" }
+    readonly route?:
+      | (
+          | { readonly type: "key" }
+          | { readonly type: "console"; readonly workspace: { readonly id: string; readonly name: string } }
+        )
+      | undefined
   }["model"]
   readonly session?: {
     readonly model: string
@@ -4989,6 +5011,12 @@ export type VoiceSessionInput = {
     readonly transport:
       | { readonly type: "webrtc"; readonly sdp: string; readonly dcid?: number | undefined }
       | { readonly type: "websocket" }
+    readonly route?:
+      | (
+          | { readonly type: "key" }
+          | { readonly type: "console"; readonly workspace: { readonly id: string; readonly name: string } }
+        )
+      | undefined
   }["session"]
   readonly transport: {
     readonly model: string
@@ -4996,10 +5024,36 @@ export type VoiceSessionInput = {
     readonly transport:
       | { readonly type: "webrtc"; readonly sdp: string; readonly dcid?: number | undefined }
       | { readonly type: "websocket" }
+    readonly route?:
+      | (
+          | { readonly type: "key" }
+          | { readonly type: "console"; readonly workspace: { readonly id: string; readonly name: string } }
+        )
+      | undefined
   }["transport"]
+  readonly route?: {
+    readonly model: string
+    readonly session?: { readonly [x: string]: unknown } | undefined
+    readonly transport:
+      | { readonly type: "webrtc"; readonly sdp: string; readonly dcid?: number | undefined }
+      | { readonly type: "websocket" }
+    readonly route?:
+      | (
+          | { readonly type: "key" }
+          | { readonly type: "console"; readonly workspace: { readonly id: string; readonly name: string } }
+        )
+      | undefined
+  }["route"]
 }
 
 export type VoiceSessionOutput = VoiceSessionResponse["data"]
+
+export type VoiceInstructionsInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly instructions: { readonly instructions: string }["instructions"]
+}
+
+export type VoiceInstructionsOutput = { data: boolean }["data"]
 
 export type ProviderListInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]
