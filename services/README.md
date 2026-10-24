@@ -9,6 +9,7 @@ and clients live in `packages/`.
 | [`updates`](./updates)     | Release metadata and update selection  | `publish.yml`, Wrangler          |
 | [`files`](./files)         | Public file distribution at `/files/*` | `deploy-files.yml`, Wrangler     |
 | [`changelog`](./changelog) | Release notes at `/changelog`          | `deploy-changelog.yml`, Wrangler |
+| [`codex-executor`](./codex-executor) | Asynchronous Codex headless execution | Planned                         |
 
 These directories are Bun workspaces. Run package commands from each service's
 directory. Repository-wide Turbo commands discover them through `services/*`.
