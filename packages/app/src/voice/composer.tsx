@@ -1,11 +1,17 @@
 import { motionTuning } from "@opencode/ui/motion-tuning"
 import { Button } from "@opencode/ui/button"
-import { createEffect, onCleanup, onMount, Show, type ParentProps } from "solid-js"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Loader } from "@opencode/ui/loader"
+import { Schema } from "effect"
+import { createEffect, For, onCleanup, onMount, Show, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionInfo } from "@opencode/client/promise"
 import { useServer } from "@/runtime/server/current"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
 import en from "@/runtime/i18n/en"
 import { useVoice } from "./context"
 import "./voice.css"
@@ -17,17 +23,22 @@ const toggle = motionTuning.toggle("voice.calls", {
   value: false,
 })
 
+// Where the panel was dragged to, as an offset from its bottom-right home.
+const PanelState = Persistence.struct({
+  x: Schema.Number,
+  y: Schema.Number,
+  expanded: Schema.Boolean,
+})
+
 export function VoiceComposer(props: ParentProps<{ session: SessionInfo | undefined }>) {
   const voice = useVoice()
   const server = useServer()
   const language = useLanguage()
   const platform = usePlatform()
   const [state, setState] = createStore({ enabled: toggle() })
-  onMount(() => onCleanup(voice.mountComposer()))
   onCleanup(motionTuning.subscribe(() => setState("enabled", toggle())))
   const enabled = () =>
     platform.platform === "desktop" && import.meta.env.VITE_OPENCODE_CHANNEL !== "prod" && state.enabled
-  const active = () => voice.state.status !== "idle"
   createEffect(() => {
     const session = props.session
 
@@ -35,53 +46,125 @@ export function VoiceComposer(props: ParentProps<{ session: SessionInfo | undefi
   })
 
   return (
-    <Show
-      when={active()}
-      fallback={
-        <>
-          {props.children}
-          <Show when={enabled() && props.session}>
-            <div class="voice-call-action">
-              <Button
-                size="small"
-                variant="ghost"
-                onClick={() => {
-                  const session = props.session
+    <>
+      {props.children}
+      <Show when={enabled() && props.session && voice.state.status === "idle"}>
+        <div class="voice-call-action">
+          <Button
+            size="small"
+            variant="ghost"
+            onClick={() => {
+              const session = props.session
 
-                  if (session) void voice.start(server.key, server.ctx, session)
-                }}
-              >
-                {language.t("voice.call")}
-              </Button>
-            </div>
-          </Show>
-        </>
-      }
-    >
-      <VoiceCapsule />
-    </Show>
+              if (session) void voice.start(server.key, server.ctx, session)
+            }}
+          >
+            {language.t("voice.call")}
+          </Button>
+        </div>
+      </Show>
+    </>
   )
 }
 
+/** The call's floating panel. It sits beside the composer, never replaces it, and can be dragged anywhere. */
 export function VoiceOverlay() {
   const voice = useVoice()
 
   return (
-    <Show when={voice.state.status !== "idle" && !voice.state.composers}>
-      <div class="voice-overlay">
-        <VoiceCapsule />
-      </div>
+    <Show when={voice.state.status !== "idle"}>
+      <VoicePanel />
     </Show>
   )
 }
 
-function VoiceCapsule() {
+function VoicePanel() {
   const voice = useVoice()
   const language = useLanguage()
+  let panel!: HTMLElement
+
+  const [position, setPosition, , ready] = persisted(Persist.global("voice.panel"), PanelState, {
+    x: 0,
+    y: 0,
+    expanded: false,
+  })
+
+  // How far the panel can move while staying inside the window, read once per drag rather than every frame.
+  const bounds = () => {
+    const rect = panel.getBoundingClientRect()
+
+    return {
+      x: [position.x - rect.left, position.x + window.innerWidth - rect.right],
+      y: [position.y - rect.top, position.y + window.innerHeight - rect.bottom],
+    }
+  }
+
+  const clamp = (limits: ReturnType<typeof bounds>, x: number, y: number) => ({
+    x: Math.min(Math.max(x, limits.x[0]), Math.max(limits.x[0], limits.x[1])),
+    y: Math.min(Math.max(y, limits.y[0]), Math.max(limits.y[0], limits.y[1])),
+  })
+
+  const settle = () => {
+    const next = clamp(bounds(), position.x, position.y)
+
+    if (next.x !== position.x || next.y !== position.y) setPosition(next)
+  }
+
+  const grab = (event: PointerEvent) => {
+    if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest("button")) return
+    event.preventDefault()
+    const limits = bounds()
+    const start = { x: event.clientX - position.x, y: event.clientY - position.y }
+    panel.setPointerCapture(event.pointerId)
+
+    const move = (moved: PointerEvent) => setPosition(clamp(limits, moved.clientX - start.x, moved.clientY - start.y))
+
+    const drop = () => {
+      panel.removeEventListener("pointermove", move)
+      panel.removeEventListener("pointerup", drop)
+      panel.removeEventListener("pointercancel", drop)
+    }
+
+    panel.addEventListener("pointermove", move)
+    panel.addEventListener("pointerup", drop)
+    panel.addEventListener("pointercancel", drop)
+  }
+
+  onMount(() => {
+    const observer = new ResizeObserver(settle)
+    observer.observe(panel)
+    window.addEventListener("resize", settle)
+    onCleanup(() => {
+      observer.disconnect()
+      window.removeEventListener("resize", settle)
+    })
+  })
+
+  // A saved position from a larger window is pulled back on screen once storage has loaded.
+  createEffect(() => {
+    if (ready()) settle()
+  })
+
+  const speaker = (value: "user" | "assistant") => language.t(value === "user" ? "voice.you" : "voice.assistant")
 
   return (
-    <section class="voice-capsule" aria-label={language.t("voice.call")}>
+    <section
+      ref={panel}
+      class="voice-panel"
+      aria-label={language.t("voice.panel")}
+      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      onPointerDown={grab}
+      // Pointer presses never move focus, so typing in the composer carries on while the call is controlled.
+      onMouseDown={(event) => event.preventDefault()}
+    >
       <div class="voice-controls">
+        <meter class="voice-level" min={0} max={1} value={voice.state.level} aria-label={language.t("voice.level")} />
+        <span class="voice-title">{voice.state.title}</span>
+        <Show when={voice.state.status === "dropped"}>
+          <Button size="small" variant="outline" onClick={() => void voice.rejoin()}>
+            {language.t("voice.rejoin")}
+          </Button>
+        </Show>
         <Button
           size="small"
           variant="ghost"
@@ -91,28 +174,49 @@ function VoiceCapsule() {
         >
           {language.t(voice.state.muted ? "voice.unmute" : "voice.mute")}
         </Button>
-        <meter class="voice-level" min={0} max={1} value={voice.state.level} aria-label={language.t("voice.level")} />
-        <span class="voice-title">{voice.state.title}</span>
-        <Show when={voice.state.status === "dropped"}>
-          <Button size="small" variant="outline" onClick={() => void voice.rejoin()}>
-            {language.t("voice.rejoin")}
-          </Button>
-        </Show>
         <Button size="small" variant="ghost" onClick={() => void voice.end()}>
           {language.t("voice.end")}
         </Button>
+        <IconButton
+          type="button"
+          size="small"
+          variant="ghost-muted"
+          icon={<Icon name={position.expanded ? "chevron-down" : "chevron-up"} />}
+          aria-expanded={position.expanded}
+          aria-label={language.t(position.expanded ? "voice.captions.hide" : "voice.captions.show")}
+          onClick={() => setPosition("expanded", !position.expanded)}
+        />
       </div>
       <Show when={voice.state.status === "connecting"}>
-        <p role="status">{language.t("voice.connecting")}</p>
+        <p class="voice-status" role="status">
+          <Loader class="size-3.5 shrink-0" />
+          {language.t("voice.connecting")}
+        </p>
       </Show>
       <Show when={voice.state.status === "dropped"}>
-        <p role="alert">{language.t(`voice.failure.${voice.state.failure ?? "dropped"}`)}</p>
-      </Show>
-      <Show when={voice.state.caption}>
-        <p class="voice-caption">
-          <span>{language.t(voice.state.speaker === "user" ? "voice.you" : "voice.assistant")}</span>{" "}
-          {voice.state.caption}
+        <p class="voice-status" role="alert">
+          {language.t(`voice.failure.${voice.state.failure ?? "dropped"}`)}
         </p>
+      </Show>
+      <Show
+        when={position.expanded}
+        fallback={
+          <Show when={voice.state.caption}>
+            <p class="voice-caption voice-latest">
+              <span>{speaker(voice.state.speaker)}</span> {voice.state.caption}
+            </p>
+          </Show>
+        }
+      >
+        <div class="voice-captions">
+          <For each={voice.state.captions}>
+            {(caption) => (
+              <p class="voice-caption">
+                <span>{speaker(caption.speaker)}</span> {caption.text}
+              </p>
+            )}
+          </For>
+        </div>
       </Show>
     </section>
   )
