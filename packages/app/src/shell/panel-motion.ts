@@ -51,7 +51,7 @@ const minDuration = distanceKnob("min", {
   unit: "s",
 })
 
-const maxDuration = distanceKnob("max", { label: "Max duration", value: 0.45, min: 0.2, max: 1, step: 0.01, unit: "s" })
+const maxDuration = distanceKnob("max", { label: "Max duration", value: 0.3, min: 0.2, max: 1, step: 0.01, unit: "s" })
 
 // The width whose flight takes the shared spring's own time.
 const referenceWidth = distanceKnob("reference", {
@@ -93,19 +93,38 @@ const style = motionTuning.choice("sidebars.style", {
   labels: { spring: "Spring", instant: "Instant" },
 })
 
-// How far a panel's contents dim at the closed end of a spring flight; they never black out.
-const fadeFloor = motionTuning.number("sidebars.fadeFloor", {
-  label: "Fade floor",
+// How a panel's contents fade on a spring flight: only across the last stretch of travel before closed, so they stay
+// solid for most of a close and arrive almost at once on an open; not at all; or across the whole flight, down to half.
+const contentsFade = motionTuning.choice("sidebars.contentsFade", {
+  label: "Contents fade",
   group,
   when: springs,
-  value: 0.5,
-  min: 0,
-  max: 1,
-  step: 0.05,
+  value: "edge",
+  labels: { edge: "Edge", off: "Off", spring: "Whole spring" },
 })
 
-/** The opacity of a panel's contents `closed` of the way through a spring flight, from 1 down to the fade floor. */
-export const panelOpacity = (closed: number) => (closed === 0 || james() ? "" : `${1 - closed * (1 - fadeFloor())}`)
+const edgeFade = motionTuning.number("sidebars.edgeFade", {
+  label: "Edge fade",
+  group,
+  when: () => springs() && contentsFade() === "edge",
+  value: 15,
+  min: 5,
+  max: 50,
+  step: 1,
+  unit: "%",
+})
+
+/** The opacity of a panel's contents `closed` of the way through a spring flight, as the contents fade sets it. */
+export const panelOpacity = (closed: number) => {
+  if (closed === 0 || james()) return ""
+  const fade = contentsFade()
+
+  if (fade === "off") return ""
+
+  if (fade === "spring") return `${1 - closed / 2}`
+
+  return `${Math.min(1, (1 - closed) / (edgeFade() / 100))}`
+}
 
 const jamesShift = motionTuning.spring("sidebars.james.shift", {
   label: "Movement",

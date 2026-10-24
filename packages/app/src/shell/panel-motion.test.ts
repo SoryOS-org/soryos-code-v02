@@ -1,9 +1,9 @@
 import { expect, it } from "bun:test"
-import { panelSpring } from "./panel-motion"
+import { panelOpacity, panelSpring } from "./panel-motion"
 
 const shared = { duration: 0.3, bounce: 0 }
 
-const scale = { min: 0.15, max: 0.45, reference: 480 }
+const scale = { min: 0.15, max: 0.3, reference: 480 }
 
 it("scales the shared spring's time by the square root of the distance against the reference width", () => {
   expect(panelSpring(480, shared, scale)).toEqual(shared)
@@ -14,7 +14,7 @@ it("scales the shared spring's time by the square root of the distance against t
 
 it("clamps the scaled time between the min and max durations", () => {
   expect(panelSpring(40, shared, scale).duration).toBe(0.15)
-  expect(panelSpring(2000, shared, scale).duration).toBe(0.45)
+  expect(panelSpring(2000, shared, scale).duration).toBe(0.3)
   expect(panelSpring(40, shared, { ...scale, min: 0.2 }).duration).toBe(0.2)
   expect(panelSpring(2000, shared, { ...scale, max: 0.6 }).duration).toBe(0.6)
 })
@@ -31,4 +31,12 @@ it("keeps the shared spring when scaling is off or the distance is unknown", () 
   expect(panelSpring(260, shared, null)).toEqual(shared)
   expect(panelSpring(undefined, shared, scale)).toEqual(shared)
   expect(panelSpring(0, shared, scale)).toEqual(shared)
+})
+
+it("keeps a panel's contents solid until the last stretch of travel before closed", () => {
+  expect(panelOpacity(0)).toBe("")
+  expect(panelOpacity(0.5)).toBe("1")
+  expect(panelOpacity(0.85)).toBe("1")
+  expect(Number(panelOpacity(0.925))).toBeCloseTo(0.5, 5)
+  expect(panelOpacity(1)).toBe("0")
 })

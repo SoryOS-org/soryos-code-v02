@@ -44,6 +44,12 @@ function setStyle(value: string) {
   if (knob?.kind === "choice") motionTuning.set(knob, value)
 }
 
+function setContentsFade(value: string) {
+  const knob = motionTuning.list().find((item) => item.id === "sidebars.contentsFade")
+
+  if (knob?.kind === "choice") motionTuning.set(knob, value)
+}
+
 // James is a mode, chosen in the preset strip rather than the Motion choice.
 function setJames(on: boolean) {
   const knob = motionTuning.list().find((item) => item.id === "sidebars.james")
@@ -446,11 +452,22 @@ it("swaps the spring knobs for James's while it's on", () => {
       .filter((knob) => knob.group === "Sidebars" && knob.kind !== "mode" && (knob.when?.() ?? true))
       .map((knob) => knob.label)
 
-  expect(shown()).toEqual(["Spring", "Motion", "Fade floor"])
+  expect(shown()).toEqual(["Spring", "Motion", "Contents fade", "Edge fade"])
   setJames(true)
   expect(shown()).toEqual(["Movement", "Fade", "Fade duration", "Panel shift", "Layout", "Layout open", "Layout close"])
   setJames(false)
-  expect(shown()).toEqual(["Spring", "Motion", "Fade floor"])
+  expect(shown()).toEqual(["Spring", "Motion", "Contents fade", "Edge fade"])
+})
+
+it("shows the edge fade's length only while the contents fade at the edge", () => {
+  const edge = motionTuning.list().find((item) => item.id === "sidebars.edgeFade")
+  cleanups.push(() => setContentsFade("edge"))
+
+  expect(edge?.when?.()).toBe(true)
+  setContentsFade("spring")
+  expect(edge?.when?.()).toBe(false)
+  setContentsFade("off")
+  expect(edge?.when?.()).toBe(false)
 })
 
 it("ships the spring as the default sidebar motion, with James one choice away", () => {

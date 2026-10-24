@@ -234,8 +234,8 @@
     justify-content: flex-end;
     gap: 8px;
     width: 100%;
-    transition: opacity 200ms ease-out;
 
+    /* Hover actions show and hide at once, without a fade. */
     @media (hover: hover) {
       opacity: 0;
       pointer-events: none;
@@ -309,7 +309,6 @@
     flex: 0 0 auto;
     white-space: nowrap;
     text-align: end;
-    transition: opacity 200ms ease-out;
 
     @media (hover: hover) {
       opacity: 0;
@@ -365,8 +364,6 @@
   :root[data-motion="reduce"] &,
   &[data-delivering],
   [data-timeline-grow] & {
-    [data-slot="user-message-copy-wrapper"],
-    [data-slot="user-message-meta-tail"],
     [data-slot="user-message-transition"] {
       transition: none;
     }
@@ -454,8 +451,8 @@
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    transition: opacity 200ms ease-out;
 
+    /* Hover actions show and hide at once, without a fade. */
     @media (hover: hover) {
       opacity: 0;
       pointer-events: none;
@@ -1735,7 +1732,6 @@
     inset-inline-end: -28px;
     z-index: 1;
     display: flex;
-    transition: opacity 150ms ease-out;
 
     @media (hover: hover) {
       opacity: 0;
@@ -1746,10 +1742,6 @@
   &:focus-within [data-slot="message-options"],
   [data-slot="message-options"]:has([data-expanded]) {
     opacity: 1;
-  }
-
-  :root[data-motion="reduce"] & [data-slot="message-options"] {
-    transition: none;
   }
 }
 
