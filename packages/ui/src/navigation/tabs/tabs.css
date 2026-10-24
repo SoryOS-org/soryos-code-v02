@@ -589,18 +589,41 @@
   height: var(--tabs-bar-height);
   padding-inline-end: 0;
   border-bottom: none;
+  /* Tabs fade out at each edge with more of them past it. The tab strip's scroll handler sets the fade widths and the
+     width of the sticky "+", which the second layer keeps unmasked. */
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent,
+      #000 var(--tab-strip-fade-start, 0px),
+      #000 calc(100% - var(--tab-strip-add, 0px) - var(--tab-strip-fade-end, 0px)),
+      transparent calc(100% - var(--tab-strip-add, 0px))
+    ),
+    linear-gradient(to left, #000 var(--tab-strip-add, 0px), transparent var(--tab-strip-add, 0px));
+
+  &:dir(rtl) {
+    mask-image:
+      linear-gradient(
+        to left,
+        transparent,
+        #000 var(--tab-strip-fade-start, 0px),
+        #000 calc(100% - var(--tab-strip-add, 0px) - var(--tab-strip-fade-end, 0px)),
+        transparent calc(100% - var(--tab-strip-add, 0px))
+      ),
+      linear-gradient(to right, #000 var(--tab-strip-add, 0px), transparent var(--tab-strip-add, 0px));
+  }
 }
 
-/* The end gap lives inside the sticky "+" box. Sticky offsets respect the strip's padding, so padding there
-   would leave a gap after the "+" where scrolled tabs show through. */
+/* The "+" sits flush with the strip's end, so it keeps the tabs' 8px gap both from the last tab and from the
+   controls after the strip. The strip's mask fades the tabs under it. */
 :root
   body
   :is(#review-panel, #bottom-panel)
   [data-component="tabs"]
   .session-review-v2-tabs-bar
   [data-slot="tabs-list"]
-  > .sticky {
-  padding-inline-end: 12px;
+  > .sticky::before {
+  display: none;
 }
 
 :root
