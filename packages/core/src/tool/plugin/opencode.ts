@@ -191,7 +191,10 @@ export const Plugin = {
               const target = yield* access.resolve({ path: input.directory, kind: "directory" })
               yield* permission.assert({
                 action: "edit",
-                resources: [target.resource],
+                resources:
+                  target.realResource && target.realResource !== target.resource
+                    ? [target.resource, target.realResource]
+                    : [target.resource],
                 save: ["*"],
                 sessionID: context.sessionID,
                 agent: context.agent,

@@ -33,7 +33,10 @@ export function required(config: Info) {
 export function authorized(credentials: DecodedCredentials, config: Info) {
   if (Option.isNone(config.password) || credentials.username !== config.username) return false
   const password = Redacted.value(credentials.password)
-  return password === config.password.value || verifySession(password, config)
+  const expected = Buffer.from(config.password.value)
+  const actual = Buffer.from(password)
+  const passwordMatches = actual.length === expected.length && timingSafeEqual(actual, expected)
+  return passwordMatches || verifySession(password, config)
 }
 
 // Sessions are signed with a key derived from the server password, so rotating the password revokes every session.

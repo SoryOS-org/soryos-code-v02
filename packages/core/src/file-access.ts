@@ -5,6 +5,7 @@ import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
 import { Array, Context, Effect, Layer, Schema } from "effect"
 import path from "path"
+import fs from "node:fs"
 import { Location } from "./location.js"
 import { Permission } from "./permission.js"
 import { Project } from "./project.js"
@@ -34,6 +35,10 @@ export interface Target {
   readonly absolute: AbsolutePath
   /** Location-relative for internal paths, absolute for external paths. */
   readonly resource: string
+  /** Permission resource derived from the resolved (real) path, used to defeat symlink bypasses. */
+  readonly realResource: string
+  /** Real (symlink-resolved) absolute path of the target, when it differs from `absolute`. */
+  readonly realAbsolute?: AbsolutePath
   readonly externalDirectory?: ExternalDirectoryAuthorization
 }
 
@@ -83,6 +88,30 @@ const invocation = (context: Invocation) => ({
   source: { type: "tool" as const, messageID: context.messageID, id: context.id },
 })
 
+/** Resolve symlinks for the longest existing prefix of a path (handles not-yet-existing files). */
+const realPathLongestPrefix = (p: string): string => {
+  const tail: string[] = []
+  let current = p
+  while (true) {
+    try {
+      const real = fs.realpathSync(current)
+      return tail.length === 0 ? real : path.join(real, ...tail.reverse())
+    } catch (e: any) {
+      const code = e?.code
+      if (!["ENOENT", "ENOTDIR", "EPERM", "EACCES"].includes(code)) return p
+      const parent = path.dirname(current)
+      if (parent === current) return p
+      tail.push(path.basename(current))
+      current = parent
+    }
+  }
+}
+
+const containsCI = (parent: string, child: string) =>
+  process.platform === "win32"
+    ? FSUtil.contains(parent.toLowerCase(), child.toLowerCase())
+    : FSUtil.contains(parent, child)
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -92,14 +121,31 @@ const layer = Layer.effect(
 
     const resolve = Effect.fn("FileAccess.resolve")(function* (input: ResolveInput) {
       const absolute = AbsolutePath.make(resolvePath(location.directory, input.path))
+      const realAbsoluteStr = realPathLongestPrefix(absolute as string)
+      const realAbsolute = AbsolutePath.make(realAbsoluteStr)
       const worktree = path.resolve(location.project.directory)
-      const internal =
-        FSUtil.contains(location.directory, absolute) ||
-        (worktree !== path.parse(worktree).root && FSUtil.contains(worktree, absolute))
+      const realDirectory = FSUtil.resolve(location.directory)
+      const realWorktree = FSUtil.resolve(location.project.directory)
+      const lexicalInternal =
+        FSUtil.contains(location.directory, absolute as string) ||
+        (worktree !== path.parse(worktree).root && FSUtil.contains(worktree, absolute as string))
+      const realInternal =
+        containsCI(realDirectory, realAbsoluteStr) ||
+        (realWorktree !== path.parse(realWorktree).root && containsCI(realWorktree, realAbsoluteStr))
+      const internal = lexicalInternal && realInternal
+      const samePath =
+        process.platform === "win32"
+          ? realAbsoluteStr.toLowerCase() === (absolute as string).toLowerCase()
+          : realAbsoluteStr === (absolute as string)
       if (internal) {
+        const resource = slash(path.relative(location.directory, absolute as string) || ".")
+        const realResourceRaw = slash(path.relative(realDirectory, realAbsoluteStr) || ".")
+        const realResource = samePath ? resource : realResourceRaw
         return {
           absolute,
-          resource: slash(path.relative(location.directory, absolute) || "."),
+          resource,
+          realResource: realResource === resource ? resource : realResource,
+          realAbsolute: samePath ? undefined : realAbsolute,
         } satisfies Target
       }
       const type =
@@ -109,14 +155,17 @@ const layer = Layer.effect(
             ? "File"
             : (yield* fs.stat(absolute).pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.undefined)))
                 ?.type
-      const directory = AbsolutePath.make(type === "Directory" ? absolute : path.dirname(absolute))
+      const directory = AbsolutePath.make(type === "Directory" ? realAbsoluteStr : path.dirname(realAbsoluteStr))
+      const realResource = slash(realAbsoluteStr)
       return {
         absolute,
-        resource: slash(absolute),
+        resource: slash(absolute as string),
+        realResource: samePath ? slash(absolute as string) : realResource,
+        realAbsolute: samePath ? undefined : realAbsolute,
         externalDirectory: {
           action: "external_directory",
           directory,
-          resource: slash(path.join(directory, "*")),
+          resource: slash(path.join(directory as string, "*")),
           save: slash(path.join((yield* Project.root(fs, directory)) ?? directory, "*")),
         },
       } satisfies Target
@@ -147,13 +196,17 @@ const layer = Layer.effect(
       options?: ReadOptions,
     ) {
       const target = yield* resolve({ path: file, kind: options ? "file" : undefined })
-      const sibling = options && path.dirname(target.absolute) === path.dirname(options.siblingOf.absolute)
+      const sibling = options && path.dirname(target.absolute as string) === path.dirname(options.siblingOf.absolute as string)
 
       // Filename recovery shares the directory approval, but checks the recovered file's own read rules.
       if (!sibling) yield* authorizeExternal([target], context)
+      const resources =
+        target.realResource && target.realResource !== target.resource
+          ? [target.resource, target.realResource]
+          : [target.resource]
       yield* permission.assert({
         action: "read",
-        resources: [target.resource],
+        resources,
         save: ["*"],
         ...invocation(context),
       })
