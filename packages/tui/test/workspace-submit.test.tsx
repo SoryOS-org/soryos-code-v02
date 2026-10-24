@@ -15,7 +15,7 @@ test.each(["agent", "model", "config"])(
     expect(input?.focused).toBe(true)
 
     fixture.setup.mockInput.pressEnter()
-    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    await fixture.setup.waitForFrame((frame) => frame.includes("[⋯] Loading workspace…"))
     expect(fixture.created).toHaveLength(0)
     expect(fixture.sent).toHaveLength(0)
     fixture.release()
@@ -29,6 +29,30 @@ test.each(["agent", "model", "config"])(
     expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
   },
 )
+
+test.each([
+  { width: 44, animations: false },
+  { width: 100, animations: false },
+  { width: 44, animations: true },
+  { width: 100, animations: true },
+])("pending submission shows the normal spinner (%j)", async (options) => {
+  await using fixture = await workspace("agent", { animations: options.animations })
+  await fixture.switchWorkspace()
+  fixture.setup.resize(options.width, 30)
+  await fixture.setup.renderOnce()
+  expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
+  expect(fixture.setup.captureCharFrame()).toMatch(
+    options.animations ? /[■⬝]{8} Loading workspace…/ : /\[⋯\] Loading workspace…/,
+  )
+  expect(fixture.setup.captureCharFrame()).not.toContain("esc interrupt")
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+  expect(fixture.sent).toHaveLength(0)
+  fixture.release()
+  await fixture.setup.waitFor(() => fixture.sent.length === 1)
+  await fixture.setup.waitForFrame((frame) => !frame.includes("Loading workspace…"))
+})
 
 test("repeated Enter during worktree loading submits only once", async () => {
   await using fixture = await workspace("agent")
@@ -46,8 +70,9 @@ test("editing the prompt while the worktree loads cancels the pending submit", a
   await using fixture = await workspace("agent")
   await fixture.switchWorkspace()
   fixture.setup.mockInput.pressEnter()
-  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
   await fixture.setup.mockInput.typeText(" and tests")
+  await fixture.setup.waitForFrame((frame) => !frame.includes("Loading workspace…"))
   fixture.release()
   await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
   expect(fixture.created).toHaveLength(0)
@@ -62,8 +87,9 @@ test("switching away while the worktree loads cancels the pending submit", async
   await using fixture = await workspace("agent")
   await fixture.switchWorkspace()
   fixture.setup.mockInput.pressEnter()
-  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
   await fixture.selectWorkspace(process.cwd())
+  expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
   fixture.release()
   await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
   expect(fixture.created).toHaveLength(0)
@@ -155,9 +181,10 @@ test("a failed catalog load preserves the prompt and reports the error", async (
   await using fixture = await workspace("agent")
   await fixture.switchWorkspace()
   fixture.setup.mockInput.pressEnter()
-  await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
   fixture.fail()
   await fixture.setup.waitForFrame((frame) => frame.includes("Failed to prepare prompt"))
+  expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
   expect(fixture.created).toHaveLength(0)
   expect(fixture.sent).toHaveLength(0)
   expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
@@ -175,7 +202,7 @@ test.each(["agent-first", "command-first", "command-only"])(
     })
     await fixture.switchWorkspace()
     fixture.setup.mockInput.pressEnter()
-    await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+    await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
     expect(fixture.created).toHaveLength(0)
     expect(fixture.sent).toHaveLength(0)
     expect(fixture.commands).toHaveLength(0)
@@ -187,6 +214,7 @@ test.each(["agent-first", "command-first", "command-only"])(
       expect(fixture.created).toHaveLength(0)
       expect(fixture.sent).toHaveLength(0)
       expect(fixture.commands).toHaveLength(0)
+      expect(fixture.setup.captureCharFrame()).toContain("Loading workspace…")
     }
     fixture.release()
     fixture.releaseCommand()
@@ -194,6 +222,7 @@ test.each(["agent-first", "command-first", "command-only"])(
     expect(fixture.sent).toHaveLength(0)
     expect(fixture.commands[0]).toMatchObject({ name: "review", text: "changed files" })
     expect(fixture.created[0]).toMatchObject({ location: { directory: fixture.target }, agent: "review" })
+    await fixture.setup.waitForFrame((frame) => !frame.includes("Loading workspace…"))
   },
 )
 
@@ -258,6 +287,7 @@ test.each(["pending", "before-native-submit", "fast-return"])(
       }
       fixture.release()
       await fixture.setup.waitForVisualIdle({ quietFrames: 2 })
+      expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
       expect(fixture.created).toHaveLength(0)
       expect(fixture.sent).toHaveLength(0)
 
@@ -274,7 +304,7 @@ test.each(["pending", "before-native-submit", "fast-return"])(
   },
 )
 
-async function workspace(catalog: string, options: { text?: string; command?: boolean } = {}) {
+async function workspace(catalog: string, options: { text?: string; command?: boolean; animations?: boolean } = {}) {
   const source = process.cwd()
   const target = path.join(path.parse(source).root, "opencode-worktree")
   const gate = Promise.withResolvers<void>()
@@ -287,7 +317,7 @@ async function workspace(catalog: string, options: { text?: string; command?: bo
   let session: unknown
   let failures = 0
   const setup = await createAppFixture({
-    config: { animations: false, tabs: { enabled: false }, keybinds: { "prompt.editor": "f9" } },
+    config: { animations: options.animations ?? false, tabs: { enabled: false }, keybinds: { "prompt.editor": "f9" } },
     fetch: async (url, request) => {
       const directory = url.searchParams.get("location[directory]") ?? source
       const destination = directory === target

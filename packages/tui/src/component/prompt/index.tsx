@@ -1687,7 +1687,7 @@ export function Prompt(props: PromptProps) {
   const footerInput = () => ({
     sessionID: props.sessionID,
     mode: store.mode,
-    showDetails: store.interrupt === 0 || dimensions().width >= 80,
+    showDetails: (store.interrupt === 0 && !pendingSubmit()) || dimensions().width >= 80,
   })
 
   const placeholderText = createMemo(() => {
@@ -1994,21 +1994,30 @@ export function Prompt(props: PromptProps) {
                 }}
               >
                 <Switch>
-                  <Match when={status() === "running"}>
+                  <Match when={status() === "running" || pendingSubmit()}>
                     <box flexDirection="row" gap={1} flexGrow={1} justifyContent="flex-start">
-                      <box marginLeft={1}>
+                      <box marginLeft={1} flexShrink={0}>
                         <Show when={config.animations ?? true} fallback={<text fg={theme.text.muted}>[⋯]</text>}>
                           <spinner color={spinnerDef().color} frames={spinnerDef().frames} interval={40} />
                         </Show>
                       </box>
-                      <PromptInterruptStatus
-                        armed={store.interrupt > 0}
-                        animations={animationsEnabled()}
-                        text={theme.text.base}
-                        subdued={theme.text.muted}
-                        warning={theme.text.feedback.warning.base}
-                        flash={theme.decrease(theme.text.feedback.warning.base, 2)}
-                      />
+                      <Show
+                        when={status() === "running"}
+                        fallback={
+                          <text fg={theme.text.muted} wrapMode="none" truncate flexShrink={1}>
+                            Loading workspace…
+                          </text>
+                        }
+                      >
+                        <PromptInterruptStatus
+                          armed={store.interrupt > 0}
+                          animations={animationsEnabled()}
+                          text={theme.text.base}
+                          subdued={theme.text.muted}
+                          warning={theme.text.feedback.warning.base}
+                          flash={theme.decrease(theme.text.feedback.warning.base, 2)}
+                        />
+                      </Show>
                     </box>
                   </Match>
                   <Match when={move.progress()}>
