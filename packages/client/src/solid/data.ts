@@ -167,12 +167,11 @@ function optimisticFiles(files: SessionPromptInput["files"]) {
   return items?.length ? items : undefined
 }
 
-// Keeps the `data:<mime>;base64,` header so the item still says what it was.
+// Keeps an empty `data:<mime>;base64,` URI so the item still says what it was. It is built from `mime` because any
+// slice of the original URI is a V8 sliced string that keeps the whole payload alive.
 function omitFileData(content: [ToolContent, ...ToolContent[]]): [ToolContent, ...ToolContent[]] {
   const omit = (item: ToolContent): ToolContent =>
-    item.type === "file" && item.uri.startsWith("data:")
-      ? { ...item, uri: item.uri.slice(0, item.uri.indexOf(",") + 1) }
-      : item
+    item.type === "file" && item.uri.startsWith("data:") ? { ...item, uri: `data:${item.mime};base64,` } : item
   return [omit(content[0]), ...content.slice(1).map(omit)]
 }
 
