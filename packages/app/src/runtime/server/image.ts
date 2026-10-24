@@ -27,7 +27,8 @@ export async function readLocalImage(
   if (!type) return
   const absolute = drive || path.startsWith("/")
 
-  // Any other location would be booted and persisted as a project, so images outside the session are not read.
+  // Any other location would be booted and persisted as a project, so images outside the session are not read
+  // until the server can read a file without booting a location.
   if (absolute && !containsDirectory(directory, path)) return
   const bytes = await api.file.read(
     {
