@@ -230,6 +230,8 @@ import type {
   ExperimentalPersistentPtyRemoveOutput,
   ExperimentalPersistentPtyConnectTokenInput,
   ExperimentalPersistentPtyConnectTokenOutput,
+  ExperimentalMediaGetInput,
+  ExperimentalMediaGetOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1993,6 +1995,20 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ).then((value) => value.data),
+      },
+      media: {
+        get: (input: ExperimentalMediaGetInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalMediaGetOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/media/${encodeURIComponent(input.hash)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+              binary: true,
+            },
+            requestOptions,
+          ),
       },
     },
     shell: {

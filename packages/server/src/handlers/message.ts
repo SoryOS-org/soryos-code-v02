@@ -1,9 +1,14 @@
+import { LocationServiceMap } from "@opencode/core/location-services"
 import { SessionMessage } from "@opencode/core/session/message"
+import { SessionMediaBlob } from "@opencode/core/session/media-blob"
 import { Session } from "@opencode/core/session"
 import { Effect, Option, Schema } from "effect"
+import { HttpServerResponse } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
 import { Api } from "../api"
+import { mediaUriFor } from "../media-uri"
 import { InvalidCursorError } from "@opencode/protocol/errors"
+import { SessionMediaMessagesResponse } from "@opencode/protocol/groups/message"
 import { failedMessageDecode, missingSession } from "./session-error"
 
 const DefaultMessagesLimit = 50
@@ -28,6 +33,7 @@ const cursor = {
 export const MessageHandler = HttpApiBuilder.group(Api, "server.message", (handlers) =>
   Effect.gen(function* () {
     const session = yield* Session.Service
+    const locations = yield* LocationServiceMap.Service
 
     return handlers.handle(
       "session.messages",
@@ -39,6 +45,7 @@ export const MessageHandler = HttpApiBuilder.group(Api, "server.message", (handl
             (yield* new InvalidCursorError({ message: "Invalid cursor" }))
           : undefined
         const order = decoded?.order ?? ctx.query.order ?? "desc"
+        const mediaUri = yield* mediaUriFor(locations, ctx.request)
         const messages = yield* session
           .messages({
             sessionID: ctx.params.sessionID,
@@ -48,18 +55,24 @@ export const MessageHandler = HttpApiBuilder.group(Api, "server.message", (handl
             cursor: decoded ? { id: decoded.id, direction: decoded.direction } : undefined,
           })
           .pipe(
+            SessionMediaBlob.withMediaUri(mediaUri),
             Effect.catchTag("Session.NotFoundError", missingSession),
             Effect.catchTag("Session.MessageDecodeError", failedMessageDecode),
           )
         const first = messages[0]
         const last = messages.at(-1)
-        return {
+        const response = {
           data: messages,
           cursor: {
             previous: first ? cursor.encode(first, order, "previous") : undefined,
             next: last ? cursor.encode(last, order, "next") : undefined,
           },
         }
+        if (mediaUri)
+          return yield* HttpServerResponse.schemaJson(SessionMediaMessagesResponse)(
+            response as unknown as typeof SessionMediaMessagesResponse.Type,
+          ).pipe(Effect.orDie)
+        return response
       }),
     )
   }),
