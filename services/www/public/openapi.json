@@ -14750,6 +14750,15 @@
               }
             ]
           },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "sessions": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
           "providers": {
             "type": "object",
             "additionalProperties": {
