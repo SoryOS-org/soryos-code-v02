@@ -3,7 +3,7 @@ import type { DurationOptions } from "./motion"
 import { motionTuning, type Bezier, type MotionKnob } from "./motion-tuning"
 
 /** The knobs field that edits a motion knob, defaulting to its shipped value. */
-export function motionField(item: MotionKnob, meta: { label: string; group?: string; tab?: string }) {
+export function motionField(item: MotionKnob, meta: { label: string; group?: string; subsection?: string }) {
   if (item.kind === "spring") return spring(item.initial, meta)
 
   if (item.kind === "toggle" || item.kind === "mode") return toggle(item.initial, meta)

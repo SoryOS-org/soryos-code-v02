@@ -107,7 +107,6 @@
   margin-inline: -0.25px -0.34px;
 }
 
-.session-header-separator[data-glyph="chevron"]:dir(rtl) > svg,
-.session-header-separator[data-glyph="bold"]:dir(rtl) > svg {
+.session-header-separator[data-glyph="chevron"]:dir(rtl) > svg {
   transform: scaleX(-1);
 }

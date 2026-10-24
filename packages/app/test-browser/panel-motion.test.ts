@@ -443,7 +443,9 @@ it("swaps the spring knobs for James's while it's on", () => {
   const shown = () =>
     motionTuning
       .list()
-      .filter((knob) => knob.group === "Sidebars" && knob.kind !== "mode" && (knob.when?.() ?? true))
+      .filter(
+        (knob) => knob.group === "Sidebars" && !knob.subsection && knob.kind !== "mode" && (knob.when?.() ?? true),
+      )
       .map((knob) => knob.label)
 
   expect(shown()).toEqual(["Spring", "Motion", "Fade floor"])

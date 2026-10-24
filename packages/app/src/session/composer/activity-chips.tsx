@@ -13,15 +13,15 @@ import "./activity-chips.css"
 
 const chip = motionTuning.choice("activity.chip", {
   label: en["experiment.activityChip"],
-  group: "Experiments",
-  order: 1,
+  group: "Composer",
+  experiment: true,
   value: "today",
   labels: { today: en["experiment.activityChip.today"], orb: en["experiment.activityChip.orb"] },
 })
 const corners = motionTuning.choice("activity.chip.corners", {
   label: en["experiment.chipCorners"],
-  group: "Experiments",
-  order: 1,
+  group: "Composer",
+  experiment: true,
   value: "capsule",
   labels: { capsule: en["experiment.chipCorners.capsule"], composer: en["experiment.chipCorners.composer"] },
 })

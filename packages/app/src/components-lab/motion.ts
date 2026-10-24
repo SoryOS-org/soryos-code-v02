@@ -3,12 +3,12 @@ import { applyMotion, motionField } from "@opencode/ui/motion-tuning-fields"
 import { action, type Field, type Values } from "knobs"
 
 /**
- * The Knobs a story names in `parameters.motion` (ids, groups or cards) and their replay buttons. Speed and slow motion
+ * The Knobs a story names in `parameters.motion` (ids, areas or sub-headings) and their replay buttons. Speed and slow motion
  * come along when there is motion to time.
  */
 export function storyMotion(names: readonly string[]) {
-  const named = (item: { id: string; group: string; card?: string }) =>
-    [item.id, item.group, item.card].some((key) => key !== undefined && names.includes(key))
+  const named = (item: { id: string; group: string; subsection?: string }) =>
+    [item.id, item.group, item.subsection].some((key) => key !== undefined && names.includes(key))
 
   const knobs = motionTuning.list().filter((item) => item.kind !== "mode" && named(item) && (item.when?.() ?? true))
   const actions = motionTuning.actions().filter(named)
@@ -30,13 +30,13 @@ export function sameMotion(a: StoryMotion, b: StoryMotion) {
   return left.length === right.length && left.every((item, index) => item === right[index])
 }
 
-/** One card per group (or card): its knobs and its replay buttons, then speed and slow motion. */
+/** One card per sub-heading (or area): its knobs and its replay buttons, then speed and slow motion. */
 export function motionFields(motion: StoryMotion): { [key: string]: Field } {
   return Object.fromEntries([
     ...motion.knobs.map((item) => [key(item), motionField(item, { label: item.label, group: group(item) })]),
     ...motion.actions.map((item) => [
       `replay.${item.id}`,
-      action(item.label, { group: item.group, subsection: "Replay", run: item.run }),
+      action(item.label, { group: item.subsection ?? item.group, subsection: "Replay", run: item.run }),
     ]),
     ...motion.globals.map((item) => [key(item), motionField(item, { label: item.label, group: item.group })]),
   ])
@@ -49,7 +49,11 @@ export function motionFields(motion: StoryMotion): { [key: string]: Field } {
 export function motionScopes(motion: StoryMotion) {
   const springs = motion.knobs.flatMap((item) => (item.kind === "spring" ? [item] : []))
   const scopes = [...new Set(springs.map(group))]
-  const groups = [...motion.knobs.map(group), ...motion.actions.map((item) => item.group), ...motion.globals.map(group)]
+  const groups = [
+    ...motion.knobs.map(group),
+    ...motion.actions.map((item) => item.subsection ?? item.group),
+    ...motion.globals.map(group),
+  ]
 
   return {
     inPresets: Object.fromEntries(groups.map((name) => [name, false])),
@@ -92,5 +96,5 @@ function key(item: MotionKnob) {
 }
 
 function group(item: MotionKnob) {
-  return item.card ?? item.group
+  return item.subsection ?? item.group
 }

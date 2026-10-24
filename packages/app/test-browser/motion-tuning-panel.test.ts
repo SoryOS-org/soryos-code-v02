@@ -9,7 +9,7 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-it("offers Snappy, Smooth and Calm for every spring, with one Global card and one card per section", async () => {
+it("offers Snappy, Smooth and Calm for every spring, with Global pinned and a collapsible card per area", async () => {
   const drawer = motionTuning.spring("test.drawer", {
     label: "Spring",
     group: "Drawer",
@@ -23,6 +23,7 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
   const image = motionTuning.spring("test.image", {
     label: "Spring",
     group: "Image open",
+    subsection: "Lightbox",
     presets: {
       snappy: { duration: 0.2, bounce: 0 },
       smooth: { duration: 0.3, bounce: 0 },
@@ -32,9 +33,11 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
 
   cleanups.push(motionTuning.action({ id: "test.replay", label: "Replay", group: "Drawer", run: () => {} }))
 
+  motionTuning.toggle("test.experiment", { label: "Try it", group: "Drawer", experiment: true, value: false })
+
   const container = document.createElement("div")
   document.body.append(container)
-  cleanups.push(mountMotionPanel(container, { section: "Drawer" }))
+  cleanups.push(mountMotionPanel(container))
 
   const chip = await waitFor(() =>
     [...container.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Smooth"),
@@ -46,14 +49,21 @@ it("offers Snappy, Smooth and Calm for every spring, with one Global card and on
   expect(labels).toContain("Calm")
   expect(labels).not.toContain("default")
 
-  // Global once, then the section's spring with its replay buttons under a sub-heading in the same card.
+  // Global pinned, then a folded card per area; an area's replay buttons and sub-headings sit inside its card.
   const shown = (selector: string) =>
     [...container.querySelectorAll(selector)].flatMap((element) =>
       element.closest("[hidden]") === null ? [element.textContent?.trim()] : [],
     )
 
-  expect(shown(".knobs-group-label")).toEqual(["Global", "Drawer"])
-  expect(shown(".knobs-subhead-label")).toEqual(["Replay"])
+  expect(shown(".knobs-group-label")).toEqual(["Global", "Drawer", "Image open"])
+  expect(
+    [...container.querySelectorAll(".knobs-group-head[data-foldable]")].map((head) => head.textContent?.trim()),
+  ).toEqual([expect.stringContaining("Drawer"), expect.stringContaining("Image open")])
+  expect([...container.querySelectorAll(".knobs-subhead-label")].map((label) => label.textContent?.trim())).toEqual([
+    "Replay",
+    "Lightbox",
+  ])
+  expect(container.querySelectorAll("[data-experiment]")).toHaveLength(1)
   expect(labels).not.toContain("Jump to…")
   expect(drawer()).toEqual({ duration: 0.15, bounce: 0 })
 

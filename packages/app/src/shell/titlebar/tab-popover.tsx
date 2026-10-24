@@ -22,16 +22,17 @@ let activePreview: (() => void) | undefined
 
 const style = motionTuning.choice("sidebars.preview.style", {
   label: "Style",
-  group: "Experiments",
-  card: "Sidebar hover",
+  group: "Sidebars",
+  subsection: "Hover",
+  experiment: true,
   value: "cursor",
   labels: { today: "Today", glide: "Glide", cursor: "Follow cursor" },
 })
 
 const spring = motionTuning.spring("sidebars.preview", {
   label: "Glide",
-  group: "Experiments",
-  card: "Sidebar hover",
+  group: "Sidebars",
+  subsection: "Hover",
   when: () => style() === "glide",
   presets: {
     snappy: { duration: 0.2, bounce: 0 },

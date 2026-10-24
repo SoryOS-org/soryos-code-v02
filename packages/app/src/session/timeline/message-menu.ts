@@ -3,10 +3,8 @@ import { createSignal } from "solid-js"
 
 const toggle = motionTuning.toggle("session.messageMenu", {
   label: "Message menu",
-  group: "Experiments",
-  card: "Experiments",
-  // Ahead of the card's other rows (order 1), so it sits at the top of the EXPERIMENTS card.
-  order: 0,
+  group: "Composer",
+  experiment: true,
   value: false,
 })
 

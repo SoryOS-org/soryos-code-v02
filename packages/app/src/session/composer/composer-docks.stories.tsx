@@ -42,7 +42,7 @@ const websearchRequest: FormInfo = {
 }
 
 // The real composer region with its docks, queue and subagent bar, driven by the story's args or by its replay
-// buttons (the components lab shows them under the Composer docks Knobs). Answering, dismissing and Esc close docks the way they do in the app.
+// buttons (the components lab shows them under Knobs → Composer → Docks). Answering, dismissing and Esc close docks the way they do in the app.
 function ComposerDocksPreview(props: DockArgs) {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
 
@@ -76,7 +76,7 @@ function ComposerDocksPreview(props: DockArgs) {
   )
 
   const replay = (id: string, label: string, run: () => void) =>
-    onCleanup(motionTuning.action({ id: `docks.${id}`, label, group: "Composer docks", run }))
+    onCleanup(motionTuning.action({ id: `docks.${id}`, label, group: "Composer", subsection: "Docks", run }))
 
   replay("question", "Question", () => setState({ question: true, revision: state.revision + 1 }))
   replay("permission", "Permission", () => setState("permission", true))
@@ -205,11 +205,11 @@ export default {
   parameters: {
     layout: "fullscreen",
     // The components lab shows these Knobs and their replay buttons in its inspector.
-    motion: ["Composer docks"],
+    motion: ["Docks"],
     docs: {
       description: {
         component:
-          "Request docks, the queue and the subagent bar around the composer. Toggle the args, or use the Replay buttons under the Composer docks Knobs, to open and close each dock and tune its motion live.",
+          "Request docks, the queue and the subagent bar around the composer. Toggle the args, or use the Replay buttons under Knobs → Composer → Docks, to open and close each dock and tune its motion live.",
       },
     },
   },

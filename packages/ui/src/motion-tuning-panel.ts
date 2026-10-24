@@ -2,22 +2,21 @@ import { motionPresets, motionTuning, type MotionKnob, type MotionPreset } from 
 
 const global = "Global"
 
+// The areas in the order the panel shows them; any other area follows in the order it registered.
+const areas = ["Sidebars", "Composer", "Projects", "Voice"]
+
 /**
- * Mounts the Motion workspace into `container`: a tab per surface under the shipped values and the Snappy, Smooth and
- * Calm presets for every spring at once. Each tab shows one Global card (speed, slow motion and other settings every surface reads), then one
- * card for its surface: its springs and knobs, with its replay buttons under a Replay sub-heading. knobs loads on first
- * mount, so importing this module costs nothing until then. Works anywhere a surface registered its knobs, including
- * Storybook stories. Returns its removal.
+ * Mounts the Knobs panel into `container`: the Global card (speed and slow motion) pinned at the top, the shipped values
+ * and the Snappy, Smooth and Calm presets for every spring at once, then a collapsible card per area of the app with
+ * its knobs under sub-headings and its replay buttons. Experiments carry a marker after their label. knobs loads on
+ * first mount, so importing this module costs nothing until then. Works anywhere a surface registered its knobs,
+ * including Storybook stories. Returns its removal.
  */
-export function mountMotionPanel(
-  container: HTMLElement,
-  options: { title?: string; section?: string; onClose?: () => void } = {},
-) {
+export function mountMotionPanel(container: HTMLElement, options: { title?: string; onClose?: () => void } = {}) {
   let unmount: (() => void) | undefined
   // The preset chosen to leave a mode, applied once the rebuilt panel has the knobs it sets.
   let switching: string | undefined
   let disposed = false
-  let section = options.section
 
   void start()
 
@@ -32,13 +31,6 @@ export function mountMotionPanel(
       import("./motion-tuning-fields"),
     ])
 
-    const field = (item: MotionKnob) =>
-      motionField(item, {
-        label: item.label,
-        group: item.card ?? item.group,
-        tab: item.group === global ? undefined : item.group,
-      })
-
     // Knobs whose `when` doesn't hold are left out; a change to it rebuilds the panel like a new knob would.
     const shown = () => motionTuning.list().filter((item) => item.when?.() ?? true)
 
@@ -48,44 +40,45 @@ export function mountMotionPanel(
     const mount = () => {
       unmount?.()
       const all = shown()
-      // Modes sit in the preset strip, not as rows. While one is on, the spring presets leave its section's springs alone
-      // (choosing one on that section's tab switches back to them first); other sections' springs take presets as usual.
+      // Modes sit in the preset strip, not as rows. While one is on, the spring presets leave its area's springs alone
+      // (choosing one switches back to them first); other areas' springs take presets as usual.
       const active = all.find((item) => item.kind === "mode" && item.value)
+      const modes = all.filter((item) => item.kind === "mode")
       const list = all.filter((item) => item.kind !== "mode")
       const actions = motionTuning.actions()
       const mounted = identity()
       const springs = list.flatMap((item) => (item.kind === "spring" && item.group !== active?.group ? [item] : []))
       const preset = (id: MotionPreset) => Object.fromEntries(springs.map((item) => [item.id, item.presets[id]]))
+      const experiments = new Set(list.flatMap((item) => (item.experiment ? [item.id] : [])))
       // Easing editors open inline, like the spring rows beside them, rather than folded behind a chevron.
       openEditors(list.flatMap((item) => (item.kind === "easing" ? [item.id] : [])))
-      const sections = [...new Set([...list, ...actions].map((item) => item.group))].filter((group) => group !== global)
 
-      // A mode sits in the strip only on its own section's tab; switching to or from that tab rebuilds the strip.
-      const modes = all.flatMap((item) =>
-        item.kind === "mode" && item.group === (section ?? sections[0]) ? [item] : [],
-      )
+      const rank = (group: string) => (areas.includes(group) ? areas.indexOf(group) : areas.length)
+      const groups = [...new Set([...list, ...actions].map((item) => item.group))]
+        .filter((group) => group !== global)
+        .toSorted((a, b) => rank(a) - rank(b))
 
       const controls = defineControls(
         "opencode-motion",
         {
-          // Global first, then each section's knobs and its replay buttons together, so each shows as one card.
-          ...Object.fromEntries(list.filter((item) => item.group === global).map((item) => [item.id, field(item)])),
+          // Global first, then each area's knobs and its replay buttons together, so each shows as one card.
           ...Object.fromEntries(
-            [...list, ...actions]
-              .filter((item) => item.group !== global)
-              .toSorted(
-                (a, b) =>
-                  sections.indexOf(a.group) - sections.indexOf(b.group) ||
-                  ("order" in a ? (a.order ?? 0) : 0) - ("order" in b ? (b.order ?? 0) : 0),
-              )
-              .map((item) =>
-                "run" in item
-                  ? [
-                      `action.${item.id}`,
-                      action(item.label, { group: item.group, tab: item.group, subsection: "Replay", run: item.run }),
-                    ]
-                  : [item.id, field(item)],
-              ),
+            list
+              .filter((item) => item.group === global)
+              .map((item) => [item.id, motionField(item, { label: item.label, group: global })]),
+          ),
+          ...Object.fromEntries(
+            groups.flatMap((group) => [
+              ...list
+                .filter((item) => item.group === group)
+                .map((item) => [item.id, motionField(item, { label: item.label, group, subsection: item.subsection })]),
+              ...actions
+                .filter((item) => item.group === group)
+                .map((item) => [
+                  `action.${item.id}`,
+                  action(item.label, { group, subsection: item.subsection ?? "Replay", run: item.run }),
+                ]),
+            ]),
           ),
         },
         {
@@ -93,6 +86,9 @@ export function mountMotionPanel(
           enabled: true,
           ship: () => import("knobs/panel"),
           persist: "variants",
+          pinned: [global],
+          // Each area folds to its header; knobs remembers what's open for the rest of the session.
+          groupFolded: Object.fromEntries(groups.map((group) => [group, true])),
           // Springs ship different presets, so the defaults get their own chip.
           defaultLabel: "Shipped",
           presetLabels: { ...motionPresets, ...Object.fromEntries(modes.map((item) => [item.id, item.label])) },
@@ -141,17 +137,7 @@ export function mountMotionPanel(
         // The debug bar shows and hides this panel, and `s` jumps only with focus inside it, so the app keeps its keys.
         toggleKey: false,
         hints: "panel",
-        tabs: sections,
-        tab: section,
-        onTab: (id) => {
-          const offered = (group: string | undefined) =>
-            all.some((item) => item.kind === "mode" && item.group === group)
-
-          const rebuild = offered(section) !== offered(id)
-          section = id
-
-          if (rebuild) mount()
-        },
+        rowAccessory: (key) => (experiments.has(key) ? experimentMark() : null),
       })
 
       const stopWatch = motionTuning.subscribe(() => {
@@ -169,6 +155,17 @@ export function mountMotionPanel(
 
     if (!disposed) mount()
   }
+}
+
+// Marks a row as a design experiment, in the panel's quietest caption style.
+function experimentMark() {
+  const mark = document.createElement("span")
+  mark.dataset.experiment = ""
+  mark.textContent = "Exp"
+  mark.title = "Experiment"
+  mark.style.cssText = "font-size: var(--_k-text-cap); letter-spacing: 0.06em; color: var(--_k-fg-3)"
+
+  return mark
 }
 
 // knobs remembers which rows' editors are open in this tab's session; adding ids there opens them on mount.

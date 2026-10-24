@@ -12,8 +12,8 @@ import "./voice.css"
 
 const toggle = motionTuning.toggle("voice.calls", {
   label: en["experiment.voiceCalls"],
-  group: "Experiments",
-  card: "Experiments",
+  group: "Voice",
+  experiment: true,
   value: false,
 })
 

@@ -19,19 +19,21 @@ import {
 } from "@opencode/ui/motion"
 import { motionTuning } from "@opencode/ui/motion-tuning"
 
-const group = "Composer docks"
+const group = "Composer"
+const subsection = "Docks"
 const presets = {
   snappy: { duration: 0.3, bounce: 0 },
   smooth: { duration: 0.4, bounce: 0 },
   calm: { duration: 0.55, bounce: 0 },
 }
 // Opening and closing share one height spring, so a dock leaves the way it came.
-const morph = motionTuning.spring("docks.morph", { label: "Height", group, shipped: "smooth", presets })
-const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, shipped: "smooth", presets })
+const morph = motionTuning.spring("docks.morph", { label: "Height", group, subsection, shipped: "smooth", presets })
+const fadeIn = motionTuning.spring("docks.fade-in", { label: "Fade in", group, subsection, shipped: "smooth", presets })
 // A closing face stays opaque until this much of its box is left, then fades out before the box closes.
 const fadeTail = motionTuning.number("docks.fade-tail", {
   label: "Fade-out tail",
   group,
+  subsection,
   value: 0.4,
   min: 0.05,
   max: 1,
@@ -40,6 +42,7 @@ const fadeTail = motionTuning.number("docks.fade-tail", {
 const blur = motionTuning.number("docks.blur", {
   label: "Blur",
   group,
+  subsection,
   value: 0,
   min: 0,
   max: 6,
@@ -49,6 +52,7 @@ const blur = motionTuning.number("docks.blur", {
 export const queueStagger = motionTuning.number("docks.stagger", {
   label: "Queue row stagger",
   group,
+  subsection,
   value: 0,
   min: 0,
   max: 0.12,

@@ -33,14 +33,22 @@ const spring = motionTuning.spring("sidebars", {
 // panel, so a narrow sidebar doesn't crawl and a wide panel doesn't snap.
 const scaleByDistance = motionTuning.toggle("sidebars.scaleByDistance", {
   label: "Scale by distance",
-  group: "Experiments",
+  group,
+  subsection: "Scale by distance",
+  experiment: true,
   value: true,
 })
 
 const distanceKnob = (
   id: string,
   meta: { label: string; value: number; min: number; max: number; step: number; unit: string },
-) => motionTuning.number(`sidebars.scaleByDistance.${id}`, { ...meta, group: "Experiments", when: scaleByDistance })
+) =>
+  motionTuning.number(`sidebars.scaleByDistance.${id}`, {
+    ...meta,
+    group,
+    subsection: "Scale by distance",
+    when: scaleByDistance,
+  })
 
 const minDuration = distanceKnob("min", {
   label: "Min duration",

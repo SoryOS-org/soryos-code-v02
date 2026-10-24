@@ -50,7 +50,7 @@ describe("motionTuning.choice", () => {
   test("starts on its shipped option and switches to another", () => {
     const choice = motionTuning.choice("test.choice", {
       label: "Choice",
-      group: "Experiments",
+      group: "Test",
       value: "b",
       labels: { a: "A", b: "B", c: "C" },
     })

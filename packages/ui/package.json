@@ -26,7 +26,6 @@
     "src/theme/themes/*.json",
     "src/components/app-icons/sprite.svg",
     "src/components/provider-icons/sprite.svg",
-    "src/components/spinner.png",
     "src/assets/icons/app/*",
     "src/assets/icons/file-types/*",
     "src/assets/fonts/*",
@@ -105,7 +104,6 @@
     "test": "bun test src --only-failures",
     "dev": "vite",
     "bench:motion": "bun script/motion-bench.ts",
-    "generate:spinner": "bun script/generate-spinner.ts",
     "generate:tailwind": "bun run script/tailwind.ts",
     "generate:v2-oc2": "bun run script/build-oc2-v2-overrides.ts"
   },

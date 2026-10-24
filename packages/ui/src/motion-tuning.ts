@@ -1,17 +1,20 @@
 import type { DurationOptions } from "./motion"
 
-// Live motion settings for developer mode. Each surface registers knobs under its own group with their shipped defaults,
-// plus actions that replay its motion; the Motion workspace (`motion-tuning-panel`) shows a section per group. Choices
-// in the "Experiments" group are design variants to try before one ships. Edits persist on this device.
+// Live motion settings for developer mode. Each surface registers knobs under the area of the app it belongs to
+// (Sidebars, Composer…) with their shipped defaults, plus actions that replay its motion; the Knobs panel
+// (`motion-tuning-panel`) shows a collapsible card per area. A knob marked `experiment` is a design variant to try
+// before one ships. Edits persist on this device.
 
 type Knob<Kind extends string, Value> = {
   kind: Kind
   id: string
   label: string
+  /** The area of the app it tunes: one card in the panel. */
   group: string
-  /** Its own card within the group's tab, such as one experiment among several; `order` places that card. */
-  card?: string
-  order?: number
+  /** A sub-heading within the area's card, such as one feature among several. */
+  subsection?: string
+  /** The design experiment this knob switches on or between, marked as one in the panel. */
+  experiment?: boolean
   /** Shown only while this holds, e.g. the controls of the option a choice selects. */
   when?: () => boolean
   initial: Value
@@ -34,9 +37,9 @@ export type MotionKnob =
   | (Knob<"number", number> & { min: number; max: number; step: number; unit?: string })
   | (Knob<"choice", string> & { options: readonly [string, ...string[]]; labels: Record<string, string> })
 
-export type MotionAction = { id: string; label: string; group: string; run: () => void }
+export type MotionAction = { id: string; label: string; group: string; subsection?: string; run: () => void }
 
-type Meta = { label: string; group: string; card?: string; order?: number; when?: () => boolean }
+type Meta = { label: string; group: string; subsection?: string; experiment?: boolean; when?: () => boolean }
 
 // Bumped when knobs are merged or renamed, so values saved for the old ones are dropped.
 const key = "opencode.motion.v2"
@@ -60,8 +63,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial,
       value: { duration: number(`${id}.duration`, initial.duration), bounce: number(`${id}.bounce`, initial.bounce) },
@@ -80,8 +83,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
       // SAFETY: mapping the four indices of a Bezier yields four numbers.
@@ -102,8 +105,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial,
       value: number(id, initial ? 1 : 0) === 1,
@@ -117,8 +120,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
       value: number(id, meta.value ? 1 : 0) === 1,
@@ -136,8 +139,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
       value: options[number(id, options.indexOf(meta.value))] ?? meta.value,
@@ -161,8 +164,8 @@ export const motionTuning = {
       id,
       label: meta.label,
       group: meta.group,
-      card: meta.card,
-      order: meta.order,
+      subsection: meta.subsection,
+      experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
       value: number(id, meta.value),

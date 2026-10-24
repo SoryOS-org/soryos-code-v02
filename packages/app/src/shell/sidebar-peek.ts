@@ -7,11 +7,13 @@ import "./sidebar-peek.css"
 
 export const sidebarPeekEnabled = motionTuning.toggle("sidebar.peek", {
   label: "Peekable sidebar",
-  group: "Experiments",
+  group: "Sidebars",
+  subsection: "Peek",
+  experiment: true,
   value: true,
 })
 
-const peekKnobs = { group: "Experiments", when: sidebarPeekEnabled }
+const peekKnobs = { group: "Sidebars", subsection: "Peek", when: sidebarPeekEnabled }
 
 // "Matched" slides the peek on the docked sidebar's own spring instead of its quicker one.
 const peekMatched = motionTuning.toggle("sidebar.peek.matched", {
@@ -47,7 +49,7 @@ const dwellKnob = (from: "edge" | "toggle", label: string, value: number) =>
 // reads as immediate, and above how long a pointer spends crossing: through the ~24px edge zone in a frame or two,
 // over the 28px toggle in ~30–60ms on the way to the breadcrumb or the traffic lights. The toggle waits longer because
 // the header row is crossed far more often than the bare window edge, and a peek that starts just before a click docks
-// smoothly. Both are tunable in Knobs → Experiments.
+// smoothly. Both are tunable in Knobs → Sidebars → Peek.
 const dwell = { edge: dwellKnob("edge", "Peek edge dwell", 40), toggle: dwellKnob("toggle", "Peek toggle dwell", 80) }
 
 /** Whether any session in the vertical sidebar draws its unread dot, published by the sidebar's tab strip. */
