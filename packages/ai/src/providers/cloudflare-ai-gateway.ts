@@ -1,6 +1,7 @@
 import type { Config, Redacted } from "effect"
 import type { ProviderPackage } from "../provider-package.js"
 import { CloudflareRunEvaluation } from "../experimental/cloudflare-run-evaluation.js"
+import { SystemOne } from "../experimental/system-one.js"
 import { AnthropicMessages, OpenAIChat, OpenAIResponses } from "../protocols/index.js"
 import { Auth } from "../route/auth.js"
 import { Endpoint } from "../route/endpoint.js"
@@ -139,6 +140,7 @@ export const configure = (input: LanguageModelOptions) => {
       baseURL: runBaseURL(input),
       headers: rest.headers,
       http: HttpOptions.make(input.http),
+      rounding: SystemOne.jevRounding,
     })
   return {
     id,
