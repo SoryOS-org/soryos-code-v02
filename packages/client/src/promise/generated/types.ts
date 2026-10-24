@@ -664,14 +664,7 @@ export type ModelCost = {
   cache: { read: MoneyUSDPerMillionTokens; write: MoneyUSDPerMillionTokens }
 }
 
-export type VoiceModel = {
-  model: string
-  provider: string
-  transports: Array<VoiceTransportType>
-  available: boolean
-  integration?: string | undefined
-  workspace?: string | undefined
-}
+export type VoiceModel = { model: string; provider: string; transports: Array<VoiceTransportType>; available: boolean }
 
 export type VoiceTransport = VoiceWebRTCTransport | VoiceWebSocketTransport
 
@@ -1262,6 +1255,7 @@ export type SessionStepEnded = {
     rawFinish?: string
     native?: SessionMessageNative1
     cost: MoneyUSD
+    allowance?: MoneyUSD
     tokens: TokenUsageInfo
     snapshot?: SnapshotID
     files?: Array<RelativePath>
@@ -1283,6 +1277,7 @@ export type SessionStepFailed = {
     rawFinish?: string
     native?: SessionMessageNative1
     cost?: MoneyUSD
+    allowance?: MoneyUSD
     tokens?: TokenUsageInfo
     snapshot?: SnapshotID
     files?: Array<RelativePath>
@@ -1476,7 +1471,13 @@ export type SessionUsageRecorded = {
   type: "session.usage.recorded"
   durable: { aggregateID: string; seq: EventSeq; version: 1 }
   location?: LocationRef
-  data: { sessionID: SessionID; source: "title" | "compaction"; cost: MoneyUSD; tokens: TokenUsageInfo }
+  data: {
+    sessionID: SessionID
+    source: "title" | "compaction"
+    cost: MoneyUSD
+    allowance?: MoneyUSD
+    tokens: TokenUsageInfo
+  }
 }
 
 export type LocationShutdown = {
@@ -1557,7 +1558,7 @@ export type SessionUsageUpdated = {
   metadata?: { [x: string]: any }
   type: "session.usage.updated"
   location?: LocationRef
-  data: { sessionID: SessionID; cost: MoneyUSD; tokens: TokenUsageInfo }
+  data: { sessionID: SessionID; cost: MoneyUSD; allowance?: MoneyUSD; tokens: TokenUsageInfo }
 }
 
 export type SessionTextDelta = {
@@ -1998,7 +1999,7 @@ export type ProviderInfo = {
 
 export type VoiceModelsResponse = { data: { models: Array<VoiceModel>; default?: string | undefined } }
 
-export type VoiceSessionResponse = { data: { transport: VoiceTransport; session?: { id: string } | undefined } }
+export type VoiceSessionResponse = { data: { transport: VoiceTransport } }
 
 export type CredentialValue = CredentialOAuth | CredentialKey | CredentialExternal
 
@@ -2135,6 +2136,7 @@ export type SessionInfo = {
   agent?: AgentID
   model?: ModelRef
   cost: MoneyUSD
+  allowance?: MoneyUSD
   tokens: TokenUsageInfo
   outcome?: "succeeded" | "failed" | "interrupted"
   time: { created: number; updated: number; idle?: number; viewed?: number; archived?: number }
@@ -2437,6 +2439,7 @@ export type SessionMessageAssistant = {
   rawFinish?: string
   native?: SessionMessageNative
   cost?: MoneyUSD
+  allowance?: MoneyUSD
   tokens?: TokenUsageInfo
   error?: SessionStructuredError
   retry?: SessionMessageAssistantRetry
@@ -3258,6 +3261,7 @@ export type SessionImportInput = {
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
+      readonly allowance?: number
       readonly tokens: {
         readonly input: number
         readonly output: number
@@ -3311,6 +3315,7 @@ export type SessionImportInput = {
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
+      readonly allowance?: number
       readonly tokens: {
         readonly input: number
         readonly output: number
@@ -3364,6 +3369,7 @@ export type SessionImportInput = {
       readonly agent?: string
       readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
       readonly cost: number
+      readonly allowance?: number
       readonly tokens: {
         readonly input: number
         readonly output: number
@@ -5007,13 +5013,6 @@ export type VoiceSessionInput = {
 }
 
 export type VoiceSessionOutput = VoiceSessionResponse["data"]
-
-export type VoiceInstructionsInput = {
-  readonly sessionID: { readonly sessionID: string }["sessionID"]
-  readonly instructions: { readonly instructions: string }["instructions"]
-}
-
-export type VoiceInstructionsOutput = void
 
 export type ProviderListInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]

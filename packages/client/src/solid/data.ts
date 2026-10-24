@@ -466,6 +466,7 @@ export function createData(config: CreateDataInput) {
     // Streaming events target one assistant message and, within it, the latest part of a kind.
     // A missing target means the row was never loaded or was evicted; the event is dropped.
     editAssistant(sessionID: string, messageID: string, fn: (assistant: SessionMessageAssistant) => void) {
+      if (!messageIndex.get(sessionID)?.has(messageID)) return
       message.update(sessionID, (draft, index) => {
         const position = index.get(messageID)
         const item = position === undefined ? undefined : draft[position]
@@ -685,6 +686,7 @@ export function createData(config: CreateDataInput) {
         if (store.session.info[event.data.sessionID])
           setStore("session", "info", event.data.sessionID, {
             cost: event.data.cost,
+            allowance: event.data.allowance,
             tokens: event.data.tokens,
           })
         return
@@ -876,6 +878,7 @@ export function createData(config: CreateDataInput) {
         })
         return
       case "session.shell.ended":
+        if (!store.session.message[event.data.sessionID]) return
         message.update(event.data.sessionID, (draft) => {
           const match = message.shell(draft, event.data.shell.id)
           if (!match) return
@@ -932,6 +935,7 @@ export function createData(config: CreateDataInput) {
           assistant.rawFinish = event.data.rawFinish
           assistant.native = event.data.native
           assistant.cost = event.data.cost
+          assistant.allowance = event.data.allowance
           assistant.tokens = event.data.tokens
           if (event.data.snapshot) assistant.snapshot = { ...assistant.snapshot, end: event.data.snapshot }
         })
@@ -947,6 +951,7 @@ export function createData(config: CreateDataInput) {
           assistant.retry = undefined
           if (event.data.cost !== undefined && event.data.tokens !== undefined) {
             assistant.cost = event.data.cost
+            assistant.allowance = event.data.allowance
             assistant.tokens = event.data.tokens
           }
         })
@@ -1142,6 +1147,7 @@ export function createData(config: CreateDataInput) {
         })
         return
       case "session.compaction.delta":
+        if (!store.session.message[event.data.sessionID]) return
         message.update(event.data.sessionID, (draft) => {
           const current = message.compaction(draft)
           if (current?.status === "running") current.summary += event.data.text
@@ -1416,6 +1422,16 @@ export function createData(config: CreateDataInput) {
         if (session.parentID) return session.cost
         return (store.session.family[sessionID] ?? [sessionID]).reduce(
           (total, id) => total + (store.session.info[id]?.cost ?? 0),
+          0,
+        )
+      },
+      /** Subscription allowance used instead of money, such as OpenCode Go's; a root session's includes its family. */
+      allowance(sessionID: string) {
+        const session = store.session.info[sessionID]
+        if (!session) return 0
+        if (session.parentID) return session.allowance ?? 0
+        return (store.session.family[sessionID] ?? [sessionID]).reduce(
+          (total, id) => total + (store.session.info[id]?.allowance ?? 0),
           0,
         )
       },
