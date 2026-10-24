@@ -1,4 +1,4 @@
-import { getDirectory, getFilename } from "@opencode/util/path"
+import { comparablePath, containsDirectory } from "@opencode/util/path"
 import type { OpenCodeClient } from "@opencode/client/promise"
 
 const types = new Map([
@@ -27,11 +27,12 @@ export async function readLocalImage(
   if (!type) return
   const absolute = drive || path.startsWith("/")
 
-  // Scope absolute images to their parent, including files outside the project.
+  // Any other location would be booted and persisted as a project, so images outside the session are not read.
+  if (absolute && !containsDirectory(directory, path)) return
   const bytes = await api.file.read(
     {
-      path: absolute ? getFilename(path) : path,
-      location: { directory: absolute ? getDirectory(path) : directory },
+      path: absolute ? comparablePath(path).slice(comparablePath(directory).length).replace(/^\//, "") : path,
+      location: { directory },
     },
     { signal },
   )
