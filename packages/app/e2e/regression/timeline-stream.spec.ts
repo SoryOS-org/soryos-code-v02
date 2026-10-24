@@ -647,6 +647,45 @@ test("shows a background subagent's outcome as its own row where it finished", a
   await expect(page).toHaveURL(new RegExp(`/session/${childID}$`))
 })
 
+test("jumps from a finished shell's notice to its call", async ({ page }) => {
+  await setupTimeline(page, {
+    settings: { timelineDetail: detailed },
+    sessionMessages: [
+      userMessage(),
+      assistantMessage([
+        ...searches(0, 2),
+        toolPart(
+          "prt_notice_shell",
+          "shell",
+          "completed",
+          { command: "bun serve.ts" },
+          { output: "listening", metadata: { shellID: "shell_notice" } },
+        ),
+        ...searches(2, 2),
+        textPart("prt_notice_notes", notes("Later", 80)),
+      ]),
+      {
+        id: "msg_shell_finished",
+        type: "synthetic",
+        text: '<shell id="shell_notice" state="completed" command="bun serve.ts">\nlistening\n</shell>',
+        description: "bun serve.ts",
+        metadata: { source: "shell", shellID: "shell_notice", state: "completed" },
+        time: { created: 1700000003000 },
+      },
+    ],
+  })
+
+  const notice = page.getByRole("button", { name: /^Shell finished/ })
+  const shellTrigger = page.locator('[data-timeline-part-id="prt_notice_shell"] [data-slot="collapsible-trigger"]')
+
+  await expect(notice).toBeInViewport()
+  await expect(shellTrigger).toHaveCount(0)
+  await notice.click()
+
+  await expect(shellTrigger).toHaveAttribute("aria-expanded", "true")
+  await expect(shellTrigger).toBeInViewport()
+})
+
 test.describe("Working", () => {
   test("shows Working between busy and reasoning states", async ({ page }) => {
     const timeline = await setupTimeline(page, {

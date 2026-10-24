@@ -86,6 +86,8 @@ export function createSessionTimelineRowRenderer(input: {
   centered?: Accessor<boolean>
   padding?: Accessor<string>
   anchor?: (messageID: string) => string | undefined
+  /** Scrolls to and expands the tool call named by its ID or by the shell ID a backgrounded shell call reports. */
+  revealPart?: (target: string) => boolean
 }) {
   const i18n = useI18n()
   const data = useData()
@@ -632,16 +634,29 @@ export function createSessionTimelineRowRenderer(input: {
       if (id) return data.sessionHref?.(id)
     })
 
-    const clickable = createMemo(() => !!(childID() && (data.navigateToSession || href())))
+    // A finished background shell jumps to its call, as its activity pill does.
+    const shellID = createMemo(() => {
+      const value = message()
+
+      if (!input.revealPart || value?.type !== "synthetic" || value.metadata?.source !== "shell") return
+      const id = value.metadata.shellID
+
+      if (Predicate.isString(id) && id) return id
+    })
+
+    const clickable = createMemo(() => !!shellID() || !!(childID() && (data.navigateToSession || href())))
 
     const open = () => {
+      const shell = shellID()
+
+      if (shell) return void input.revealPart?.(shell)
       const id = childID()
 
       if (id) data.navigateToSession?.(id)
     }
 
     const navigate = (event: MouseEvent) => {
-      if (!childID() || !data.navigateToSession) return
+      if (!shellID() && (!childID() || !data.navigateToSession)) return
 
       if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
       event.preventDefault()
@@ -685,7 +700,7 @@ export function createSessionTimelineRowRenderer(input: {
                           class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-v2-text-text-faint ${inset()}`}
                           classList={{ "cursor-pointer hover:text-v2-text-text-base": clickable() }}
                           href={href()}
-                          role={clickable() && !href() ? "link" : undefined}
+                          role={clickable() && !href() ? (shellID() ? "button" : "link") : undefined}
                           tabIndex={clickable() && !href() ? 0 : undefined}
                           onClick={navigate}
                           onKeyDown={navigateKey}

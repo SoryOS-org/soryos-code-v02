@@ -354,6 +354,7 @@ function MessageTimelineView(
     centered: () => props.centered,
     padding: turnPadding,
     anchor: props.anchor,
+    revealPart: virtualized.revealPart,
   })
 
   const backgroundHintPartID = createMemo(() => {
