@@ -5,6 +5,7 @@ import { LLM, AIError, LLMEvent, LLMRequest, Message, ToolCallPart, ToolDefiniti
 import { Auth, LLMClient } from "../../src/route.js"
 import { compileRequest } from "../../src/route/client.js"
 import * as Gemini from "../../src/protocols/gemini.js"
+import { Google, GoogleVertex, GoogleVertexInteractions } from "../../src/providers.js"
 import { it } from "../lib/effect.js"
 import { dynamicResponse, fixedResponse } from "../lib/http.js"
 import { sseEvents, sseRaw } from "../lib/sse.js"
@@ -553,6 +554,78 @@ describe("Gemini route", () => {
           ],
         },
       ])
+    }),
+  )
+
+  it.effect("forwards native video URLs and references in user and tool input", () =>
+    Effect.gen(function* () {
+      const google = Google.configure({ apiKey: "test" })
+      const vertex = { accessToken: "test", project: "test" }
+      for (const [selected, interactions] of [
+        [model, false],
+        [gemini3, false],
+        [google.interactions("gemini-3-flash-preview"), true],
+        [GoogleVertex.configure(vertex).model("gemini-2.5-flash"), false],
+        [GoogleVertexInteractions.configure(vertex).model("gemini-3-flash-preview"), true],
+      ] as const) {
+        for (const uri of [
+          "https://example.test/clip.mp4",
+          "http://example.test/clip.mp4",
+          "https://generativelanguage.googleapis.com/v1beta/files/clip",
+          "gs://bucket/clip.mp4",
+        ]) {
+          const media = uri.includes("example.test")
+            ? Media.url(uri, { mediaType: "video/mp4" })
+            : Media.ref("google", uri, "video/mp4")
+          const prepared = yield* compileRequest(
+            LLM.request({
+              model: selected,
+              messages: [
+                Message.user(Message.media(media)),
+                Message.assistant([ToolCallPart.make({ id: "call_video", name: "read", input: {} })]),
+                Message.tool({
+                  id: "call_video",
+                  name: "read",
+                  result: { type: "content", value: [{ type: "file", uri, mime: "video/mp4" }] },
+                }),
+              ],
+            }),
+          )
+          const part = { fileData: { mimeType: "video/mp4", fileUri: uri } }
+          const content = { type: "video", uri, mime_type: "video/mp4" }
+          expect(prepared.body).toMatchObject(
+            interactions
+              ? {
+                  input: [
+                    { type: "user_input", content: [content] },
+                    { type: "function_call", name: "read" },
+                    { type: "function_result", result: [content] },
+                  ],
+                }
+              : {
+                  contents: [
+                    { role: "user", parts: [part] },
+                    { role: "model", parts: [{ functionCall: { name: "read" } }] },
+                    {
+                      role: "user",
+                      parts: [{ functionResponse: { name: "read" } }],
+                    },
+                    { role: "user", parts: [{ text: "Attached media from tool result:" }, part] },
+                  ],
+                },
+          )
+        }
+        for (const media of [
+          Media.ref("openai", "file_video", "video/mp4"),
+          Media.url("https://example.test/image.png", { mediaType: "image/png" }),
+          Media.url("file:///clip.mp4", { mediaType: "video/mp4" }),
+        ]) {
+          const error = yield* compileRequest(LLM.request({ model: selected, prompt: Message.media(media) })).pipe(
+            Effect.flip,
+          )
+          expect(error.reason._tag).toBe("InvalidRequest")
+        }
+      }
     }),
   )
 
