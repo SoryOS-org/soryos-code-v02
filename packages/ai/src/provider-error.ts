@@ -65,6 +65,8 @@ const exclusions = [
   /too many requests/i,
   // Cohere reports an output limit above the model maximum as "too many tokens"; compaction cannot fix it.
   /max[_ ]tokens must be less than/i,
+  // Bedrock phrases throttling as "Too many tokens[, per day], please wait..."; it is a 429 to retry, not overflow.
+  /too many tokens(?: per day)?, please wait/i,
 ]
 
 export const isContextOverflow = (message: string) =>
@@ -126,6 +128,7 @@ const QUOTA_CODES = new Set([
   "usage_not_included",
   "billing_error",
   "gousagelimiterror",
+  "budgetlimiterror",
   "freeusagelimiterror",
   "creditlimitexceeded",
 ])
