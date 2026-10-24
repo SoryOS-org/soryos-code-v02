@@ -67,6 +67,14 @@ This section is the single source for loading indicators across `app`, `ui`, `se
 - Every other loading state uses `Loader` (`@opencode/ui/loader`): page, pane and file loads, browser reload, search, connecting, authenticating, sending, installing. Use a purpose-built indicator only when the state has one, such as the titlebar update ring.
 - Choose the indicator at each call site. Never restyle a shared indicator (`Loader`, `ActivityRing`, `Spinner`) to look like another one; that silently changes every caller.
 
+## Scrolling
+
+This section is the single source for scroll containers across `app`, `ui`, `session-ui`, `gui-extensions` and `desktop`.
+
+- A plain `overflow-y-auto` (or `overflow-x-auto`, `overflow-auto`) is enough. `packages/ui/src/styles/scrollbar.css` gives every native scrollbar the same thumb as `ScrollView`.
+- Use `ScrollView` (`@opencode/ui/scroll-view`) only when you need what CSS cannot do: a thumb that takes no layout width, a thumb in an external track (`thumbContainer`), a virtualized scroll adjustment, or its keyboard paging.
+- Never set `scrollbar-width: thin`, `scrollbar-width: auto` or `scrollbar-color`. Chromium then ignores the shared style and draws the native Windows scrollbar. Hide a scrollbar only with `no-scrollbar` or `scrollbar-width: none`.
+
 ## Localization
 
 - NEVER hardcode user-visible English strings in production code. ALWAYS use an i18n key for visible copy, placeholders, accessible labels, tooltips, menus, dialogs, toasts, empty states, and displayed errors.

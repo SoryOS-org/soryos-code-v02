@@ -642,7 +642,6 @@ export function DirectoryPickerDialog(props: DirectoryPickerDialogProps) {
         }
         [data-file-tree-virtualized-scroll] {
           overscroll-behavior: contain;
-          scrollbar-width: thin;
         }
       `,
       onExpansionChange(change) {

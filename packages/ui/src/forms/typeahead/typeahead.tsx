@@ -149,7 +149,7 @@ export function Typeahead<T>(props: {
           <div
             id={typeahead.listID}
             role="listbox"
-            class="max-h-56 overflow-y-auto px-1 pb-1 [scrollbar-width:thin] empty:hidden"
+            class="max-h-56 overflow-y-auto px-1 pb-1 empty:hidden"
           >
             <For each={results().items}>
               {(item) => (
