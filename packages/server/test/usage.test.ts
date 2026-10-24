@@ -53,6 +53,8 @@ it.live("returns the usage limits of the OpenCode Console workspace a location i
           per: "set",
           coverage: "all",
           models: [],
+          vendors: [],
+          picked: false,
           shared: false,
           resetsAt: 1793491200000,
         },

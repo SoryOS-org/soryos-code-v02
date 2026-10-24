@@ -21039,6 +21039,18 @@
               "$ref": "#/components/schemas/UsageLimits.BudgetModel"
             }
           },
+          "vendors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inputPriceAtLeast": {
+            "$ref": "#/components/schemas/Money.USDPerMillionTokens"
+          },
+          "picked": {
+            "type": "boolean"
+          },
           "shared": {
             "type": "boolean"
           },
@@ -21047,7 +21059,19 @@
             "description": "Milliseconds since the Unix epoch"
           }
         },
-        "required": ["id", "limit", "spent", "scope", "per", "coverage", "models", "shared", "resetsAt"],
+        "required": [
+          "id",
+          "limit",
+          "spent",
+          "scope",
+          "per",
+          "coverage",
+          "models",
+          "vendors",
+          "picked",
+          "shared",
+          "resetsAt"
+        ],
         "additionalProperties": false
       },
       "UsageLimits.BudgetModel": {

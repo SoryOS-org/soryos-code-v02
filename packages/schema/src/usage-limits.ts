@@ -51,6 +51,12 @@ export const Budget = Schema.Struct({
   /** `all` covers every model and billable service; `models` covers only `models`. */
   coverage: Schema.Literals(["all", "models"]),
   models: Schema.Array(BudgetModel),
+  /** The vendors whose models the budget counts, by name; empty when it doesn't count by vendor. */
+  vendors: Schema.Array(Schema.String),
+  /** The input price per 1M tokens from which the budget counts a model, when it sets one. */
+  inputPriceAtLeast: Money.USDPerMillionTokens.pipe(optional),
+  /** The budget counts models picked one by one, rather than by vendor or price. */
+  picked: Schema.Boolean,
   /** Everyone in the workspace pools spend against it, so reaching it pauses model use for all of them. */
   shared: Schema.Boolean,
   resetsAt: Instant,

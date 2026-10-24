@@ -954,6 +954,9 @@ export type UsageLimitsBudget = {
   per: "set" | "model"
   coverage: "all" | "models"
   models: Array<UsageLimitsBudgetModel>
+  vendors: Array<string>
+  inputPriceAtLeast?: MoneyUSDPerMillionTokens
+  picked: boolean
   shared: boolean
   resetsAt: number
 }

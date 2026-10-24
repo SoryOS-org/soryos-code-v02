@@ -88,6 +88,9 @@ const ConsoleBudget = Schema.Struct({
       spentDollars: Schema.optional(Schema.Finite),
     }),
   ),
+  vendors: Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
+  inputPriceAtLeast: Schema.optional(Schema.Finite),
+  picked: Schema.Boolean,
   shared: Schema.Boolean,
   resetsAt: Schema.DateFromString,
 })
@@ -128,6 +131,11 @@ function readBudgets(http: HttpClient.HttpClient, server: string, credential: Cr
                     name: model.name,
                     ...(model.spentDollars === undefined ? {} : { spent: Money.USD.make(model.spentDollars) }),
                   })),
+                  vendors: budget.vendors.map((vendor) => vendor.name),
+                  ...(budget.inputPriceAtLeast === undefined
+                    ? {}
+                    : { inputPriceAtLeast: Money.USDPerMillionTokens.make(budget.inputPriceAtLeast) }),
+                  picked: budget.picked,
                   shared: budget.shared,
                   resetsAt: budget.resetsAt.getTime(),
                 })),
