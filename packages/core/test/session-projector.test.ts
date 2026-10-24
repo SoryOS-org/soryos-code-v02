@@ -27,17 +27,32 @@ import { Shell } from "@opencode/schema/shell"
 import {
   InstructionStateTable,
   MediaBlobTable,
+  MediaRefTable,
   SessionInboxTable,
   SessionMessageTable,
   SessionTable,
 } from "@opencode/core/session/sql"
+import { Image } from "@opencode/core/image"
+import { Config } from "@opencode/core/config"
+import { Document, Info } from "@opencode/schema/config"
+import { ConfigExperimental } from "@opencode/schema/config/experimental"
+import { SessionMediaBlob } from "@opencode/core/session/media-blob"
+import { SessionTransfer } from "@opencode/core/session/transfer"
 import { testEffect } from "./lib/effect"
 import { Snapshot } from "@opencode/core/snapshot"
 
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionProjector.node, SessionInbox.node, SessionStore.node]),
-    [Bus.node.replace(Bus.configured({ persist: true }))],
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionProjector.node,
+      SessionInbox.node,
+      SessionStore.node,
+      Image.node,
+      SessionTransfer.node,
+    ]),
+    [Bus.node.replace(Bus.configured({ persist: true })), SessionExecution.node.replace(SessionExecution.noopLayer)],
   ),
 )
 const sessionsLayer = AppNodeBuilder.build(Session.node, [SessionExecution.node.replace(SessionExecution.noopLayer)])
@@ -1000,142 +1015,536 @@ describe("SessionProjector", () => {
     }),
   )
 
-  it.effect("hydrates media:<hash> refs (and legacy /api/media/<hash> refs) on message and inbox reads", () =>
+  it.effect("gates media_blob ref writes behind experimental.mediaBlob (default off) while always hydrating reads", () =>
     Effect.gen(function* () {
       const db = yield* seedSession()
       const bus = yield* Bus.Service
       const inbox = yield* SessionInbox.Service
       const store = yield* SessionStore.Service
 
-      const rawBytes = Buffer.from("externalized-media-payload")
+      const rawBytes = Buffer.from("default-off-inline-payload")
       const base64 = rawBytes.toString("base64")
-      const hash = "a".repeat(64)
-      const uri = `media:${hash}`
-      // Rows written by early builds carry the old URL form; reads still resolve it.
-      const legacyUri = `/api/media/${hash}`
+      const inlineID = SessionMessage.ID.make("msg_default_inline")
+      const file = {
+        data: base64,
+        mime: "application/pdf",
+        source: { type: "inline" as const },
+        name: "inline.pdf",
+      }
 
-      yield* db
-        .insert(MediaBlobTable)
-        .values({
-          hash,
-          mime: "application/pdf",
-          bytes: rawBytes.byteLength,
-          width: null,
-          height: null,
-          data: rawBytes,
+      // Default (experimental.mediaBlob off): writes stay inline and media_blob/media_ref stay empty.
+      yield* inbox.admit({
+        id: inlineID,
+        sessionID,
+        item: { type: "user", payload: { text: "keep inline", files: [file] }, delivery: "steer" },
+      })
+      yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID: inlineID })
+
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(0)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(0)
+      const rawInlineRow = yield* db
+        .select()
+        .from(SessionMessageTable)
+        .where(eq(SessionMessageTable.id, inlineID))
+        .get()
+        .pipe(Effect.orDie)
+      expect(JSON.stringify(rawInlineRow?.data)).toContain(base64)
+
+      // When experimental.mediaBlob is enabled, writes externalize and deduplicate into media_blob + media_ref.
+      const userID = SessionMessage.ID.make("msg_user_media_blob")
+      const item = {
+        type: "user" as const,
+        payload: { text: "check these", files: [file, { ...file, name: "spec-copy.pdf" }] },
+        delivery: "steer" as const,
+      }
+
+      const admitted = yield* inbox
+        .admit({ id: userID, sessionID, item })
+        .pipe(SessionMediaBlob.withWriteEnabled(true))
+      expect(admitted?.payload.files).toEqual([file, { ...file, name: "spec-copy.pdf" }])
+
+      const rawInbox = yield* db
+        .select()
+        .from(SessionInboxTable)
+        .where(eq(SessionInboxTable.id, userID))
+        .get()
+        .pipe(Effect.orDie)
+      expect(JSON.stringify(rawInbox?.payload)).not.toContain(base64)
+      expect(JSON.stringify(rawInbox?.payload)).toContain(`"media:${SessionMediaBlob.hashBytes(rawBytes)}"`)
+
+      // Promotion preserves externalized refs even when WriteEnabled is not set on the delivery fiber.
+      yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID: userID })
+
+      const assistantMessageID = SessionMessage.ID.make("msg_assistant_media_blob")
+      const dataUri = `data:application/pdf;base64,${base64}`
+      yield* Effect.gen(function* () {
+        yield* bus.publish(SessionEvent.Step.Started, {
+          sessionID,
+          assistantMessageID,
+          agent: build,
+          model,
+          started: 1,
         })
-        .run()
-        .pipe(Effect.orDie)
-
-      const userID = SessionMessage.ID.make("msg_read_user")
-      const assistantID = SessionMessage.ID.make("msg_read_assistant")
-      const inboxID = SessionMessage.ID.make("msg_read_inbox")
-
-      yield* db
-        .insert(SessionMessageTable)
-        .values([
-          {
-            id: userID,
-            session_id: sessionID,
-            type: "user",
-            seq: 1,
-            time_created: 1,
-            data: {
-              text: "user attachment",
-              files: [{ uri, mime: "application/pdf", bytes: rawBytes.byteLength, name: "spec.pdf" }] as any,
-              time: { created: 1 },
-            },
-          },
-          {
-            id: assistantID,
-            session_id: sessionID,
-            type: "assistant",
-            seq: 2,
-            time_created: 2,
-            data: {
-              agent: build,
-              model,
-              content: [
-                {
-                  type: "tool",
-                  id: "call_1",
-                  name: "read",
-                  executed: true,
-                  state: {
-                    status: "completed",
-                    input: { path: "spec.pdf" },
-                    content: [
-                      { type: "file", uri: legacyUri, mime: "application/pdf", bytes: rawBytes.byteLength, name: "spec.pdf" },
-                    ] as any,
-                  },
-                  time: { created: 2, ran: 2, completed: 2 },
-                },
-              ],
-              time: { created: 2, completed: 2 },
-            },
-          },
-        ])
-        .run()
-        .pipe(Effect.orDie)
-
-      yield* db
-        .insert(SessionInboxTable)
-        .values({
-          id: inboxID,
-          session_id: sessionID,
-          type: "user",
-          payload: {
-            text: "queued attachment",
-            files: [{ uri, mime: "application/pdf", bytes: rawBytes.byteLength, name: "queued.pdf" }] as any,
-          },
-          delivery: "queue",
-          enqueued_seq: 3,
-          time_created: 3,
+        yield* bus.publish(SessionEvent.Tool.Input.Started, {
+          sessionID,
+          assistantMessageID,
+          id: "call_media_1",
+          name: "read",
         })
-        .run()
-        .pipe(Effect.orDie)
+        yield* bus.publish(SessionEvent.Tool.Called, {
+          sessionID,
+          assistantMessageID,
+          id: "call_media_1",
+          input: { path: "spec.pdf" },
+          executed: false,
+        })
+        yield* bus.publish(SessionEvent.Tool.Success, {
+          sessionID,
+          assistantMessageID,
+          id: "call_media_1",
+          executed: false,
+          content: [
+            { type: "text", text: "PDF read" },
+            { type: "file", uri: dataUri, mime: "application/pdf", name: "spec.pdf" },
+            { type: "file", uri: dataUri, mime: "application/pdf", name: "spec-2.pdf" },
+          ],
+        })
+      }).pipe(SessionMediaBlob.withWriteEnabled(true))
 
-      const messages = yield* store.messages({ sessionID, order: "asc" })
-      expect(messages).toHaveLength(2)
-      expect(messages[0]).toMatchObject({
+      const blobs = yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)
+      expect(blobs).toHaveLength(1)
+      expect(blobs[0]?.mime).toBe("application/pdf")
+      expect(blobs[0]?.bytes).toBe(rawBytes.byteLength)
+      expect(blobs[0]?.width).toBeNull()
+      expect(blobs[0]?.height).toBeNull()
+      expect(Buffer.from(blobs[0]!.data).equals(rawBytes)).toBe(true)
+
+      const refs = yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)
+      expect(refs).toHaveLength(2)
+
+      // Stored rows name the blob by hash, never by a server route.
+      const hash = SessionMediaBlob.hashBytes(rawBytes)
+      expect(blobs[0]?.hash).toBe(hash)
+      const rawRows = JSON.stringify([
+        yield* db.select().from(SessionMessageTable).all().pipe(Effect.orDie),
+        yield* db.select().from(SessionInboxTable).all().pipe(Effect.orDie),
+      ])
+      expect(rawRows).toContain(`"media:${hash}"`)
+      expect(rawRows).not.toContain("/api/")
+
+      // Hydrate-on-read works even when experimental.mediaBlob is off.
+      expect((yield* store.message(userID))?.message).toMatchObject({
         id: userID,
         type: "user",
-        files: [{ data: base64, mime: "application/pdf", source: { type: "inline" }, name: "spec.pdf" }],
+        files: [file, { ...file, name: "spec-copy.pdf" }],
       })
-      expect(messages[1]).toMatchObject({
-        id: assistantID,
-        type: "assistant",
+
+      // Rows written by early builds carry `/api/media/<hash>`; reads still resolve them.
+      const legacyID = SessionMessage.ID.make("msg_legacy_media_ref")
+      yield* db
+        .insert(SessionMessageTable)
+        .values({
+          id: legacyID,
+          session_id: sessionID,
+          type: "user",
+          seq: 1_000,
+          time_created: 1_000,
+          data: {
+            text: "legacy ref",
+            files: [{ uri: `/api/media/${hash}`, mime: "application/pdf", bytes: rawBytes.byteLength }] as any,
+            time: { created: 1_000 },
+          },
+        })
+        .run()
+        .pipe(Effect.orDie)
+      expect((yield* store.message(legacyID))?.message).toMatchObject({
+        files: [{ data: base64, mime: "application/pdf", source: { type: "inline" } }],
+      })
+
+      expect(SessionMediaBlob.hashFromUri(`media:${hash}`)).toBe(hash)
+      expect(SessionMediaBlob.hashFromUri(`/api/media/${hash}`)).toBe(hash)
+      expect(SessionMediaBlob.hashFromUri(`/api/experimental/media/${hash}`)).toBe(hash)
+      expect(SessionMediaBlob.hashFromUri(`https://studio.example:4096/api/experimental/media/${hash}?x=1`)).toBe(hash)
+      expect(SessionMediaBlob.hashFromUri("media:../etc/passwd")).toBeUndefined()
+      expect(SessionMediaBlob.hashFromUri(`media:${hash.toUpperCase()}`)).toBeUndefined()
+      expect(SessionMediaBlob.hashFromUri(`/proxy/api/media/${hash}`)).toBeUndefined()
+      expect(SessionMediaBlob.hashFromUri(`file:///api/media/${hash}`)).toBeUndefined()
+      expect(SessionMediaBlob.hashFromUri(`/api/media/${hash}/extra`)).toBeUndefined()
+    }),
+  )
+
+  it.effect("canonicalizes media URLs to media:<hash> on every write, even with experimental.mediaBlob off", () =>
+    Effect.gen(function* () {
+      const db = yield* seedSession()
+      const bytes = Buffer.from("canonical-blob")
+      const hash = SessionMediaBlob.hashBytes(bytes)
+      const gone = "d".repeat(64)
+      yield* db
+        .insert(MediaBlobTable)
+        .values({ hash, mime: "image/png", bytes: bytes.byteLength, width: null, height: null, data: bytes })
+        .run()
+        .pipe(Effect.orDie)
+      const urls = [
+        `/api/media/${hash}`,
+        `/api/experimental/media/${hash}`,
+        `http://127.0.0.1:4096/api/experimental/media/${hash}`,
+        `https://studio.example/api/media/${hash}?location%5Bdirectory%5D=%2Fp`,
+      ]
+      const owner = { sessionID, messageID: SessionMessage.ID.make("msg_canonical_tool"), seq: 1 }
+      const assistant = {
+        agent: build,
+        model,
         content: [
           {
             type: "tool",
+            id: "call_1",
+            name: "fetch",
+            executed: true,
             state: {
               status: "completed",
-              content: [{ type: "file", uri: `data:application/pdf;base64,${base64}`, mime: "application/pdf", name: "spec.pdf" }],
+              input: {},
+              content: [...urls, `/api/experimental/media/${gone}`].map((uri) => ({ type: "file", uri, mime: "image/png" })),
             },
+            time: { created: 1, ran: 1, completed: 1 },
           },
         ],
+        time: { created: 1, completed: 1 },
+      } as any
+      const user = {
+        text: "imported",
+        files: urls.map((uri) => ({ uri, mime: "image/png" })),
+        time: { created: 2 },
+      } as any
+
+      const writtenAssistant = yield* SessionMediaBlob.externalize(db, assistant, owner)
+      const writtenUser = yield* SessionMediaBlob.externalize(db, user, {
+        ...owner,
+        messageID: SessionMessage.ID.make("msg_canonical_user"),
+        seq: 2,
+      })
+      const written = JSON.stringify([writtenAssistant, writtenUser])
+      expect(written).not.toContain("/api/")
+      expect(written.match(new RegExp(`"media:${hash}"`, "g"))).toHaveLength(urls.length * 2)
+      // A blob that is already gone still canonicalizes, but records no ref (media_ref.hash references media_blob).
+      expect(written).toContain(`"media:${gone}"`)
+      const refs = yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)
+      expect(refs.map((row) => [row.message_id, row.hash]).sort()).toEqual([
+        ["msg_canonical_tool", hash],
+        ["msg_canonical_user", hash],
+      ])
+      // Canonicalization never stores bytes; only an enabled write does.
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(1)
+    }),
+  )
+
+  it.effect("re-reads experimental.mediaBlob from config on every write, so turning it off stops externalizing", () =>
+    Effect.gen(function* () {
+      const db = yield* seedSession()
+      const bytes = Buffer.from("runtime-toggle")
+      const data = {
+        text: "toggle",
+        files: [{ data: bytes.toString("base64"), mime: "application/pdf", source: { type: "inline" } }],
+        time: { created: 1 },
+      } as any
+      const config = yield* Config.Test
+      const enabled = new Document({ type: "document", info: new Info({ experimental: new ConfigExperimental.Info({ mediaBlob: true }) }) })
+
+      // Absent from config means off.
+      expect(JSON.stringify(yield* SessionMediaBlob.externalize(db, data))).toContain(bytes.toString("base64"))
+
+      yield* config.setEntries([enabled])
+      expect(yield* SessionMediaBlob.isWriteEnabled).toBe(true)
+      expect(JSON.stringify(yield* SessionMediaBlob.externalize(db, data))).toContain(
+        `"media:${SessionMediaBlob.hashBytes(bytes)}"`,
+      )
+
+      yield* config.setEntries([])
+      expect(yield* SessionMediaBlob.isWriteEnabled).toBe(false)
+      expect(JSON.stringify(yield* SessionMediaBlob.externalize(db, data))).toContain(bytes.toString("base64"))
+    }).pipe(Effect.provide(Config.testLayer())),
+  )
+
+  it.effect("garbage-collects media_ref and media_blob across cancel, revert, fork, and session delete", () =>
+    Effect.gen(function* () {
+      const db = yield* seedSession()
+      const bus = yield* Bus.Service
+      const inbox = yield* SessionInbox.Service
+
+      const makeFile = (label: string) => ({
+        data: Buffer.from(`media-gc-${label}`).toString("base64"),
+        mime: "application/pdf",
+        source: { type: "inline" as const },
+        name: `${label}.pdf`,
       })
 
-      expect((yield* store.message(userID))?.message).toEqual(messages[0]!)
-      expect(yield* store.context(sessionID)).toEqual(messages)
+      const msg1 = SessionMessage.ID.make("msg_gc_1")
+      const msg2 = SessionMessage.ID.make("msg_gc_2")
+      const cancelledID = SessionMessage.ID.make("msg_gc_cancel")
 
-      const listedInbox = yield* inbox.list(sessionID)
-      expect(listedInbox).toHaveLength(1)
-      expect(listedInbox[0]).toMatchObject({
-        id: inboxID,
-        type: "user",
-        payload: {
-          text: "queued attachment",
-          files: [{ data: base64, mime: "application/pdf", source: { type: "inline" }, name: "queued.pdf" }],
-        },
-      })
+      yield* Effect.gen(function* () {
+        yield* inbox.admit({
+          id: msg1,
+          sessionID,
+          item: { type: "user", payload: { text: "first", files: [makeFile("first")] }, delivery: "steer" },
+        })
+        yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID: msg1 })
 
-      yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID })
-      expect((yield* store.message(inboxID))?.message).toMatchObject({
-        id: inboxID,
-        type: "user",
-        files: [{ data: base64, mime: "application/pdf", source: { type: "inline" }, name: "queued.pdf" }],
+        yield* inbox.admit({
+          id: msg2,
+          sessionID,
+          item: { type: "user", payload: { text: "second", files: [makeFile("second")] }, delivery: "steer" },
+        })
+        yield* bus.publish(SessionEvent.InboxDelivered, { sessionID, inboxID: msg2 })
+
+        yield* inbox.admit({
+          id: cancelledID,
+          sessionID,
+          item: { type: "user", payload: { text: "cancelled", files: [makeFile("cancelled")] }, delivery: "queue" },
+        })
+      }).pipe(SessionMediaBlob.withWriteEnabled(true))
+
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(3)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(3)
+
+      // 1. Cancelling a queued inbox item removes its ref and sweeps its blob.
+      yield* inbox.cancel({ id: cancelledID, sessionID })
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(2)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(2)
+
+      // 2. Forking through msg1 records a media_ref for the child session on the first blob.
+      const childSessionID = Session.ID.make("ses_gc_fork_child")
+      yield* bus.publish(SessionEvent.Forked, {
+        sessionID: childSessionID,
+        parentID: sessionID,
+        boundary: { type: "through", messageID: msg1 },
       })
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(3)
+
+      // 3. Reverting the parent session at msg2 drops msg2's ref and sweeps the second blob.
+      yield* bus.publish(SessionEvent.RevertEvent.Committed, {
+        sessionID,
+        to: msg2,
+      })
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(1)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(2)
+
+      // 4. Deleting the parent session removes its ref, but the shared blob survives for the fork child.
+      yield* bus.publish(SessionEvent.Deleted, { sessionID })
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(1)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(1)
+
+      // 5. Deleting the fork child removes the last ref and sweeps the remaining blob.
+      yield* bus.publish(SessionEvent.Deleted, { sessionID: childSessionID })
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(0)
+      expect(yield* db.select().from(MediaRefTable).all().pipe(Effect.orDie)).toHaveLength(0)
+    }),
+  )
+
+  it.effect("proves byte-identical toEqual output across message.list, inbox.list, and export (including >2000px and PNG->JPEG)", () =>
+    Effect.gen(function* () {
+      yield* seedSession({ time_created: 0, time_updated: 0 })
+      const bus = yield* Bus.Service
+      const inbox = yield* SessionInbox.Service
+      const store = yield* SessionStore.Service
+      const transfer = yield* SessionTransfer.Service
+      const image = yield* Image.Service
+      const db = (yield* Database.Service).db
+
+      const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
+
+      // 1) Image larger than 2000px (2400x1200) -> normalized by Image.Service before persistence.
+      const overW = 2400
+      const overH = 1200
+      const overPixels = new Uint8Array(overW * overH * 4)
+      overPixels.fill(210)
+      const overImg = new photon.PhotonImage(overPixels, overW, overH)
+      const rawOversizedBase64 = Buffer.from(overImg.get_bytes()).toString("base64")
+      overImg.free()
+
+      // 2) Opaque PNG >384KB base64 -> converted to image/jpeg by Image.Service before persistence.
+      const opaqueW = 640
+      const opaqueH = 640
+      const opaquePixels = new Uint8Array(opaqueW * opaqueH * 4)
+      for (let i = 0; i < opaquePixels.length; i += 4) {
+        const px = i >>> 2
+        opaquePixels[i] = ((px * 73) ^ (px >>> 3)) & 0xff
+        opaquePixels[i + 1] = ((px * 151) ^ (px >>> 5)) & 0xff
+        opaquePixels[i + 2] = ((px * 211) ^ (px >>> 7)) & 0xff
+        opaquePixels[i + 3] = 255
+      }
+      const opaqueImg = new photon.PhotonImage(opaquePixels, opaqueW, opaqueH)
+      const rawOpaquePngBase64 = Buffer.from(opaqueImg.get_bytes()).toString("base64")
+      opaqueImg.free()
+
+      const normOversized = yield* image.normalize("huge.png", {
+        uri: "huge.png",
+        content: rawOversizedBase64,
+        encoding: "base64",
+        mime: "image/png",
+      })
+      const normOpaque = yield* image.normalize("photo.png", {
+        uri: "photo.png",
+        content: rawOpaquePngBase64,
+        encoding: "base64",
+        mime: "image/png",
+      })
+      expect(normOpaque.mime).toBe("image/jpeg")
+
+      const populateSession = (targetSessionID: Session.ID, prefix: string) =>
+        Effect.gen(function* () {
+          if (targetSessionID !== sessionID) {
+            yield* bus.publish(SessionEvent.Created, {
+              sessionID: targetSessionID,
+              slug: prefix,
+              version: "test",
+              projectID: Project.ID.global,
+              location: { directory: AbsolutePath.make("/project") },
+              subpath: RelativePath.make(""),
+              title: "test",
+            })
+          }
+          const userID = SessionMessage.ID.make(`msg_${prefix}_user`)
+          const assistantID = SessionMessage.ID.make(`msg_${prefix}_assistant`)
+          const queuedID = SessionMessage.ID.make(`msg_${prefix}_queued`)
+
+          yield* inbox.admit({
+            id: userID,
+            sessionID: targetSessionID,
+            item: {
+              type: "user",
+              payload: {
+                text: "normalized images",
+                files: [
+                  {
+                    data: normOversized.content,
+                    mime: normOversized.mime,
+                    source: { type: "inline" },
+                    name: "huge.png",
+                  },
+                  {
+                    data: normOpaque.content,
+                    mime: normOpaque.mime,
+                    source: { type: "uri", uri: "file:///project/photo.png" },
+                    name: "photo.png",
+                  },
+                ],
+              },
+              delivery: "steer",
+            },
+          })
+          yield* bus.publish(SessionEvent.InboxDelivered, { sessionID: targetSessionID, inboxID: userID })
+
+          yield* bus.publish(SessionEvent.Step.Started, {
+            sessionID: targetSessionID,
+            assistantMessageID: assistantID,
+            agent: build,
+            model,
+            started: 10,
+          })
+          yield* bus.publish(SessionEvent.Tool.Input.Started, {
+            sessionID: targetSessionID,
+            assistantMessageID: assistantID,
+            id: "call_img",
+            name: "read",
+          })
+          yield* bus.publish(SessionEvent.Tool.Called, {
+            sessionID: targetSessionID,
+            assistantMessageID: assistantID,
+            id: "call_img",
+            input: { path: "photo.png" },
+            executed: false,
+          })
+          yield* bus.publish(SessionEvent.Tool.Success, {
+            sessionID: targetSessionID,
+            assistantMessageID: assistantID,
+            id: "call_img",
+            executed: false,
+            content: [
+              { type: "text", text: "Image read successfully" },
+              {
+                type: "file",
+                uri: `data:${normOpaque.mime};base64,${normOpaque.content}`,
+                mime: normOpaque.mime,
+                name: "photo.png",
+              },
+            ],
+          })
+          yield* bus.publish(SessionEvent.Step.Ended, {
+            sessionID: targetSessionID,
+            assistantMessageID: assistantID,
+            finish: "stop",
+            cost: Money.USD.make(0),
+            tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          })
+
+          yield* inbox.admit({
+            id: queuedID,
+            sessionID: targetSessionID,
+            item: {
+              type: "user",
+              payload: {
+                text: "queued follow-up",
+                files: [
+                  {
+                    data: normOversized.content,
+                    mime: normOversized.mime,
+                    source: { type: "inline" },
+                    name: "queued-huge.png",
+                  },
+                ],
+              },
+              delivery: "queue",
+            },
+          })
+        })
+
+      // Session 1: stored inline (experimental.mediaBlob off)
+      yield* TestClock.setTime(100)
+      yield* populateSession(sessionID, "compare")
+      const inlineMessages = yield* store.messages({ sessionID, order: "asc" })
+      const inlineInbox = yield* inbox.list(sessionID)
+      const inlineExport = yield* transfer.export({ sessionID })
+
+      expect(yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)).toHaveLength(0)
+
+      // Clear Session 1 and run the exact same sequence with experimental.mediaBlob enabled
+      yield* bus.publish(SessionEvent.Deleted, { sessionID })
+      yield* db.delete(EventTable).run().pipe(Effect.orDie)
+      yield* db.run(sql`DELETE FROM event_sequence`).pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "test",
+          version: "test",
+          time_created: 0,
+          time_updated: 0,
+        })
+        .run()
+        .pipe(Effect.orDie)
+      yield* TestClock.setTime(100)
+      yield* populateSession(sessionID, "compare").pipe(SessionMediaBlob.withWriteEnabled(true))
+
+      const blobs = yield* db.select().from(MediaBlobTable).all().pipe(Effect.orDie)
+      expect(blobs).toHaveLength(2)
+      const byWidth = new Map(blobs.map((blob) => [blob.width, blob]))
+      expect(byWidth.get(2000)?.height).toBe(1000)
+      expect(byWidth.get(640)?.height).toBe(640)
+      expect(byWidth.get(640)?.mime).toBe("image/jpeg")
+
+      const refMessages = yield* store.messages({ sessionID, order: "asc" })
+      const refInbox = yield* inbox.list(sessionID)
+      const refExport = yield* transfer.export({ sessionID })
+
+      expect(refMessages).toEqual(inlineMessages)
+      expect(refInbox).toEqual(inlineInbox)
+      expect(refExport).toEqual(inlineExport)
+      expect(JSON.parse(JSON.stringify(refMessages))).toEqual(JSON.parse(JSON.stringify(inlineMessages)))
+      expect(JSON.parse(JSON.stringify(refInbox))).toEqual(JSON.parse(JSON.stringify(inlineInbox)))
+      expect(JSON.parse(JSON.stringify(refExport))).toEqual(JSON.parse(JSON.stringify(inlineExport)))
     }),
   )
 
