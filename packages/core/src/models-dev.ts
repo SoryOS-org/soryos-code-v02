@@ -1,5 +1,5 @@
 import { Cause, Context, Duration, Effect, Layer, Option, Schedule, Schema, Semaphore } from "effect"
-import { HttpClient, HttpClientRequest } from "effect/unstable/http"
+import { HttpClient, HttpClientRequest } from "effect/http"
 import { ModelsDev } from "@opencode/schema/models-dev"
 import { Money } from "@opencode/schema/money"
 import { App } from "./app.js"
@@ -18,13 +18,26 @@ import snapshotText from "./models-dev/snapshot.txt" with { type: "text" }
 export const CatalogModelStatus = Schema.Literals(["alpha", "beta", "deprecated"])
 export type CatalogModelStatus = typeof CatalogModelStatus.Type
 
+// models.dev treats a model without a type as a chat model.
+export const CatalogModelType = Schema.Literals([
+  "chat",
+  "image",
+  "video",
+  "embedding",
+  "reranking",
+  "decision",
+  "transcription",
+  "speech",
+  "realtime",
+])
+export type CatalogModelType = typeof CatalogModelType.Type
+
 type Cost = {
   readonly input: Money.USDPerMillionTokens
   readonly output: Money.USDPerMillionTokens
   readonly cache_read?: Money.USDPerMillionTokens
   readonly cache_write?: Money.USDPerMillionTokens
   readonly tiers?: readonly (Cost & { readonly tier: { readonly type: "context"; readonly size: number } })[]
-  readonly context_over_200k?: Omit<Cost, "tiers" | "context_over_200k">
 }
 
 type Modality = "text" | "audio" | "image" | "video" | "pdf"
@@ -32,6 +45,7 @@ type Modality = "text" | "audio" | "image" | "video" | "pdf"
 type SourceModel = {
   readonly id: string
   readonly name: string
+  readonly type?: CatalogModelType
   readonly family?: string
   readonly release_date: string
   readonly attachment: boolean
@@ -61,7 +75,11 @@ type SourceModel = {
     >
   }
   readonly status?: CatalogModelStatus
-  readonly provider?: { readonly npm?: string; readonly api?: string }
+  readonly provider?: {
+    readonly npm?: string
+    readonly api?: string
+    readonly shape?: "responses" | "completions"
+  }
 }
 
 type SourceProvider = {
@@ -77,11 +95,19 @@ export type Snapshot = {
   readonly info: Provider.Info
   readonly models: readonly Model.Info[]
   readonly environment: readonly string[]
+  /** The models.dev type of each typed model, by catalog model ID. */
+  readonly types?: ReadonlyMap<Model.ID, CatalogModelType>
 }
 
 function nativePackage(provider: SourceProvider, model?: SourceModel) {
   const npm = model?.provider?.npm ?? provider.npm
-  return AISDKNative.native(npm, { providerID: provider.id, modelID: model?.id }) ?? Provider.aisdk(npm)
+  return (
+    AISDKNative.native(npm, {
+      providerID: provider.id,
+      modelID: model?.id,
+      shape: model?.provider?.shape,
+    }) ?? Provider.aisdk(npm)
+  )
 }
 
 function normalize(input: Record<string, SourceProvider>): readonly Snapshot[] {
@@ -99,12 +125,14 @@ function normalize(input: Record<string, SourceProvider>): readonly Snapshot[] {
         : {}),
     } satisfies Provider.Info
     const models: Model.Info[] = []
+    const types = new Map<Model.ID, CatalogModelType>()
     for (const model of Object.values(item.models)) {
       const baseCost = cost(model.cost)
       const id = Model.ID.make(model.id)
       const base = modelInfo(item, id, model, { cost: baseCost })
       const variants = Variant.resolve({ ...base, package: nativePackage(item, model) }, supports(model))
       models.push({ ...base, variants })
+      if (model.type) types.set(id, model.type)
       for (const [mode, options] of Object.entries(model.experimental?.modes ?? {})) {
         const modeID = Model.ID.make(`${model.id}-${mode}`)
         models.push(
@@ -115,9 +143,10 @@ function normalize(input: Record<string, SourceProvider>): readonly Snapshot[] {
             variants,
           }),
         )
+        if (model.type) types.set(modeID, model.type)
       }
     }
-    providers.push({ info, models, environment: [...item.env] })
+    providers.push({ info, models, environment: [...item.env], types })
   }
   return providers
 }
@@ -147,19 +176,6 @@ function cost(input: SourceModel["cost"]): Model.Info["cost"] {
         write: item.cache_write ?? Money.USDPerMillionTokens.zero,
       },
     })) ?? []),
-    ...(input?.context_over_200k
-      ? [
-          {
-            tier: { type: "context" as const, size: 200_000 },
-            input: input.context_over_200k.input,
-            output: input.context_over_200k.output,
-            cache: {
-              read: input.context_over_200k.cache_read ?? Money.USDPerMillionTokens.zero,
-              write: input.context_over_200k.cache_write ?? Money.USDPerMillionTokens.zero,
-            },
-          },
-        ]
-      : []),
   ]
 }
 
@@ -217,11 +233,12 @@ function modelInfo(
   } = {},
 ): Model.Info {
   const providerID = Provider.ID.make(provider.id)
-  const pkg = model.provider?.npm ? nativePackage(provider, model) : undefined
+  const resolved = nativePackage(provider, model)
+  const pkg = model.provider?.npm || resolved !== nativePackage(provider) ? resolved : undefined
   // Per model, so it never merges into a model that overrides to a different package.
   const settings = {
     ...(model.provider?.api ? { baseURL: model.provider.api } : {}),
-    ...(nativePackage(provider, model) === "@opencode/ai/providers/openai-compatible" ? { provider: providerID } : {}),
+    ...(resolved === "@opencode/ai/providers/openai-compatible" ? { provider: providerID } : {}),
   }
   return {
     id,
@@ -236,6 +253,7 @@ function modelInfo(
       tools: model.tool_call,
       input: [...(model.modalities?.input ?? [])],
       output: [...(model.modalities?.output ?? [])],
+      temperature: model.temperature,
     },
     variants: [...(input.variants ?? [])],
     time: { released: released(model.release_date) },
@@ -422,7 +440,7 @@ export const layer = (options?: Options) =>
               yield* decodeCatalog(text)
               yield* writeCache(text, digest)
               yield* invalidate
-              yield* bus.publish(ModelsDev.Event.Refreshed, {})
+              yield* bus.publish(ModelsDev.Event.Refreshed, {}, { global: true })
             }),
           )
           .pipe(

@@ -2,8 +2,8 @@ import { describe, expect } from "bun:test"
 import { NodeFileSystem } from "@effect/platform-node"
 import { Effect, Ref, Schema } from "effect"
 import { FileSystem } from "effect"
-import { HttpClientRequest } from "effect/unstable/http"
-import { Media, Message } from "../src/index.js"
+import { HttpClientRequest } from "effect/http"
+import { AIError, Media, Message } from "../src/index.js"
 import { it } from "./lib/effect.js"
 import { dynamicResponse, scriptedResponses } from "./lib/http.js"
 
@@ -73,6 +73,31 @@ describe("Media", () => {
       expect(Media.bytes(PNG).mediaType).toBe("image/png")
       expect(Media.bytes(Uint8Array.from([1, 2, 3])).mediaType).toBe("application/octet-stream")
       expect(Media.bytes(Uint8Array.from([1, 2, 3]), "image/x-custom").mediaType).toBe("image/x-custom")
+    }),
+  )
+
+  it.effect("tells ISO-BMFF brands apart", () =>
+    Effect.sync(() => {
+      const ftyp = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"))
+      expect(Media.detectMediaType(ftyp("000000206674797061766966000000004d695072617669666d6961666d696631"))).toBe(
+        "image/avif",
+      )
+      expect(Media.detectMediaType(ftyp("000000186674797061766973000000006d73663161766973"))).toBe("image/avif")
+      expect(Media.detectMediaType(ftyp("000000246674797068656963000000006d6966314d6950726d6961664d694842"))).toBe(
+        "image/heic",
+      )
+      expect(Media.detectMediaType(ftyp("00000018667479706d69663100000000617669666d69663100000000"))).toBe("image/avif")
+      expect(Media.detectMediaType(ftyp("00000018667479706d69663100000000686569636d69663100000000"))).toBe("image/heic")
+      expect(Media.detectMediaType(ftyp("000000206674797069736f6d0000020069736f6d69736f32617663316d703431"))).toBe(
+        "video/mp4",
+      )
+      expect(Media.detectMediaType(ftyp("00000014667479707174202000000200717420200000000877696465"))).toBe(
+        "video/quicktime",
+      )
+      expect(Media.detectMediaType(ftyp("0000001c667479704d344120000002004d34412069736f6d69736f3200000008"))).toBe(
+        "audio/mp4",
+      )
+      expect(Media.bytes(ftyp("000000206674797061766966000000004d695072617669666d6961666d696631")).kind).toBe("image")
     }),
   )
 
@@ -158,6 +183,56 @@ describe("Media", () => {
       expect(parts[0].filename).toBe("a.png")
       expect(parts[1].media.kind).toBe("document")
       expect(parts[1].media.expiresAt).toBe(7)
+    }),
+  )
+
+  it.effect("keeps transient url download headers out of toJSON and AssetSchema encoding", () =>
+    Effect.sync(() => {
+      const asset = Media.url("https://cdn.example.test/video.mp4", {
+        mediaType: "video/mp4",
+        expiresAt: 42,
+        headers: { "x-goog-api-key": "secret" },
+      })
+      expect(asset.headers).toEqual({ "x-goog-api-key": "secret" })
+      const source = { type: "url", url: "https://cdn.example.test/video.mp4", mediaType: "video/mp4", expiresAt: 42 }
+
+      expect(asset.toJSON()).not.toHaveProperty("headers")
+      expect(JSON.stringify(asset)).not.toContain("secret")
+      expect(asset.toJSON().source).toEqual(source)
+
+      const encoded = Schema.encodeSync(Media.AssetSchema)(asset)
+      expect(encoded).not.toHaveProperty("headers")
+      expect(encoded.source).toEqual(source)
+
+      const codec = Schema.fromJsonString(Media.AssetSchema)
+      const json = Schema.encodeSync(codec)(asset)
+      expect(json).not.toContain("secret")
+      const restored = Schema.decodeSync(codec)(json)
+      expect(restored).toBeInstanceOf(Media.Asset)
+      expect(restored.source).toEqual(source)
+      expect(restored.expiresAt).toBe(42)
+      expect(restored.headers).toBeUndefined()
+    }),
+  )
+
+  it.effect("fails url downloads with non-2xx status as a typed AIError keeping http and body", () =>
+    Effect.gen(function* () {
+      const body = JSON.stringify({ error: { message: "file expired" } })
+      const error = yield* Media.url("https://cdn.example.test/expired.png")
+        .bytes()
+        .pipe(
+          Effect.flip,
+          Effect.provide(
+            dynamicResponse((input) =>
+              Effect.succeed(input.respond(body, { status: 404, headers: { "content-type": "application/json" } })),
+            ),
+          ),
+        )
+      expect(error).toBeInstanceOf(AIError)
+      expect(error.message).toContain("file expired")
+      expect(error.reason.http?.status).toBe(404)
+      expect(error.reason.http?.url).toBe("https://cdn.example.test/expired.png")
+      expect(error.reason.body).toBe(body)
     }),
   )
 

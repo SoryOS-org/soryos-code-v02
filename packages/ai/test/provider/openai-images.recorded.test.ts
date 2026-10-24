@@ -22,14 +22,17 @@ describe("OpenAI Images recorded", () => {
       const response = yield* Image.generate({
         model,
         prompt: "A simple flat black circle centered on a plain white background.",
-        size: "1024x1024",
-        format: "jpeg",
-        providerOptions: { quality: "low", outputCompression: 10 },
+        aspect: "1:1",
+        providerOptions: { outputFormat: "jpeg", quality: "low", outputCompression: 10 },
       })
 
       expect(response.images).toHaveLength(1)
       expect(response.image.mediaType).toBe("image/jpeg")
+      expect(response.image.info).toEqual({ format: "jpeg", width: 1024, height: 1024 })
       expect((yield* response.image.bytes()).length).toBeGreaterThan(0)
+      expect(response.providerMetadata).toEqual({
+        openai: { outputFormat: "jpeg", size: "1024x1024", quality: "low", background: "opaque" },
+      })
     }),
   )
 
@@ -51,9 +54,7 @@ describe("OpenAI Images recorded", () => {
               "image/jpeg",
             ),
           ],
-          size: "1024x1024",
-          format: "jpeg",
-          providerOptions: { quality: "low", outputCompression: 10 },
+          providerOptions: { size: "1024x1024", outputFormat: "jpeg", quality: "low", outputCompression: 10 },
         })
 
         expect(response.image.mediaType).toBe("image/jpeg")
@@ -67,17 +68,22 @@ describe("OpenAI Images recorded", () => {
         yield* Image.stream({
           model,
           prompt: "A simple flat black circle centered on a plain white background.",
-          size: "1024x1024",
-          format: "jpeg",
-          providerOptions: { quality: "low", outputCompression: 10, partialImages: 1 },
+          aspect: "1:1",
+          resolution: "1K",
+          providerOptions: { outputFormat: "jpeg", quality: "low", outputCompression: 10, partialImages: 1 },
         }).pipe(Stream.runCollect),
       )
 
       expect(events.map((event) => event.type)).toEqual(["image-partial", "image", "finish"])
       const image = events.find(ImageEvent.is.image)
       expect(image?.image.mediaType).toBe("image/jpeg")
+      expect(image?.image.info).toEqual({ format: "jpeg", width: 1024, height: 1024 })
       expect(dimensions(yield* image!.image.bytes())).toEqual({ width: 1024, height: 1024 })
-      expect(events.find(ImageEvent.is.finish)?.usage).toMatchObject({ type: "tokens" })
+      const finish = events.find(ImageEvent.is.finish)
+      expect(finish?.usage).toMatchObject({ type: "tokens" })
+      expect(finish?.providerMetadata).toEqual({
+        openai: { outputFormat: "jpeg", size: "1024x1024", quality: "low", background: "opaque" },
+      })
     }),
   )
 })

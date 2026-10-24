@@ -9,7 +9,6 @@ import {
   type VideoModelOptions,
   type VideoOptions,
   type VideoRequestFor,
-  type VideoRoute,
 } from "../src/index.js"
 import type { Service } from "../src/video-client.js"
 import { Anthropic, Fal, Google, OpenAI, Runway, XAI } from "../src/providers.js"
@@ -23,8 +22,7 @@ type VeoLikeOptions = {
   readonly personGeneration?: "allow_all" | "allow_adult"
 } & Record<string, unknown>
 
-declare const route: VideoRoute<VeoLikeOptions>
-const veo = VideoModel.make<VeoLikeOptions>({ id: "veo", provider: "google", route })
+declare const veo: VideoModel<VeoLikeOptions>
 // @ts-expect-error Extracted model options retain known provider fields.
 const invalidVeoOptions: VideoModelOptions<typeof veo> = { personGeneration: "everyone" }
 void invalidVeoOptions
@@ -39,7 +37,7 @@ Video.generate(
     },
     references: [Media.bytes(Uint8Array.from([1]), "image/png")],
     durationSeconds: 8,
-    aspectRatio: "16:9",
+    aspect: "16:9",
     resolution: "1080p",
     audio: true,
     seed: 7,
@@ -75,7 +73,7 @@ const runway = Runway.configure({ apiKey: "test" }).video("gen4.5")
 Video.start({
   model: runway,
   prompt: "Kite",
-  aspectRatio: "1280:720",
+  aspect: "1280:720",
   providerOptions: { contentModeration: { publicFigureThreshold: "low" }, outputFormat: "future-format" },
 })
 // @ts-expect-error Known Runway nested options retain their value kind.
@@ -92,13 +90,15 @@ Video.generate({ model: OpenAI.configure({ apiKey: "test" }).image("gpt-image-2"
 // @ts-expect-error Frames are media assets, not strings.
 Video.generate({ model: google, prompt: "A kitten", frames: { first: "https://example.com/first.png" } })
 // @ts-expect-error Aspect ratios are `${w}:${h}` strings.
-Video.generate({ model: google, prompt: "A kitten", aspectRatio: "wide" })
+Video.generate({ model: google, prompt: "A kitten", aspect: "wide" })
 // @ts-expect-error Durations are numbers of seconds.
 Video.generate({ model: google, prompt: "A kitten", durationSeconds: "8s" })
 // @ts-expect-error Provider-native controls live under `providerOptions`.
 Video.generate({ model: google, prompt: "A kitten", options: { personGeneration: "allow_all" } })
 
 declare const generic: VideoModel<VideoOptions>
+const widenVideo = <Options extends VideoOptions>(model: VideoModel<Options>): VideoModel => model
+void widenVideo
 Video.generate({ model: generic, prompt: "A kitten", providerOptions: { arbitrary: true } })
 
 const request = Video.request({ model: veo, prompt: "A kitten", providerOptions: { personGeneration: "allow_all" } })

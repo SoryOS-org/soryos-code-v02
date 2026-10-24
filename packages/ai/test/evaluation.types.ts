@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 import { Evaluation, EvaluationClient, EvaluationModel, type EvaluationRoute } from "../src/experimental.js"
 import type { Service } from "../src/experimental/evaluation-client.js"
-import { OpenCodeZen, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
+import { Baseten, OpenCode, OpenRouter, TypeSafeAI, VercelAIGateway } from "../src/providers.js"
 
 type Requirements<T> = T extends Effect.Effect<infer _A, infer _E, infer R> ? R : never
 type Success<T> = T extends Effect.Effect<infer A, infer _E, infer _R> ? A : never
@@ -26,13 +26,15 @@ const request = Evaluation.request({
 const result = EvaluationClient.evaluate(request)
 type Result = Success<typeof result>
 type Choice = Assert<Equal<Result["answers"]["topic"]["choice"], "billing" | "support">>
+type Confidence = Assert<Equal<Result["answers"]["topic"]["confidence"], number | undefined>>
 type ClientRequirements = Assert<Equal<Requirements<typeof result>, Service>>
 void (true satisfies Choice)
+void (true satisfies Confidence)
 void (true satisfies ClientRequirements)
 
 Effect.gen(function* () {
   const response = yield* Evaluation.run({
-    model: OpenCodeZen.experimental.evaluation("jev-1.13"),
+    model: OpenCode.experimental.evaluation("jev-1.13"),
     state: ["hello"],
     questions: { greeting: { type: "boolean", instructions: "Greeting?" } },
   })
@@ -71,6 +73,20 @@ Evaluation.run({
   state: "hello",
   questions: { ok: { type: "boolean", instructions: "OK?" } },
   options: { session_id: 1 },
+})
+
+Evaluation.run({
+  model: Baseten.experimental.evaluation("decision-models/baseten-elephant-9b-latest"),
+  state: "hello",
+  questions: { ok: { type: "boolean", instructions: "OK?" } },
+  options: { max_len: 512 },
+})
+// @ts-expect-error Baseten max_len is a number.
+Evaluation.run({
+  model: Baseten.experimental.evaluation("decision-models/baseten-elephant-9b-latest"),
+  state: "hello",
+  questions: { ok: { type: "boolean", instructions: "OK?" } },
+  options: { max_len: "512" },
 })
 
 Evaluation.run({
