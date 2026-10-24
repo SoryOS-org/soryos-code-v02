@@ -194,8 +194,7 @@ const layer = Layer.effect(
     })
 
     const prepareContext = Effect.fn("SessionRunner.prepareContext")(function* (sessionID: SessionSchema.ID) {
-      // Plugins can reload mid-turn (a local plugin file changed); each step and retry must see the settled
-      // catalog, not a partially rebuilt one that lacks the session's model or skills.
+      // Plugins can reload mid-turn; each step and retry must read the settled agents, models and skills.
       yield* plugins.awaitActivation
       const selected = yield* context.select(sessionID)
       // A blocked initial instruction baseline must leave admitted input pending.
@@ -250,7 +249,11 @@ const layer = Layer.effect(
           assistantMessageID,
           agent: loaded.agent.id,
           model: loaded.model,
-          prepared,
+          prepared: {
+            ...prepared,
+            // A tool call can arrive during a reload; its permission check reads the session's agent.
+            executeTool: (call) => plugins.awaitActivation.pipe(Effect.andThen(prepared.executeTool(call))),
+          },
           retry: (cause, error, proposed) =>
             retry.decide({
               cause,
