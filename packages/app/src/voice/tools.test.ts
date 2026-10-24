@@ -1,9 +1,32 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import type { SessionInfo } from "@opencode/client/promise"
 import type { ServerCtx } from "@/runtime/server/runtime"
 import { parseVoiceDelegation } from "@/session/timeline/voice-delegation"
-import { continuedHeader, header } from "./handoff"
+import { continuedHeader, header, headerLapse } from "./handoff"
 import { VoiceTools } from "./tools"
+
+afterEach(() => {
+  setSystemTime()
+})
+
+const models = [
+  {
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    providerID: "console-anthropic",
+    enabled: true,
+    variants: [{ id: "medium" }, { id: "high" }],
+  },
+  {
+    id: "gpt-6-astra",
+    name: "GPT-6 Astra",
+    providerID: "openai",
+    enabled: true,
+    variants: [{ id: "high" }, { id: "xhigh" }],
+  },
+  { id: "gemini-4-argon", name: "Gemini 4 Argon", providerID: "console-google", enabled: true, variants: [] },
+  { id: "gpt-4", name: "GPT-4", providerID: "openai", enabled: false, variants: [] },
+]
 
 const session = (id: string, title: string, extra: Partial<SessionInfo> = {}) =>
   ({
@@ -15,10 +38,16 @@ const session = (id: string, title: string, extra: Partial<SessionInfo> = {}) =>
   }) as SessionInfo
 
 function setup(
-  input: { open?: (session: SessionInfo) => Promise<void>; tabs?: string[]; sessions?: SessionInfo[] } = {},
+  input: {
+    open?: (session: SessionInfo, signal: AbortSignal) => Promise<void>
+    tabs?: string[]
+    sessions?: SessionInfo[]
+  } = {},
 ) {
   const sessions = [
-    session("ses_here", "HERE"),
+    session("ses_here", "HERE", {
+      model: { id: "claude-opus-5-5", providerID: "console-anthropic", variant: "high" },
+    } as Partial<SessionInfo>),
     session("ses_desktop", "DESKTOP"),
     session("ses_old", "OLD", { time: { created: 1, updated: 1, archived: 2 } }),
     ...(input.sessions ?? []),
@@ -28,6 +57,7 @@ function setup(
     open: [] as string[],
     background: [] as string[],
     prompts: [] as { sessionID: string; text: string }[],
+    switched: [] as unknown[],
   }
 
   const empty = { data: [], cursor: {} }
@@ -43,19 +73,25 @@ function setup(
 
             return found
           },
-          list: async (request: { search?: string; parentID?: null }) => ({
-            data: sessions.filter(
-              (item) =>
-                !item.time.archived &&
-                (request.parentID !== null || !item.parentID) &&
-                (!request.search || item.title?.toLowerCase().includes(request.search.toLowerCase())),
-            ),
+          // Newest first, one page, like the server.
+          list: async (request: { search?: string; parentID?: null; limit?: number }) => ({
+            data: sessions
+              .filter(
+                (item) =>
+                  !item.time.archived &&
+                  (request.parentID !== null || !item.parentID) &&
+                  (!request.search || item.title?.toLowerCase().includes(request.search.toLowerCase())),
+              )
+              .toSorted((a, b) => b.time.updated - a.time.updated)
+              .slice(0, request.limit),
             cursor: {},
           }),
+          switchModel: async (request: unknown) => calls.switched.push(request),
           background: async (request: { sessionID: string }) => calls.background.push(request.sessionID),
           inbox: { list: async () => [] },
         },
         message: { list: async () => empty },
+        model: { list: async () => ({ data: models }) },
       },
     },
     data: {
@@ -66,9 +102,9 @@ function setup(
   } as unknown as ServerCtx
 
   const tools = new VoiceTools(ctx, {
-    open: async (next) => {
+    open: async (next, signal) => {
       calls.open.push(next.id)
-      await input.open?.(next)
+      await input.open?.(next, signal)
     },
     tabs: () => input.tabs ?? [],
   })
@@ -76,14 +112,8 @@ function setup(
   const request = { id: "delegation", sessionID: "ses_here", transcript: ["user: go to the desktop session"] }
   let count = 0
 
-  const run = async (name: string, args: Record<string, unknown> = {}) =>
-    JSON.parse(
-      await tools.run(
-        { call_id: `call_${count++}`, name, arguments: JSON.stringify(args) },
-        request,
-        new AbortController().signal,
-      ),
-    )
+  const run = async (name: string, args: Record<string, unknown> = {}, signal = new AbortController().signal) =>
+    JSON.parse(await tools.run({ call_id: `call_${count++}`, name, arguments: JSON.stringify(args) }, request, signal))
 
   return { calls, request, run }
 }
@@ -104,6 +134,16 @@ describe("open_session", () => {
     expect((await voice.run("open_session", { session_id: "ses_old" })).error).toContain("archived")
     expect(voice.calls.open).toEqual([])
     expect(voice.request.sessionID).toBe("ses_here")
+  })
+
+  test("passes the tool's abort signal to the screen", async () => {
+    const signals: AbortSignal[] = []
+    const voice = setup({ open: async (_, signal) => void signals.push(signal) })
+    const abort = new AbortController()
+
+    await voice.run("open_session", { session_id: "ses_desktop" }, abort.signal)
+
+    expect(signals).toEqual([abort.signal])
   })
 
   test("reports failure when Desktop never shows the session", async () => {
@@ -132,6 +172,89 @@ describe("search_sessions", () => {
 
     expect(found.map((row: { id: string }) => row.id)).toEqual(["ses_hex", "ses_hex_tab", "ses_hex_new", "ses_hex_sub"])
     expect(found[1].open_tab).toBe(true)
+  })
+
+  test("finds an old root session behind a page of matching subagents", async () => {
+    const voice = setup({
+      sessions: [
+        ...Array.from({ length: 100 }, (_, index) =>
+          session(`ses_recent_${index}`, `Recent ${index}`, { time: { created: 1, updated: 200 + index } }),
+        ),
+        ...Array.from({ length: 25 }, (_, index) =>
+          session(`ses_child_${index}`, `Hex probe ${index}`, {
+            parentID: "ses_here",
+            time: { created: 1, updated: 100 + index },
+          }),
+        ),
+        session("ses_hex", "HEX", { time: { created: 1, updated: 0 } }),
+      ],
+    })
+
+    const found = await voice.run("search_sessions", { query: "hex" })
+
+    expect(found[0].id).toBe("ses_hex")
+  })
+
+  test("retries with the longest word when only subagents match the phrase", async () => {
+    const voice = setup({
+      sessions: [
+        ...Array.from({ length: 100 }, (_, index) =>
+          session(`ses_recent_${index}`, `Recent ${index}`, { time: { created: 1, updated: 200 + index } }),
+        ),
+        session("ses_child", "Kindle import probe", { parentID: "ses_here", time: { created: 1, updated: 100 } }),
+        session("ses_kindle", "Kindle agent", { time: { created: 1, updated: 0 } }),
+      ],
+    })
+
+    const found = await voice.run("search_sessions", { query: "kindle import" })
+
+    expect(found.map((row: { id: string }) => row.id)).toContain("ses_kindle")
+  })
+})
+
+describe("models", () => {
+  test("list_models matches enabled models and marks the current one", async () => {
+    const voice = setup()
+
+    const gpt = await voice.run("list_models", { query: "gpt" })
+    expect(gpt.models.map((model: { id: string }) => model.id)).toEqual(["openai/gpt-6-astra"])
+
+    const all = await voice.run("list_models")
+    expect(all.matches).toBe(3)
+    expect(all.models[0]).toEqual({
+      id: "console-anthropic/claude-opus-5-5",
+      name: "Claude Opus 5.5",
+      provider: "console-anthropic",
+      variants: ["medium", "high"],
+      current: true,
+      current_variant: "high",
+    })
+  })
+
+  test("switch_model keeps a variant the new model offers and drops one it doesn't", async () => {
+    const voice = setup()
+
+    expect(await voice.run("switch_model", { model: "openai/gpt-6-astra" })).toEqual({
+      switched_to: "GPT-6 Astra",
+      variant: "high",
+      session: "HERE",
+    })
+    expect((await voice.run("switch_model", { model: "console-google/gemini-4-argon" })).variant).toBe("default")
+    expect(voice.calls.switched).toEqual([
+      { sessionID: "ses_here", model: { id: "gpt-6-astra", providerID: "openai", variant: "high" } },
+      { sessionID: "ses_here", model: { id: "gemini-4-argon", providerID: "console-google", variant: undefined } },
+    ])
+  })
+
+  test("switch_model refuses an unknown or disabled model and an unknown variant", async () => {
+    const voice = setup()
+
+    expect((await voice.run("switch_model", { model: "openai/gpt-9" })).error).toContain("did not change")
+    expect((await voice.run("switch_model", { model: "openai/gpt-4" })).error).toContain("did not change")
+    expect((await voice.run("switch_model", { model: "openai/gpt-6-astra", variant: "ultra" })).error).toContain(
+      "high, xhigh",
+    )
+    expect(voice.calls.switched).toEqual([])
   })
 })
 
@@ -167,6 +290,23 @@ describe("send_message", () => {
     expect(second.text.startsWith(`${continuedHeader}\n`)).toBe(true)
     expect(other.sessionID).toBe("ses_here")
     expect(other.text.startsWith(`${header}\n`)).toBe(true)
+  })
+
+  test("explains the fields again after the header lapse", async () => {
+    const voice = setup()
+    setSystemTime(new Date(1_000_000))
+
+    await voice.run("send_message", { text: "One." })
+    setSystemTime(new Date(1_000_000 + headerLapse - 1))
+    await voice.run("send_message", { text: "Two." })
+    setSystemTime(new Date(1_000_000 + 2 * headerLapse))
+    await voice.run("send_message", { text: "Three." })
+
+    expect(voice.calls.prompts.map((prompt) => prompt.text.slice(0, prompt.text.indexOf("\n")))).toEqual([
+      header,
+      continuedHeader,
+      header,
+    ])
   })
 
   test("moves running work to the background before a steer, not before a queued message", async () => {

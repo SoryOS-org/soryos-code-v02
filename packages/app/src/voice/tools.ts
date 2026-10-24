@@ -20,7 +20,7 @@ export class VoiceTools {
     private readonly ctx: ServerCtx,
     private readonly screen: {
       /** Shows the session on Desktop's screen; resolves only once the screen shows it. */
-      open: (session: SessionInfo) => Promise<void>
+      open: (session: SessionInfo, signal: AbortSignal) => Promise<void>
       /** Session IDs with an open tab. */
       tabs: () => string[]
     },
@@ -93,13 +93,24 @@ export class VoiceTools {
       const search = new SessionSearch(args.query)
       const query = args.query
 
+      // Subagents stay searchable, but a separate top-level search keeps a page of matching subagents from
+      // crowding out root sessions, and only root matches decide whether to retry with the longest word.
+      const lookup = async (text: string) => {
+        const [roots, all] = await Promise.all([
+          api.session.list({ search: text, limit: 20, parentID: null, archived: false }, options),
+          api.session.list({ search: text, limit: 20, archived: false }, options),
+        ])
+
+        return { roots: roots.data, all: [...roots.data, ...all.data] }
+      }
+
       const remote = async () => {
-        const found = await api.session.list({ search: query, limit: 20, archived: false }, options)
+        const found = await lookup(query)
         const term = search.longestTerm
 
-        if (found.data.length || !term || term === search.phrase) return found.data
+        if (found.roots.length || !term || term === search.phrase) return found.all
 
-        return (await api.session.list({ search: term, limit: 20, archived: false }, options)).data
+        return [...found.all, ...(await lookup(term)).all]
       }
 
       const [recent, found] = await Promise.all([
@@ -153,7 +164,7 @@ export class VoiceTools {
       if (session.time.archived) return { error: "That session is archived. The screen did not move." }
       signal.throwIfAborted()
 
-      const shown = await this.screen.open(session).then(
+      const shown = await this.screen.open(session, signal).then(
         () => true,
         () => false,
       )

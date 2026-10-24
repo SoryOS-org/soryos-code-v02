@@ -31,11 +31,13 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
     const current: { call?: ReturnType<typeof createVoiceCall>; generation: number } = { generation: 0 }
 
     // Resolves once the router shows href; voice must not report a move that didn't happen.
-    const routed = (href: string) =>
+    const routed = (href: string, signal: AbortSignal) =>
       new Promise<void>((resolve, reject) => {
         const started = Date.now()
 
         const check = () => {
+          if (signal.aborted) return reject(signal.reason)
+
           if (location.pathname === href) return resolve()
 
           if (Date.now() - started > 3000) return reject(new Error("Desktop did not show the session"))
@@ -91,7 +93,7 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
               ctx,
               session,
               platform,
-              open: async (next) => {
+              open: async (next, signal) => {
                 const href = sessionHref(server, next.id)
                 // Subagent sessions open inside their root session's tab, which the titlebar finds from the route.
                 const tab =
@@ -100,7 +102,7 @@ export const { provider: VoiceProvider, use: useVoice } = createSimpleContext({
 
                 if (tab) tabs.remember(tab)
                 navigate(href)
-                await routed(href)
+                await routed(href, signal)
               },
               tabs: () =>
                 tabs.store.flatMap((tab) => (tab.type === "session" && tab.server === server ? [tab.sessionId] : [])),

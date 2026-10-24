@@ -32,7 +32,7 @@ export function createVoiceCall(input: {
   session: SessionInfo
   platform: Platform
   /** Shows the session on screen; rejects unless the route really changed. */
-  open: (session: SessionInfo) => Promise<void>
+  open: (session: SessionInfo, signal: AbortSignal) => Promise<void>
   /** Session IDs with an open tab. */
   tabs: () => string[]
   change: (state: Partial<CallState>) => void
@@ -41,8 +41,10 @@ export function createVoiceCall(input: {
   let gates = new VoiceGates()
 
   const tools = new VoiceTools(input.ctx, {
-    open: async (session) => {
-      await input.open(session)
+    open: async (session, signal) => {
+      await input.open(session, signal)
+      // A call that ended or dropped mid-open must not take over the view.
+      signal.throwIfAborted()
       view(session)
     },
     tabs: input.tabs,
