@@ -2256,7 +2256,7 @@ export type ConfigEntry =
         }
         tool_output?: { max_lines?: number; max_bytes?: number }
         mcp?: {
-          timeout?: { startup?: number; catalog?: number; execution?: number }
+          timeout?: { startup?: number; catalog?: number; execution?: number; wait?: number }
           servers?: {
             [x: string]:
               | {
@@ -2266,7 +2266,7 @@ export type ConfigEntry =
                   environment?: { [x: string]: string }
                   disabled?: boolean
                   codemode?: boolean
-                  timeout?: { startup?: number; catalog?: number; execution?: number }
+                  timeout?: { startup?: number; catalog?: number; execution?: number; wait?: number }
                   protocol?: McpProtocol
                 }
               | {
@@ -2285,7 +2285,7 @@ export type ConfigEntry =
                     | false
                   disabled?: boolean
                   codemode?: boolean
-                  timeout?: { startup?: number; catalog?: number; execution?: number }
+                  timeout?: { startup?: number; catalog?: number; execution?: number; wait?: number }
                   protocol?: McpProtocol
                 }
           }
@@ -5195,7 +5195,12 @@ export type McpAddInput = {
           readonly environment?: { readonly [x: string]: string }
           readonly disabled?: boolean
           readonly codemode?: boolean
-          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly timeout?: {
+            readonly startup?: number
+            readonly catalog?: number
+            readonly execution?: number
+            readonly wait?: number
+          }
           readonly protocol?: "legacy" | "auto" | "2026-07-28"
         }
       | {
@@ -5214,7 +5219,12 @@ export type McpAddInput = {
             | false
           readonly disabled?: boolean
           readonly codemode?: boolean
-          readonly timeout?: { readonly startup?: number; readonly catalog?: number; readonly execution?: number }
+          readonly timeout?: {
+            readonly startup?: number
+            readonly catalog?: number
+            readonly execution?: number
+            readonly wait?: number
+          }
           readonly protocol?: "legacy" | "auto" | "2026-07-28"
         }
   }["config"]
