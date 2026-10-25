@@ -58,7 +58,14 @@ describe("shell", () => {
       "-NoProfile",
       "-NonInteractive",
       "-Command",
-      "Write-Output hi",
+      process.platform === "win32" ? `${ShellSelect.PS_UTF8} Write-Output hi` : "Write-Output hi",
+    ])
+    expect(ShellSelect.args("powershell.exe", "Write-Output hi")).toEqual([
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      process.platform === "win32" ? `${ShellSelect.PS_UTF8} Write-Output hi` : "Write-Output hi",
     ])
   })
 

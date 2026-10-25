@@ -161,10 +161,25 @@ function info(file: string, options?: Options, bin?: string): Item {
   }
 }
 
+// PowerShell encodes stdout with the console code page. Commands are spawned without a
+// console, so that lookup fails and PowerShell falls back to the system ANSI code page
+// (GBK on Chinese Windows). Every reader decodes UTF-8, so pin the encoding before the
+// command runs. Assigning OutputEncoding also sets the console code page, so native
+// children emit UTF-8 too; SetOut alone would leave native output on the ANSI code page.
+export const PS_UTF8 =
+  "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding;"
+
 export function args(file: string, command: string) {
   const n = name(file)
   if (n === "cmd") return ["/c", command]
-  if (ps(file)) return ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]
+  if (ps(file))
+    return [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      process.platform === "win32" ? `${PS_UTF8} ${command}` : command,
+    ]
   return ["-c", command]
 }
 
