@@ -311,6 +311,8 @@ export interface ParserState {
   readonly providerMetadataKey: string
   readonly tools: ToolStream.State<number>
   readonly pendingTools: Partial<Record<number, PendingToolDelta>>
+  /** Tool call ids finalized in-step; late replay deltas for them are dropped. */
+  readonly finishedToolIds: ReadonlyArray<string>
   readonly toolCallEvents: ReadonlyArray<LLMEvent>
   readonly usage?: Usage
   readonly finishReason?: FinishReasonDetails
@@ -1042,6 +1044,7 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
     let pendingTools = state.pendingTools
     let latestToolIndex = state.latestToolIndex
     let nextToolIndex = state.nextToolIndex
+    let { finishedToolIds } = state
 
     let lifecycle = state.lifecycle
 
@@ -1095,6 +1098,10 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
       const current = tools[index]
       const pending = pendingTools[index]
       const id = current?.id ?? pending?.id ?? (tool.id || undefined)
+      // A host that replays an already finalized call after the finish would
+      // otherwise open a second identical call. Drop the replay instead; the
+      // settled tool keeps its own parsed input.
+      if (id && finishedToolIds.includes(id)) continue
       const name = current?.name ?? pending?.name ?? (tool.function?.name || undefined)
       const text = `${pending?.input ?? ""}${tool.function?.arguments ?? ""}`
       const extraContent = pending?.extraContent ?? decodeExtraContent(tool.extra_content)
@@ -1151,19 +1158,30 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
       )
 
     // Filtering or truncation terminates the response without confirming pending tool calls.
-    const finished =
+    const finalizeTools =
       finishReason !== undefined &&
       !incompleteTools &&
       state.finishReason === undefined &&
       Object.keys(tools).length > 0
-        ? yield* ToolStream.finishAll(ADAPTER, tools)
-        : undefined
+    // The in-step terminal finalizes every open call; remember their ids so a
+    // later replay of the same call is dropped instead of re-opened.
+    const finalizedToolIds = finalizeTools
+      ? [
+          ...state.finishedToolIds,
+          ...Object.values(tools)
+            .filter((tool) => tool !== undefined)
+            .map((tool) => tool.id)
+            .filter((id): id is string => id !== undefined),
+        ]
+      : state.finishedToolIds
+    const finished = finalizeTools ? yield* ToolStream.finishAll(ADAPTER, tools) : undefined
 
     return [
       {
         providerMetadataKey: state.providerMetadataKey,
         tools: finished?.tools ?? tools,
         pendingTools,
+        finishedToolIds: finalizedToolIds,
         toolCallEvents: finished?.events ?? state.toolCallEvents,
         usage,
         finishReason,
@@ -1190,13 +1208,25 @@ export const finishEvents = Effect.fnUntraced(function* (state: ParserState) {
         route: ADAPTER,
       }),
     })
+  // Identity-less tool fragments cannot form a call: fail instead of settling
+  // the step with silently dropped data — the same rule the terminal chunk
+  // applies mid-stream. Truncation finishes intentionally leave calls
+  // unconfirmed. Streams without a finish reason keep their existing
+  // leniency here.
+  const truncatedFinish =
+    state.finishReason?.normalized === "content-filter" || state.finishReason?.normalized === "length"
+  if (state.finishReason !== undefined && !truncatedFinish && Object.keys(state.pendingTools).length > 0)
+    return yield* new AIError({
+      reason: new InvalidProviderOutputError({
+        message: "OpenAI Chat tool call delta is missing id or name",
+        route: ADAPTER,
+      }),
+    })
   const events: LLMEvent[] = []
   // Tool calls that opened after the finish reason are still unconfirmed here
   // and finalize with the terminal's tool-call close. A `length` or
   // `content-filter` finish truncates on purpose, so their late calls stay
   // unconfirmed — the same rule that applies when the finish arrives.
-  const truncatedFinish =
-    state.finishReason?.normalized === "content-filter" || state.finishReason?.normalized === "length"
   const lateToolEvents =
     !truncatedFinish && Object.keys(state.tools).length > 0
       ? (yield* ToolStream.finishAll(ADAPTER, state.tools)).events
@@ -1255,6 +1285,7 @@ export const protocol = Protocol.make({
       tools: ToolStream.empty<number>(),
       pendingTools: {},
       toolCallEvents: [],
+      finishedToolIds: [],
       lifecycle: Lifecycle.initial(),
       reasoningField: request.model.compatibility?.reasoningField,
       reasoningTextObserved: false,

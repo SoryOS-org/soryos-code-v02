@@ -1162,6 +1162,53 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("ignores a replay of an already finalized tool call", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup data", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({
+                tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup", arguments: '{"q":"x"}' } }],
+              }),
+              deltaChunk({}, "stop"),
+              deltaChunk({
+                tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup", arguments: '{"q":"x"}' } }],
+              }),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.toolCalls).toHaveLength(1)
+      expect(response.toolCalls).toMatchObject([{ id: "call_1", name: "lookup", input: { q: "x" } }])
+      expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "stop" })
+    }),
+  )
+
+  it.effect("fails on tool fragments left unresolvable after the finish", () =>
+    Effect.gen(function* () {
+      const error = yield* LLMClient.generate(request).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ role: "assistant", content: "Hello" }),
+              deltaChunk({}, "stop"),
+              deltaChunk({ tool_calls: [{ index: 0, function: { arguments: '{"a":1}' } }] }),
+            ),
+          ),
+        ),
+        Effect.flip,
+      )
+
+      expect(error.message).toContain("OpenAI Chat tool call delta is missing id or name")
+    }),
+  )
+
   it.effect("preserves streamed refusals as ordinary assistant text", () =>
     Effect.gen(function* () {
       const response = yield* LLMClient.generate(request).pipe(
