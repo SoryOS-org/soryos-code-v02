@@ -73,6 +73,7 @@ import { DialogPair } from "./component/dialog-pair"
 import { DialogHighlights } from "./component/dialog-highlights"
 import { claim } from "./util/highlights"
 import { DialogThemeList } from "./component/dialog-theme-list"
+import { DialogToastHistory } from "./ui/dialog-toast-history"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
@@ -149,6 +150,7 @@ const pinnedSessionBindingCommands = [
 
 const appBindingCommands = [
   "command.palette.show",
+  "notification.history",
   "model.list",
   "model.cycle_recent",
   "model.cycle_recent_reverse",
@@ -749,6 +751,13 @@ function App() {
   const connected = useConnected()
   const appCommands = createMemo(() =>
     [
+      {
+        name: "notification.history",
+        title: "Notification history",
+        category: "System",
+        slash: { name: "notifications" },
+        run: () => dialog.replace(() => <DialogToastHistory />),
+      },
       {
         name: COMMAND_PALETTE_COMMAND,
         title: "Show command palette",
