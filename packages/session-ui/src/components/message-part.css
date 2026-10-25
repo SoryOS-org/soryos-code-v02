@@ -964,6 +964,12 @@
     overflow: auto;
     border-radius: 8px;
     box-shadow: 0 0 0 0.5px var(--v2-border-border-base);
+
+    /* The file wrapper sets Pierre's 3ch default inline, so override it on the shadow host below that wrapper. */
+    diffs-container {
+      --diffs-min-number-column-width: var(--execute-details-number-width, 1ch);
+      --opencode-diffs-number-inset: 12px;
+    }
   }
 
   [data-slot="execute-details-error"] {
