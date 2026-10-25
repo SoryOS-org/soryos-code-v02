@@ -112,36 +112,60 @@ const ripgrepLayer = Layer.effect(
   }),
 )
 
+const FFF_SCAN_WAIT = Duration.seconds(3)
+
+function createPicker(directory: string): { ok: true; value: Fff.Picker } | { ok: false; error: unknown } {
+  try {
+    return Fff.create({
+      basePath: directory,
+      aiMode: true,
+      disableMmapCache: true,
+      disableContentIndexing: true,
+    })
+  } catch (error) {
+    return { ok: false, error }
+  }
+}
+
+// Each fff picker owns its own scanner, watcher and git threads, so it starts on the first search
+// instead of when the Location boots.
 export const fffLayer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const location = yield* Location.Service
-    const result = yield* Effect.try({
-      try: () =>
-        Fff.create({
-          basePath: location.directory,
-          aiMode: true,
-          disableMmapCache: true,
-          disableContentIndexing: true,
-        }),
-      catch: (cause) => cause,
-    }).pipe(
-      Effect.catch((error) => Effect.logWarning("failed to initialize fff", { error }).pipe(Effect.as(undefined))),
-    )
-    if (!result?.ok) {
-      if (result) yield* Effect.logWarning("failed to initialize fff", { error: result.error })
-      return Service.of({
-        find: () => Effect.succeed([]),
-      })
-    }
-    yield* Effect.addFinalizer(() => Effect.sync(() => result.value.destroy()))
+    const scope = yield* Scope.Scope
+    let state: { readonly result: ReturnType<typeof createPicker>; scanned: boolean } | undefined
+    const picker = Effect.gen(function* () {
+      if (!state) {
+        const result = createPicker(location.directory)
+        state = { result, scanned: false }
+        if (result.ok)
+          yield* Scope.addFinalizer(
+            scope,
+            Effect.sync(() => result.value.destroy()),
+          )
+        else yield* Effect.logWarning("failed to initialize fff", { error: result.error })
+      }
+      const current = state
+      if (!current.result.ok) return undefined
+      if (!current.scanned) {
+        const value = current.result.value
+        yield* Effect.gen(function* () {
+          while (value.isScanning()) yield* Effect.sleep("20 millis")
+        }).pipe(Effect.timeoutOption(FFF_SCAN_WAIT))
+        current.scanned = true
+      }
+      return current.result.value
+    })
     return Service.of({
       find: (input) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          const finder = yield* picker
+          if (!finder) return []
           const options = { pageIndex: 0, pageSize: input.limit ?? 50 }
           const items = (() => {
             if (input.type === "file") {
-              const found = result.value.fileSearch(input.query.trim(), options)
+              const found = finder.fileSearch(input.query.trim(), options)
               if (!found.ok) throw found.error
               return found.value.items.map((item, index) => ({
                 path: item.relativePath,
@@ -150,7 +174,7 @@ export const fffLayer = Layer.effect(
               }))
             }
             if (input.type === "directory") {
-              const found = result.value.directorySearch(input.query.trim(), options)
+              const found = finder.directorySearch(input.query.trim(), options)
               if (!found.ok) throw found.error
               return found.value.items.map((item, index) => ({
                 path: item.relativePath,
@@ -158,7 +182,7 @@ export const fffLayer = Layer.effect(
                 score: found.value.scores[index]?.total ?? 0,
               }))
             }
-            const found = result.value.mixedSearch(input.query.trim(), options)
+            const found = finder.mixedSearch(input.query.trim(), options)
             if (!found.ok) throw found.error
             return found.value.items.map((item, index) => ({
               path: item.item.relativePath,
