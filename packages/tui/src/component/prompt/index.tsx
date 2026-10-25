@@ -83,6 +83,8 @@ import { useWorkingDirectoryActions } from "../../ui/working-directory-actions"
 import { truncateFilePath } from "../../ui/file-path"
 import { PromptMetadataRow } from "./metadata"
 import { isDeepEqual } from "remeda"
+import { isLocationNotFoundError } from "@opencode/client"
+import { retry } from "@opencode/util/retry"
 
 export type PromptProps = {
   sessionID?: string
@@ -1237,7 +1239,17 @@ export function Prompt(props: PromptProps) {
         slash: slashInput,
       }
       setPendingSubmit(pending)
-      void Promise.all(catalogs.map((catalog) => catalog.sync(location))).catch((error: unknown) => {
+      // Match the location provider's bounded retry policy. A shared request can
+      // fail while that provider is still preparing the workspace in the background.
+      void retry(
+        async () => {
+          if (disposed || pendingSubmit() !== pending) return
+          await Promise.all(catalogs.map((catalog) => catalog.sync(location)))
+        },
+        {
+          retryIf: (error) => !disposed && pendingSubmit() === pending && !isLocationNotFoundError(error),
+        },
+      ).catch((error: unknown) => {
         if (disposed || pendingSubmit() !== pending) return
         setPendingSubmit(undefined)
         toast.show({ title: "Failed to prepare prompt", message: errorMessage(error), variant: "error" })

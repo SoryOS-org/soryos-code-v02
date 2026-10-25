@@ -177,20 +177,72 @@ test("a pending worktree submit does not block sending in another workspace", as
   expect(fixture.sent).toHaveLength(1)
 })
 
-test("a failed catalog load preserves the prompt and reports the error", async () => {
-  await using fixture = await workspace("agent")
+test.each(["agent", "command"])("a temporary %s failure keeps Enter pending until recovery", async (catalog) => {
+  await using fixture = await workspace(catalog, {
+    text: catalog === "command" ? "/review changed files" : undefined,
+    holdRetry: true,
+  })
   await fixture.switchWorkspace()
   fixture.setup.mockInput.pressEnter()
   await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
   fixture.fail()
+  await fixture.retried
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
+  expect(fixture.setup.captureCharFrame()).not.toContain("Failed to prepare prompt")
+  expect(fixture.created).toHaveLength(0)
+  fixture.releaseRetry()
+  await fixture.setup.waitFor(() => fixture.sent.length + fixture.commands.length === 1)
+  expect(fixture.created).toHaveLength(1)
+  expect(fixture.sent).toHaveLength(catalog === "command" ? 0 : 1)
+  expect(fixture.commands).toHaveLength(catalog === "command" ? 1 : 0)
+  expect(fixture.setup.captureCharFrame()).not.toContain("Failed to prepare prompt")
+})
+
+test("editing during a catalog retry cancels the pending send", async () => {
+  await using fixture = await workspace("agent", { holdRetry: true })
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
+  fixture.fail()
+  await fixture.retried
+  await fixture.setup.mockInput.typeText(" and tests")
+  await fixture.setup.waitForFrame((frame) => !frame.includes("Loading workspace…"))
+  fixture.releaseRetry()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Review · Target Model Provider"))
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes and tests")
+  expect(fixture.setup.captureCharFrame()).not.toContain("Failed to prepare prompt")
+})
+
+test("exhausted catalog retries preserve the prompt and report the error", async () => {
+  await using fixture = await workspace("agent")
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
+  fixture.fail(Infinity)
+  await fixture.exhausted
   await fixture.setup.waitForFrame((frame) => frame.includes("Failed to prepare prompt"))
   expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
   expect(fixture.created).toHaveLength(0)
   expect(fixture.sent).toHaveLength(0)
   expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+  fixture.recover()
   fixture.setup.mockInput.pressEnter()
   await fixture.setup.waitFor(() => fixture.sent.length === 1)
   expect(fixture.sent[0]).toMatchObject({ text: "Review the changes" })
+})
+
+test("a missing location fails without retrying the prompt catalogs", async () => {
+  await using fixture = await workspace("agent")
+  await fixture.switchWorkspace()
+  fixture.setup.mockInput.pressEnter()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Loading workspace…"))
+  fixture.missing()
+  await fixture.setup.waitForFrame((frame) => frame.includes("Failed to prepare prompt"))
+  expect(fixture.created).toHaveLength(0)
+  expect(fixture.setup.renderer.currentFocusedEditor?.plainText).toBe("Review the changes")
+  expect(fixture.setup.captureCharFrame()).not.toContain("Loading workspace…")
+  expect(fixture.loads()).toBe(1)
 })
 
 test.each(["agent-first", "command-first", "command-only"])(
@@ -304,11 +356,18 @@ test.each(["pending", "before-native-submit", "fast-return"])(
   },
 )
 
-async function workspace(catalog: string, options: { text?: string; command?: boolean; animations?: boolean } = {}) {
+async function workspace(
+  catalog: string,
+  options: { text?: string; command?: boolean; animations?: boolean; holdRetry?: boolean } = {},
+) {
   const source = process.cwd()
   const target = path.join(path.parse(source).root, "opencode-worktree")
   const gate = Promise.withResolvers<void>()
   const requested = Promise.withResolvers<void>()
+  const retried = Promise.withResolvers<void>()
+  const exhausted = Promise.withResolvers<void>()
+  const retry = Promise.withResolvers<void>()
+  if (!options.holdRetry) retry.resolve()
   const command = Promise.withResolvers<void>()
   if (!options.command) command.resolve()
   const created: unknown[] = []
@@ -316,6 +375,8 @@ async function workspace(catalog: string, options: { text?: string; command?: bo
   const commands: unknown[] = []
   let session: unknown
   let failures = 0
+  let missing = false
+  let loads = 0
   const setup = await createAppFixture({
     config: { animations: options.animations ?? false, tabs: { enabled: false }, keybinds: { "prompt.editor": "f9" } },
     fetch: async (url, request) => {
@@ -323,10 +384,21 @@ async function workspace(catalog: string, options: { text?: string; command?: bo
       const destination = directory === target
       const location = { directory, project: { id: "proj_test", directory, canonical: source } }
       if (destination && url.pathname === `/api/${catalog}`) {
+        loads++
         requested.resolve()
         await gate.promise
+        if (loads > 1) {
+          retried.resolve()
+          await retry.promise
+        }
+        if (missing)
+          return json(
+            { _tag: "LocationNotFoundError", location: { directory }, message: "Workspace no longer exists" },
+            { status: 404 },
+          )
         if (failures > 0) {
           failures--
+          if (loads >= 3) exhausted.resolve()
           return json({ message: "Catalog unavailable" }, { status: 503 })
         }
       }
@@ -405,8 +477,19 @@ async function workspace(catalog: string, options: { text?: string; command?: bo
     commands,
     release: gate.resolve,
     releaseCommand: command.resolve,
-    fail() {
-      failures = 1
+    retried: retried.promise,
+    exhausted: exhausted.promise,
+    releaseRetry: retry.resolve,
+    loads: () => loads,
+    fail(count = 1) {
+      failures = count
+      gate.resolve()
+    },
+    recover() {
+      failures = 0
+    },
+    missing() {
+      missing = true
       gate.resolve()
     },
     openWorkspace,
@@ -425,6 +508,7 @@ async function workspace(catalog: string, options: { text?: string; command?: bo
     async [Symbol.asyncDispose]() {
       gate.resolve()
       command.resolve()
+      retry.resolve()
       await setup[Symbol.asyncDispose]()
     },
   }
