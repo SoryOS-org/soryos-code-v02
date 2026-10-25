@@ -38,6 +38,18 @@ describe("Media", () => {
     }),
   )
 
+  it.effect("rejects local file references without rejecting provider storage references", () =>
+    Effect.sync(() => {
+      expect(() => Media.url("file:///Users/example/clip.mp4")).toThrow("Media.file(path)")
+      expect(() => Media.from({ type: "url", url: " FILE:/C:/clips/video.mp4" })).toThrow("Media.file(path)")
+      expect(() => Media.ref("custom", "file:///Users/example/clip.mp4")).toThrow("Media.file(path)")
+      expect(Media.ref("google", "gs://bucket/clip.mp4").source).toMatchObject({ id: "gs://bucket/clip.mp4" })
+      expect(Media.url("https://example.test/clip.mp4").source).toMatchObject({
+        url: "https://example.test/clip.mp4",
+      })
+    }),
+  )
+
   it.effect("parses data URLs and rejects malformed ones", () =>
     Effect.sync(() => {
       const asset = Media.fromDataUrl("data:image/jpeg;base64,/9j/")
