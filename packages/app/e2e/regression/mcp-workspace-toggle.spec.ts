@@ -176,13 +176,11 @@ for (const surface of ["dialog"] as const) {
     ])
     expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
 
-    // The status itself is the shared v2 button that opens the error.
+    // As in the session's MCP list, the red dot is the status and opens the error; the switch stays on.
     const failed = view.panel.getByRole("button", { name: "Details for figma-desktop", exact: true })
     const details = page.getByRole("dialog", { name: "figma-desktop", exact: true })
-    await expect(view.toggle).toHaveCount(0)
-    await expect(view.panel.getByText("Failed", { exact: true })).toHaveCount(1)
-    await expect(failed).toHaveText("Failed")
-    await expect(failed).toHaveAttribute("data-component", "button-v2")
+    await expect(view.toggle).toBeChecked()
+    await expect(view.toggle).toHaveAccessibleDescription("Failed")
     await failed.click()
     await expect(details).toHaveAccessibleDescription("Connection failed")
     await expect(details.getByText(error, { exact: true })).toBeVisible()
@@ -282,8 +280,8 @@ for (const surface of ["popover", "dialog"] as const) {
     })
 
     await expect(signIn).toHaveAttribute("data-component", "button-v2")
-    // The dialog marks that sign-in continues in the browser.
-    await expect(signIn.locator("svg")).toHaveCount(surface === "dialog" ? 1 : 0)
+    await expect(signIn).toHaveAttribute("data-variant", "ghost-muted")
+    await expect(signIn.locator("svg")).toHaveCount(0)
     await signIn.click()
     await expect(signIn).toHaveText("Signing in…")
     await expect(signIn).toBeDisabled()
@@ -341,9 +339,9 @@ for (const surface of ["popover", "dialog"] as const) {
         .locator(surface === "dialog" ? '[role="option"]' : ".session-mcp-row")
         .filter({ hasText: name })
 
-      // The popover's dot is the status, so the control beside the name must stay whole.
+      // The dot is the status, so the control beside the name must stay whole.
       const status =
-        surface === "dialog" || index === 3
+        index === 3
           ? row.getByText(["Connected", "Disabled", "Failed", "Sign in"][index], { exact: true })
           : row.locator('[data-slot="switch-control"]')
 

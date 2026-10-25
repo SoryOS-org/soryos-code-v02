@@ -123,6 +123,14 @@
   gap: 16px;
 }
 
+.mcp-dialog-lead {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
 .mcp-dialog-name {
   color: var(--v2-text-text-base);
   font-size: 13px;
@@ -131,38 +139,94 @@
   letter-spacing: -0.04px;
 }
 
+.mcp-dialog [data-status="disabled"] .mcp-dialog-name {
+  color: var(--v2-text-text-muted);
+}
+
+/* The session MCP list's status dot: filled while on, a ring when disabled. */
+.mcp-dialog-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--v2-icon-icon-faint);
+}
+
+.mcp-dialog-dot[data-status="connected"] {
+  color: var(--icon-success-base);
+}
+
+.mcp-dialog-dot[data-status="failed"] {
+  color: var(--icon-critical-base);
+}
+
+.mcp-dialog-dot[data-status="needs_auth"] {
+  color: var(--icon-warning-base);
+}
+
+.mcp-dialog-dot[data-status="disabled"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.mcp-dialog-dot[data-status="pending"] {
+  animation: mcp-dialog-pulse 1s ease-in-out infinite;
+}
+
+@keyframes mcp-dialog-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* A failed dot opens the error; a 16px target keeps it easy to hit. */
+button.mcp-dialog-dot {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+
+  &::after {
+    position: absolute;
+    inset: -5px;
+    content: "";
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--v2-border-border-focus);
+    outline-offset: 2px;
+  }
+}
+
+.mcp-dialog-dot-tip {
+  display: flex;
+  flex-shrink: 0;
+}
+
 .mcp-trailing {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: flex-end;
-  color: var(--v2-text-text-muted);
-  font-size: 13px;
-  font-weight: 440;
-  line-height: var(--line-height-compact);
-  letter-spacing: -0.04px;
   white-space: nowrap;
 }
 
-/* Set like the status label beside a switch, and only looks pressable under the pointer. */
+/* A quiet ghost action in the switch's place, small enough to weigh about as much as a switch. */
 .mcp-status-action[data-component="button-v2"][data-size="small"] {
   height: 20px;
   margin-inline-end: -5px;
   padding-inline: 5px;
-  gap: 1px;
   font-size: 11px;
   font-weight: 440;
   line-height: 16px;
   letter-spacing: 0.05px;
 }
 
-.mcp-status-action[data-component="button-v2"]:has([data-slot="icon-svg"]) {
-  padding-inline-end: 2px;
-}
-
-.mcp-status-action[data-tone="danger"][data-component="button-v2"],
-.mcp-status-action[data-tone="danger"][data-component="button-v2"] [data-slot="icon-svg"] {
-  color: var(--v2-state-fg-danger);
+@media (prefers-reduced-motion: reduce) {
+  .mcp-dialog-dot[data-status="pending"] {
+    animation: none;
+  }
 }
 
 .mcp-error-heading {

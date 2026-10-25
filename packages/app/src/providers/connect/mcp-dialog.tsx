@@ -9,6 +9,7 @@ import { Icon } from "@opencode/ui/icon"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { SearchList } from "@opencode/ui/search-list"
 import { Switch } from "@opencode/ui/switch"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { TruncatedText } from "@opencode/ui/truncated-text"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useMcpToggle } from "@/providers/connect/mcp"
@@ -19,6 +20,7 @@ import "@/shell/search-list.css"
 
 const statusLabels = {
   connected: "mcp.status.connected",
+  failed: "mcp.status.failed",
   needs_auth: "mcp.status.needs_auth",
   disabled: "mcp.status.disabled",
 } as const
@@ -198,65 +200,80 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
             {(item, row) => {
               const server = () => servers().find((entry) => entry.name === item().name)
               const status = () => server()?.status
-              // The switch would start sign-in anyway, so an auth-gated server shows that action instead.
-              const signIn = () => status()?.status === "needs_auth" && !!server()?.integrationID
-              const busy = () => toggle.isPending && toggle.variables === item().name
-
-              const detail = () => {
+              const error = () => {
                 const current = status()
 
-                if (!current || current.status === "pending" || current.status === "failed" || signIn()) return
+                return current?.status === "failed" ? current.error : undefined
+              }
+              // The switch would start sign-in anyway, so an auth-gated server shows that action instead.
+              const signIn = () => status()?.status === "needs_auth" && !!server()?.integrationID
 
-                return language.t(statusLabels[current.status])
+              const busy = () => {
+                const target = toggle.isPending ? toggle.variables : undefined
+
+                return (typeof target === "string" ? target : target?.name) === item().name
+              }
+
+              // The dot shows the status, as in the session's MCP list; the words stay for assistive technology.
+              const label = () => {
+                const current = status()?.status
+
+                return current && current !== "pending" ? language.t(statusLabels[current]) : undefined
               }
 
               return (
-                <div {...row} data-option-key={item().name}>
-                  <TruncatedText text={item().name} class="mcp-dialog-name" />
+                <div {...row} data-option-key={item().name} data-status={status()?.status}>
+                  <span class="mcp-dialog-lead">
+                    <Show
+                      when={error()}
+                      fallback={<span class="mcp-dialog-dot" data-status={status()?.status} aria-hidden="true" />}
+                    >
+                      {(message) => (
+                        <Tooltip value={message()} placement="top" openDelay={0} class="mcp-dialog-dot-tip">
+                          <button
+                            type="button"
+                            class="mcp-dialog-dot"
+                            data-status="failed"
+                            aria-label={language.t("dialog.mcp.error.actionLabel", { name: item().name })}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              select(item().name)
+                            }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Show>
+                    <TruncatedText text={item().name} class="mcp-dialog-name" />
+                  </span>
                   <div class="mcp-trailing" onClick={(event) => event.stopPropagation()}>
                     <Show
-                      when={status()?.status === "failed"}
+                      when={signIn()}
                       fallback={
-                        <Show
-                          when={signIn()}
-                          fallback={
-                            <Switch
-                              checked={status()?.status === "connected"}
-                              disabled={status()?.status === "pending" || busy()}
-                              onChange={() => toggleServer(item().name)}
-                            >
-                              <span class="sr-only">{item().name}</span>
-                              <span aria-hidden="true">{detail()}</span>
-                            </Switch>
-                          }
+                        <Switch
+                          checked={!!status() && status()?.status !== "disabled"}
+                          disabled={status()?.status === "pending" || busy()}
+                          description={label()}
+                          class="[&_[data-slot=switch-description]]:sr-only"
+                          onChange={(enabled) => {
+                            if (toggle.isPending) return
+                            toggle.mutate({ name: item().name, enabled })
+                          }}
                         >
-                          <Button
-                            size="small"
-                            variant="ghost-muted"
-                            class="mcp-status-action"
-                            disabled={busy()}
-                            aria-busy={busy()}
-                            aria-label={language.t("dialog.mcp.signIn.open", { name: item().name })}
-                            onClick={() => toggleServer(item().name)}
-                          >
-                            {language.t(busy() ? "dialog.mcp.signingIn" : "dialog.mcp.signIn")}
-                            {/* Sign-in continues in the browser, like the model picker's external links. */}
-                            <Icon name="arrow-up-right" size="small" />
-                          </Button>
-                        </Show>
+                          <span class="sr-only">{item().name}</span>
+                        </Switch>
                       }
                     >
-                      {/* The status is the way in: one control says what went wrong and opens why. */}
                       <Button
                         size="small"
                         variant="ghost-muted"
                         class="mcp-status-action"
-                        data-tone="danger"
-                        aria-label={language.t("dialog.mcp.error.actionLabel", { name: item().name })}
-                        onClick={() => select(item().name)}
+                        disabled={busy()}
+                        aria-busy={busy()}
+                        aria-label={language.t("dialog.mcp.signIn.open", { name: item().name })}
+                        onClick={() => toggleServer(item().name)}
                       >
-                        {language.t("mcp.status.failed")}
-                        <Icon name="chevron-right" size="small" />
+                        {language.t(busy() ? "dialog.mcp.signingIn" : "dialog.mcp.signIn")}
                       </Button>
                     </Show>
                   </div>
