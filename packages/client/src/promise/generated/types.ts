@@ -4905,17 +4905,19 @@ export type MessageListInput = {
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
     readonly type?:
-      | "agent-switched"
-      | "model-switched"
-      | "location-switched"
-      | "user"
-      | "synthetic"
-      | "system"
-      | "skill"
-      | "shell"
-      | "assistant"
-      | "compaction"
-      | "idle"
+      | (
+          | "agent-switched"
+          | "model-switched"
+          | "location-switched"
+          | "user"
+          | "synthetic"
+          | "system"
+          | "skill"
+          | "shell"
+          | "assistant"
+          | "compaction"
+          | "idle"
+        )
       | undefined
   }["limit"]
   readonly order?: {
@@ -4923,17 +4925,19 @@ export type MessageListInput = {
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
     readonly type?:
-      | "agent-switched"
-      | "model-switched"
-      | "location-switched"
-      | "user"
-      | "synthetic"
-      | "system"
-      | "skill"
-      | "shell"
-      | "assistant"
-      | "compaction"
-      | "idle"
+      | (
+          | "agent-switched"
+          | "model-switched"
+          | "location-switched"
+          | "user"
+          | "synthetic"
+          | "system"
+          | "skill"
+          | "shell"
+          | "assistant"
+          | "compaction"
+          | "idle"
+        )
       | undefined
   }["order"]
   readonly cursor?: {
@@ -4941,17 +4945,19 @@ export type MessageListInput = {
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
     readonly type?:
-      | "agent-switched"
-      | "model-switched"
-      | "location-switched"
-      | "user"
-      | "synthetic"
-      | "system"
-      | "skill"
-      | "shell"
-      | "assistant"
-      | "compaction"
-      | "idle"
+      | (
+          | "agent-switched"
+          | "model-switched"
+          | "location-switched"
+          | "user"
+          | "synthetic"
+          | "system"
+          | "skill"
+          | "shell"
+          | "assistant"
+          | "compaction"
+          | "idle"
+        )
       | undefined
   }["cursor"]
   readonly type?: {
@@ -4959,17 +4965,19 @@ export type MessageListInput = {
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
     readonly type?:
-      | "agent-switched"
-      | "model-switched"
-      | "location-switched"
-      | "user"
-      | "synthetic"
-      | "system"
-      | "skill"
-      | "shell"
-      | "assistant"
-      | "compaction"
-      | "idle"
+      | (
+          | "agent-switched"
+          | "model-switched"
+          | "location-switched"
+          | "user"
+          | "synthetic"
+          | "system"
+          | "skill"
+          | "shell"
+          | "assistant"
+          | "compaction"
+          | "idle"
+        )
       | undefined
   }["type"]
 }
