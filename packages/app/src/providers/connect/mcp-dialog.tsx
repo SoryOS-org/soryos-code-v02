@@ -4,7 +4,7 @@ import fuzzysort from "fuzzysort"
 import { useData } from "@/runtime/server/current"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { Button } from "@opencode/ui/button"
-import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
+import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { SearchList } from "@opencode/ui/search-list"
@@ -14,13 +14,13 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useMcpToggle } from "@/providers/connect/mcp"
 import { usePlatform } from "@/runtime/platform/platform"
 import { showToast } from "@/shell/notifications/toast"
+import "@/shell/commands/dialog.css"
 import "@/shell/search-list.css"
 
+// An off switch already says disabled, so only the states it can't show get a label.
 const statusLabels = {
   connected: "mcp.status.connected",
-  failed: "mcp.status.failed",
   needs_auth: "mcp.status.needs_auth",
-  disabled: "mcp.status.disabled",
 } as const
 
 /** The MCPs dialog for the current workspace. */
@@ -65,8 +65,6 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
       .map((result) => result.obj)
       .sort((a, b) => a.name.localeCompare(b.name))
   })
-
-  const enabledCount = createMemo(() => items().filter((i) => i.status === "connected").length)
 
   // Like the TUI, a failed server's row opens its error; retrying and disabling happen there.
   const failure = createMemo(() => {
@@ -126,16 +124,14 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
   let backRef: HTMLButtonElement | undefined
 
   return (
-    <Dialog class="search-list-dialog mcp-dialog">
+    // Like the model picker and the TUI, the list has no visible header; the search field leads.
+    <Dialog class="command-palette search-list-dialog mcp-dialog" size="large">
       <Show
         when={failure()}
         fallback={
-          <DialogHeader>
-            <DialogTitleGroup
-              title={language.t("dialog.mcp.title")}
-              description={language.t("dialog.mcp.description", { enabled: enabledCount(), total: items().length })}
-            />
-          </DialogHeader>
+          <div class="sr-only">
+            <DialogTitle>{language.t("dialog.mcp.title")}</DialogTitle>
+          </div>
         }
       >
         {(current) => (
@@ -189,7 +185,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
         )}
       </Show>
       <div class="contents" ref={listRef} style={{ display: failure() ? "none" : undefined }}>
-        <DialogBody class="search-list-body">
+        <DialogBody class="command-palette-body">
           <SearchList
             query={store.query}
             onQuery={(query) => setStore("query", query)}
@@ -209,7 +205,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
               const detail = () => {
                 const current = status()
 
-                if (!current || current.status === "pending" || current.status === "failed" || signIn()) return
+                if ((current?.status !== "connected" && current?.status !== "needs_auth") || signIn()) return
 
                 return language.t(statusLabels[current.status])
               }

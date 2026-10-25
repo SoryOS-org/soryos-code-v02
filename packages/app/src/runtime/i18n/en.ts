@@ -357,7 +357,6 @@ export const dict = {
   "prompt.toast.promptSendFailed.title": "Failed to send prompt",
 
   "dialog.mcp.title": "MCPs",
-  "dialog.mcp.description": "{{enabled}} of {{total}} enabled",
   "dialog.mcp.empty": "No MCPs configured",
   "dialog.mcp.search.empty": "No MCPs found",
   "dialog.mcp.error.title": "MCP server: {{name}}",

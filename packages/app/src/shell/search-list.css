@@ -115,12 +115,8 @@
   letter-spacing: -0.04px;
 }
 
-/* The list's title lines up with the server names below it; the error view keeps its own alignment. */
-[data-component="dialog-v2"]
-  [data-slot="dialog-container"]
-  .mcp-dialog[data-slot="dialog-content"]
-  > [data-slot="dialog-header"] {
-  padding-inline-start: 18px;
+[data-component="dialog-v2"]:has(.mcp-dialog) [data-slot="dialog-container"] {
+  width: min(calc(100vw - 24px), 480px);
 }
 
 .mcp-dialog [data-slot="search-list-row"] {

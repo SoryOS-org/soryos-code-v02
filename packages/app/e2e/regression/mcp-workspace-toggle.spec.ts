@@ -233,6 +233,8 @@ test("toggling an MCP from the dialog keeps it highlighted", async ({ page }) =>
 
   const row = view.panel.getByRole("option").filter({ hasText: "figma-desktop" })
   const toggle = row.getByRole("switch", { name: "figma-desktop", exact: true })
+  // The off switch says disabled on its own.
+  await expect(row.getByText("Disabled", { exact: true })).toHaveCount(0)
 
   // From the keyboard, Enter toggles the highlighted server and the highlight stays on it.
   await page.keyboard.press("ArrowDown")
@@ -340,9 +342,10 @@ for (const surface of ["popover", "dialog"] as const) {
         .locator(surface === "dialog" ? '[role="option"]' : ".session-mcp-row")
         .filter({ hasText: name })
 
-      // The popover's dot is the status, so the control beside the name must stay whole.
+      // The popover's dot is the status, so the control beside the name must stay whole. In the dialog an off switch
+      // is the whole status, with no label beside it.
       const status =
-        surface === "dialog" || index === 3
+        (surface === "dialog" && index !== 1) || index === 3
           ? row.getByText(["Connected", "Disabled", "Failed", "Sign in"][index], { exact: true })
           : row.locator('[data-slot="switch-control"]')
 
