@@ -4,7 +4,8 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Document, Info, type Entry } from "@opencode/schema/config"
 import { ConfigAgent } from "@opencode/schema/config/agent"
 import path from "path"
-import { Effect, Option, PubSub, Schema, Stream } from "effect"
+import { Effect, FiberMap, Option, PubSub, Schema, Stream } from "effect"
+import { Watcher } from "../../filesystem/watcher.js"
 import { Agent } from "../../agent.js"
 import { Config } from "../../config.js"
 import { ConfigMarkdown } from "../markdown.js"
@@ -38,6 +39,40 @@ export const Plugin = define({
     const config = yield* Config.Service
     const fs = yield* FSUtil.Service
     const global = yield* Global.Service
+    const watcher = yield* Effect.serviceOption(Watcher.Service)
+    const watches = yield* FiberMap.make<string>()
+    const externalDirectories = new Set<string>()
+
+    const syncExternalWatches = Effect.fnUntraced(function* () {
+      const entries = yield* config.entries()
+      const current = new Set<string>()
+      for (const entry of entries) {
+        if (entry.type !== "directory") continue
+        for (const name of sourceDirectories) {
+          const sourcePath = path.join(entry.path, name)
+          const resolved = yield* fs.realPath(sourcePath).pipe(Effect.orElseSucceed(() => undefined))
+          if (resolved && !FSUtil.contains(entry.path, resolved)) {
+            current.add(resolved)
+          }
+        }
+      }
+      externalDirectories.clear()
+      for (const dir of current) externalDirectories.add(dir)
+
+      if (Option.isSome(watcher)) {
+        const w = watcher.value
+        for (const key of Array.from(watches, ([key]) => key)) {
+          if (!current.has(key)) yield* FiberMap.remove(watches, key)
+        }
+        for (const dir of current) {
+          const updates = yield* w.subscribe({ path: dir, type: "directory", ignore: FSUtil.ignoreGlobs })
+          yield* FiberMap.run(watches, dir, updates.pipe(Stream.runForEach(notify)), {
+            onlyIfMissing: true,
+            startImmediately: true,
+          })
+        }
+      }
+    })
     const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
       if (entry.type === "document") return [entry]
       if (entry.type !== "directory") return []
@@ -50,6 +85,7 @@ export const Plugin = define({
       ).pipe(Effect.map((documents) => documents.filter((document): document is Document => document !== undefined)))
     })
     const load = Effect.fn("ConfigAgentPlugin.load")(function* () {
+      yield* syncExternalWatches()
       return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))
     })
     const loaded = { documents: [] as Document[] }
@@ -65,7 +101,9 @@ export const Plugin = define({
     const changes = yield* PubSub.sliding<void>(1)
     const notify = () => PubSub.publish(changes, undefined)
     yield* config.changes().pipe(
-      Stream.filterEffect((update) => Effect.map(config.entries(), (entries) => isAgentSource(entries, update.path))),
+      Stream.filterEffect((update) =>
+        Effect.map(config.entries(), (entries) => isAgentSource(entries, update.path, externalDirectories)),
+      ),
       Stream.runForEach(notify),
       Effect.forkScoped({ startImmediately: true }),
     )
@@ -129,9 +167,14 @@ export const Plugin = define({
   }),
 })
 
-// Matches anything at or under <root>/{agent,agents,mode,modes}. No file-suffix
-// check: directory-level events such as renames carry no per-file paths.
-function isAgentSource(entries: Entry[], file: string) {
+// Matches anything at or under <root>/{agent,agents,mode,modes} or external targets of those directories.
+// No file-suffix check: directory-level events such as renames carry no per-file paths.
+function isAgentSource(entries: Entry[], file: string, external?: ReadonlySet<string>) {
+  if (external) {
+    for (const dir of external) {
+      if (FSUtil.contains(dir, file)) return true
+    }
+  }
   return entries.some(
     (entry) =>
       entry.type === "directory" &&
