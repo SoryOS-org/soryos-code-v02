@@ -32,23 +32,13 @@ const fromRequest = Effect.fn("MetaMessages.fromRequest")(function* (request: LL
     ...body,
     messages: body.messages.map((message) => {
       if (message.role !== "user") return message
-      const videos = message.content.flatMap((block) =>
-        block.type === "tool_result" && typeof block.content !== "string"
-          ? block.content.filter((item) => item.type === "video")
-          : [],
-      )
-      if (videos.length === 0) return message
-      return {
-        ...message,
-        content: [
-          ...message.content.map((block) =>
-            block.type === "tool_result" && typeof block.content !== "string"
-              ? { ...block, content: block.content.filter((item) => item.type !== "video") }
-              : block,
-          ),
-          ...videos,
-        ],
-      }
+      const videos: Array<(typeof message.content)[number]> = []
+      const content = message.content.map((block) => {
+        if (block.type !== "tool_result" || typeof block.content === "string") return block
+        videos.push(...block.content.filter((item) => item.type === "video"))
+        return { ...block, content: block.content.filter((item) => item.type !== "video") }
+      })
+      return videos.length === 0 ? message : { ...message, content: [...content, ...videos] }
     }),
     tools:
       body.tools === undefined

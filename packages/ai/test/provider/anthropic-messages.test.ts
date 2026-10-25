@@ -860,20 +860,22 @@ describe("Anthropic Messages route", () => {
     }),
   )
 
-  it.effect("serializes Messages video by default and keeps Meta placement private", () =>
+  const video = { type: "video", source: { type: "base64", media_type: "video/mp4", data: "AAECAw==" } }
+  const videoFile = { type: "file" as const, uri: "data:video/mp4;base64,AAECAw==", mime: "video/mp4" }
+  const customModel = AnthropicMessages.route.with({ provider: "custom" }).model({ id: "video-model" })
+
+  it.effect("serializes Messages video inputs", () =>
     Effect.gen(function* () {
-      const video = { type: "video", source: { type: "base64", media_type: "video/mp4", data: "AAECAw==" } }
-      const attachment = { type: "file" as const, uri: "data:video/mp4;base64,AAECAw==", mime: "video/mp4" }
       const user = LLM.request({
-        model: AnthropicMessages.route.with({ provider: "custom" }).model({ id: "video-model" }),
+        model: customModel,
         prompt: [
           Message.media(Media.base64("AAECAw==", "video/mp4"), { cache: new CacheHint({ type: "ephemeral" }) }),
           Message.media(Media.ref("custom", "file_clip", "video/mp4")),
         ],
         cache: "none",
       })
-      const unknown = yield* compileRequest(user)
-      expect(unknown.body.messages).toEqual([
+      const prompt = yield* compileRequest(user)
+      expect(prompt.body.messages).toEqual([
         {
           role: "user",
           content: [
@@ -891,7 +893,7 @@ describe("Anthropic Messages route", () => {
               id: "clip",
               name: "read",
               resultType: "content",
-              result: [attachment, { type: "file", uri: "storage://clip", mime: "video/mp4" }],
+              result: [videoFile, { type: "file", uri: "storage://clip", mime: "video/mp4" }],
             }),
           ],
         }),
@@ -901,6 +903,22 @@ describe("Anthropic Messages route", () => {
         { type: "video", source: { type: "url", url: "storage://clip" } },
       ])
 
+      const foreign = yield* compileRequest(LLMRequest.update(user, { model })).pipe(Effect.flip)
+      expect(foreign.message).toContain("got custom:file_clip")
+
+      const native = yield* compileRequest(
+        LLM.request({
+          model: AnthropicMessages.route.model({ id: "video-model" }),
+          prompt: Message.media(Media.base64("AAECAw==", "video/mp4")),
+          cache: "none",
+        }),
+      )
+      expect(native.body.messages).toEqual([{ role: "user", content: [video] }])
+    }),
+  )
+
+  it.effect("moves Meta tool result videos after consecutive results", () =>
+    Effect.gen(function* () {
       const meta = LLM.request({
         model: Meta.configure({ apiKey: "test" }).messages("video-model"),
         messages: [
@@ -908,8 +926,8 @@ describe("Anthropic Messages route", () => {
             ToolCallPart.make({ id: "first", name: "read", input: {} }),
             ToolCallPart.make({ id: "second", name: "read", input: {} }),
           ]),
-          Message.tool({ id: "first", name: "read", resultType: "content", result: [attachment] }),
-          Message.tool({ id: "second", name: "read", resultType: "content", result: [attachment] }),
+          Message.tool({ id: "first", name: "read", resultType: "content", result: [videoFile] }),
+          Message.tool({ id: "second", name: "read", resultType: "content", result: [videoFile] }),
           Message.assistant("Observed."),
         ],
         cache: "none",
@@ -935,23 +953,11 @@ describe("Anthropic Messages route", () => {
         { role: "assistant", content: [{ type: "text", text: "Observed." }] },
       ])
 
-      const generic = yield* compileRequest(LLMRequest.update(meta, { model: user.model }))
+      const generic = yield* compileRequest(LLMRequest.update(meta, { model: customModel }))
       expect(generic.body.messages[1]?.content).toEqual([
         { type: "tool_result", tool_use_id: "first", content: [video] },
         { type: "tool_result", tool_use_id: "second", content: [video] },
       ])
-
-      const foreign = yield* compileRequest(LLMRequest.update(user, { model })).pipe(Effect.flip)
-      expect(foreign.message).toContain("got custom:file_clip")
-
-      const native = yield* compileRequest(
-        LLM.request({
-          model: AnthropicMessages.route.model({ id: "video-model" }),
-          prompt: Message.media(Media.base64("AAECAw==", "video/mp4")),
-          cache: "none",
-        }),
-      )
-      expect(native.body.messages).toEqual([{ role: "user", content: [video] }])
     }),
   )
 

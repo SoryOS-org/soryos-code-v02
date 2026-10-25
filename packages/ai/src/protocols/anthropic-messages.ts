@@ -689,12 +689,15 @@ const lowerMedia = Effect.fnUntraced(function* (part: MediaPart, request: LLMReq
   const cacheControlValue = breakpoints ? cacheControl(breakpoints, part.cache) : undefined
   if (mime.startsWith("video/")) {
     const inline = part.media.inline()
-    const reference = yield* ProviderShared.mediaReference(part.media, request.model.provider, "Messages video")
     const source = inline
       ? { type: "base64" as const, media_type: mime, data: inline.base64 }
-      : reference.type === "ref" && !reference.value.includes("://")
-        ? { type: "file" as const, file_id: reference.value }
-        : { type: "url" as const, url: reference.value }
+      : yield* ProviderShared.mediaReference(part.media, request.model.provider, "Messages video").pipe(
+          Effect.map((reference) =>
+            reference.type === "ref" && !reference.value.includes("://")
+              ? { type: "file" as const, file_id: reference.value }
+              : { type: "url" as const, url: reference.value },
+          ),
+        )
     return {
       type: "video" as const,
       source,
@@ -1408,7 +1411,10 @@ const onContentBlockDelta = Effect.fnUntraced(function* (
   return [state, NO_EVENTS] satisfies StepResult
 })
 
-const onContentBlockStop = Effect.fnUntraced(function* (state: ParserState, event: AnthropicEvent) {
+const onContentBlockStop = Effect.fnUntraced(function* (
+  state: ParserState,
+  event: AnthropicEvent,
+) {
   if (event.index === undefined) return [state, NO_EVENTS] satisfies StepResult
   if (event.index in state.compactions) {
     const { [event.index]: content, ...compactions } = state.compactions
