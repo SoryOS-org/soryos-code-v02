@@ -89,6 +89,14 @@ describe("xAI Responses route", () => {
     }),
   )
 
+  it.effect("sends min_p from provider options", () =>
+    Effect.gen(function* () {
+      const prepared = yield* compileRequest(LLM.request({ model, prompt: "Hello", providerOptions: { minP: 0.1 } }))
+
+      expect(prepared.body.min_p).toBe(0.1)
+    }),
+  )
+
   it.effect("parses xAI reasoning summaries", () =>
     Effect.gen(function* () {
       const response = yield* LLMClient.generate(LLM.request({ model, prompt: "Think" })).pipe(
