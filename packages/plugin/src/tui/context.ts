@@ -394,7 +394,7 @@ export interface DialogSelectOptions<Value> {
 export interface Dialog {
   /** Shows a dialog. */
   show(render: () => JSX.Element, onClose?: () => void): void
-  /** Sets the active dialog's presentation options. */
+  /** Sets the shown dialog's presentation options. Call after `show()`, which resets size and centering. Omitted options reset to their defaults. */
   set(options: DialogOptions): void
   /** Closes the active dialog. */
   clear(): void

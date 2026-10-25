@@ -423,10 +423,9 @@ await context.ui.dialog.select({
 - Escape, `clear()`, or showing another dialog resolves `undefined`.
 - Do not bind `ctrl+n` or `ctrl+p`. The dialog reserves them for navigation, and its own bindings take precedence.
 
-Custom JSX dialogs can set their size and close themselves.
+Custom JSX dialogs can set their size and close themselves. `set()` applies to the dialog that is shown, so call it after `show()`. Showing a dialog resets its size to `medium` and `centered` to `false`.
 
 ```tsx
-context.ui.dialog.set({ size: "large", centered: true })
 context.ui.dialog.show(
   () => (
     <box>
@@ -435,6 +434,7 @@ context.ui.dialog.show(
   ),
   () => console.log("closed"),
 )
+context.ui.dialog.set({ size: "large", centered: true })
 context.ui.dialog.clear()
 ```
 
