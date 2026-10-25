@@ -228,17 +228,13 @@ export const Plugin = {
                         .write(moveTarget.absolute, new TextEncoder().encode(change.content))
                         .pipe(Effect.mapError((error) => fail(`Failed to write ${moveTarget.resource}`, error)))
                       // The destination was created, not renamed, so it inherited the process umask.
-                      // Carry the source's permission bits over before the source disappears.
+                      // Carry the source's permission bits over before the source disappears. Best-effort:
+                      // chmod can legitimately fail (EPERM on network or bind-mounted filesystems), and
+                      // failing here after the destination was already written would leave two copies on
+                      // disk — losing the exec bit beats failing a move that used to succeed.
                       yield* environment.files
                         .copyMode(change.target.absolute, moveTarget.absolute)
-                        .pipe(
-                          Effect.mapError((error) =>
-                            fail(
-                              `Wrote ${moveTarget.resource} but failed to copy permissions from ${change.target.resource}`,
-                              error,
-                            ),
-                          ),
-                        )
+                        .pipe(Effect.ignore)
                       yield* environment.files
                         .remove(change.target.absolute)
                         .pipe(
