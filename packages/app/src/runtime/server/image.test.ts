@@ -22,16 +22,14 @@ function setup(
 describe("readLocalImage", () => {
   test.each([
     ["images/screen #1 + 50% ?.PNG", "/workspace/project", "images/screen%20%231%20%2B%2050%25%20%3F.PNG"],
-    ["C:/tmp/opencode/screen #1.png", "C:/tmp/opencode/", "screen%20%231.png"],
-    ["d:/screen.png", "d:/", "screen.png"],
-    ["D:/charts/screen.png", "D:/charts/", "screen.png"],
-    ["Z:/charts/screen.png", "Z:/charts/", "screen.png"],
-    ["/tmp/opencode/screen #1.png", "/tmp/opencode/", "screen%20%231.png"],
+    ["/workspace/project/images/screen #1.png", "/workspace/project", "images/screen%20%231.png"],
+    ["C:/project/charts/screen #1.png", "C:\\project", "charts/screen%20%231.png"],
+    ["d:/Project/screen.png", "D:/project/", "screen.png"],
     ["/screen.png", "/", "screen.png"],
-  ])("reads %s with the correct location and authentication", async (path, directory, encoded) => {
+  ])("reads %s with the session location and authentication", async (path, directory, encoded) => {
     const { api, requests } = setup()
     const signal = new AbortController().signal
-    const blob = await readLocalImage(api, "/workspace/project", path, signal)
+    const blob = await readLocalImage(api, directory, path, signal)
 
     expect(blob).toBeInstanceOf(Blob)
     expect(blob?.type).toBe("image/png")
@@ -94,7 +92,10 @@ describe("readLocalImage", () => {
     "images.png/image",
     "image.png/",
     "",
-  ])("does not request unsupported input %s", async (path) => {
+    "/tmp/opencode/image.png",
+    "/repository/image.png",
+    "C:/repo/image.png",
+  ])("does not request unsupported or outside input %s", async (path) => {
     const { api, requests } = setup()
     expect(await readLocalImage(api, "/repo", path, new AbortController().signal)).toBeUndefined()
     expect(requests).toHaveLength(0)

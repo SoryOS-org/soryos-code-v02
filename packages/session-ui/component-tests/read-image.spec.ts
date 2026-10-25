@@ -27,7 +27,7 @@ for (const grouped of [true, false]) {
       await page.evaluate(
         async ({ fixture, grouped }) => {
           const { mountReadImage } = await import(fixture)
-          mountReadImage({ path: "C:\\tmp\\chart%20 one.PNG", grouped, running: true })
+          mountReadImage({ path: "C:\\project\\chart%20 one.PNG", grouped, running: true })
         },
         { fixture, grouped },
       )
@@ -60,7 +60,7 @@ for (const grouped of [true, false]) {
         if (action === "click") {
           expect(requests).toHaveLength(1)
           expect(new URL(requests[0]).pathname).toBe("/api/fs/read/chart%2520%20one.PNG")
-          expect(new URL(requests[0]).searchParams.get("location[directory]")).toBe("C:/tmp/")
+          expect(new URL(requests[0]).searchParams.get("location[directory]")).toBe("C:/project")
           await root.getByRole("button", { name: "Append read", exact: true }).click()
           await expect(image).toHaveAttribute("src", url!)
           expect(requests).toHaveLength(1)
@@ -141,7 +141,7 @@ story("keeps an unavailable image read collapsible", async ({ page }) => {
   await page.route("**/api/fs/read/**", (route) => route.fulfill({ status: 404, body: "Not found" }))
   await page.evaluate(async (fixture) => {
     const { mountReadImage } = await import(fixture)
-    mountReadImage({ path: "/tmp/missing.png", grouped: true })
+    mountReadImage({ path: "C:/project/missing.png", grouped: true })
   }, fixture)
   const root = page.getByTestId("read-image-fixture")
   const trigger = root.getByRole("button", { name: "Read missing.png", exact: true })

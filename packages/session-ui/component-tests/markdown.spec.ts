@@ -665,7 +665,7 @@ for (const streaming of [false, true]) {
         async ({ fixture, streaming }) => {
           const { mountMarkdown } = await import(fixture)
           await mountMarkdown({
-            text: "![Chart](C:/tmp/chart%20one.png)\n\n![Again](C:/tmp/chart%20one.png)",
+            text: "![Chart](C:/project/chart%20one.png)\n\n![Again](C:/project/chart%20one.png)",
             streaming,
             cached: !streaming,
             images: true,
@@ -678,7 +678,7 @@ for (const streaming of [false, true]) {
       await expect.poll(() => image.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1)
       await expect(harness.getByRole("button", { name: "Again", exact: true })).toHaveAttribute("src", /^blob:/)
       expect(requests).toHaveLength(1)
-      expect(new URL(requests[0]).searchParams.get("location[directory]")).toBe("C:/tmp/")
+      expect(new URL(requests[0]).searchParams.get("location[directory]")).toBe("C:/project")
       const url = await image.getAttribute("src")
       await harness.getByLabel("Streaming").uncheck()
       await expect(harness.locator('[data-component="markdown"]')).toHaveAttribute("data-markdown-ready", "")
@@ -763,7 +763,7 @@ story("keeps scripts and external resources inactive inside local SVG images", a
   )
   await page.evaluate(async (fixture) => {
     const { mountMarkdown } = await import(fixture)
-    await mountMarkdown({ images: true, text: "![SVG](Z:/charts/chart.svg)" })
+    await mountMarkdown({ images: true, text: "![SVG](C:/project/chart.svg)" })
   }, fixture)
   const image = page.getByTestId("markdown-fixture").getByRole("button", { name: "SVG" })
   await expect.poll(() => image.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(32)
@@ -793,7 +793,7 @@ story("loads file URLs and Windows paths, and leaves unreadable images as alt te
     await mountMarkdown({
       images: true,
       // Marked percent-encodes the backslashes of a Windows image path, here inside a table cell.
-      text: "![Available](file:///C:/tmp/chart%25.png)\n\n![Unavailable](file:///tmp/missing.png)\n\n| Windows |\n| --- |\n| ![Windows](C:\\tmp\\windows.png) |",
+      text: "![Available](file:///C:/project/chart%25.png)\n\n![Unavailable](file:///C:/project/missing.png)\n\n| Windows |\n| --- |\n| ![Windows](C:\\project\\windows.png) |",
     })
   }, fixture)
   const harness = page.getByTestId("markdown-fixture")
