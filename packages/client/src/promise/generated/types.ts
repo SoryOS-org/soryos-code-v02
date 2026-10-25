@@ -140,6 +140,22 @@ export type InstructionHash = string
 
 export type SessionInboxSyntheticPayload1 = { text: string; description?: string; metadata?: { [x: string]: any } }
 
+export type SessionGoalID = string
+
+export type SessionGoalReason = { code: string; message: string }
+
+export type SessionGoalTodoInput = {
+  content: string
+  status: "pending" | "in_progress" | "completed" | "cancelled"
+  acceptance?: string
+}
+
+export type SessionGoalTodoVerification = {
+  position: number
+  status: "pending" | "in_progress" | "completed" | "cancelled"
+  feedback: string
+}
+
 export type SessionMessageNative1 = { [x: string]: any }
 
 export type ToolFileContent1 = { type: "file"; uri: string; mime: string; name?: string | undefined }
@@ -553,6 +569,15 @@ export type InstructionEntrySnapshot = Array<{ key: InstructionEntryKey; value: 
 export type EventLogSynced = { type: "log.synced"; aggregateID: string; seq?: EventSeq }
 
 export type LocationRef = { directory: AbsolutePath; workspaceID?: WorkspaceID }
+
+export type SessionGoalSnapshot = {
+  id: SessionGoalID
+  revision: number
+  objective: string
+  phase: "active" | "paused" | "blocked" | "complete"
+  blockedReason?: SessionGoalReason
+  maxGoalRounds: number
+}
 
 export type SessionMessageAssistantText1 = { type: "text"; text: string; native?: SessionMessageNative1 }
 
@@ -1189,6 +1214,36 @@ export type SessionInstructionsUpdated = {
   durable: { aggregateID: string; seq: EventSeq; version: 2 }
   location?: LocationRef
   data: { sessionID: SessionID; delta: { [x: string]: InstructionHash | "removed" }; text?: string }
+}
+
+export type SessionGoalCleared = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.goal.cleared"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; goalID: SessionGoalID; revision: number }
+}
+
+export type SessionTodoUpdated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.todo.updated"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; revision: number; todos: Array<SessionGoalTodoInput> }
+}
+
+export type SessionTodoVerified = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.todo.verified"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; revision: number; items: Array<SessionGoalTodoVerification> }
 }
 
 export type SessionSynthetic = {
@@ -1932,6 +1987,16 @@ export type McpResourcesChanged = {
   data: { server: string }
 }
 
+export type SessionGoalUpdated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.goal.updated"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; snapshot: SessionGoalSnapshot }
+}
+
 export type SessionToolSuccess = {
   id: EventID
   created: number
@@ -2564,6 +2629,10 @@ export type SessionEventDurable =
   | SessionExecutionFailed
   | SessionExecutionInterrupted
   | SessionInstructionsUpdated
+  | SessionGoalUpdated
+  | SessionGoalCleared
+  | SessionTodoUpdated
+  | SessionTodoVerified
   | SessionSynthetic
   | SessionSkillActivated
   | SessionShellStarted
@@ -2630,6 +2699,10 @@ export type V2Event =
   | SessionExecutionFailed
   | SessionExecutionInterrupted
   | SessionInstructionsUpdated
+  | SessionGoalUpdated
+  | SessionGoalCleared
+  | SessionTodoUpdated
+  | SessionTodoVerified
   | SessionSynthetic
   | SessionSkillActivated
   | SessionShellStarted
@@ -6087,68 +6160,3 @@ export type ConfigShellsOutput = Array<ConfigShellOption>
 export type ConfigUpdateInput = { readonly shell: { readonly shell: string | null }["shell"] }
 
 export type ConfigUpdateOutput = void
-
-export type SessionGoalID = string
-
-export type SessionGoalReason = { code: string; message: string }
-
-export type SessionGoalTodoInput = {
-  content: string
-  status: "pending" | "in_progress" | "completed" | "cancelled"
-  acceptance?: string
-}
-
-export type SessionGoalTodoVerification = {
-  position: number
-  status: "pending" | "in_progress" | "completed" | "cancelled"
-  feedback: string
-}
-
-export type SessionGoalSnapshot = {
-  id: SessionGoalID
-  revision: number
-  objective: string
-  phase: "active" | "paused" | "blocked" | "complete"
-  blockedReason?: SessionGoalReason
-  maxGoalRounds: number
-}
-
-export type SessionGoalCleared = {
-  id: EventID
-  created: number
-  metadata?: { [x: string]: any }
-  type: "session.goal.cleared"
-  durable: { aggregateID: string; seq: EventSeq; version: 1 }
-  location?: LocationRef
-  data: { sessionID: SessionID; goalID: SessionGoalID; revision: number }
-}
-
-export type SessionTodoUpdated = {
-  id: EventID
-  created: number
-  metadata?: { [x: string]: any }
-  type: "session.todo.updated"
-  durable: { aggregateID: string; seq: EventSeq; version: 1 }
-  location?: LocationRef
-  data: { sessionID: SessionID; revision: number; todos: Array<SessionGoalTodoInput> }
-}
-
-export type SessionTodoVerified = {
-  id: EventID
-  created: number
-  metadata?: { [x: string]: any }
-  type: "session.todo.verified"
-  durable: { aggregateID: string; seq: EventSeq; version: 1 }
-  location?: LocationRef
-  data: { sessionID: SessionID; revision: number; items: Array<SessionGoalTodoVerification> }
-}
-
-export type SessionGoalUpdated = {
-  id: EventID
-  created: number
-  metadata?: { [x: string]: any }
-  type: "session.goal.updated"
-  durable: { aggregateID: string; seq: EventSeq; version: 1 }
-  location?: LocationRef
-  data: { sessionID: SessionID; snapshot: SessionGoalSnapshot }
-}
