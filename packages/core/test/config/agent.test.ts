@@ -698,6 +698,43 @@ Mixed fields.`,
       ),
     ),
   )
+
+  it.effect("rebuilds on an update to an agent file through a directory symlink", () =>
+    Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          const external = path.join(tmp.path, "external-agents")
+          const linked = path.join(tmp.path, "config-root", "agents")
+          yield* Effect.promise(async () => {
+            await fs.mkdir(external, { recursive: true })
+            await fs.mkdir(path.dirname(linked), { recursive: true })
+            await fs.symlink(external, linked, "junction")
+            await fs.writeFile(path.join(external, "reviewer.md"), "Initial prompt")
+          })
+
+          const agents = yield* Agent.Service
+          const configTest = yield* Config.Test
+          let reloads = 0
+          yield* ConfigAgentPlugin.Plugin.effect(
+            host({
+              agent: {
+                ...agentHost(agents),
+                reload: () => agents.reload().pipe(Effect.tap(() => Effect.sync(() => reloads++))),
+              },
+            }),
+          )
+
+          expect(yield* agents.get(Agent.ID.make("reviewer"))).toMatchObject({ system: "Initial prompt" })
+
+          yield* Effect.promise(() => fs.writeFile(path.join(external, "reviewer.md"), "Updated prompt"))
+          yield* configTest.emitChange({ type: "update", path: path.join(external, "reviewer.md") })
+          yield* advance(() => reloads >= 1)
+          expect(reloads).toBe(1)
+          expect(yield* agents.get(Agent.ID.make("reviewer"))).toMatchObject({ system: "Updated prompt" })
+        }).pipe(Effect.provide(Config.testLayer([directoryEntry(path.join(tmp.path, "config-root"))]))),
+      ),
+    ),
+  )
 })
 
 function loadMarkdownAgent(frontmatter: string) {
