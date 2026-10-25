@@ -75,6 +75,11 @@ export function createSessionRevert(input: {
     // and redo delivers them.
     restore(target, message)
     owner.run(() => input.setActiveMessage(previous))
+    // Rewinding also puts the files back, so offer the way out right where it happened.
+    showToast({
+      title: language.t("session.rewind.toast.title"),
+      actions: [{ label: language.t("session.rewind.toast.undo"), onClick: () => void redo() }],
+    })
   }
 
   const to = async (messageID: string) => {

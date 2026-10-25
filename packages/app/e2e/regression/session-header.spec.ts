@@ -32,11 +32,13 @@ for (const direction of ["ltr", "rtl"] as const) {
 
     // Every control in the header highlights the same 28px band on hover.
     const usage = header.getByRole("button", { name: "Toggle session context", exact: true })
+
     const heights = await Promise.all(
       [project, header.getByRole("heading"), options, usage, details, review].map(
         async (control) => (await control.boundingBox())?.height,
       ),
     )
+
     expect(heights).toEqual([28, 28, 28, 28, 28, 28])
 
     for (const editing of [false, true]) {
@@ -146,6 +148,7 @@ for (const direction of ["ltr", "rtl"] as const) {
     await expect(page.locator('[data-slot="shell-drag-inset"]')).toHaveCSS("app-region", "drag")
 
     const gap = header.locator('[data-slot="session-header-gap"]')
+
     const aligned = async () => {
       const [box, space, end, start, row] = await Promise.all([
         area.boundingBox(),
@@ -156,6 +159,7 @@ for (const direction of ["ltr", "rtl"] as const) {
       ])
 
       if (!box || !space || !end || !start || !row) return false
+
       const between =
         direction === "ltr"
           ? space.x >= end.x + end.width && space.x + space.width <= start.x
@@ -246,11 +250,13 @@ test.describe("location", () => {
       await expect(header.getByRole("button", { name: "More options", exact: true })).toBeInViewport()
       await header.getByRole("heading").hover()
       await location.hover()
+
       if (state.project && state.worktree) {
         // Advance past the shared tooltip delay, so absence is not just its initial waiting period.
         await page.clock.fastForward(500)
         await expect(tooltip).toBeHidden()
       }
+
       if (!state.project || !state.worktree) await expect(tooltip).toHaveText("Location / quiet-falcon")
       await expect
         .poll(() =>
@@ -562,7 +568,7 @@ test.describe("revert", () => {
         new URL(response.url()).pathname === `/api/session/${session.id}/revert/stage`,
     )
 
-    await message.getByRole("button", { name: "Revert message" }).click()
+    await message.getByRole("button", { name: "Rewind to here" }).click()
     expect((await response).ok()).toBe(true)
 
     await expect(page.getByRole("textbox", { name: "Prompt" })).toHaveText("Second prompt")
@@ -608,6 +614,6 @@ test.describe("revert", () => {
     await expectSessionTitle(page, "Session message revert")
     const message = page.locator('[data-message-id="msg_second"]')
     await message.hover()
-    await expect(message.getByRole("button", { name: "Revert message" })).toHaveCount(0)
+    await expect(message.getByRole("button", { name: "Rewind to here" })).toHaveCount(0)
   })
 })

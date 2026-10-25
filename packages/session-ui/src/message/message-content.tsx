@@ -99,7 +99,7 @@ function modelLabel(
 
 function MessageActionButton(
   props: Pick<ComponentProps<"button">, "disabled" | "onMouseDown" | "onClick" | "aria-label"> & {
-    icon: "check" | "copy" | "reset" | "arrow-down-to-line" | "outline-trash"
+    icon: "check" | "copy" | "reset" | "fork" | "arrow-down-to-line" | "outline-trash"
     label: JSX.Element
     size?: "small" | "normal"
   },
@@ -326,7 +326,7 @@ export function CurrentUserMessageDisplay(props: {
   const i18n = useI18n()
   const menu = useMessageMenu()
 
-  const [state, setState] = createStore({ copied: false, reverting: false, updating: false })
+  const [state, setState] = createStore({ copied: false, reverting: false, forking: false, updating: false })
 
   const status = createMemo(() => props.actions?.pending?.status(props.message.id))
   const pending = createMemo(() => status() !== undefined && status() !== "queued")
@@ -423,6 +423,17 @@ export function CurrentUserMessageDisplay(props: {
     }
   }
 
+  const fork = async () => {
+    if (!props.actions?.fork || state.forking) return
+    setState("forking", true)
+
+    try {
+      await props.actions.fork({ sessionID: props.sessionID, messageID: props.message.id })
+    } finally {
+      setState("forking", false)
+    }
+  }
+
   const updatePending = async (action: "queue" | "remove") => {
     const actions = props.actions?.pending
 
@@ -475,6 +486,22 @@ export function CurrentUserMessageDisplay(props: {
               void revert()
             }}
             aria-label={i18n.t("ui.message.revertMessage")}
+          />
+        </UserMessageTransition>
+      </Show>
+      <Show when={props.actions?.fork}>
+        <UserMessageTransition active={!pending()}>
+          <MessageActionButton
+            icon="fork"
+            size="small"
+            label={i18n.t("ui.message.forkMessage")}
+            disabled={state.forking}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => {
+              event.stopPropagation()
+              void fork()
+            }}
+            aria-label={i18n.t("ui.message.forkMessage")}
           />
         </UserMessageTransition>
       </Show>
@@ -611,6 +638,11 @@ export function CurrentUserMessageDisplay(props: {
           <Show when={props.actions?.revert && !pending()}>
             <Menu.Item disabled={state.reverting} onSelect={() => void revert()}>
               {i18n.t("ui.message.revertMessage")}
+            </Menu.Item>
+          </Show>
+          <Show when={props.actions?.fork && !pending()}>
+            <Menu.Item disabled={state.forking} onSelect={() => void fork()}>
+              {i18n.t("ui.message.forkMessage")}
             </Menu.Item>
           </Show>
           <Show when={props.text}>
