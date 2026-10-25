@@ -1753,15 +1753,15 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
-  it.effect("preserves metadata-only reasoning when the stream ends", () =>
+  it.effect("preserves metadata-only reasoning arriving after the finish reason", () =>
     Effect.gen(function* () {
       const details = [{ type: "reasoning.encrypted", data: "opaque", format: "openai-responses-v1", index: 0 }]
       const response = yield* LLMClient.generate(request).pipe(
         Effect.provide(
           fixedResponse(
             sseEvents(
-              { choices: [{ delta: { reasoning_details: details } }] },
               { choices: [{ delta: {}, finish_reason: "stop" }] },
+              { choices: [{ delta: { reasoning_details: details } }] },
             ),
           ),
         ),
