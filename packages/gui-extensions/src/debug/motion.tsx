@@ -442,10 +442,8 @@ function FeatureKnobs(props: {
   const set = (key: string, value: Value | null) => {
     const item = byId.get(key)
 
-    if (!item) return
-
-    // An undo back to what ships arrives as null.
-    if (value === null) return reset(item)
+    // With nullDefaults off, null never arrives; resets reach onReset.
+    if (!item || value === null) return
 
     // SAFETY: each key's descriptor was made from its knob, so knobs sends that knob's kind of value.
     applyMotion(item, value as MotionKnob["value"])
@@ -453,6 +451,8 @@ function FeatureKnobs(props: {
 
   const controls = createRemoteControls(`opencode-motion-${group}`, descriptors, {
     values: values(),
+    // Beta is a production build, where knobs resolves its production entry: the panel mounts only when shipped.
+    ship: () => import("knobs/panel"),
     nullDefaults: false,
     echo: 0,
     persist: "none",
@@ -490,7 +490,8 @@ function FeatureKnobs(props: {
 
       chosen = next
 
-      if (next) applyFeaturePreset(feature, next === "default" ? "shipped" : next)
+      // The Shipped chip clears the scope's active preset.
+      applyFeaturePreset(feature, next ?? "shipped")
     }),
   )
 

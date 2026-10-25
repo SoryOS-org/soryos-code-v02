@@ -130,6 +130,7 @@ story("a feature page's preset chips go through the feature model, modes include
         },
       })
 
+      const shipped = spring().duration
       const { mountExtensions, until } = await import(modules.fixture)
       const debug = await import(modules.debug)
       const definition = { ...debug.default, renderer: () => import(modules.renderer) }
@@ -158,7 +159,13 @@ story("a feature page's preset chips go through the feature model, modes include
       await until(() => !!chip("Snappy"))
       chip("Snappy")?.click()
       await until(() => !alt() && spring().duration === 0.2)
-      const values = { alt: alt(), duration: spring().duration }
+      await until(() => !!chip("Alt"))
+      chip("Alt")?.click()
+      await until(() => alt())
+      await until(() => !!chip("Shipped"))
+      chip("Shipped")?.click()
+      await until(() => !alt())
+      const values = { alt: alt(), shipped: spring().duration === shipped }
       host.unmount()
 
       return values
@@ -166,5 +173,5 @@ story("a feature page's preset chips go through the feature model, modes include
     { ...modules, tuning: sourceURL(new URL("../../ui/src/motion-tuning.ts", import.meta.url)) },
   )
 
-  expect(result).toEqual({ alt: false, duration: 0.2 })
+  expect(result).toEqual({ alt: false, shipped: true })
 })
