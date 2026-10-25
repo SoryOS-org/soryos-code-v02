@@ -1867,7 +1867,6 @@ describe("OpenAI Responses route", () => {
 
   it.effect("lowers Responses video by provider and preserves ordered tool results", () =>
     Effect.gen(function* () {
-      const media = Media.url("https://example.com/clip.mp4", { mediaType: "video/mp4" })
       const videoResult = Message.tool({
         id: "call_video",
         name: "record",
@@ -1875,50 +1874,36 @@ describe("OpenAI Responses route", () => {
         result: [{ type: "file", uri: "https://example.com/clip.mp4", mime: "video/mp4", name: "clip.mp4" }],
       })
       const messages = [
-        Message.user({ type: "media", media, filename: "clip.mp4" }),
+        Message.user({ type: "media", media: Media.base64("AAECAw==", "video/mp4"), filename: "inline.mp4" }),
         Message.assistant([ToolCallPart.make({ id: "call_video", name: "record", input: {} })]),
         videoResult,
       ]
-      const fileInput = [
-        {
-          type: "message",
-          role: "user",
-          content: [{ type: "input_file", filename: "clip.mp4", file_url: "https://example.com/clip.mp4" }],
-        },
+      const expectedInput = (user: object, tool: object) => [
+        { type: "message", role: "user", content: [user] },
         { type: "function_call", call_id: "call_video", name: "record", arguments: "{}" },
-        {
-          type: "function_call_output",
-          call_id: "call_video",
-          output: [{ type: "input_file", filename: "clip.mp4", file_url: "https://example.com/clip.mp4" }],
-        },
-      ]
-      const videoInput = [
-        {
-          type: "message",
-          role: "user",
-          content: [{ type: "input_video", video_url: "https://example.com/clip.mp4" }],
-        },
-        { type: "function_call", call_id: "call_video", name: "record", arguments: "{}" },
-        {
-          type: "function_call_output",
-          call_id: "call_video",
-          output: [{ type: "input_video", video_url: "https://example.com/clip.mp4" }],
-        },
+        { type: "function_call_output", call_id: "call_video", output: [tool] },
       ]
       const custom = OpenAICompatibleResponses.route
         .with({ provider: "custom", endpoint: { baseURL: "https://provider.example/v1" } })
         .model({ id: "video-model" })
-      for (const item of [
-        {
-          name: "unknown provider uses input_video for user and tool video",
-          model: custom,
-          input: videoInput,
-        },
-        { name: "xAI user and tool video", model: xaiModel, input: fileInput },
-      ]) {
-        const prepared = yield* compileRequest(LLM.request({ model: item.model, messages }))
-        expect(prepared.body.input, item.name).toMatchObject(item.input)
-      }
+      expect(
+        (yield* compileRequest(LLM.request({ model: custom, messages }))).body.input,
+        "unknown provider uses input_video for user and tool video",
+      ).toMatchObject(
+        expectedInput(
+          { type: "input_video", video_url: "data:video/mp4;base64,AAECAw==" },
+          { type: "input_video", video_url: "https://example.com/clip.mp4" },
+        ),
+      )
+      expect(
+        (yield* compileRequest(LLM.request({ model: xaiModel, messages }))).body.input,
+        "xAI uses input_file for user and tool video",
+      ).toMatchObject(
+        expectedInput(
+          { type: "input_file", filename: "inline.mp4", file_data: "data:video/mp4;base64,AAECAw==" },
+          { type: "input_file", filename: "clip.mp4", file_url: "https://example.com/clip.mp4" },
+        ),
+      )
 
       const meta = Meta.configure({ apiKey: "test" }).responses("muse-spark-1.3")
       const metaRequest = LLM.request({

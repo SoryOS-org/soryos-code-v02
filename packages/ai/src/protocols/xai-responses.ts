@@ -36,14 +36,10 @@ const adapter = {
   name: NAME,
   lowerMedia: ({ part, media }) => {
     if (part.media.kind !== "video") return undefined
+    const filename = part.filename ?? "file"
     const url = ProviderShared.mediaUrl(part.media)
-    const location = url ?? media?.dataUrl
-    if (location === undefined) return undefined
-    return {
-      type: "input_file",
-      filename: part.filename ?? "file",
-      ...(url ? { file_url: url } : { file_data: location }),
-    }
+    if (url) return { type: "input_file", filename, file_url: url }
+    return media && { type: "input_file", filename, file_data: media.dataUrl }
   },
   restoreHostedToolItem: (item: unknown) => (Schema.is(XAIResponsesHostedToolItem)(item) ? item : undefined),
 } satisfies OpenResponses.ProviderAdapter

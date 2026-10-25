@@ -89,18 +89,14 @@ const fromRequest = Effect.fn("MetaResponses.fromRequest")(function* (request: L
     }),
     adapter,
   )
-  const input: typeof body.input = []
-  const videos: Extract<OpenResponses.MediaInput, { type: "input_video" }>[] = []
-  const isFunctionOutput = (
-    item: (typeof body.input)[number],
-  ): item is Extract<(typeof body.input)[number], { type: "function_call_output" }> =>
-    item.type === "function_call_output"
+  // Meta cannot see video nested in tool results; attach it after the complete result batch.
+  const input: InputItem[] = []
+  const videos: OpenResponses.MediaInput[] = []
   const flushVideos = () => {
-    if (videos.length === 0) return
-    input.push({ type: "message", role: "user", content: videos.splice(0) })
+    if (videos.length > 0) input.push({ type: "message", role: "user", content: videos.splice(0) })
   }
   for (const item of body.input) {
-    if (!isFunctionOutput(item)) {
+    if (!isFunctionCallOutput(item)) {
       flushVideos()
       input.push(item)
       continue
@@ -109,18 +105,23 @@ const fromRequest = Effect.fn("MetaResponses.fromRequest")(function* (request: L
       input.push(item)
       continue
     }
-    const attachments = item.output.filter((part) => part.type === "input_video")
     const content = item.output.filter((part) => part.type !== "input_video")
-    videos.push(...attachments)
+    videos.push(...item.output.filter((part) => part.type === "input_video"))
     input.push({
       ...item,
       output:
-        attachments.length > 0 && content.length === 0 ? "Video attached in the following user message." : content,
+        content.length === 0 && item.output.length > 0 ? "Video attached in the following user message." : content,
     })
   }
   flushVideos()
   return { ...body, input }
 })
+
+type InputItem = OpenResponses.OpenResponsesBody["input"][number]
+
+// Hosted replay items have an open `type`, so a plain tag check does not narrow the union.
+const isFunctionCallOutput = (item: InputItem): item is Extract<InputItem, { type: "function_call_output" }> =>
+  item.type === "function_call_output"
 
 const HOSTED_TOOLS = {
   web_search_call: { name: "web_search", input: (item) => item.action ?? {} },
