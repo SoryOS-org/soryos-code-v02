@@ -10,7 +10,7 @@ import {
   type Media,
   Message,
   SystemPart,
-} from "@opencode/ai"
+} from "@opencode/ai/effect"
 import type { StreamOptions } from "@opencode/ai/route"
 import type {
   SessionCompaction,
