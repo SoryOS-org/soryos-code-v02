@@ -115,22 +115,54 @@
   letter-spacing: -0.04px;
 }
 
-.mcp-dialog .search-list-row {
+/* The list's title lines up with the server names below it; the error view keeps its own alignment. */
+[data-component="dialog-v2"]
+  [data-slot="dialog-container"]
+  .mcp-dialog[data-slot="dialog-content"]
+  > [data-slot="dialog-header"] {
+  padding-inline-start: 18px;
+}
+
+.mcp-dialog [data-slot="search-list-row"] {
   gap: 16px;
 }
 
-.mcp-dialog .search-list-row-text {
-  flex: 1;
-}
-
-.mcp-dialog .search-list-title {
-  flex: 1;
+.mcp-dialog-name {
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  font-weight: 530;
+  line-height: var(--line-height-compact);
+  letter-spacing: -0.04px;
 }
 
 .mcp-trailing {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  color: var(--v2-text-text-muted);
+  font-size: 13px;
+  font-weight: 440;
+  line-height: var(--line-height-compact);
+  letter-spacing: -0.04px;
   white-space: nowrap;
+}
+
+/* Reads as the status text beside a switch, and only looks pressable under the pointer. */
+.mcp-status-action[data-component="button-v2"][data-size="small"] {
+  height: 22px;
+  margin-inline-end: -6px;
+  padding-inline: 6px;
+  gap: 2px;
+}
+
+.mcp-status-action[data-component="button-v2"]:has([data-slot="icon-svg"]) {
+  padding-inline-end: 2px;
+}
+
+.mcp-status-action[data-tone="danger"][data-component="button-v2"],
+.mcp-status-action[data-tone="danger"][data-component="button-v2"] [data-slot="icon-svg"] {
+  color: var(--v2-state-fg-danger);
 }
 
 .mcp-error-heading {
@@ -160,14 +192,9 @@
 }
 
 @media (max-width: 639px), (hover: none) {
-  .mcp-dialog .search-list-row {
+  .mcp-dialog [data-slot="search-list-row"] {
     height: auto;
     min-height: 44px;
     padding-block: 8px;
-  }
-
-  .mcp-dialog .search-list-title {
-    white-space: normal;
-    overflow-wrap: anywhere;
   }
 }

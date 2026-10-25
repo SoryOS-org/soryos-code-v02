@@ -156,7 +156,7 @@ for (const surface of ["dialog"] as const) {
 
     // The dialog opens with its search focused and the first server highlighted.
     if (surface === "dialog") {
-      await expect(view.panel.getByRole("searchbox", { name: "Search", exact: true })).toBeFocused()
+      await expect(view.panel.getByRole("combobox", { name: "Search", exact: true })).toBeFocused()
       await expect(view.panel.getByRole("option")).toHaveAttribute("aria-selected", "true")
     }
 
@@ -176,12 +176,12 @@ for (const surface of ["dialog"] as const) {
     ])
     expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
 
-    // Status is separate from the shared v2 button that opens the error.
+    // The status itself is the shared v2 button that opens the error.
     const failed = view.panel.getByRole("button", { name: "Details for figma-desktop", exact: true })
     const details = page.getByRole("dialog", { name: "figma-desktop", exact: true })
     await expect(view.toggle).toHaveCount(0)
     await expect(view.panel.getByText("Failed", { exact: true })).toHaveCount(1)
-    await expect(failed).toHaveText("Details")
+    await expect(failed).toHaveText("Failed")
     await expect(failed).toHaveAttribute("data-component", "button-v2")
     await failed.click()
     await expect(details).toHaveAccessibleDescription("Connection failed")
@@ -219,6 +219,34 @@ for (const surface of ["dialog"] as const) {
     await expect(view.toggle).toBeEnabled()
   })
 }
+
+test("toggling an MCP from the dialog keeps it highlighted", async ({ page }) => {
+  const connected = new Set<string>()
+  const names = ["alpha-mcp", "figma-desktop", "zeta-mcp"]
+
+  const view = await open(page, {
+    surface: "dialog",
+    mcp: () => names.map((name) => ({ name, status: { status: connected.has(name) ? "connected" : "disabled" } })),
+    onMcpAction: (input) =>
+      void (input.action === "connect" ? connected.add(input.server) : connected.delete(input.server)),
+  })
+
+  const row = view.panel.getByRole("option").filter({ hasText: "figma-desktop" })
+  const toggle = row.getByRole("switch", { name: "figma-desktop", exact: true })
+
+  // From the keyboard, Enter toggles the highlighted server and the highlight stays on it.
+  await page.keyboard.press("ArrowDown")
+  await expect(row).toHaveAttribute("aria-selected", "true")
+  await page.keyboard.press("Enter")
+  await expect(toggle).toBeChecked()
+  await expect(row).toHaveAttribute("aria-selected", "true")
+
+  // With the pointer, the switch toggles the row under it and the highlight stays there too.
+  await row.locator('[data-slot="switch-control"]').click()
+  await expect(toggle).not.toBeChecked()
+  await expect(toggle).toBeEnabled()
+  await expect(row).toHaveAttribute("aria-selected", "true")
+})
 
 for (const surface of ["popover", "dialog"] as const) {
   test(`signs in to an auth-gated MCP from the ${surface}`, async ({ page, context }) => {
