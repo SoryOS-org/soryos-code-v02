@@ -19,6 +19,8 @@ import "./voice.css"
 const toggle = motionTuning.toggle("voice.calls", {
   label: en["experiment.voiceCalls"],
   group: "Voice",
+  description: "Call button in the composer",
+  target: ".voice-call-action",
   experiment: true,
   value: false,
 })
@@ -37,8 +39,10 @@ export function VoiceComposer(props: ParentProps<{ session: SessionInfo | undefi
   const platform = usePlatform()
   const [state, setState] = createStore({ enabled: toggle() })
   onCleanup(motionTuning.subscribe(() => setState("enabled", toggle())))
+
   const enabled = () =>
     platform.platform === "desktop" && import.meta.env.VITE_OPENCODE_CHANNEL !== "prod" && state.enabled
+
   createEffect(() => {
     const session = props.session
 

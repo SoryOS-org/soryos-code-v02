@@ -202,7 +202,7 @@ function SessionScreenContent(props: {
 
   replayPanelToggle({
     id: "side",
-    label: "Toggle the side panel",
+    label: "Side panel",
     toggle: () => session.layout.view().side.toggle(),
   })
 

@@ -51,3 +51,51 @@ story("the debug bar stays open across a remount until its close button hides it
 
   expect(result).toEqual({ opened: true, saved: { visible: false, motion: false }, reopened: false })
 })
+
+story("a feature page's Enabled switch turns that feature on after another feature's page", async ({ page }) => {
+  const result = await page.evaluate(
+    async (modules) => {
+      localStorage.setItem("opencode.motion.panel", JSON.stringify({ x: 0, y: 0, width: 680 }))
+      const { motionTuning } = await import(modules.tuning)
+
+      const experiment = (id: string, subsection: string) =>
+        motionTuning.toggle(id, { label: subsection, group: "Switches", subsection, experiment: true, value: false })
+
+      const first = experiment("switches.first", "First")
+      const second = experiment("switches.second", "Second")
+      const { mountExtensions, until } = await import(modules.fixture)
+      const debug = await import(modules.debug)
+      const definition = { ...debug.default, renderer: () => import(modules.renderer) }
+
+      const host = mountExtensions({
+        definitions: [definition],
+        stored: { "extension.debug.bar": { visible: true, motion: true } },
+      })
+
+      host.release()
+
+      const row = (name: string) =>
+        document.querySelector<HTMLButtonElement>(`[data-motion-feature="Switches · ${name}"]`)
+
+      const enabled = (name: string) =>
+        [...document.querySelectorAll("h3")]
+          .find((heading) => heading.textContent === name)
+          ?.parentElement?.querySelector<HTMLInputElement>('[data-component="switch"] input')
+
+      await until(() => row("First") !== null)
+      row("First")?.click()
+      await until(() => !!enabled("First"))
+      row("Second")?.click()
+      await until(() => !!enabled("Second"))
+      enabled("Second")?.click()
+      await until(() => first() || second())
+      const values = { first: first(), second: second() }
+      host.unmount()
+
+      return values
+    },
+    { ...modules, tuning: sourceURL(new URL("../../ui/src/motion-tuning.ts", import.meta.url)) },
+  )
+
+  expect(result).toEqual({ first: false, second: true })
+})

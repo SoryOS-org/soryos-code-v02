@@ -7,6 +7,8 @@ const enabled = motionTuning.toggle("sources.enabled", {
   label: "Enabled",
   group: "Experiments",
   subsection: "Sources",
+  description: "Pages a turn searched and read",
+  target: '[data-component="sources-chip"]',
   experiment: true,
   value: false,
 })

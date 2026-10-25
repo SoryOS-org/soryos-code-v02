@@ -57,7 +57,7 @@
     "./motion": "./src/motion/index.ts",
     "./motion/solid": "./src/motion/solid.ts",
     "./motion-tuning": "./src/motion-tuning.ts",
-    "./motion-tuning-panel": "./src/motion-tuning-panel.ts",
+    "./motion-tuning-features": "./src/motion-tuning-features.ts",
     "./motion-tuning-fields": "./src/motion-tuning-fields.ts",
     "./progress-circle": "./src/feedback/progress-circle/progress-circle.tsx",
     "./project-avatar": "./src/data-display/project-avatar/project-avatar.tsx",

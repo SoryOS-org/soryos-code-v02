@@ -4,7 +4,6 @@
   .cursor-grab,
   .cursor-grabbing,
   .active\:cursor-grabbing:active,
-  .knobs-panel > header,
   [data-slot="image-preview-body"][data-zoomed],
   [data-slot="image-preview-body"][data-dragging],
   .session-service-config,

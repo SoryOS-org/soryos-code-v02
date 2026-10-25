@@ -24,6 +24,8 @@ const style = motionTuning.choice("sidebars.preview.style", {
   label: "Style",
   group: "Sidebars",
   subsection: "Hover",
+  description: "Tab tooltip between rows",
+  target: "#vertical-tabs-sidebar",
   experiment: true,
   value: "cursor",
   labels: { today: "Today", glide: "Glide", cursor: "Follow cursor" },
@@ -100,7 +102,9 @@ export function TabPreviewPopover(props: {
       open,
       (now, before) => {
         if (!before || now || !triggerEl) return
+
         if (triggerEl === glide.trigger) unwatch()
+
         if (props.orientation === "vertical" && glides()) leave(triggerEl)
       },
       { defer: true },
@@ -148,6 +152,7 @@ export function TabPreviewPopover(props: {
         tabIndex={-1}
         onPointerMove={(event: PointerEvent) => {
           glide.pointerY = event.clientY
+
           if (props.orientation === "vertical" && style() === "cursor" && triggerEl === glide.trigger) place()
         }}
       >
@@ -209,6 +214,7 @@ function show(card: HTMLElement, trigger: HTMLElement) {
   if (style() === "cursor") {
     watch(trigger)
     place()
+
     // The card has no height while it mounts, so clamp again once it's laid out.
     if (!glide.rects) requestAnimationFrame(place)
 
@@ -240,6 +246,7 @@ function cursorOffset() {
   const rects = glide.rects ?? measure()
 
   if (!rects) return 0
+
   // The card has no height until it's attached, so a measurement taken as it mounts isn't kept.
   if (rects.card > 0) glide.rects = rects
   const top = glide.pointerY - rects.row.height / 2
@@ -262,6 +269,7 @@ function watch(trigger: HTMLElement) {
     glide.rects = undefined
     place()
   }
+
   const observer = new ResizeObserver(refresh)
   observer.observe(trigger.closest('[data-slot="vertical-tabs"]') ?? trigger)
   window.addEventListener("scroll", refresh, { capture: true, passive: true })

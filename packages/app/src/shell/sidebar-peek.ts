@@ -9,6 +9,8 @@ export const sidebarPeekEnabled = motionTuning.toggle("sidebar.peek", {
   label: "Peekable sidebar",
   group: "Sidebars",
   subsection: "Peek",
+  description: "Float the sidebar from its toggle",
+  target: 'button[aria-controls="vertical-tabs-sidebar"]',
   experiment: true,
   value: true,
 })
@@ -18,13 +20,13 @@ const peekKnobs = { group: "Sidebars", subsection: "Peek", when: sidebarPeekEnab
 // "Matched" slides the peek on the docked sidebar's own spring instead of its quicker one.
 const peekMatched = motionTuning.toggle("sidebar.peek.matched", {
   ...peekKnobs,
-  label: "Peek matches sidebar spring",
+  label: "Match sidebar spring",
   value: false,
 })
 
 const peekSpring = motionTuning.spring("sidebar.peek.spring", {
   ...peekKnobs,
-  label: "Peek spring",
+  label: "Spring",
   when: () => sidebarPeekEnabled() && !peekMatched(),
   shipped: "smooth",
   presets: {
@@ -50,7 +52,7 @@ const dwellKnob = (from: "edge" | "toggle", label: string, value: number) =>
 // over the 28px toggle in ~30–60ms on the way to the breadcrumb or the traffic lights. The toggle waits longer because
 // the header row is crossed far more often than the bare window edge, and a peek that starts just before a click docks
 // smoothly. Both are tunable in Knobs → Sidebars → Peek.
-const dwell = { edge: dwellKnob("edge", "Peek edge dwell", 40), toggle: dwellKnob("toggle", "Peek toggle dwell", 80) }
+const dwell = { edge: dwellKnob("edge", "Edge dwell", 40), toggle: dwellKnob("toggle", "Toggle dwell", 80) }
 
 /** Whether any session in the vertical sidebar draws its unread dot, published by the sidebar's tab strip. */
 export const [sidebarUnread, setSidebarUnread] = createSignal(false)
@@ -239,11 +241,13 @@ export function createSidebarPeek(input: {
   // A visible menu, a drag, or typing in one of the sidebar's fields keeps it open wherever the pointer goes.
   const held = () => {
     const active = document.activeElement
+
     const typing =
       active instanceof HTMLElement &&
       input.aside()?.contains(active) &&
       (active.matches("input, textarea") || active.isContentEditable) &&
       active.getClientRects().length > 0
+
     const menu = [...document.querySelectorAll(menus)].some((element) => element.getClientRects().length > 0)
 
     return pressed || typing || menu || !!document.querySelector('[data-dragging="true"]')

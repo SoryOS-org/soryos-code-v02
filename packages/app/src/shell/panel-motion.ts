@@ -4,6 +4,8 @@ import { motionGlobals, motionTuning } from "@opencode/ui/motion-tuning"
 
 const group = "Sidebars"
 
+const subsection = "Open & close"
+
 // Panels in flight, across the app. Native views, which no DOM box clips, stay hidden while any panel moves.
 const [flights, setFlights] = createSignal(0)
 
@@ -12,7 +14,7 @@ export const panelsMoving = () => flights() > 0
 // The "James" option, chosen in the preset strip beside Snappy, Smooth and Calm, swaps the section's knobs for its own: the
 // layout moves on its layout spring, like the shared spring's, while the panel opens with a short shift and fade (Web
 // Animations on the compositor) and closes at once. The shared spring ships; James stays one choice away.
-const james = motionTuning.mode("sidebars.james", { label: "James", group })
+const james = motionTuning.mode("sidebars.james", { label: "James", group, subsection })
 
 const springs = () => !james()
 
@@ -20,6 +22,9 @@ const springs = () => !james()
 const spring = motionTuning.spring("sidebars", {
   label: "Spring",
   group,
+  subsection,
+  description: "Sidebar and side panel, one spring",
+  target: "#vertical-tabs-sidebar",
   when: springs,
   shipped: "smooth",
   presets: {
@@ -35,6 +40,8 @@ const scaleByDistance = motionTuning.toggle("sidebars.scaleByDistance", {
   label: "Scale by distance",
   group,
   subsection: "Scale by distance",
+  description: "Wider panels take a little longer",
+  target: "#vertical-tabs-sidebar",
   experiment: true,
   value: true,
 })
@@ -96,6 +103,7 @@ export function panelSpring(distance?: number, base = spring(), scale = distance
 const style = motionTuning.choice("sidebars.style", {
   label: "Motion",
   group,
+  subsection,
   when: springs,
   value: "spring",
   labels: { spring: "Spring", instant: "Instant" },
@@ -106,6 +114,7 @@ const style = motionTuning.choice("sidebars.style", {
 const contentsFade = motionTuning.choice("sidebars.contentsFade", {
   label: "Contents fade",
   group,
+  subsection,
   when: springs,
   value: "edge",
   labels: { edge: "Edge", off: "Off", spring: "Whole spring" },
@@ -114,6 +123,7 @@ const contentsFade = motionTuning.choice("sidebars.contentsFade", {
 const edgeFade = motionTuning.number("sidebars.edgeFade", {
   label: "Edge fade",
   group,
+  subsection,
   when: () => springs() && contentsFade() === "edge",
   value: 15,
   min: 5,
@@ -137,6 +147,7 @@ export const panelOpacity = (closed: number) => {
 const jamesShift = motionTuning.spring("sidebars.james.shift", {
   label: "Movement",
   group,
+  subsection,
   when: james,
   shipped: "smooth",
   presets: {
@@ -149,6 +160,7 @@ const jamesShift = motionTuning.spring("sidebars.james.shift", {
 const jamesFade = motionTuning.easing("sidebars.james.fade", {
   label: "Fade",
   group,
+  subsection,
   when: james,
   value: [0.17, 0.85, 0.63, 1.03],
 })
@@ -156,6 +168,7 @@ const jamesFade = motionTuning.easing("sidebars.james.fade", {
 const jamesFadeDuration = motionTuning.number("sidebars.james.fadeDuration", {
   label: "Fade duration",
   group,
+  subsection,
   when: james,
   value: 0.24,
   min: 0.05,
@@ -169,6 +182,7 @@ const jamesFadeDuration = motionTuning.number("sidebars.james.fadeDuration", {
 export const jamesPanelShift = motionTuning.number("sidebars.james.panelShift", {
   label: "Panel shift",
   group,
+  subsection,
   when: james,
   value: 46,
   min: 0,
@@ -182,6 +196,7 @@ export const jamesPanelShift = motionTuning.number("sidebars.james.panelShift", 
 const jamesLayout = motionTuning.choice("sidebars.james.layout", {
   label: "Layout",
   group,
+  subsection,
   when: james,
   value: "animate",
   labels: { animate: "Animate", off: "Off" },
@@ -191,6 +206,7 @@ const layoutSpring = (direction: string, label: string) =>
   motionTuning.spring(`sidebars.james.layout.${direction}`, {
     label,
     group,
+    subsection,
     when: () => james() && jamesLayout() !== "off",
     shipped: "smooth",
     presets: {
@@ -385,9 +401,9 @@ function measureBlocks(box: HTMLElement) {
   }
 }
 
-/** Adds a button that toggles a panel to the Motion workspace's Sidebars section while the panel is mounted. */
+/** Adds a button that toggles a panel to the Knobs panel's Open & close page while the panel is mounted. */
 export function replayPanelToggle(input: { id: string; label: string; toggle: () => void }) {
-  onCleanup(motionTuning.action({ id: `sidebars.${input.id}`, label: input.label, group, run: input.toggle }))
+  onCleanup(motionTuning.action({ id: `sidebars.${input.id}`, label: input.label, group, subsection, run: input.toggle }))
 }
 
 /**

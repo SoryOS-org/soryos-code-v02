@@ -31,6 +31,8 @@ import { windowDragEnabled } from "@/session/header/drag-area"
 // start padding.
 const homeClearance = collapsedSidebarToggleEnd - 10
 
+type SidebarPose = { closed: number; peek: number | undefined }
+
 export const sidebarToggleCommand = { id: "sidebar.toggle", keybind: "mod+shift+b" }
 
 export default function Layout(props: ParentProps) {
@@ -62,7 +64,7 @@ export default function Layout(props: ParentProps) {
   const toggleSidebar = () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen())
 
   // How far closed the docked sidebar is, and how far in its peek has it, undefined while it isn't peeking.
-  const sidebar: { closed: number; peek: number | undefined } = {
+  const sidebar: SidebarPose = {
     closed: preferences.appearance.sidebarOpen() ? 0 : 1,
     peek: undefined,
   }
@@ -139,7 +141,7 @@ export default function Layout(props: ParentProps) {
     whenDocked: sidebarMotion.whenSettled,
   })
 
-  replayPanelToggle({ id: "sidebar", label: "Toggle the left sidebar", toggle: toggleSidebar })
+  replayPanelToggle({ id: "sidebar", label: "Sidebar", toggle: toggleSidebar })
 
   guardClosingFocus({
     root: () => state.tabsAside,

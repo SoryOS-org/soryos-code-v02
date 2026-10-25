@@ -450,7 +450,11 @@ it("swaps the spring knobs for James's while it's on", () => {
     motionTuning
       .list()
       .filter(
-        (knob) => knob.group === "Sidebars" && !knob.subsection && knob.kind !== "mode" && (knob.when?.() ?? true),
+        (knob) =>
+          knob.group === "Sidebars" &&
+          knob.subsection === "Open & close" &&
+          knob.kind !== "mode" &&
+          (knob.when?.() ?? true),
       )
       .map((knob) => knob.label)
 

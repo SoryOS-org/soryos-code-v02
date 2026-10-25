@@ -1,18 +1,22 @@
 import type { DurationOptions } from "./motion"
 
 // Live motion settings for developer mode. Each surface registers knobs under the area of the app it belongs to
-// (Sidebars, Composer…) with their shipped defaults, plus actions that replay its motion; the Knobs panel
-// (`motion-tuning-panel`) shows a collapsible card per area. A knob marked `experiment` is a design variant to try
-// before one ships. Edits persist on this device.
+// (Sidebars, Composer…) and the feature they tune, with their shipped defaults, plus actions that replay its motion;
+// the Knobs panel lists the features (`motion-tuning-features`) and opens one to tune it. A knob marked `experiment`
+// is a design variant to try before one ships. Edits persist on this device.
 
 type Knob<Kind extends string, Value> = {
   kind: Kind
   id: string
   label: string
-  /** The area of the app it tunes: one card in the panel. */
+  /** The area of the app it tunes: a heading in the panel's list of features. */
   group: string
-  /** A sub-heading within the area's card, such as one feature among several. */
+  /** The feature it tunes within the area, such as one experiment among several; the area's own knobs have none. */
   subsection?: string
+  /** A short hint at what the feature changes, shown under its name; the first of a feature's knobs to give one wins. */
+  description?: string
+  /** A CSS selector for the part of the app the feature changes, outlined by the panel's Focus. */
+  target?: string
   /** The design experiment this knob switches on or between, marked as one in the panel. */
   experiment?: boolean
   /** Shown only while this holds, e.g. the controls of the option a choice selects. */
@@ -39,7 +43,15 @@ export type MotionKnob =
 
 export type MotionAction = { id: string; label: string; group: string; subsection?: string; run: () => void }
 
-type Meta = { label: string; group: string; subsection?: string; experiment?: boolean; when?: () => boolean }
+type Meta = {
+  label: string
+  group: string
+  subsection?: string
+  description?: string
+  target?: string
+  experiment?: boolean
+  when?: () => boolean
+}
 
 // Bumped when knobs are merged or renamed, so values saved for the old ones are dropped.
 const key = "opencode.motion.v2"
@@ -64,6 +76,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial,
@@ -84,6 +98,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
@@ -106,6 +122,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial,
@@ -121,6 +139,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
@@ -140,6 +160,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,
@@ -165,6 +187,8 @@ export const motionTuning = {
       label: meta.label,
       group: meta.group,
       subsection: meta.subsection,
+      description: meta.description,
+      target: meta.target,
       experiment: meta.experiment,
       when: meta.when,
       initial: meta.value,

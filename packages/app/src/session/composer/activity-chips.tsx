@@ -12,20 +12,27 @@ import { useSettings } from "@/settings/model"
 import "./activity-chips.css"
 
 const chip = motionTuning.choice("activity.chip", {
-  label: en["experiment.activityChip"],
+  label: en["experiment.activityChip.style"],
   group: "Composer",
+  subsection: en["experiment.activityChip"],
+  description: "Chip above the composer",
+  target: '[data-component="session-activity-chips"]',
   experiment: true,
   value: "today",
   labels: { today: en["experiment.activityChip.today"], orb: en["experiment.activityChip.orb"] },
 })
+
 const corners = motionTuning.choice("activity.chip.corners", {
   label: en["experiment.chipCorners"],
   group: "Composer",
+  subsection: en["experiment.activityChip"],
   experiment: true,
   value: "capsule",
   labels: { capsule: en["experiment.chipCorners.capsule"], composer: en["experiment.chipCorners.composer"] },
 })
+
 const [experiment, setExperiment] = createStore({ chip: chip(), corners: corners() })
+
 motionTuning.subscribe(() => setExperiment({ chip: chip(), corners: corners() }))
 
 export type SessionActivityItem = {
@@ -73,16 +80,20 @@ export function SessionActivityChips(props: {
 }) {
   const language = useLanguage()
   const settings = useSettings()
+
   const active = () =>
     settings.general.backgroundActivity() !== "off" && (props.subagents.length > 0 || props.shells.length > 0)
+
   const alignment = createMemo(() => {
     const value = settings.general.backgroundActivity()
+
     if (value === "center") return "center"
 
     // Left/right are physical positions; Kobalte and flex alignment use logical start/end.
     return (value === "left") !== (language.direction() === "rtl") ? "start" : "end"
   })
-  const placement = () => (alignment() === "center" ? "top" : alignment() === "end" ? "top-end" : "top-start")
+
+  const placement = () => ({ center: "top", start: "top-start", end: "top-end" } as const)[alignment()]
 
   // A subagent can only be interrupted once its child session exists.
   const stoppable = (item: SessionActivityItem) => item.type === "shell" || !!item.sessionID
@@ -200,6 +211,7 @@ export function SessionActivityChips(props: {
               onFocusIn={(event: FocusEvent) => {
                 if (!(event.target instanceof HTMLElement)) return
                 const row = event.target.closest<HTMLElement>('[data-component="menu-v2-item"]')
+
                 if (!row) return
                 // Kobalte's scroll adjustment ignores scroll-padding; native scrolling keeps the ring clear of the edge.
                 queueMicrotask(() => row.scrollIntoView({ block: "nearest", inline: "nearest" }))
@@ -248,12 +260,16 @@ export function SessionActivityChips(props: {
 // Load on first opt-in, then retain both identities for an interruptible crossfade.
 function ActivityGlyph(props: { muted?: boolean }) {
   const enabled = createMemo((previous) => previous || experiment.chip === "orb", false)
+
   const [orb] = createResource(enabled, async () => {
     const { CssAgentOrb } = await import("@/session/agent-glyph/css-agent-orb")
+
     return CssAgentOrb
   })
+
   // Guard the first read so loading this experiment never suspends the composer or hides today's glyph.
   const loaded = () => orb.state === "ready"
+
   return (
     <span data-slot="activity-glyph" data-orb={experiment.chip === "orb" && loaded()} aria-hidden="true">
       <span data-slot="activity-glyph-today">
