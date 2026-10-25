@@ -27,6 +27,8 @@ import { Cause, Context, Effect, Layer, Result, Stream } from "effect"
 import { HttpClientRequest, HttpClientResponse } from "effect/http"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { App } from "../app.js"
+import { Config } from "../config.js"
+import { ModelPreconnect } from "../model-preconnect.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "../plugin/hooks.js"
 import { QuestionTool } from "../tool/plugin/question.js"
@@ -226,6 +228,8 @@ export const layer = Layer.effect(
     const hooks = yield* PluginHooks.Service
     const transport = yield* SessionModelTransport.Service
     const app = yield* App.Metadata
+    const config = yield* Config.Service
+    const preconnect = yield* ModelPreconnect.Service
     const prepare = Effect.fn("SessionModelRequest.prepare")(function* <
       S extends SessionRequest & { tools?: Definitions },
     >(kind: SessionRequestKind, input: Input, shape: (draft: SessionRequest, tools: Definitions) => Effect.Effect<S>) {
@@ -318,6 +322,15 @@ export const layer = Layer.effect(
       const hasHttpHooks =
         (yield* hooks.has("session", "http.request", model.ref.providerID)) ||
         (yield* hooks.has("session", "http.response", model.ref.providerID))
+      if (kind === "primary") {
+        const enabled = Config.latest(yield* config.entries(), "experimental")?.preconnect === true
+        // HTTP hooks may send the request anywhere, so only an unhooked route is worth warming.
+        yield* preconnect.remember(
+          session,
+          model.ref.providerID,
+          enabled && !hasHttpHooks ? ModelPreconnect.target({ ...model, model: request.model }) : undefined,
+        )
+      }
       const http: StreamOptions["http"] = hasHttpHooks
         ? (req, handler) =>
             Effect.gen(function* () {
@@ -416,5 +429,5 @@ export const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [PluginHooks.node, SessionModelTransport.node, App.node],
+  deps: [PluginHooks.node, SessionModelTransport.node, App.node, Config.node, ModelPreconnect.node],
 })
