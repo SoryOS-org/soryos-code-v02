@@ -2326,6 +2326,7 @@ export type ConfigEntry =
             models?: {
               [x: string]: {
                 modelID?: string
+                base?: string
                 family?: string
                 name?: string
                 releaseDate?: string
