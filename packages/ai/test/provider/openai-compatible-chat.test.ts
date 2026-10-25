@@ -651,7 +651,7 @@ describe("OpenAI-compatible Chat route", () => {
     }),
   )
 
-  it.effect("preserves late reasoning, replay metadata, and usage without changing the finished tool call", () =>
+  it.effect("preserves late text and reasoning for replay without changing the finished tool call", () =>
     Effect.gen(function* () {
       const details = [{ type: "reasoning.encrypted", data: "opaque", id: "late-reasoning" }]
       const response = yield* LLMClient.generate(request).pipe(
@@ -662,6 +662,8 @@ describe("OpenAI-compatible Chat route", () => {
               deltaChunk({ content: "Hello" }),
               deltaChunk({ tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup", arguments: "{}" } }] }),
               deltaChunk({}, "tool_calls"),
+              deltaChunk({ content: " world" }),
+              deltaChunk({ refusal: " (refusal)" }),
               deltaChunk({ reasoning_content: " then" }),
               deltaChunk({ reasoning: " more" }),
               deltaChunk({ reasoning_text: " thoughts", reasoning_details: details }, "stop"),
@@ -671,7 +673,7 @@ describe("OpenAI-compatible Chat route", () => {
         ),
       )
 
-      expect(response.text).toBe("Hello")
+      expect(response.text).toBe("Hello world (refusal)")
       expect(response.reasoning).toBe("First then more thoughts")
       expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "tool_calls" })
       expect(response.usage).toMatchObject({ inputTokens: 11, outputTokens: 7 })
@@ -684,14 +686,14 @@ describe("OpenAI-compatible Chat route", () => {
       const replay = yield* compileRequest(LLM.request({ model, messages: [response.message] }))
       expect(replay.body.messages[0]).toMatchObject({
         role: "assistant",
-        content: "Hello",
+        content: "Hello world (refusal)",
         reasoning_content: "First then more thoughts",
         reasoning_details: details,
       })
     }),
   )
 
-  it.effect("rejects content after a terminal chunk", () =>
+  it.effect("rejects tool changes after a terminal chunk", () =>
     Effect.gen(function* () {
       const error = yield* LLMClient.generate(request).pipe(
         Effect.provide(
