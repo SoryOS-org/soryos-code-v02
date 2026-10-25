@@ -152,6 +152,7 @@ export function createCommandPaletteModel(props: { filesOnly?: () => boolean; on
   const sessions = createServerSessionEntries({
     server: ServerConnection.key(serverSDK.server),
     known: createKnownServerSessions(serverCtx),
+    apply: serverCtx.data.session.apply,
     projects: serverCtx.projects.list,
     load: (search, signal) =>
       serverSDK.api.session.list({ parentID: null, search, archived: false, limit: 50 }, { signal }),
@@ -238,11 +239,14 @@ export function createCommandPaletteCommandEntry(option: CommandOption, category
 
 type SessionSearchState = {
   abort?: AbortController
+  recent?: AbortController
 }
 
 export function createServerSessionEntries(props: {
   server: ServerConnection.Key
   known?: () => SessionInfo[]
+  /** Hides sessions deleted since they were loaded. */
+  apply?: (sessions: SessionInfo[]) => SessionInfo[]
   projects: () => Project[]
   load: (search: string, signal: AbortSignal) => Promise<{ data: SessionInfo[] }>
   get: (sessionID: string, signal: AbortSignal) => Promise<SessionInfo>
@@ -254,18 +258,29 @@ export function createServerSessionEntries(props: {
   const state: SessionSearchState = {}
   const [store, setStore] = createStore<{ loaded: SessionInfo[] }>({ loaded: [] })
 
-  // Let the newest metadata win duplicates before ranking the merged sessions newest-first.
-  const known = createMemo(() =>
-    [
+  // Let the newest metadata win duplicates, and live sessions win ties so renames and archives made since a
+  // load show, before ranking the merged sessions newest-first.
+  const known = createMemo(() => {
+    const merged = [
       ...new Map(
-        [...(props.known?.() ?? []), ...store.loaded]
+        [...store.loaded, ...(props.known?.() ?? [])]
           .toSorted((a, b) => a.time.updated - b.time.updated)
           .map((session) => [session.id, session] as const),
       ).values(),
-    ].toSorted((a, b) => b.time.updated - a.time.updated),
-  )
+    ].toSorted((a, b) => b.time.updated - a.time.updated)
 
-  onCleanup(() => abort(state.abort))
+    return props.apply?.(merged) ?? merged
+  })
+
+  onCleanup(() => {
+    abort(state.abort)
+    abort(state.recent)
+  })
+
+  const remember = (sessions: SessionInfo[]) =>
+    setStore("loaded", (previous) => [
+      ...new Map([...previous, ...sessions].map((session) => [session.id, session] as const)).values(),
+    ])
 
   const entries = (sessions: SessionInfo[], search: string): CommandPaletteEntry[] => {
     const projects = props.projects()
@@ -334,9 +349,7 @@ export function createServerSessionEntries(props: {
 
     const loaded = [...new Map([...exact, ...listed.items].map((session) => [session.id, session] as const)).values()]
     // Keep names learned while this palette is open available to subsequent keystrokes.
-    setStore("loaded", (previous) => [
-      ...new Map([...previous, ...loaded].map((session) => [session.id, session] as const)).values(),
-    ])
+    remember(loaded)
 
     // The local collection owns the recent rows, including newly loaded ones.
     return search ? entries(loaded, search) : []
@@ -344,6 +357,16 @@ export function createServerSessionEntries(props: {
 
   return Object.assign(search, {
     search,
+    /** Loads the recent sessions; typed searches do not cancel it. */
+    async recent() {
+      abort(state.recent)
+      const current = new AbortController()
+      state.recent = current
+      const result = await props.load("", current.signal)
+
+      if (!current.signal.aborted) remember(result.data)
+    },
+    all: () => entries(known(), ""),
     items(text: string) {
       const search = text.trim()
       const all = entries(known(), search)
@@ -367,8 +390,7 @@ export function createKnownServerSessions(server: ServerCtx) {
 
     const merged = new Map([...cached, ...server.data.session.list()].map((session) => [session.id, session] as const))
 
-    return server.data.session.apply(
-      [...merged.values()].filter((session) => !session.parentID && !session.time.archived),
-    )
+    // Archived sessions stay in so they replace older loaded copies; the entries leave them out.
+    return server.data.session.apply([...merged.values()].filter((session) => !session.parentID))
   }
 }
