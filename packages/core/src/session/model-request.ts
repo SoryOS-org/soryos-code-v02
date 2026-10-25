@@ -210,6 +210,18 @@ export const boundImages = (messages: LLMRequest["messages"]) => {
 
 type Definitions = PluginHooks.Domains["session"]["context"]["tools"]
 
+// Tool schemas are shared across steps and sessions, and hooks may edit them in place, so each
+// request gets its own deep copy. Parsing cached JSON costs much less than cloning the object.
+const schemaJson = new WeakMap<object, string>()
+
+const copySchema = (schema: Definitions[string]["input"]): Definitions[string]["input"] => {
+  const cached = schemaJson.get(schema)
+  if (cached !== undefined) return JSON.parse(cached)
+  const json = JSON.stringify(schema)
+  schemaJson.set(schema, json)
+  return JSON.parse(json)
+}
+
 /** Builds the model request for each session flow. Each entry runs its own plugin hook. */
 export interface Interface {
   readonly primary: (input: Input) => Effect.Effect<Prepared<SessionContext>>
@@ -239,7 +251,7 @@ export const layer = Layer.effect(
       // Remember which tool each definition object came from. Hooks rename a tool by moving
       // its definition to a new key, so after the hook we find the tool by object identity.
       const given = new Map(
-        tools.definitions.map((t) => [{ description: t.description, input: { ...t.inputSchema } }, t] as const),
+        tools.definitions.map((t) => [{ description: t.description, input: copySchema(t.inputSchema) }, t] as const),
       )
       // Hooks see the default output limit and may change or remove it. Titles and generate keep the provider default,
       // because their reasoning is hard to budget.
