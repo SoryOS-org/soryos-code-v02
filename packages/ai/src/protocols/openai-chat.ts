@@ -1063,21 +1063,15 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
     let lifecycle = state.lifecycle
 
     const reasoning = reasoningDelta(delta, state.reasoningField)
-    const hasLateContent =
-      Boolean(delta?.content) ||
-      Boolean(delta?.refusal) ||
-      reasoning !== undefined ||
-      (Array.isArray(delta?.reasoning_details) && delta.reasoning_details.length > 0) ||
+    if (
+      state.finishReason !== undefined &&
       toolDeltas.some((tool) => Boolean(tool.id) || Boolean(tool.function?.name) || Boolean(tool.function?.arguments))
-    if (state.finishReason !== undefined) {
-      if (hasLateContent)
-        return yield* ProviderShared.eventError(
-          ADAPTER,
-          "OpenAI Chat received content after the finish reason",
-          ProviderShared.encodeJson(event),
-        )
-      return [{ ...state, usage }, events] as const
-    }
+    )
+      return yield* ProviderShared.eventError(
+        ADAPTER,
+        "OpenAI Chat received content after the finish reason",
+        ProviderShared.encodeJson(event),
+      )
 
     const reasoningField = state.reasoningField ?? reasoning?.field
     const reasoningTextObserved = state.reasoningTextObserved || reasoning !== undefined
@@ -1188,7 +1182,7 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
         pendingTools,
         toolCallEvents: finished?.events ?? state.toolCallEvents,
         usage,
-        finishReason,
+        finishReason: state.finishReason ?? finishReason,
         lifecycle,
         reasoningField,
         reasoningTextObserved,
