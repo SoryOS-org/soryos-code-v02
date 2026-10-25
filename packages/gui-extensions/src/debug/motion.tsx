@@ -14,6 +14,7 @@ import {
   featurePresets,
   motionFeatures,
   reset,
+  resetFeature,
   type MotionFeature,
 } from "@opencode/ui/motion-tuning-features"
 import { applyMotion } from "@opencode/ui/motion-tuning-fields"
@@ -364,6 +365,12 @@ function FeaturePage(props: {
           </button>
         )}
       </Show>
+      <h3 classList={{ "px-4 text-[15px] font-semibold leading-5": true, "pt-3": !props.back }}>
+        {props.feature.name}
+      </h3>
+      <Show when={props.feature.description}>
+        {(description) => <p class="px-4 text-[12px] leading-[18px] text-v2-text-text-muted">{description()}</p>}
+      </Show>
       <Show when={rows()} keyed>
         {(shown) => (
           <FeatureKnobs
@@ -380,8 +387,8 @@ function FeaturePage(props: {
 }
 
 /**
- * A feature's knobs as one knobs group bound to the registry: its presets beside its die and reset, a toolbar for
- * Replay and Focus, and its rows. Choosing a preset goes through the feature model, so a mode turns on as it does from
+ * A feature's knobs as one embedded knobs group bound to the registry: Replay and Focus beside its reset and die, its
+ * presets, and its rows. Choosing a preset goes through the feature model, so a mode turns on as it does from
  * anywhere else.
  */
 function FeatureKnobs(props: {
@@ -397,7 +404,6 @@ function FeatureKnobs(props: {
   const toggle = feature.switch
   const knobs = [...(toggle ? [toggle] : []), ...props.controls]
   const byId = new Map(knobs.map((item) => [item.id, item]))
-  const actions = new Map(feature.actions.map((item) => [`action.${item.id}`, item]))
   // While a mode is on, the spring presets don't move its springs; choosing one turns the mode off first.
   const springs = props.mode ? [] : props.controls.flatMap((item) => (item.kind === "spring" ? [item] : []))
   const presets = featurePresets(feature).filter((preset) => preset !== "shipped")
@@ -408,25 +414,24 @@ function FeatureKnobs(props: {
     return Object.fromEntries(springs.map((item) => [item.id, { ...item.presets[id] }]))
   }
 
-  const tools = [
+  const target = feature.target
+
+  const groupActions = () => [
     // One trigger is Replay; several replay on their own, each named for what it moves.
     ...feature.actions.map((item) => ({
-      key: `action.${item.id}`,
       label: feature.actions.length === 1 ? ctx.t("motion.replay") : item.label,
       icon: "retrigger",
+      run: () => item.run(),
     })),
-    ...(feature.target ? [{ key: "focus", label: ctx.t("motion.focus"), icon: "target" }] : []),
+    ...(target ? [{ label: ctx.t("motion.focus"), icon: "target", run: () => props.onFocus(target) }] : []),
   ]
 
   // Everything but the switch dims while it's off.
   const off = toggle ? (values: State) => values[toggle.id] === false : undefined
 
-  const descriptors: ControlDescriptor[] = [
-    ...(tools.length > 0 ? [{ key: "tools", kind: "toolbar" as const, label: "", group, items: tools }] : []),
-    ...knobs.map((item) =>
-      item === toggle ? descriptor(item, group, ctx.t("motion.enabled")) : descriptor(item, group, item.label, off),
-    ),
-  ]
+  const descriptors = knobs.map((item) =>
+    item === toggle ? descriptor(item, group, ctx.t("motion.enabled")) : descriptor(item, group, item.label, off),
+  )
 
   const values = () => {
     props.live()
@@ -437,7 +442,10 @@ function FeatureKnobs(props: {
   const set = (key: string, value: Value | null) => {
     const item = byId.get(key)
 
-    if (!item || value === null) return
+    if (!item) return
+
+    // An undo back to what ships arrives as null.
+    if (value === null) return reset(item)
 
     // SAFETY: each key's descriptor was made from its knob, so knobs sends that knob's kind of value.
     applyMotion(item, value as MotionKnob["value"])
@@ -449,20 +457,20 @@ function FeatureKnobs(props: {
     echo: 0,
     persist: "none",
     storage: null,
-    toggleKey: false,
     defaultLabel: ctx.t("motion.shipped"),
     groupLabels: { [group]: feature.name },
-    groupDescriptions: feature.description ? { [group]: feature.description } : undefined,
     presetLabels: { ...motionPresets, ...Object.fromEntries(feature.modes.map((item) => [item.id, item.label])) },
     scopedPresets:
       presets.length > 0 ? { [group]: Object.fromEntries(presets.map((id) => [id, preset(id)])) } : undefined,
     onSet: set,
     onSetBatch: (changes) => changes.forEach((change) => set(change.key, change.value)),
-    onReset: (target) => (target.key ? [byId.get(target.key)] : knobs).forEach((item) => item && reset(item)),
-    onAction: (key) => {
-      if (key === "focus" && feature.target) return props.onFocus(feature.target)
+    // A group's reset is the feature's, modes included.
+    onReset: (scope) => {
+      if (!scope.key) return resetFeature(feature)
 
-      actions.get(key)?.run()
+      const item = byId.get(scope.key)
+
+      if (item) reset(item)
     },
   })
 
@@ -487,12 +495,16 @@ function FeatureKnobs(props: {
   )
 
   return (
-    <div class="px-2" style={{ "--k-width": "100%", "--k-chrome": "0" }}>
+    // Inset so the rows' labels line up with the page's title.
+    <div class="px-2 pt-1">
       <KnobsPanel
         controls={controls}
         values={values()}
         theme={document.documentElement.dataset.colorScheme === "light" ? "light" : "dark"}
-        header={{ title: false, buttons: ["undo", "redo"] }}
+        embed
+        surface="flat"
+        groups={[group]}
+        groupActions={groupActions}
         hints="panel"
         session={false}
       />

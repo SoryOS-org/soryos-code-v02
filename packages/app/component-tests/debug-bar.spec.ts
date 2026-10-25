@@ -107,6 +107,18 @@ story("a feature page's preset chips go through the feature model, modes include
 
       const alt = motionTuning.mode("chips.alt", { label: "Alt", ...meta })
 
+      // A mode brings rows of its own, as James does.
+      motionTuning.number("chips.alt.shift", {
+        label: "Shift",
+        ...meta,
+        when: alt,
+        value: 10,
+        min: 0,
+        max: 20,
+        step: 1,
+        unit: "px",
+      })
+
       const spring = motionTuning.spring("chips.spring", {
         label: "Spring",
         ...meta,
