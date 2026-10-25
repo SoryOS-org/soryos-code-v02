@@ -21,7 +21,6 @@ import { Markdown } from "../components/markdown"
 import { linkSegments } from "../components/link-segments"
 import { sessionReferenceText, setupSessionLinks } from "../components/markdown-session-links"
 import { useMarkdown } from "../context/markdown"
-import { useMessageMenu } from "../context/message-menu"
 import { useSources } from "../context/sources"
 import { SourcesChip } from "../sources/sources-chip"
 import type { TurnSources } from "../sources/sources"
@@ -118,35 +117,6 @@ function MessageActionButton(
         aria-label={props["aria-label"]}
       />
     </Tooltip>
-  )
-}
-
-function MessageOptions(props: { info: string[]; children: JSX.Element }) {
-  const i18n = useI18n()
-
-  return (
-    <div data-slot="message-options">
-      <Menu gutter={4} modal={false} placement="bottom-end">
-        <Menu.Trigger
-          as={IconButton}
-          icon={<Icon name="outline-dots" size="small" />}
-          size="normal"
-          variant="ghost-muted"
-          aria-label={i18n.t("ui.message.options")}
-        />
-        <Menu.Portal>
-          <Menu.Content>
-            <Show when={props.info.length > 0}>
-              <div data-slot="message-options-info">
-                <For each={props.info}>{(line) => <span dir="auto">{line}</span>}</For>
-              </div>
-              <Menu.Separator />
-            </Show>
-            {props.children}
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu>
-    </div>
   )
 }
 
@@ -324,7 +294,6 @@ export function CurrentUserMessageDisplay(props: {
   const data = useData()
   const dialog = useDialog()
   const i18n = useI18n()
-  const menu = useMessageMenu()
 
   const [state, setState] = createStore({ copied: false, reverting: false, updating: false })
 
@@ -353,13 +322,6 @@ export function CurrentUserMessageDisplay(props: {
 
   const stamp = createMemo(() => timefmt().format(props.message.time.created))
 
-  const info = createMemo(() =>
-    [
-      waiting() ? i18n.t("ui.message.pending") : "",
-      [agentLabel(props.agent, data.agents), model()].filter(Boolean).join(" \u00B7 "),
-      fulltimefmt().format(props.message.time.created),
-    ].filter(Boolean),
-  )
 
   // In a run, only the last message keeps the meta line; the others offer their actions beside the bubble.
   // Bubble corners tighten where two bubbles meet, as in the iOS app's grouped corners.
@@ -598,29 +560,6 @@ export function CurrentUserMessageDisplay(props: {
       }}
       data-timeline-part-id={props.text ? `${props.message.id}:text:0` : undefined}
     >
-      <Show when={menu() && (props.text || comments().length > 0 || pending())}>
-        <MessageOptions info={info()}>
-          <Show when={props.actions?.pending && pending()}>
-            <Menu.Item disabled={state.updating} onSelect={() => void updatePending("queue")}>
-              {i18n.t("ui.message.moveToQueue")}
-            </Menu.Item>
-            <Menu.Item disabled={state.updating} onSelect={() => void updatePending("remove")}>
-              {i18n.t("ui.message.deletePending")}
-            </Menu.Item>
-          </Show>
-          <Show when={props.actions?.revert && !pending()}>
-            <Menu.Item disabled={state.reverting} onSelect={() => void revert()}>
-              {i18n.t("ui.message.revertMessage")}
-            </Menu.Item>
-          </Show>
-          <Show when={props.text}>
-            <Menu.Item onSelect={() => void copy(props.text)}>{i18n.t("ui.message.copyMessage")}</Menu.Item>
-          </Show>
-          <Show when={props.voice}>
-            <Menu.Item onSelect={() => void copy(props.message.text)}>{i18n.t("ui.message.copyFullMessage")}</Menu.Item>
-          </Show>
-        </MessageOptions>
-      </Show>
       {renderAttachments()}
       <Show
         when={props.text}
@@ -644,14 +583,13 @@ export function CurrentUserMessageDisplay(props: {
               <UserMessageComments comments={comments()} bounded />
             </Show>
           </div>
-          <Show when={!menu() && folded()}>
+          <Show when={folded()}>
             <div data-slot="user-message-run-actions">{renderActions()}</div>
           </Show>
         </div>
       </Show>
       {/* Like the TUI, a pending steer of only attachments still offers its actions. */}
-      {/* With the message menu, a pending steer still keeps its Pending label and actions in view. */}
-      <Show when={menu() ? waiting() : props.text || comments().length > 0 || pending()}>
+      <Show when={props.text || comments().length > 0 || pending()}>
         <div data-slot="user-message-copy-wrapper">
           <span data-slot="user-message-meta-wrap">
             <span data-slot="user-message-meta">
@@ -907,7 +845,6 @@ export function AssistantTextContent(props: {
 }) {
   const data = useData()
   const i18n = useI18n()
-  const menu = useMessageMenu()
   const sourcesHost = useSources()
   const numfmt = createMemo(() => new Intl.NumberFormat(i18n.locale()))
   // A footer that arrives after the reply rendered belongs to a turn that just finished, so its chip fades in.
@@ -973,17 +910,7 @@ export function AssistantTextContent(props: {
         <div data-slot="text-part-body">
           <PacedMarkdown text={props.text} cacheKey={props.id} streaming={props.message.time.completed === undefined} />
         </div>
-        <Show when={menu() && props.showCopy}>
-          <MessageOptions
-            info={[
-              [agentLabel(props.message.agent, data.agents), model()].filter(Boolean).join(" \u00B7 "),
-              [duration(), interrupted() ? i18n.t("ui.message.interrupted") : ""].filter(Boolean).join(" \u00B7 "),
-            ].filter(Boolean)}
-          >
-            <Menu.Item onSelect={() => void copy()}>{i18n.t("ui.message.copyResponse")}</Menu.Item>
-          </MessageOptions>
-        </Show>
-        <Show when={sources()} fallback={<Show when={!menu() && props.showCopy}>{copyFooter()}</Show>}>
+        <Show when={sources()} fallback={<Show when={props.showCopy}>{copyFooter()}</Show>}>
           {(value) => (
             <div data-slot="text-part-footer">
               <SourcesChip
@@ -992,7 +919,7 @@ export function AssistantTextContent(props: {
                 appear={rendered}
                 onOpen={() => props.onOpenSources?.()}
               />
-              <Show when={!menu()}>{copyFooter()}</Show>
+              {copyFooter()}
             </div>
           )}
         </Show>
