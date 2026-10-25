@@ -238,7 +238,7 @@ test("keeps the same height as the number of results changes", async ({ page }) 
   const container = page.locator('[data-component="dialog-v2"] [data-slot="dialog-container"]')
   const height = async () => (await container.boundingBox())?.height
   const initial = await height()
-  expect(initial).toBe(368)
+  expect(initial).toBe(480)
 
   await input.fill("copy session")
   await expect(dialog.getByRole("option")).toHaveCount(1)
