@@ -1081,6 +1081,87 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("absorbs streamed text that arrives after the finish reason", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(request).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(deltaChunk({}, "stop"), deltaChunk({ content: "Hello" }), deltaChunk({ content: "!" })),
+          ),
+        ),
+      )
+
+      expect(response.text).toBe("Hello!")
+      expect(response.finishReason).toEqual({ normalized: "stop", raw: "stop" })
+    }),
+  )
+
+  it.effect("absorbs reasoning-only trailing chunks after the finish reason", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(request).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ role: "assistant", content: "Hello" }),
+              deltaChunk({}, "stop"),
+              deltaChunk({ reasoning_content: " trailing" }),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.text).toBe("Hello")
+      expect(response.finishReason).toEqual({ normalized: "stop", raw: "stop" })
+    }),
+  )
+
+  it.effect("streams tool calls that begin after the finish reason", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup data", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ content: "Looking up" }),
+              deltaChunk({}, "stop"),
+              deltaChunk({
+                tool_calls: [{ index: 0, id: "call_1", function: { name: "lookup", arguments: '{"q":"' } }],
+              }),
+              deltaChunk({ tool_calls: [{ function: { arguments: 'x"}' } }] }),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.text).toBe("Looking up")
+      expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "stop" })
+      expect(response.toolCalls).toMatchObject([{ id: "call_1", name: "lookup", input: { q: "x" } }])
+    }),
+  )
+
+  it.effect("keeps the first finish reason when trailing chunks repeat one", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(request).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ content: "Hello" }),
+              deltaChunk({}, "tool_calls"),
+              deltaChunk({ content: " late" }),
+              deltaChunk({}, "stop"),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.text).toBe("Hello late")
+      expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "tool_calls" })
+    }),
+  )
+
   it.effect("preserves streamed refusals as ordinary assistant text", () =>
     Effect.gen(function* () {
       const response = yield* LLMClient.generate(request).pipe(
