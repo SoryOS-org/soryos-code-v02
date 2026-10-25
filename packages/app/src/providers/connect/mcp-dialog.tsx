@@ -9,7 +9,6 @@ import { Icon } from "@opencode/ui/icon"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { SearchList } from "@opencode/ui/search-list"
 import { Switch } from "@opencode/ui/switch"
-import { Tooltip } from "@opencode/ui/tooltip"
 import { TruncatedText } from "@opencode/ui/truncated-text"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useMcpToggle } from "@/providers/connect/mcp"
@@ -224,29 +223,21 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
               return (
                 <div {...row} data-option-key={item().name} data-status={status()?.status}>
                   <span class="mcp-dialog-lead">
-                    <Show
-                      when={error()}
-                      fallback={<span class="mcp-dialog-dot" data-status={status()?.status} aria-hidden="true" />}
-                    >
-                      {(message) => (
-                        <Tooltip value={message()} placement="top" openDelay={0} class="mcp-dialog-dot-tip">
-                          <button
-                            type="button"
-                            class="mcp-dialog-dot"
-                            data-status="failed"
-                            aria-label={language.t("dialog.mcp.error.actionLabel", { name: item().name })}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              select(item().name)
-                            }}
-                          />
-                        </Tooltip>
-                      )}
-                    </Show>
+                    <span class="mcp-dialog-dot" data-status={status()?.status} aria-hidden="true" />
                     <TruncatedText text={item().name} class="mcp-dialog-name" />
                   </span>
                   <div class="mcp-trailing" onClick={(event) => event.stopPropagation()}>
+                    <Show when={error()}>
+                      <Button
+                        size="small"
+                        variant="ghost-muted"
+                        class="mcp-status-action"
+                        aria-label={language.t("dialog.mcp.error.viewLabel", { name: item().name })}
+                        onClick={() => select(item().name)}
+                      >
+                        {language.t("dialog.mcp.error.view")}
+                      </Button>
+                    </Show>
                     <Show
                       when={signIn()}
                       fallback={

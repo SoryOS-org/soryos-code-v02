@@ -176,11 +176,13 @@ for (const surface of ["dialog"] as const) {
     ])
     expect(view.requests.every((request) => request.directory === workspace)).toBe(true)
 
-    // As in the session's MCP list, the red dot is the status and opens the error; the switch stays on.
-    const failed = view.panel.getByRole("button", { name: "Details for figma-desktop", exact: true })
+    // The red dot is the status and the switch stays on; a ghost action beside it opens the error.
+    const failed = view.panel.getByRole("button", { name: "View error for figma-desktop", exact: true })
     const details = page.getByRole("dialog", { name: "figma-desktop", exact: true })
     await expect(view.toggle).toBeChecked()
     await expect(view.toggle).toHaveAccessibleDescription("Failed")
+    await expect(failed).toHaveText("View error")
+    await expect(failed).toHaveAttribute("data-variant", "ghost-muted")
     await failed.click()
     await expect(details).toHaveAccessibleDescription("Connection failed")
     await expect(details.getByText(error, { exact: true })).toBeVisible()
@@ -369,7 +371,7 @@ for (const surface of ["popover", "dialog"] as const) {
     await page.setViewportSize({ width: 390, height: 844 })
     await expect(name).toHaveCSS("white-space", "normal")
     await expect.poll(() => name.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
-    await view.panel.getByRole("button", { name: `Details for ${names[2]}`, exact: true }).scrollIntoViewIfNeeded()
-    await expect(view.panel.getByRole("button", { name: `Details for ${names[2]}`, exact: true })).toBeInViewport()
+    await view.panel.getByRole("button", { name: `View error for ${names[2]}`, exact: true }).scrollIntoViewIfNeeded()
+    await expect(view.panel.getByRole("button", { name: `View error for ${names[2]}`, exact: true })).toBeInViewport()
   })
 }

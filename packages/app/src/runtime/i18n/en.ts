@@ -368,6 +368,8 @@ export const dict = {
   "dialog.mcp.error.status": "Connection failed",
   "dialog.mcp.signingIn": "Signing in…",
   "dialog.mcp.error.actionLabel": "Details for {{name}}",
+  "dialog.mcp.error.view": "View error",
+  "dialog.mcp.error.viewLabel": "View error for {{name}}",
   "dialog.mcp.error.disable": "Disable",
   "dialog.mcp.signIn": "Sign in",
   "dialog.mcp.signIn.open": "Sign in to {{name}}",
