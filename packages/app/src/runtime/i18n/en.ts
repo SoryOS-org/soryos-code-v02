@@ -66,7 +66,8 @@ export const dict = {
   "command.usage.view.description": "See your OpenCode Go allowance and Console budgets",
   "command.session.location.cycle": "Cycle session location",
 
-  "command.palette": "Command palette",
+  "command.palette": "Search everything",
+  "command.commands.search": "Search commands",
 
   "command.session.new": "New session",
   "command.session.search": "Search sessions",
@@ -1076,6 +1077,7 @@ export const dict = {
   "settings.shortcuts.conflict.description": "{{keybind}} is already assigned to {{titles}}.",
   "settings.shortcuts.unassigned": "Unassigned",
   "settings.shortcuts.pressKeys": "Press keys",
+  "settings.shortcuts.unbind": "Unbind",
   "settings.shortcuts.search.placeholder": "Search shortcuts",
 
   "settings.shortcuts.group.general": "General",

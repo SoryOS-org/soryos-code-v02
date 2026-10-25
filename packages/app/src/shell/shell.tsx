@@ -12,7 +12,7 @@ import { useSettingsSurface } from "@/settings/surface"
 import { useSettings } from "@/settings/model"
 import { ExtensionServerCover } from "@/runtime/extension/server-shell"
 import { ExtensionSlot } from "@/runtime/extension/render"
-import { useCommand } from "@/shell/commands/command"
+import { COMMAND_SEARCH_ID, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useServers } from "@/runtime/server/registry"
@@ -190,6 +190,17 @@ export default function Layout(props: ParentProps) {
             }}
           />
         ))
+      },
+    },
+  ])
+  command.register("commands", () => [
+    {
+      id: COMMAND_SEARCH_ID,
+      title: language.t("command.commands.search"),
+      category: language.t("command.category.view"),
+      onSelect: async () => {
+        const { DialogCommandSearch } = await import("@/shell/commands/command-search")
+        void dialog.show(() => <DialogCommandSearch />)
       },
     },
   ])

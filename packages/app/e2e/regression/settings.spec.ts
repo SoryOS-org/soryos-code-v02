@@ -564,6 +564,28 @@ test("clearing project fields sends explicit removal values", async ({ page }) =
   }
 })
 
+test("shortcuts list Search sessions once and unbind a shortcut while recording it", async ({ page }) => {
+  // Opening Settings from Home registers Home's Find, which must not add a second Search sessions.
+  const { settings } = await open(page)
+  await settings.getByRole("tab", { name: "Shortcuts", exact: true }).click()
+  await expect(settings.locator('[data-keybind-id="sessions.search"]')).toBeVisible()
+  await expect(settings.getByText("Search sessions", { exact: true })).toHaveCount(1)
+
+  const binding = settings.locator('[data-keybind-id="settings.open"]')
+  const unbind = settings.getByRole("button", { name: "Unbind", exact: true })
+  await expect(binding).toHaveText("Ctrl+,")
+  await expect(unbind).toHaveCount(0)
+  await binding.click()
+  await expect(binding).toHaveText("Press keys")
+  await unbind.click()
+  await expect(binding).toHaveText("Unassigned")
+  await expect(unbind).toHaveCount(0)
+  // An unassigned shortcut has nothing to unbind.
+  await binding.click()
+  await expect(binding).toHaveText("Press keys")
+  await expect(unbind).toHaveCount(0)
+})
+
 test("the new session shortcut waits for a shortcut recording, then leaves settings", async ({ page }) => {
   const { settings } = await open(page)
   await settings.getByRole("tab", { name: "Shortcuts", exact: true }).click()

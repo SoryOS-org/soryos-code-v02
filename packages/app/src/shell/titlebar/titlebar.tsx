@@ -37,6 +37,9 @@ import { TitlebarItems, useTitlebarItems } from "@/runtime/extension/titlebar-it
 
 export const newTabCommand = { id: "tab.new", keybind: "mod+t,mod+n" }
 
+/** A draft registers its own Search projects; everywhere else it opens a new draft with the project picker open. */
+export const projectSearchCommand = { id: "project.select", keybind: "mod+shift+o" }
+
 export const goBackCommand = { id: "common.goBack", keybind: "mod+[" }
 
 export const goForwardCommand = { id: "common.goForward", keybind: "mod+]" }
@@ -338,6 +341,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               tabsStoreActions.removeSessions(detail)
             })
 
+            /** Opens a new session draft for the current context. Returns false when there is nothing to open it in. */
             const openNewTab = () => {
               const route = layout.route()
 
@@ -349,12 +353,12 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     const model = tabs.stateValue<ComposerState>(pending.draft, "prompt")?.model.current()
                     void tabs.newDraft({ server: route.server, directory: pending.draft.directory }, "", model)
 
-                    return
+                    return true
                   }
 
                   const activeSession = session()
 
-                  if (!activeSession) return
+                  if (!activeSession) return false
 
                   const sessionTab = {
                     type: "session" as const,
@@ -369,18 +373,18 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     model,
                   )
 
-                  return
+                  return true
                 }
 
                 case "draft": {
                   const activeTab = currentTab()
 
-                  if (activeTab?.type !== "draft") return
+                  if (activeTab?.type !== "draft") return false
 
                   const model = tabs.stateValue<ComposerState>(activeTab, "prompt")?.model.current()
                   void tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "", model)
 
-                  return
+                  return true
                 }
 
                 case "settings":
@@ -403,8 +407,10 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   if (conn && project) {
                     void tabs.newDraft({ server: ServerConnection.key(conn), directory: project.worktree }, "")
 
-                    return
+                    return true
                   }
+
+                  return false
                 }
               }
             }
@@ -548,6 +554,16 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   hidden: true,
                   onSelect: () => {
                     tabsStoreActions.closeTab(tabsStore.findIndex((tab) => current === tab))
+                  },
+                },
+                {
+                  ...projectSearchCommand,
+                  title: language.t("session.new.project.search"),
+                  category: language.t("command.category.project"),
+                  onSelect: () => {
+                    layout.draft.projectSearch.request()
+
+                    if (!openNewTab()) layout.draft.projectSearch.take()
                   },
                 },
                 {
