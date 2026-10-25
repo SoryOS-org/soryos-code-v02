@@ -1,5 +1,5 @@
 import { useDialog } from "@opencode/ui/context/dialog"
-import { startTransition } from "solid-js"
+import { createSignal, onCleanup, Show, startTransition } from "solid-js"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -8,6 +8,8 @@ import { createKnownServerSessions, createServerSessionEntries, type CommandPale
 import { CommandPaletteView } from "./dialog"
 
 const RECENT_LIMIT = 10
+
+const RECENT_WAIT = 200
 
 export function DialogSessionSearch() {
   const dialog = useDialog()
@@ -52,7 +54,7 @@ export function DialogSessionSearch() {
     }
   })
 
-  const items = (query: string) => {
+  const ranked = (query: string) => {
     const entries = loaders
       .flatMap((loader) => loader.items(query))
       .toSorted((a, b) => (b.updated ?? 0) - (a.updated ?? 0))
@@ -60,12 +62,23 @@ export function DialogSessionSearch() {
     return query ? entries : entries.slice(0, RECENT_LIMIT)
   }
 
+  // The cached index can be stale, so rank recent sessions once each server's list arrives (or the wait runs out),
+  // and keep that order while the dialog is open instead of reshuffling as fresher times come in.
+  const [recent, setRecent] = createSignal<CommandPaletteEntry[]>()
+  const wait = setTimeout(() => setRecent((current) => current ?? ranked("")), RECENT_WAIT)
+  onCleanup(() => clearTimeout(wait))
+  void Promise.all(loaders.map((loader) => loader.search("").catch(() => []))).then(() =>
+    setRecent((current) => current ?? ranked("")),
+  )
+
+  const items = (query: string) => (query ? ranked(query) : (recent() ?? []))
+
   const sessions = async (query: string) => {
-    const entries = (await Promise.all(loaders.map((loader) => loader.search(query))))
+    if (!query) return []
+
+    return (await Promise.all(loaders.map((loader) => loader.search(query))))
       .flat()
       .toSorted((a, b) => (b.updated ?? 0) - (a.updated ?? 0))
-
-    return query ? entries : entries.slice(0, RECENT_LIMIT)
   }
 
   const select = (item: CommandPaletteEntry | undefined) => {
@@ -81,13 +94,15 @@ export function DialogSessionSearch() {
   }
 
   return (
-    <CommandPaletteView
-      placeholder={language.t("home.sessions.search.placeholder")}
-      items={items}
-      sources={[sessions]}
-      highlight={() => {}}
-      select={select}
-      close={() => dialog.close()}
-    />
+    <Show when={recent()}>
+      <CommandPaletteView
+        placeholder={language.t("home.sessions.search.placeholder")}
+        items={items}
+        sources={[sessions]}
+        highlight={() => {}}
+        select={select}
+        close={() => dialog.close()}
+      />
+    </Show>
   )
 }

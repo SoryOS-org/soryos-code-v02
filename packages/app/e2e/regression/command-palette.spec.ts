@@ -129,6 +129,47 @@ test("titlebar search lists recent sessions and opens the typed match", async ({
   await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
 })
 
+declare global {
+  interface Window {
+    __paletteOrders?: string[][]
+  }
+}
+
+test("titlebar search opens recent sessions in their final order", async ({ page }) => {
+  const stale = { ...paletteSession, time: { ...paletteSession.time } }
+
+  const fresh = {
+    ...paletteSession,
+    id: "ses_command_palette_fresh",
+    title: "Fresh fixture session",
+    time: { created: 1700000001000, updated: 1700000001000 },
+  }
+
+  await openPaletteWorkspace(page, true, [stale, fresh])
+  // Activity Home has not seen yet: the server now lists the stale session first.
+  stale.time.updated = 1700000002000
+
+  await page.evaluate(() => {
+    const seen: string[][] = []
+    window.__paletteOrders = seen
+
+    new MutationObserver(() => {
+      const order = [...document.querySelectorAll('[role="dialog"] [role="option"] .command-palette-title')].map(
+        (title) => title.textContent ?? "",
+      )
+
+      if (order.length > 0 && order.join() !== seen.at(-1)?.join()) seen.push(order)
+    }).observe(document.body, { childList: true, subtree: true, characterData: true })
+  })
+
+  const listed = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/session")
+  await page.getByRole("banner").getByRole("button", { name: "Search sessions", exact: true }).click()
+  await listed
+  const options = page.getByRole("dialog").getByRole("option")
+  await expect(options).toHaveText([/Palette fixture session/, /Fresh fixture session/])
+  expect(await page.evaluate(() => window.__paletteOrders)).toEqual([[paletteSession.title, fresh.title]])
+})
+
 test("reopens from its shortcut as soon as it closes", async ({ page }) => {
   const { dialog, input } = await openCommandPalette(page)
   await input.press("Escape")
