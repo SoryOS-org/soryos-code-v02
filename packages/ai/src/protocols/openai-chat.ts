@@ -1210,12 +1210,17 @@ export const finishEvents = Effect.fnUntraced(function* (state: ParserState) {
     })
   // Identity-less tool fragments cannot form a call: fail instead of settling
   // the step with silently dropped data — the same rule the terminal chunk
-  // applies mid-stream. Truncation finishes intentionally leave calls
-  // unconfirmed. Streams without a finish reason keep their existing
-  // leniency here.
+  // applies mid-stream. Empty no-op deltas (no id, no name, no argument text)
+  // do not reach `pendingTools` with anything visible, so they never count as
+  // fragments. Truncation finishes intentionally leave calls unconfirmed.
+  // Streams without a finish reason keep their existing leniency here.
+  const unresolvableFragments = Object.values(state.pendingTools).some(
+    (fragment) =>
+      fragment !== undefined && (Boolean(fragment.id) || Boolean(fragment.name) || fragment.input.length > 0),
+  )
   const truncatedFinish =
     state.finishReason?.normalized === "content-filter" || state.finishReason?.normalized === "length"
-  if (state.finishReason !== undefined && !truncatedFinish && Object.keys(state.pendingTools).length > 0)
+  if (state.finishReason !== undefined && !truncatedFinish && unresolvableFragments)
     return yield* new AIError({
       reason: new InvalidProviderOutputError({
         message: "OpenAI Chat tool call delta is missing id or name",

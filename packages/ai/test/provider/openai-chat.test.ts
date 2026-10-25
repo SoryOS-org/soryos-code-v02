@@ -1209,6 +1209,30 @@ describe("OpenAI Chat route", () => {
     }),
   )
 
+  it.effect("ignores trailing no-op tool deltas after a finalized call", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup data", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ tool_calls: [{ index: 0, id: "c1", function: { name: "lookup", arguments: "{}" } }] }),
+              deltaChunk({}, "tool_calls"),
+              deltaChunk({ tool_calls: [{ index: 0, function: { arguments: "" } }] }),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.toolCalls).toHaveLength(1)
+      expect(response.toolCalls).toMatchObject([{ id: "c1", name: "lookup", input: {} }])
+      expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "tool_calls" })
+    }),
+  )
+
   it.effect("preserves streamed refusals as ordinary assistant text", () =>
     Effect.gen(function* () {
       const response = yield* LLMClient.generate(request).pipe(

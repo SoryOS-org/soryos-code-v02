@@ -777,4 +777,29 @@ describe("OpenAI-compatible Chat route", () => {
       expect(error.message).toContain("OpenAI Chat tool call delta is missing id or name")
     }),
   )
+
+  it.effect("ignores trailing no-op tool deltas after a finalized call", () =>
+    Effect.gen(function* () {
+      const response = yield* LLMClient.generate(
+        LLMRequest.update(request, {
+          tools: [ToolDefinition.make({ name: "lookup", description: "Lookup", inputSchema: { type: "object" } })],
+        }),
+      ).pipe(
+        Effect.provide(
+          fixedResponse(
+            sseEvents(
+              deltaChunk({ tool_calls: [{ index: 0, id: "c1", function: { name: "lookup", arguments: "{}" } }] }),
+              deltaChunk({}, "tool_calls"),
+              // Empty trailing delta for the settled call is a no-op, not a fragment.
+              deltaChunk({ tool_calls: [{ index: 0, function: { arguments: "" } }] }),
+            ),
+          ),
+        ),
+      )
+
+      expect(response.toolCalls).toHaveLength(1)
+      expect(response.toolCalls).toMatchObject([{ id: "c1", name: "lookup", input: {} }])
+      expect(response.finishReason).toEqual({ normalized: "tool-calls", raw: "tool_calls" })
+    }),
+  )
 })
