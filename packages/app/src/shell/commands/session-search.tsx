@@ -1,5 +1,5 @@
 import { useDialog } from "@opencode/ui/context/dialog"
-import { createSignal, onCleanup, Show, startTransition } from "solid-js"
+import { createMemo, createSignal, onCleanup, startTransition } from "solid-js"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -28,6 +28,7 @@ export function DialogSessionSearch() {
     const load = createServerSessionEntries({
       server: ServerConnection.key(conn),
       known: createKnownServerSessions(ctx),
+      apply: ctx.data.session.apply,
       projects: ctx.projects.list,
       load: (search, signal) =>
         ctx.sdk.api.session.list({ parentID: null, search, archived: false, limit: 50 }, { signal }),
@@ -49,8 +50,10 @@ export function DialogSessionSearch() {
           }))
 
     return {
+      all: () => format(load.all()),
       items: (query: string) => format(load.items(query)),
       search: (query: string) => load.search(query).then(format),
+      recent: load.recent,
     }
   })
 
@@ -62,19 +65,30 @@ export function DialogSessionSearch() {
     return query ? entries : entries.slice(0, RECENT_LIMIT)
   }
 
-  // The cached index can be stale, so rank recent sessions once each server's list arrives (or the wait runs out),
-  // and keep that order while the dialog is open instead of reshuffling as fresher times come in.
-  const [recent, setRecent] = createSignal<CommandPaletteEntry[]>()
-  const wait = setTimeout(() => setRecent((current) => current ?? ranked("")), RECENT_WAIT)
+  // The cached index can be stale, so take the recent order once each server's list arrives (or the wait runs out)
+  // and keep it while the dialog is open. Rows still show live titles, and deleted or archived sessions leave.
+  const [order, setOrder] = createSignal<string[]>()
+  const top = () => ranked("").map((entry) => entry.id)
+  const wait = setTimeout(() => setOrder((current) => current ?? top()), RECENT_WAIT)
   onCleanup(() => clearTimeout(wait))
-  void Promise.all(loaders.map((loader) => loader.search("").catch(() => []))).then(() =>
-    setRecent((current) => current ?? ranked("")),
-  )
 
-  const items = (query: string) => (query ? ranked(query) : (recent() ?? []))
+  const initial = Promise.all(loaders.map((loader) => loader.recent().catch(() => {}))).then(() => {
+    clearTimeout(wait)
+    // Lists that arrive after the wait only add the sessions the order is missing.
+    setOrder((current = []) => [...current, ...top().filter((id) => !current.includes(id))].slice(0, RECENT_LIMIT))
+  })
+
+  const recent = createMemo(() => {
+    const live = new Map(loaders.flatMap((loader) => loader.all()).map((entry) => [entry.id, entry] as const))
+
+    return (order() ?? []).flatMap((id) => live.get(id) ?? [])
+  })
+
+  const items = (query: string) => (query ? ranked(query) : recent())
 
   const sessions = async (query: string) => {
-    if (!query) return []
+    // Waiting on the recent lists shows the loading state when the order froze before any arrived.
+    if (!query) return initial.then(() => [])
 
     return (await Promise.all(loaders.map((loader) => loader.search(query))))
       .flat()
@@ -94,15 +108,14 @@ export function DialogSessionSearch() {
   }
 
   return (
-    <Show when={recent()}>
-      <CommandPaletteView
-        placeholder={language.t("home.sessions.search.placeholder")}
-        items={items}
-        sources={[sessions]}
-        highlight={() => {}}
-        select={select}
-        close={() => dialog.close()}
-      />
-    </Show>
+    <CommandPaletteView
+      placeholder={language.t("home.sessions.search.placeholder")}
+      items={items}
+      sources={[sessions]}
+      pending={() => !order()}
+      highlight={() => {}}
+      select={select}
+      close={() => dialog.close()}
+    />
   )
 }
