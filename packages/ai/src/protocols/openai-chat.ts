@@ -92,7 +92,11 @@ const OpenRouterDetailFields = {
 }
 const ReasoningDetail = Schema.Union([
   Schema.StructWithRest(
-    Schema.Struct({ type: Schema.Literal("reasoning.text"), text: Schema.optional(Schema.String), ...OpenRouterDetailFields }),
+    Schema.Struct({
+      type: Schema.Literal("reasoning.text"),
+      text: Schema.optional(Schema.String),
+      ...OpenRouterDetailFields,
+    }),
     [Schema.Record(Schema.String, Schema.Unknown)],
   ),
   Schema.StructWithRest(
@@ -307,6 +311,8 @@ export interface ParserState {
   readonly providerMetadataKey: string
   readonly tools: ToolStream.State<number>
   readonly pendingTools: Partial<Record<number, PendingToolDelta>>
+  /** Tool call ids finalized in-step; late replay deltas for them are dropped. */
+  readonly finishedToolIds: ReadonlyArray<string>
   readonly toolCallEvents: ReadonlyArray<LLMEvent>
   readonly usage?: Usage
   readonly finishReason?: FinishReasonDetails
@@ -414,10 +420,7 @@ const lowerReasoningDetail = (detail: ReasoningDetail) => {
 
 const isKimiDetail = (detail: { readonly type: string }) => detail.type === "summary" || detail.type === "encrypted"
 
-const lowerUserMessage = Effect.fnUntraced(function* (
-  message: OpenAIChatRequestMessage,
-  options: LoweringOptions,
-) {
+const lowerUserMessage = Effect.fnUntraced(function* (message: OpenAIChatRequestMessage, options: LoweringOptions) {
   const content: OpenAIChatUserContent[] = []
   for (const part of message.content) {
     if (part.type === "text") {
@@ -503,10 +506,7 @@ const lowerAssistantMessage = Effect.fnUntraced(function* (
   return { ...result, [field]: reasoningText }
 })
 
-const lowerToolMessages = Effect.fnUntraced(function* (
-  message: OpenAIChatRequestMessage,
-  options: LoweringOptions,
-) {
+const lowerToolMessages = Effect.fnUntraced(function* (message: OpenAIChatRequestMessage, options: LoweringOptions) {
   const messages: OpenAIChatMessage[] = []
   const attachments: OpenAIChatUserContent[] = []
   for (const part of message.content) {
@@ -614,10 +614,7 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, options:
       if (pendingAttachments.length > 0) {
         messages.push({
           role: "user",
-          content: [
-            ...pendingAttachments.splice(0),
-            { type: "text", text: part.text, cache_control: cacheControl },
-          ],
+          content: [...pendingAttachments.splice(0), { type: "text", text: part.text, cache_control: cacheControl }],
         })
         continue
       }
@@ -635,10 +632,7 @@ const lowerMessages = Effect.fnUntraced(function* (request: LLMRequest, options:
       else if (previous?.role === "user" && Array.isArray(previous.content))
         messages[messages.length - 1] = {
           role: "user",
-          content: [
-            ...previous.content,
-            { type: "text", text: part.text, cache_control: cacheControl },
-          ],
+          content: [...previous.content, { type: "text", text: part.text, cache_control: cacheControl }],
         }
       else
         messages.push(
@@ -1034,37 +1028,37 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
       mapUsage(choice?.usage, state.providerMetadataKey) ??
       state.usage
     const rawFinishReason = choice?.finish_reason
-    const finishReason = rawFinishReason
-      ? {
-          normalized: yield* mapFinishReason(event, rawFinishReason),
-          raw: choice?.native_finish_reason ?? rawFinishReason,
-        }
-      : state.finishReason
+    // The first terminal chunk records the finish reason. Later chunks that
+    // repeat one are documentary trailing chatter and must not rewrite the
+    // settled outcome of the stream.
+    const finishReason =
+      rawFinishReason && state.finishReason === undefined
+        ? {
+            normalized: yield* mapFinishReason(event, rawFinishReason),
+            raw: choice?.native_finish_reason ?? rawFinishReason,
+          }
+        : state.finishReason
     const delta = choice?.delta
     const toolDeltas = delta?.tool_calls ?? []
     let tools = state.tools
     let pendingTools = state.pendingTools
     let latestToolIndex = state.latestToolIndex
     let nextToolIndex = state.nextToolIndex
+    let { finishedToolIds } = state
 
     let lifecycle = state.lifecycle
 
     const reasoning = reasoningDelta(delta, state.reasoningField)
-    const hasLateContent =
-      Boolean(delta?.content) ||
-      Boolean(delta?.refusal) ||
-      reasoning !== undefined ||
-      (Array.isArray(delta?.reasoning_details) && delta.reasoning_details.length > 0) ||
-      toolDeltas.some((tool) => Boolean(tool.id) || Boolean(tool.function?.name) || Boolean(tool.function?.arguments))
-    if (state.finishReason !== undefined) {
-      if (hasLateContent)
-        return yield* ProviderShared.eventError(
-          ADAPTER,
-          "OpenAI Chat received content after the finish reason",
-          ProviderShared.encodeJson(event),
-        )
-      return [{ ...state, usage }, events] as const
-    }
+
+    // Deltas that arrive after a terminal chunk are absorbed into the open
+    // channels instead of failing the step. Several OpenAI-compatible hosts
+    // (radoxai.com, vLLM behind LiteLLM, DeepInfra via OpenRouter, SenseNova)
+    // emit real output — text, reasoning, or fully-identified tool calls —
+    // after `finish_reason`; failing the step threw away a complete, already
+    // billed answer. The finish event and its usage are published once, when
+    // the stream ends, so absorbing these deltas preserves spec-legal event
+    // ordering. Tool calls that open post-finish stay open in `tools` until
+    // the terminal's close finalizes them. See #43040 / #56455.
 
     const reasoningField = state.reasoningField ?? reasoning?.field
     const reasoningTextObserved = state.reasoningTextObserved || reasoning !== undefined
@@ -1104,6 +1098,10 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
       const current = tools[index]
       const pending = pendingTools[index]
       const id = current?.id ?? pending?.id ?? (tool.id || undefined)
+      // A host that replays an already finalized call after the finish would
+      // otherwise open a second identical call. Drop the replay instead; the
+      // settled tool keeps its own parsed input.
+      if (id && finishedToolIds.includes(id)) continue
       const name = current?.name ?? pending?.name ?? (tool.function?.name || undefined)
       const text = `${pending?.input ?? ""}${tool.function?.arguments ?? ""}`
       const extraContent = pending?.extraContent ?? decodeExtraContent(tool.extra_content)
@@ -1160,19 +1158,30 @@ const step = (state: ParserState, event: OpenAIChatEvent) =>
       )
 
     // Filtering or truncation terminates the response without confirming pending tool calls.
-    const finished =
+    const finalizeTools =
       finishReason !== undefined &&
       !incompleteTools &&
       state.finishReason === undefined &&
       Object.keys(tools).length > 0
-        ? yield* ToolStream.finishAll(ADAPTER, tools)
-        : undefined
+    // The in-step terminal finalizes every open call; remember their ids so a
+    // later replay of the same call is dropped instead of re-opened.
+    const finalizedToolIds = finalizeTools
+      ? [
+          ...state.finishedToolIds,
+          ...Object.values(tools)
+            .filter((tool) => tool !== undefined)
+            .map((tool) => tool.id)
+            .filter((id): id is string => id !== undefined),
+        ]
+      : state.finishedToolIds
+    const finished = finalizeTools ? yield* ToolStream.finishAll(ADAPTER, tools) : undefined
 
     return [
       {
         providerMetadataKey: state.providerMetadataKey,
         tools: finished?.tools ?? tools,
         pendingTools,
+        finishedToolIds: finalizedToolIds,
         toolCallEvents: finished?.events ?? state.toolCallEvents,
         usage,
         finishReason,
@@ -1199,11 +1208,35 @@ export const finishEvents = Effect.fnUntraced(function* (state: ParserState) {
         route: ADAPTER,
       }),
     })
+  // Identity-less tool fragments cannot form a call: fail instead of settling
+  // the step with silently dropped data — the same rule the terminal chunk
+  // applies mid-stream. Empty no-op deltas (no id, no name, no argument text)
+  // do not reach `pendingTools` with anything visible, so they never count as
+  // fragments. Truncation finishes intentionally leave calls unconfirmed.
+  // Streams without a finish reason keep their existing leniency here.
+  const unresolvableFragments = Object.values(state.pendingTools).some(
+    (fragment) =>
+      fragment !== undefined && (Boolean(fragment.id) || Boolean(fragment.name) || fragment.input.length > 0),
+  )
+  const truncatedFinish =
+    state.finishReason?.normalized === "content-filter" || state.finishReason?.normalized === "length"
+  if (state.finishReason !== undefined && !truncatedFinish && unresolvableFragments)
+    return yield* new AIError({
+      reason: new InvalidProviderOutputError({
+        message: "OpenAI Chat tool call delta is missing id or name",
+        route: ADAPTER,
+      }),
+    })
   const events: LLMEvent[] = []
-  const toolCallEvents =
-    state.finishReason === undefined && Object.keys(state.tools).length > 0
+  // Tool calls that opened after the finish reason are still unconfirmed here
+  // and finalize with the terminal's tool-call close. A `length` or
+  // `content-filter` finish truncates on purpose, so their late calls stay
+  // unconfirmed — the same rule that applies when the finish arrives.
+  const lateToolEvents =
+    !truncatedFinish && Object.keys(state.tools).length > 0
       ? (yield* ToolStream.finishAll(ADAPTER, state.tools)).events
-      : state.toolCallEvents
+      : []
+  const toolCallEvents = [...state.toolCallEvents, ...lateToolEvents]
   const hasToolCalls = toolCallEvents.length > 0
   const reason = state.finishReason
     ? {
@@ -1257,6 +1290,7 @@ export const protocol = Protocol.make({
       tools: ToolStream.empty<number>(),
       pendingTools: {},
       toolCallEvents: [],
+      finishedToolIds: [],
       lifecycle: Lifecycle.initial(),
       reasoningField: request.model.compatibility?.reasoningField,
       reasoningTextObserved: false,
