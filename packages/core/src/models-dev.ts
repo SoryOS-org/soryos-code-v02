@@ -295,10 +295,13 @@ const Cache = Schema.Struct({
   // Digest of the raw body, persisted so refresh() can skip republishing a
   // byte-identical catalog. Optional for entries written before it existed.
   digest: Schema.optional(Schema.String),
-  etag: Schema.optional(Schema.String),
   body: CatalogJson,
 })
-const RawCache = Schema.Struct({ ...Cache.fields, body: Schema.String })
+const CacheMeta = Schema.Struct({
+  updatedAt: Schema.Number,
+  digest: Schema.optional(Schema.String),
+  etag: Schema.optional(Schema.String),
+})
 const defaultSource = "https://models.opencode.ai"
 
 // Bundled snapshot of https://models.opencode.ai/api.json, committed at
@@ -350,6 +353,7 @@ export const layer = (options?: Options) =>
       const fetch = options?.fetch ?? true
       const userAgent = App.useragent(app)
       const key = cacheKey(source)
+      const metaKey = `${key}:meta`
       const ttl = Duration.minutes(5)
       const lock = Semaphore.makeUnsafe(1)
 
@@ -362,7 +366,9 @@ export const layer = (options?: Options) =>
             updatedAt: cached.value.updatedAt,
             digest: cached.value.digest,
           }
-        if (value !== undefined) yield* kv.remove(key)
+        if (value === undefined) return
+        yield* kv.remove(key)
+        yield* kv.remove(metaKey)
       })
 
       const fetchApi = Effect.fn("ModelsDev.fetchApi")(function* (etag?: string) {
@@ -386,6 +392,9 @@ export const layer = (options?: Options) =>
       // periodic fetch below still refreshes on top.
       const loadSnapshot = options?.snapshot === false ? Effect.undefined : bundledSnapshot
 
+      const writeMeta = (updatedAt: number, digest: string | undefined, etag: string | undefined) =>
+        kv.set(metaKey, { updatedAt, ...(digest ? { digest } : {}), ...(etag ? { etag } : {}) })
+
       // Best-effort: a cache-write failure must never kill catalog
       // population. The payload has outgrown some KV backends' per-value
       // limits (Durable Object SQLite caps values at 2 MB and api.json
@@ -395,7 +404,9 @@ export const layer = (options?: Options) =>
         etag: string | undefined,
         digest = bodyDigest(text),
       ) {
-        yield* kv.set(key, { updatedAt: Date.now(), digest, ...(etag ? { etag } : {}), body: text }).pipe(
+        const updatedAt = Date.now()
+        yield* kv.set(key, { updatedAt, digest, body: text }).pipe(
+          Effect.andThen(writeMeta(updatedAt, digest, etag)),
           Effect.catchCauseIf(
             (cause) => !Cause.hasInterruptsOnly(cause),
             (cause) => Effect.logWarning("Failed to cache models.dev catalog", { cause }),
@@ -436,7 +447,9 @@ export const layer = (options?: Options) =>
         yield* lock
           .withPermit(
             Effect.gen(function* () {
-              const stored = Option.getOrUndefined(Schema.decodeUnknownOption(RawCache)(yield* kv.get(key)))
+              const stored = Option.getOrUndefined(
+                Schema.decodeUnknownOption(CacheMeta)((yield* kv.get(metaKey)) ?? (yield* kv.get(key))),
+              )
               if (!force && stored && Date.now() - stored.updatedAt < Duration.toMillis(ttl)) return
               const response = yield* fetchApi(force ? undefined : stored?.etag).pipe(
                 Effect.catchIf(
@@ -449,7 +462,7 @@ export const layer = (options?: Options) =>
               // the Refreshed event for a byte-identical body so downstream
               // provider/model update listeners stay quiet.
               if (!force && stored && (!response || stored.digest === digest)) {
-                yield* writeCache(stored.body, response?.etag ?? stored.etag, stored.digest)
+                yield* writeMeta(Date.now(), stored.digest, response?.etag ?? stored.etag)
                 return
               }
               if (!response) return

@@ -16,6 +16,7 @@ import { location } from "./fixture/location"
 import { it } from "./lib/effect"
 
 const cacheKey = "models-dev:catalog"
+const metaKey = `${cacheKey}:meta`
 
 test("normalizes permissive interleaved values to compatibility", () => {
   expect(Model.compatibility("reasoning_text")).toEqual({ reasoningField: "reasoning_text" })
@@ -581,6 +582,7 @@ describe("ModelsDev Service", () => {
     Effect.gen(function* () {
       const cache = makeCache()
       writeCache(cache, fixture, Date.now() - 10 * 60 * 1000)
+      const body = cache.values.get(cacheKey)
       // The server serves a byte-identical body, so the refresh still hits
       // the network but must only record the check time, not publish Refreshed.
       const state = yield* Ref.make(initialState)
@@ -607,8 +609,9 @@ describe("ModelsDev Service", () => {
       )
       const final = yield* Ref.get(state)
       expect(final.calls.length).toBe(1)
-      expect(cache.values.get(cacheKey)).toMatchObject({ digest: bodyDigest(JSON.stringify(fixture)) })
-      expect(Date.now() - (cache.values.get(cacheKey) as { updatedAt: number }).updatedAt).toBeLessThan(60 * 1000)
+      expect(cache.values.get(cacheKey)).toBe(body)
+      expect(cache.values.get(metaKey)).toMatchObject({ digest: bodyDigest(JSON.stringify(fixture)) })
+      expect(Date.now() - (cache.values.get(metaKey) as { updatedAt: number }).updatedAt).toBeLessThan(60 * 1000)
     }),
   )
 
@@ -616,14 +619,15 @@ describe("ModelsDev Service", () => {
     Effect.gen(function* () {
       const cache = makeCache()
       const state = yield* Ref.make<MockState>({ ...initialState, etag: 'W/"v1"' })
-      yield* provided(
+      const body = yield* provided(
         state,
         cache,
         Effect.gen(function* () {
           const svc = yield* ModelsDev.Service
           yield* svc.refresh(true)
-          const stored = cache.values.get(cacheKey) as { updatedAt: number }
-          cache.values.set(cacheKey, { ...stored, updatedAt: Date.now() - 10 * 60 * 1000 })
+          const meta = cache.values.get(metaKey) as { updatedAt: number }
+          cache.values.set(metaKey, { ...meta, updatedAt: Date.now() - 10 * 60 * 1000 })
+          const body = cache.values.get(cacheKey)
           yield* Ref.update(state, (s) => ({ ...s, status: 304 }))
           const bus = yield* Bus.Service
           const event = yield* bus.subscribe(ModelsDev.Event.Refreshed).pipe(
@@ -640,12 +644,14 @@ describe("ModelsDev Service", () => {
           )
           expect(event._tag).toBe("None")
           expect(yield* svc.get()).toEqual(fixtureSnapshot)
+          return body
         }),
       )
       const final = yield* Ref.get(state)
       expect(final.calls.map((call) => call.ifNoneMatch)).toEqual([undefined, 'W/"v1"'])
-      expect(cache.values.get(cacheKey)).toMatchObject({ etag: 'W/"v1"', body: JSON.stringify(fixture) })
-      expect(Date.now() - (cache.values.get(cacheKey) as { updatedAt: number }).updatedAt).toBeLessThan(60 * 1000)
+      expect(cache.values.get(cacheKey)).toBe(body)
+      expect(cache.values.get(metaKey)).toMatchObject({ etag: 'W/"v1"' })
+      expect(Date.now() - (cache.values.get(metaKey) as { updatedAt: number }).updatedAt).toBeLessThan(60 * 1000)
     }),
   )
 
