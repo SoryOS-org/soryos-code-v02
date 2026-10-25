@@ -640,11 +640,6 @@ export function CurrentUserMessageDisplay(props: {
               {i18n.t("ui.message.revertMessage")}
             </Menu.Item>
           </Show>
-          <Show when={props.actions?.fork && !pending()}>
-            <Menu.Item disabled={state.forking} onSelect={() => void fork()}>
-              {i18n.t("ui.message.forkMessage")}
-            </Menu.Item>
-          </Show>
           <Show when={props.text}>
             <Menu.Item onSelect={() => void copy(props.text)}>{i18n.t("ui.message.copyMessage")}</Menu.Item>
           </Show>
