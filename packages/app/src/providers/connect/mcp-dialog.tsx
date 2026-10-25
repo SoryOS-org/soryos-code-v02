@@ -240,6 +240,8 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
                             onClick={() => toggleServer(item().name)}
                           >
                             {language.t(busy() ? "dialog.mcp.signingIn" : "dialog.mcp.signIn")}
+                            {/* Sign-in continues in the browser, like the model picker's external links. */}
+                            <Icon name="arrow-up-right" size="small" />
                           </Button>
                         </Show>
                       }

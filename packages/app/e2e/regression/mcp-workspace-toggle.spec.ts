@@ -282,7 +282,8 @@ for (const surface of ["popover", "dialog"] as const) {
     })
 
     await expect(signIn).toHaveAttribute("data-component", "button-v2")
-    await expect(signIn.locator("svg")).toHaveCount(0)
+    // The dialog marks that sign-in continues in the browser.
+    await expect(signIn.locator("svg")).toHaveCount(surface === "dialog" ? 1 : 0)
     await signIn.click()
     await expect(signIn).toHaveText("Signing in…")
     await expect(signIn).toBeDisabled()
