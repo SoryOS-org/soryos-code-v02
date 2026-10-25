@@ -123,11 +123,9 @@ export default {
     },
     {
       filetype: "php",
-      wasm: "https://github.com/tree-sitter/tree-sitter-php/releases/download/v0.24.2/tree-sitter-php.wasm",
+      wasm: "https://github.com/tree-sitter/tree-sitter-php/releases/download/v0.24.2/tree-sitter-php_only.wasm",
       queries: {
         highlights: [
-          // NOTE: This nvim-treesitter query is currently broken, because the parser is not compatible with the query apparently.
-          // "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/php/highlights.scm",
           "https://github.com/tree-sitter/tree-sitter-php/raw/refs/heads/master/queries/highlights.scm",
         ],
       },
