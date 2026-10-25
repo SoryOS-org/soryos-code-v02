@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { GenerationOptions, LLMClient, LLMEvent, LanguageModel, ToolDefinition, type LLMRequest } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols"
+import type { StreamOptions } from "@opencode/ai/route"
 import { Database } from "@opencode/core/database/database"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
@@ -34,6 +35,7 @@ import { asc, eq } from "drizzle-orm"
 import { testEffect } from "./lib/effect"
 
 let requests: LLMRequest[] = []
+let requestOptions: Array<StreamOptions | undefined> = []
 /** Runs before a request's response streams; tests hold it back to keep a background summary in flight. */
 let beforeResponse: Effect.Effect<void> = Effect.void
 const model = LanguageModel.make({
@@ -52,8 +54,9 @@ const cost = [
   },
 ]
 const client = Layer.mock(LLMClient.Service)({
-  stream: (request: LLMRequest) => {
+  stream: (request: LLMRequest, options?: StreamOptions) => {
     requests.push(request)
+    requestOptions.push(options)
     return Stream.fromEffect(beforeResponse).pipe(
       Stream.drain,
       Stream.concat(
@@ -525,6 +528,40 @@ const recentWithToolOutput = (id: Session.ID, content: SessionMessage.ToolStateC
     return stored?.type === "compaction" && stored.status === "completed" ? stored.metadata?.recent : ""
   })
 
+for (const transport of ["websocket", "http"] as const) {
+  it.effect(`summary compaction respects ${transport} so large histories keep the selected transport`, () =>
+    Effect.gen(function* () {
+      requestOptions = []
+      const session = yield* insertSession(Session.ID.make(`ses_summary_transport_${transport}`))
+      const inputID = SessionMessage.ID.create()
+      const bus = yield* Bus.Service
+      const compaction = yield* SessionCompaction.Service
+      yield* bus.publish(SessionEvent.Compaction.Started, {
+        sessionID: session.id,
+        reason: "manual",
+        inputID,
+      })
+      const messages = ["Earlier work", "Continue the work"].map((text) =>
+        SessionMessage.User.make({
+          id: SessionMessage.ID.create(),
+          type: "user",
+          text,
+          time: { created: DateTime.makeUnsafe(0) },
+        }),
+      )
+      const context = loaded(session, messages)
+      const outcome = yield* compaction.compact({
+        reason: "manual",
+        inputID,
+        context: { ...context, model: { ...context.model, transport } },
+      })
+      expect(outcome).toEqual({ status: "completed" })
+      expect(requestOptions).toHaveLength(1)
+      expect(requestOptions[0]?.webSocket !== undefined).toBe(transport === "websocket")
+    }),
+  )
+}
+
 it.effect("manual compaction summarizes short context instead of no-op", () =>
   Effect.gen(function* () {
     requests = []
@@ -904,6 +941,53 @@ const enablePrecompute = Effect.gen(function* () {
   yield* compaction.transform((editor) => editor.configure({ precompute: true }))
   return compaction
 })
+
+it.effect("background summaries retain HTTP so they cannot occupy the foreground WebSocket", () =>
+  Effect.gen(function* () {
+    requests = []
+    requestOptions = []
+    const compaction = yield* enablePrecompute
+    const session = yield* insertSession(Session.ID.make("ses_precompute_transport"))
+    const history = precomputeHistory()
+    const context = (messages: readonly SessionMessage.Info[]) => ({
+      ...loaded(session, messages),
+      model: { ...resolved, transport: "websocket" as const },
+    })
+    yield* compaction.precompute(Effect.succeed(context(history.near)))
+    expect(yield* compaction.compact({ reason: "auto", context: context(history.due) })).toEqual({
+      status: "completed",
+    })
+    expect(requestOptions).toHaveLength(1)
+    expect(requestOptions[0]?.webSocket).toBeUndefined()
+  }),
+)
+
+it.effect("a failed background HTTP summary falls back to foreground WebSocket compaction", () =>
+  Effect.gen(function* () {
+    requests = []
+    requestOptions = []
+    const compaction = yield* enablePrecompute
+    const session = yield* insertSession(Session.ID.make("ses_precompute_transport_failure"))
+    const history = precomputeHistory()
+    const context = (messages: readonly SessionMessage.Info[]) => ({
+      ...loaded(session, messages),
+      model: { ...resolved, transport: "websocket" as const },
+    })
+    const reached = yield* Deferred.make<void>()
+    beforeResponse = Deferred.succeed(reached, undefined).pipe(
+      Effect.andThen(Effect.die("synthetic background failure")),
+    )
+    yield* compaction.precompute(Effect.succeed(context(history.near)))
+    yield* Deferred.await(reached)
+    beforeResponse = Effect.void
+    expect(yield* compaction.compact({ reason: "auto", context: context(history.due) })).toEqual({
+      status: "completed",
+    })
+    expect(requestOptions).toHaveLength(2)
+    expect(requestOptions[0]?.webSocket).toBeUndefined()
+    expect(requestOptions[1]?.webSocket).toBeDefined()
+  }).pipe(Effect.ensuring(Effect.sync(() => (beforeResponse = Effect.void)))),
+)
 
 it.effect("background summaries stay off unless enabled", () =>
   Effect.gen(function* () {
