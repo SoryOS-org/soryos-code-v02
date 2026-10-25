@@ -319,6 +319,7 @@ function NewSessionLocation(props: {
               {(name) => (
                 <>
                   <Slash gap={0} />
+                  <span class="sr-only">{" / "}</span>
                   <span class="min-w-12 shrink-[1000] truncate">{name()}</span>
                 </>
               )}
