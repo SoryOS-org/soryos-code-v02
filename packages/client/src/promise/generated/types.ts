@@ -1493,6 +1493,16 @@ export type SessionUsageRecorded = {
   data: { sessionID: SessionID; source: "title" | "compaction"; cost: MoneyUSD; tokens: TokenUsageInfo }
 }
 
+export type SessionToolSessionLinked = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "session.tool.session.linked"
+  durable: { aggregateID: string; seq: EventSeq; version: 1 }
+  location?: LocationRef
+  data: { sessionID: SessionID; assistantMessageID: SessionMessageID; id: string; childSessionID: SessionID }
+}
+
 export type LocationShutdown = {
   id: EventID
   created: number
@@ -2590,6 +2600,7 @@ export type SessionEventDurable =
   | SessionRevertCommitted
   | SessionUsageRecorded
   | SessionMessageContentUpdated
+  | SessionToolSessionLinked
 
 export type IntegrationInfo = {
   id: IntegrationID
