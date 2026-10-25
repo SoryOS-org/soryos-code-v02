@@ -273,6 +273,12 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    /* The variant reads as a qualifier of the model before it, so it is dimmer and never the part that truncates. */
+    &[data-variant] {
+      flex: none;
+      opacity: 0.66;
+    }
   }
 
   [data-slot="user-message-meta-separator"] {
@@ -486,6 +492,11 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+
+    &[data-variant] {
+      flex: none;
+      opacity: 0.66;
+    }
   }
 
   [data-slot="text-part-meta-separator"] {
