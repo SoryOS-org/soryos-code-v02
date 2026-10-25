@@ -20,6 +20,7 @@ import { Bus } from "../../bus.js"
 import { Config } from "../../config.js"
 import { ConfigIntegration } from "../../config/integration.js"
 import { ConfigProviderPlugin } from "../../config/plugin/provider.js"
+import { ConsoleAccess } from "../../console-access.js"
 import { Credential } from "../../credential.js"
 import { Integration } from "../../integration.js"
 import { IntegrationConnection } from "../../integration/connection.js"
@@ -28,7 +29,6 @@ import { Provider } from "../../provider.js"
 import { WebSearch } from "../../websearch.js"
 import { OpencodeLegacy } from "./opencode-legacy.js"
 
-const defaultServer = "https://opencode.ai/console"
 const clientID = "opencode-cli"
 const methodID = Integration.MethodID.make("device")
 const Device = Schema.Struct({
@@ -90,13 +90,13 @@ function oauth(http: HttpClient.HttpClient) {
           type: "string",
           format: "uri",
           hidden: true,
-          default: defaultServer,
+          default: ConsoleAccess.defaultServer,
         },
       ],
     },
     authorize: (answer) =>
       Effect.gen(function* () {
-        const server = yield* normalizeServer(answer.server ?? defaultServer)
+        const server = yield* normalizeServer(answer.server ?? ConsoleAccess.defaultServer)
         const device = yield* post(
           http,
           `${server}/auth/device/code`,
@@ -121,7 +121,7 @@ function oauth(http: HttpClient.HttpClient) {
       }),
     refresh: (credential) =>
       Effect.gen(function* () {
-        const response = yield* send(http, `${serverUrl(credential)}/auth/device/token`, {
+        const response = yield* send(http, `${ConsoleAccess.server(credential)}/auth/device/token`, {
           grant_type: "refresh_token",
           refresh_token: credential.refresh,
           client_id: clientID,
@@ -204,7 +204,7 @@ export const OpencodePlugin = define<
             Effect.map((remote) => ({
               remote:
                 remote?.type === "legacy"
-                  ? OpencodeLegacy.make(remote.response, credentialHeaders(credential))
+                  ? OpencodeLegacy.make(remote.response, ConsoleAccess.headers(credential))
                   : remote,
               connection,
               organization: organizationName(credential),
@@ -284,7 +284,7 @@ export const OpencodePlugin = define<
           const metadata = credential.metadata
           const orgID = typeof metadata?.orgID === "string" ? metadata.orgID : undefined
           const token = credential.type === "oauth" ? credential.access : credential.key
-          const server = yield* normalizeServer(serverUrl(credential))
+          const server = yield* normalizeServer(ConsoleAccess.server(credential))
           const request = yield* HttpClientRequest.post(`${server}/api/websearch`).pipe(
             HttpClientRequest.acceptJson,
             HttpClientRequest.bearerToken(token),
@@ -444,9 +444,9 @@ function fetchConfig(http: HttpClient.HttpClient, value: Credential.Key | Creden
   // Scoped so responses whose body is never read (404, errors) are released here instead of by a GC-time abort.
   return HttpClient.withScope(http)
     .execute(
-      HttpClientRequest.get(`${serverUrl(value)}/api/v2/config`).pipe(
+      HttpClientRequest.get(`${ConsoleAccess.server(value)}/api/v2/config`).pipe(
         HttpClientRequest.acceptJson,
-        HttpClientRequest.setHeaders(credentialHeaders(value)),
+        HttpClientRequest.setHeaders(ConsoleAccess.headers(value)),
       ),
     )
     .pipe(
@@ -462,7 +462,7 @@ function fetchConfig(http: HttpClient.HttpClient, value: Credential.Key | Creden
             if (Option.isSome(body))
               return yield* new SsoRequiredError({
                 organization: organizationName(value),
-                url: yield* ssoUrl(serverUrl(value), body.value.connectionId),
+                url: yield* ssoUrl(ConsoleAccess.server(value), body.value.connectionId),
               })
           }
           const body = yield* HttpClientResponse.filterStatusOk(response).pipe(Effect.flatMap((ok) => ok.json))
@@ -503,21 +503,6 @@ function connectionStatus(cause: unknown): IntegrationConnection.Status | undefi
 
 function organizationName(credential: Credential.Value) {
   return typeof credential.metadata?.orgName === "string" ? credential.metadata.orgName : undefined
-}
-
-function credentialHeaders(value: Credential.Key | Credential.OAuth): Record<string, string> {
-  const orgID = value.metadata?.orgID
-  return {
-    authorization: `Bearer ${value.type === "oauth" ? value.access : value.key}`,
-    ...(typeof orgID === "string" ? { "x-org-id": orgID } : {}),
-  }
-}
-
-function serverUrl(value: Credential.Value) {
-  const server = typeof value.metadata?.server === "string" ? value.metadata.server : defaultServer
-  // Credentials saved before August 2026 store the retired console.opencode.ai host, which maps path-for-path onto
-  // the default server; rewriting it lets that host be shut down without forcing those users to reconnect.
-  return server.replace(/^https:\/\/console\.opencode\.ai(?=\/|$)/, defaultServer)
 }
 
 function normalizeServer(input: unknown) {
