@@ -123,8 +123,6 @@ export default {
     },
     {
       filetype: "php",
-      // tree-sitter-php.wasm is the HTML-embedded grammar that requires <?php tags to trigger highlighting.
-      // tree-sitter-php_only.wasm is the bare PHP grammar that highlights PHP without <?php tags.
       wasm: "https://github.com/tree-sitter/tree-sitter-php/releases/download/v0.24.2/tree-sitter-php_only.wasm",
       queries: {
         highlights: [
