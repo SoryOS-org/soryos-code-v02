@@ -23,7 +23,7 @@ import {
   measureSidebarToggles,
   paintCollapsedSlots,
 } from "@/shell/sidebar-toggle"
-import { createPanelMotion, guardClosingFocus, panelOpacity, replayPanelToggle } from "@/shell/panel-motion"
+import { createPanelMotion, guardClosingFocus, panelOpacity } from "@/shell/panel-motion"
 import { createSidebarPeek } from "@/shell/sidebar-peek"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
@@ -86,12 +86,14 @@ export default function Layout(props: ParentProps) {
     const fade = peeking && prefersReducedMotion()
     const rtl = document.documentElement.dir === "rtl"
     const shift = peeking && !fade && hidden > 0 ? `translateX(${(rtl ? 100 : -100) * hidden}%)` : ""
-    mount.style.opacity = fade ? (hidden === 0 ? "" : `${1 - hidden}`) : panelOpacity(hidden)
+    const opacity = fade ? (hidden === 0 ? "" : `${1 - hidden}`) : panelOpacity(hidden)
+    mount.style.opacity = opacity
     mount.style.transform = shift
 
     if (peekSurface) {
-      // Lifted while it floats, and settling as a dock lands; under reduced motion it fades with the contents.
-      peekSurface.style.opacity = peeking ? `${sidebar.closed * (fade ? 1 - hidden : 1)}` : ""
+      // Lifted while it floats, and settling as a dock lands. It fades with the contents, so its hairline and shadow,
+      // which reach past its end edge, leave with them rather than lingering at the window's edge.
+      peekSurface.style.opacity = peeking ? `${sidebar.closed * Number(opacity || 1)}` : ""
       peekSurface.style.transform = shift
     }
 
@@ -122,7 +124,6 @@ export default function Layout(props: ParentProps) {
     measure: () => measureSidebarToggles(state.tabsWidth * sidebarHidden()),
     // A dock from a peek already shows the sidebar, so reduced motion has nothing to fade in.
     element: () => (peek.handedOff() ? undefined : state.tabsPanel),
-    offset: () => -10,
     distance: () => state.tabsWidth,
   })
 
@@ -131,17 +132,12 @@ export default function Layout(props: ParentProps) {
     open: preferences.appearance.sidebarOpen,
     aside: () => state.tabsAside,
     panel: () => state.tabsPanel,
-    width: () => state.tabsWidth,
     paint: (shown) => {
       sidebar.peek = shown
       paintSidebarContents()
     },
-    // James opens the docked panel with its own shift and fade.
-    continues: () => !sidebarMotion.pinned(),
     whenDocked: sidebarMotion.whenSettled,
   })
-
-  replayPanelToggle({ id: "sidebar", label: "Sidebar", toggle: toggleSidebar })
 
   guardClosingFocus({
     root: () => state.tabsAside,
@@ -242,8 +238,6 @@ export default function Layout(props: ParentProps) {
               data-slot="vertical-tabs-panel"
               class="absolute inset-0 overflow-hidden [contain:layout_style_paint]"
               classList={{ "[content-visibility:hidden]": !sidebarMotion.present() && !peek.shown() }}
-              // Under James the sidebar keeps its landing width (start edge held) while the layout moves.
-              style={{ width: sidebarMotion.pinned() ? `${state.tabsWidth}px` : undefined }}
             >
               {/* Under a peek's contents, so they dim over the sidebar's own background, as when docking, rather than
                   showing the content beneath through them. */}
@@ -284,8 +278,6 @@ export default function Layout(props: ParentProps) {
         {/* Size containment collapses percentage-height descendants in WebKit. */}
         <main
           class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-content"
-          // Under James the sidebar stays at its landing box during a flight, under the content as the layout moves.
-          classList={{ "z-20": sidebarMotion.pinned() }}
           style={{
             "padding-top": bottomTitlebar() ? "env(safe-area-inset-top, 0px)" : "0px",
             "padding-bottom":
