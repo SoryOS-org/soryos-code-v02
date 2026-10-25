@@ -31,9 +31,21 @@ const XAIResponsesHostedToolItem = Schema.Union([
   ),
 ])
 
+const Body = Schema.Struct({
+  ...OpenResponses.OpenResponsesBody.fields,
+  top_k: Schema.optional(Schema.Number),
+})
+
 const adapter = {
   id: ADAPTER,
   name: NAME,
+  lowerMedia: ({ part, media }) => {
+    if (part.media.kind !== "video") return undefined
+    const filename = part.filename ?? "file"
+    const url = ProviderShared.mediaUrl(part.media)
+    if (url) return { type: "input_file", filename, file_url: url }
+    return media && { type: "input_file", filename, file_data: media.dataUrl }
+  },
   restoreHostedToolItem: (item: unknown) => (Schema.is(XAIResponsesHostedToolItem)(item) ? item : undefined),
 } satisfies OpenResponses.ProviderAdapter
 
@@ -46,7 +58,14 @@ const fromRequest = Effect.fn("XAIResponses.fromRequest")(function* (request: LL
       message:
         "xAI requires explicit compaction through LLMClient.compact; automatic context management is not supported",
     })
-  return yield* OpenResponses.fromRequestWithAdapter(request, adapter)
+  const body = yield* OpenResponses.fromRequestWithAdapter(request, adapter)
+  // xAI Responses does not support penalties (they are ignored), but does support top_k.
+  return {
+    ...body,
+    presence_penalty: undefined,
+    frequency_penalty: undefined,
+    top_k: request.generation?.topK,
+  }
 })
 
 const HOSTED_TOOLS = {
@@ -76,7 +95,7 @@ const step = (state: OpenResponses.ParserState, input: OpenResponses.Event) => {
 export const protocol = Protocol.make({
   id: ADAPTER,
   body: {
-    schema: OpenResponses.OpenResponsesBody,
+    schema: Body,
     from: fromRequest,
   },
   stream: {
