@@ -197,6 +197,38 @@ it.effect("Cohere preserves native tool plans in continued history", () =>
   }),
 )
 
+it.effect("Cohere accepts image MIME types regardless of case", () =>
+  Effect.gen(function* () {
+    for (const mime of ["image/png", "IMAGE/PNG", "Image/Png"]) {
+      for (const media of [
+        Media.base64("aGVsbG8=", mime),
+        Media.url("https://example.test/image.png", { mediaType: mime }),
+      ]) {
+        const prepared = yield* compileRequest(
+          LLM.request({
+            model: cohere.model("command-a-vision-07-2025"),
+            prompt: Message.media(media),
+          }),
+        )
+        expect(prepared.body.messages).toEqual([
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url:
+                    media.source.type === "url" ? "https://example.test/image.png" : "data:image/png;base64,aGVsbG8=",
+                },
+              },
+            ],
+          },
+        ])
+      }
+    }
+  }),
+)
+
 it.effect("Cohere rejects unsupported media instead of silently dropping it", () =>
   Effect.gen(function* () {
     const error = yield* compileRequest(
