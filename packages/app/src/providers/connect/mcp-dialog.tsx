@@ -17,10 +17,10 @@ import { showToast } from "@/shell/notifications/toast"
 import "@/shell/commands/dialog.css"
 import "@/shell/search-list.css"
 
-// An off switch already says disabled, so only the states it can't show get a label.
 const statusLabels = {
   connected: "mcp.status.connected",
   needs_auth: "mcp.status.needs_auth",
+  disabled: "mcp.status.disabled",
 } as const
 
 /** The MCPs dialog for the current workspace. */
@@ -189,7 +189,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
           <SearchList
             query={store.query}
             onQuery={(query) => setStore("query", query)}
-            placeholder={language.t("common.search.placeholder")}
+            placeholder={language.t("dialog.mcp.search.placeholder")}
             items={results()}
             key={(item) => item.name}
             empty={language.t(items().length > 0 ? "dialog.mcp.search.empty" : "dialog.mcp.empty")}
@@ -205,7 +205,7 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
               const detail = () => {
                 const current = status()
 
-                if ((current?.status !== "connected" && current?.status !== "needs_auth") || signIn()) return
+                if (!current || current.status === "pending" || current.status === "failed" || signIn()) return
 
                 return language.t(statusLabels[current.status])
               }

@@ -358,6 +358,7 @@ export const dict = {
 
   "dialog.mcp.title": "MCPs",
   "dialog.mcp.empty": "No MCPs configured",
+  "dialog.mcp.search.placeholder": "Search MCPs",
   "dialog.mcp.search.empty": "No MCPs found",
   "dialog.mcp.error.title": "MCP server: {{name}}",
   "dialog.mcp.error.copy": "Copy details",
