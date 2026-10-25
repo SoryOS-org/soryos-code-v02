@@ -97,7 +97,7 @@ const countingModels = Model.node.replace(
   ),
 )
 
-// Counts PATH lookups of git, which only happen while resolving the git executable (macOS and Windows).
+// Counts PATH lookups of git: resolving the git executable (macOS and Windows) and finding Git Bash (Windows).
 const countingGitLookups = Effect.acquireRelease(
   Effect.sync(() => {
     const sync = whichPkg.sync
@@ -145,8 +145,9 @@ const expected = {
   "boot: git spawns": 8,
   // The step's snapshot: repository probe, snapshot init, diff, untracked files, ignore check, index and tree.
   "turn: git spawns": 9,
-  // Git is resolved once per process, before this test, and every spawn uses that resolution.
-  "boot + turn: git executable lookups": 0,
+  // Git is resolved once per process, before this test, and every spawn uses that resolution. On Windows the shell
+  // tool's ShellSelect.gitbash() looks up git once to find Git Bash (cached per process), so one lookup is allowed.
+  "boot + turn: git lookups beyond one": 0,
   "boot + turn: git spawns not using the resolved executable": 0,
   // One step resolves the prompt hook model once, shared by the context, compaction and generate hooks.
   "turn: catalog lookups per step": 1,
@@ -193,7 +194,7 @@ describe("boot work", () => {
       const measured: Record<keyof typeof expected, number> = {
         "boot: git spawns": boot,
         "turn: git spawns": spawns.length - boot,
-        "boot + turn: git executable lookups": counters.gitLookups,
+        "boot + turn: git lookups beyond one": Math.max(0, counters.gitLookups - 1),
         "boot + turn: git spawns not using the resolved executable": spawns.filter(
           (spawn) => !spawn.startsWith(`${executable} `),
         ).length,
