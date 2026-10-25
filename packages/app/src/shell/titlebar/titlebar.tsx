@@ -808,11 +808,11 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 data-tauri-drag-region
                               >
                                 <Show when={macTrafficLights()}>
-                                  {/* The sidebar's 10px start padding already covers part of the traffic lights. */}
+                                  {/* The sidebar's 18px start padding already covers part of the traffic lights. */}
                                   <div
                                     class="shrink-0"
                                     style={{
-                                      width: `calc(${macVerticalTrafficLights(zoom()).width / zoom()}px - 10px)`,
+                                      width: `calc(${macVerticalTrafficLights(zoom()).width / zoom()}px - 18px)`,
                                     }}
                                     aria-hidden="true"
                                   />
@@ -820,7 +820,10 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 <Show when={homeInSidebarHeader()} fallback={<div class="flex-1" />}>
                                   <div class="min-w-0 flex-1">{homeButton(true)}</div>
                                 </Show>
-                                <SidebarToggle handoff="out" />
+                                {/* Optically aligns the toggle's glyph with the selected session's end edge. */}
+                                <div class="-me-0.5 flex shrink-0">
+                                  <SidebarToggle handoff="out" />
+                                </div>
                               </div>
                             </Show>
                             <div class="flex w-full shrink-0 flex-col gap-1">

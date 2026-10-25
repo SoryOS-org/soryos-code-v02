@@ -27,9 +27,9 @@ import { createPanelMotion, guardClosingFocus, panelOpacity, replayPanelToggle }
 import { createSidebarPeek } from "@/shell/sidebar-peek"
 import { windowDragEnabled } from "@/session/header/drag-area"
 
-// How far Home steps along a peek's header to clear the collapsed toggle: to the toggle's end, from the sidebar's 10px
+// How far Home steps along a peek's header to clear the collapsed toggle: to the toggle's end, from the sidebar's 18px
 // start padding.
-const homeClearance = collapsedSidebarToggleEnd - 10
+const homeClearance = collapsedSidebarToggleEnd - 18
 
 type SidebarPose = { closed: number; peek: number | undefined }
 
@@ -53,7 +53,7 @@ export default function Layout(props: ParentProps) {
     tabsAside: HTMLElement | undefined
     tabsPanel: HTMLElement | undefined
   }>({
-    tabsWidth: 260,
+    tabsWidth: 276,
     tabsMount: undefined,
     tabsAside: undefined,
     tabsPanel: undefined,
@@ -257,7 +257,7 @@ export default function Layout(props: ParentProps) {
               <div
                 ref={(element) => setState("tabsMount", element)}
                 data-slot="vertical-tabs-mount"
-                class="absolute inset-y-0 end-0 contain-strict will-change-[opacity] flex min-h-0 flex-col bg-v2-background-bg-deep pe-0.5 ps-2.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+                class="absolute inset-y-0 end-0 contain-strict will-change-[opacity] flex min-h-0 flex-col bg-v2-background-bg-deep pe-2.5 ps-4.5 pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]"
                 style={{
                   width: `${state.tabsWidth}px`,
                   "padding-bottom": "max(10px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
@@ -274,7 +274,7 @@ export default function Layout(props: ParentProps) {
                 class="-end-1"
                 direction="horizontal"
                 size={state.tabsWidth}
-                min={120}
+                min={136}
                 max={640}
                 onResize={(width) => setState("tabsWidth", width)}
               />
