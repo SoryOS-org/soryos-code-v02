@@ -543,7 +543,12 @@ export namespace Timeline {
       appendGroups(before)
 
       if (interruptedAt >= 0) {
-        if (!compaction && detail?.notices.placement !== "hidden")
+        // Confirmed restarts have their own synthetic divider, possibly after other notices.
+        if (
+          !compaction &&
+          detail?.notices.placement !== "hidden" &&
+          messages[interruptedAt]?.metadata?.interruptionReason !== "restart"
+        )
           rows.push(new TimelineRow.TurnDivider({ userMessageID: turnID }))
         appendGroups(after)
       }
@@ -610,6 +615,15 @@ export namespace Timeline {
           if (detail?.notices.placement === "hidden" && !timelineNoticeRequired(entry.message)) return
           appendAssistantSegment(assistantSegment)
           assistantSegment = []
+
+          if (entry.message.type === "synthetic" && entry.message.metadata?.notice === "restart") {
+            rows.push(
+              new TimelineRow.TurnDivider({ userMessageID: turnID, messageID: entry.message.id, reason: "restart" }),
+            )
+
+            return
+          }
+
           rows.push(new TimelineRow.Notice({ userMessageID: turnID, messageID: entry.message.id }))
       }
     })
