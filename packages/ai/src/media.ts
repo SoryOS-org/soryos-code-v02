@@ -125,10 +125,6 @@ export class Asset {
   #base64: string | undefined
 
   constructor(input: Asset.Input) {
-    const reference =
-      input.source.type === "url" ? input.source.url : input.source.type === "ref" ? input.source.id : undefined
-    if (reference !== undefined && /^\s*file:/i.test(reference))
-      throw invalid("Local file references must be read with Media.file(path) before sending")
     this.source = input.source
     this.mediaType =
       input.source.mediaType ??
